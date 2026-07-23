@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 import { hashPassword, verifyPassword as verifyPasswordHash } from "./password";
 
 /**
@@ -146,13 +146,13 @@ function registrationFromRow(row: RegistrationRow): Registration {
 }
 
 export async function findUserByPhone(phone: string): Promise<User | undefined> {
-  const { data, error } = await supabase.from("users").select("*").eq("phone", phone).maybeSingle();
+  const { data, error } = await getSupabase().from("users").select("*").eq("phone", phone).maybeSingle();
   if (error) throw error;
   return data ? userFromRow(data as UserRow) : undefined;
 }
 
 export async function findUserById(id: string): Promise<User | undefined> {
-  const { data, error } = await supabase.from("users").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await getSupabase().from("users").select("*").eq("id", id).maybeSingle();
   if (error) throw error;
   return data ? userFromRow(data as UserRow) : undefined;
 }
@@ -165,7 +165,7 @@ export async function createUser(
   if (existing) throw new Error("phone_taken");
 
   const { hash, salt } = hashPassword(password);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("users")
     .insert({
       role: input.role,
@@ -194,7 +194,7 @@ export async function verifyUserPassword(phone: string, password: string): Promi
 
 export async function updateUserPassword(userId: string, newPassword: string): Promise<User | undefined> {
   const { hash, salt } = hashPassword(newPassword);
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("users")
     .update({ password_hash: hash, password_salt: salt })
     .eq("id", userId)
@@ -205,7 +205,7 @@ export async function updateUserPassword(userId: string, newPassword: string): P
 }
 
 export async function listCourses(kind?: CourseKind): Promise<Course[]> {
-  let query = supabase.from("courses").select("*");
+  let query = getSupabase().from("courses").select("*");
   if (kind) query = query.eq("kind", kind);
   const { data, error } = await query;
   if (error) throw error;
@@ -213,7 +213,7 @@ export async function listCourses(kind?: CourseKind): Promise<Course[]> {
 }
 
 export async function addCourse(input: Omit<Course, "id">): Promise<Course> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("courses")
     .insert({
       kind: input.kind,
@@ -244,19 +244,19 @@ export async function updateCourse(
   if (input.startDate !== undefined) patch.start_date = input.startDate ?? null;
   if (input.mode !== undefined) patch.mode = input.mode ?? null;
 
-  const { data, error } = await supabase.from("courses").update(patch).eq("id", id).select("*").maybeSingle();
+  const { data, error } = await getSupabase().from("courses").update(patch).eq("id", id).select("*").maybeSingle();
   if (error) throw error;
   return data ? courseFromRow(data as CourseRow) : undefined;
 }
 
 export async function deleteCourse(id: string): Promise<boolean> {
-  const { error, count } = await supabase.from("courses").delete({ count: "exact" }).eq("id", id);
+  const { error, count } = await getSupabase().from("courses").delete({ count: "exact" }).eq("id", id);
   if (error) throw error;
   return (count ?? 0) > 0;
 }
 
 export async function addRegistration(input: Omit<Registration, "id" | "createdAt">): Promise<Registration> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("registrations")
     .insert({
       user_id: input.userId,
@@ -273,13 +273,13 @@ export async function addRegistration(input: Omit<Registration, "id" | "createdA
 }
 
 export async function listRegistrationsByUser(userId: string): Promise<Registration[]> {
-  const { data, error } = await supabase.from("registrations").select("*").eq("user_id", userId);
+  const { data, error } = await getSupabase().from("registrations").select("*").eq("user_id", userId);
   if (error) throw error;
   return (data as RegistrationRow[]).map(registrationFromRow);
 }
 
 export async function listAllRegistrations(): Promise<(Registration & { user?: PublicUser })[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("registrations")
     .select("*, users(*)")
     .order("created_at", { ascending: false });
@@ -295,7 +295,7 @@ export async function listAllRegistrations(): Promise<(Registration & { user?: P
 }
 
 export async function approveRegistration(id: string): Promise<Registration | undefined> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("registrations")
     .update({ status: "active" })
     .eq("id", id)
