@@ -1,26 +1,158 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* ---- Color ---- */
+  --color-bg: oklch(0.985 0.004 250);
+  --color-bg-soft: oklch(0.965 0.006 250);
+  --color-surface: #ffffff;
+  --color-surface-2: oklch(0.975 0.006 250);
+
+  --color-navy: #0b3d78;
+  --color-navy-2: #082f5e;
+  --color-navy-deep: #051f42;
+
+  --color-blue: #0e5fc4;
+  --color-blue-strong: #0a4a9e;
+  --color-blue-soft: #eaf2fc;
+  --color-blue-soft-2: #d3e4f8;
+
+  --color-gold: #fdc201;
+  --color-gold-strong: #e0a800;
+  --color-gold-soft: #fff6dc;
+
+  --color-green: oklch(0.62 0.115 158);
+  --color-green-soft: oklch(0.95 0.04 158);
+  --color-red-soft: oklch(0.62 0.13 25);
+
+  --color-ink: oklch(0.27 0.025 264);
+  --color-ink-2: oklch(0.44 0.022 264);
+  --color-ink-3: oklch(0.58 0.018 264);
+  --color-line: oklch(0.92 0.01 258);
+  --color-line-2: oklch(0.88 0.012 258);
+
+  /* ---- Radius ---- */
+  --radius-xs: 10px;
+  --radius-sm: 14px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-xl: 36px;
+
+  /* ---- Shadow (blue-tinted) ---- */
+  --shadow-xs: 0 1px 2px rgba(30, 38, 76, 0.05), 0 1px 3px rgba(30, 38, 76, 0.06);
+  --shadow-sm: 0 2px 6px -2px rgba(30, 38, 76, 0.08), 0 4px 12px -4px rgba(30, 38, 76, 0.08);
+  --shadow-md: 0 8px 24px -8px rgba(30, 38, 76, 0.14), 0 2px 6px -2px rgba(30, 38, 76, 0.06);
+  --shadow-lg: 0 28px 60px -22px rgba(30, 38, 76, 0.3), 0 8px 24px -12px rgba(30, 38, 76, 0.14);
+  --shadow-gold: 0 14px 30px -10px rgba(224, 168, 0, 0.45);
+  --shadow-blue: 0 14px 30px -10px rgba(10, 74, 158, 0.42);
+
+  /* ---- Layout ---- */
+  --container-page: 1180px;
+  --breakpoint-nav: 980px;
+  --breakpoint-xs: 460px;
+
+  /* ---- Font ---- */
+  --font-sans: var(--font-nunito), system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  img,
+  svg {
+    display: block;
+    max-width: 100%;
+  }
+  button {
+    cursor: pointer;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  ::selection {
+    background: var(--color-gold-soft);
+    color: var(--color-ink);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .wrap {
+    width: 100%;
+    max-width: var(--container-page);
+    margin-inline: auto;
+    padding-inline: clamp(20px, 5vw, 48px);
+  }
+  .section-pad {
+    padding-block: clamp(64px, 9vw, 116px);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+@keyframes pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+.animate-pop {
+  animation: pop 0.5s cubic-bezier(0.18, 1.4, 0.4, 1);
+}
+.animate-slide-in {
+  animation: slide-in 0.35s ease;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .animate-float {
+    animation: none;
+  }
 }
