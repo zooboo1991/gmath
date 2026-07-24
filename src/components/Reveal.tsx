@@ -6,6 +6,7 @@ type RevealProps = {
   children: React.ReactNode;
   className?: string;
   as?: keyof React.JSX.IntrinsicElements;
+  style?: React.CSSProperties;
 };
 
 function prefersInstantReveal() {
@@ -16,7 +17,7 @@ function prefersInstantReveal() {
   );
 }
 
-export default function Reveal({ children, className = "", as = "div" }: RevealProps) {
+export default function Reveal({ children, className = "", as = "div", style }: RevealProps) {
   const ref = useRef<HTMLElement | null>(null);
   const [visible, setVisible] = useState(prefersInstantReveal);
 
@@ -43,7 +44,7 @@ export default function Reveal({ children, className = "", as = "div" }: RevealP
   const Tag = as as React.ElementType;
 
   return (
-    <Tag ref={ref} className={`reveal ${visible ? "in" : ""} ${className}`}>
+    <Tag ref={ref} className={`reveal ${visible ? "in" : ""} ${className}`} style={style}>
       {children}
     </Tag>
   );

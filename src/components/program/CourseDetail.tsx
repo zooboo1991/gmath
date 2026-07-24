@@ -1,4 +1,5 @@
 import type { Course } from "@/lib/db";
+import Reveal from "@/components/Reveal";
 import { RegisterTriggerButton } from "./ProgramRegister";
 import CourseCard from "@/components/CourseCard";
 import {
@@ -32,7 +33,7 @@ const aboutItems = (lessonCount: number) => [
   },
   {
     icon: <IconPeopleHero className="w-6 h-6" />,
-    iconBg: "bg-[oklch(0.93_0.04_300)] text-[oklch(0.52_0.15_300)]",
+    iconBg: "bg-purple-soft text-purple",
     title: "Zoom-ээр хичээллэнэ",
     text: "Сургалтыг zoom-ээр орох ба багш сурагчидтай харилцаад хичээллэдэг.",
   },
@@ -64,8 +65,8 @@ export default function CourseDetail({ course, related }: { course: Course; rela
 
   return (
     <>
-      <section className="relative text-white overflow-hidden bg-[radial-gradient(120%_120%_at_85%_0%,rgba(14,95,196,.55),transparent_55%),radial-gradient(90%_90%_at_0%_100%,rgba(8,47,94,.7),transparent_60%),linear-gradient(158deg,var(--color-navy),var(--color-navy-deep))]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,.05)_1px,transparent_1px)] bg-[length:26px_26px] opacity-50 [mask-image:linear-gradient(180deg,#000,transparent_70%)]" />
+      <section className="hero-navy relative text-white overflow-hidden">
+        <div className="hero-dotgrid pointer-events-none absolute inset-0 opacity-50" />
 
         <div className="wrap relative z-[2] py-[clamp(48px,7vw,84px)] max-w-[760px]">
           <span className="inline-flex items-center gap-2 text-[.76rem] font-extrabold tracking-[.14em] uppercase text-gold before:content-[''] before:w-[22px] before:h-[2px] before:rounded-sm before:bg-gold-strong">
@@ -74,7 +75,7 @@ export default function CourseDetail({ course, related }: { course: Course; rela
           <h1 className="mt-4 text-[clamp(1.9rem,3.6vw,2.6rem)] font-extrabold leading-[1.14] tracking-[-.02em] text-balance">
             {course.title}
           </h1>
-          <p className="mt-4 text-[oklch(0.86_0.025_250)] text-[1.05rem] font-semibold max-w-[56ch]">
+          <p className="mt-4 text-navy-ink-2 text-[1.05rem] font-semibold max-w-[56ch]">
             {course.topics}
           </p>
 
@@ -84,7 +85,7 @@ export default function CourseDetail({ course, related }: { course: Course; rela
                 <IconCalendar className="w-[22px] h-[22px] text-gold" />
                 <div>
                   <b className="text-[1.3rem] font-extrabold block leading-none">{course.startDate}</b>
-                  <small className="text-[oklch(0.82_0.025_250)] font-bold text-[.78rem]">эхлэх огноо</small>
+                  <small className="text-navy-ink-2 font-bold text-[.78rem]">эхлэх огноо</small>
                 </div>
               </div>
             )}
@@ -93,7 +94,7 @@ export default function CourseDetail({ course, related }: { course: Course; rela
                 <IconBook className="w-[22px] h-[22px] text-gold" />
                 <div>
                   <b className="text-[1.3rem] font-extrabold block leading-none">{course.lessons.length}</b>
-                  <small className="text-[oklch(0.82_0.025_250)] font-bold text-[.78rem]">хичээл</small>
+                  <small className="text-navy-ink-2 font-bold text-[.78rem]">хичээл</small>
                 </div>
               </div>
             )}
@@ -102,14 +103,14 @@ export default function CourseDetail({ course, related }: { course: Course; rela
                 <IconMonitor className="w-[22px] h-[22px] text-gold" />
                 <div>
                   <b className="text-[1.3rem] font-extrabold block leading-none">{course.mode}</b>
-                  <small className="text-[oklch(0.82_0.025_250)] font-bold text-[.78rem]">төрөл</small>
+                  <small className="text-navy-ink-2 font-bold text-[.78rem]">төрөл</small>
                 </div>
               </div>
             )}
           </div>
 
           <div className="mt-6">
-            <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-[oklch(0.32_0.06_70)] shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
+            <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
               Сургалтанд бүртгүүлэх <span>→</span>
             </RegisterTriggerButton>
           </div>
@@ -129,7 +130,7 @@ export default function CourseDetail({ course, related }: { course: Course; rela
               {course.lessons.map((lesson, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between gap-4 flex-wrap bg-surface border border-line rounded-md shadow-xs px-6 py-5"
+                  className="card-flat flex items-center justify-between gap-4 flex-wrap px-6 py-5"
                 >
                   <div className="flex items-center gap-4">
                     <span className="w-9 h-9 rounded-md bg-blue-soft text-blue-strong grid place-items-center font-extrabold shrink-0">
@@ -163,16 +164,13 @@ export default function CourseDetail({ course, related }: { course: Course; rela
 
           <ul className="grid grid-cols-1 sm:grid-cols-2 nav:grid-cols-3 gap-[18px] max-w-[960px] mx-auto mt-[44px]">
             {aboutItems(course.lessons.length).map((item) => (
-              <li
-                key={item.title}
-                className="bg-surface border border-line rounded-md px-[22px] py-[26px] shadow-xs transition-[transform,box-shadow] hover:-translate-y-1 hover:shadow-md"
-              >
+              <Reveal key={item.title} as="li" className="card-flat px-[22px] py-[26px]">
                 <span className={`w-12 h-12 rounded-[14px] grid place-items-center mb-3.5 ${item.iconBg}`}>
                   {item.icon}
                 </span>
                 <b className="font-extrabold text-ink text-[1.02rem] block mb-1">{item.title}</b>
                 <p className="text-ink-2 text-[.92rem] leading-[1.4]">{item.text}</p>
-              </li>
+              </Reveal>
             ))}
           </ul>
         </div>
@@ -190,7 +188,7 @@ export default function CourseDetail({ course, related }: { course: Course; rela
               бүртгүүлсэн сурагч урьтал эдэлнэ.
             </p>
             <div className="mt-6">
-              <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] w-full font-extrabold rounded-full bg-gold text-[oklch(0.32_0.06_70)] shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
+              <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
                 Бүртгүүлэх <span>→</span>
               </RegisterTriggerButton>
             </div>

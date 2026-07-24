@@ -60,7 +60,7 @@ export default function ProfileClient({
               <button
                 type="button"
                 onClick={() => setShowEdit(true)}
-                className="inline-flex items-center gap-2 font-extrabold text-[.9rem] rounded-full bg-surface shadow-[inset_0_0_0_1.5px_var(--color-line-2)] px-5 py-3 transition-colors hover:text-blue-strong shrink-0"
+                className="btn-ring inline-flex items-center gap-2 font-extrabold text-[.9rem] rounded-full bg-surface px-5 py-3 transition-colors hover:text-blue-strong shrink-0"
               >
                 <IconPencil className="w-4 h-4" /> Профайл засах
               </button>

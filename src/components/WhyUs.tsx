@@ -22,7 +22,7 @@ const features = [
   },
   {
     icon: <IconPlayBox className="w-[26px] h-[26px]" />,
-    iconBg: "bg-[oklch(0.93_0.04_300)] text-[oklch(0.52_0.15_300)]",
+    iconBg: "bg-purple-soft text-purple",
     title: "Хаанаас ч, хэзээ ч",
     text: "Бүх хичээл хадгалагдаж, хүссэн үедээ дахин нөхөж үзэх боломжтой.",
   },
@@ -48,7 +48,7 @@ export default function WhyUs() {
           {features.map((f) => (
             <Reveal
               key={f.title}
-              className="bg-surface border border-line rounded-md px-[22px] py-[26px] shadow-xs transition-[transform,box-shadow,border-color] hover:-translate-y-1 hover:shadow-md hover:border-blue-soft-2"
+              className="card-flat px-[22px] py-[26px] hover:border-blue-soft-2"
             >
               <span className={`w-[52px] h-[52px] rounded-[15px] grid place-items-center mb-4 ${f.iconBg}`}>
                 {f.icon}

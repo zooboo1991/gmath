@@ -18,8 +18,8 @@ export default function FormField({
         {hint && <span className="text-ink-3 font-semibold"> ({hint})</span>}
       </label>
       <div
-        className={`[&>input]:w-full [&>select]:w-full [&>input]:px-4 [&>select]:px-4 [&>input]:py-[14px] [&>select]:py-[14px] [&>input]:rounded-xs [&>select]:rounded-xs [&>input]:border-[1.5px] [&>select]:border-[1.5px] [&>input]:bg-surface-2 [&>select]:bg-surface-2 [&>input]:text-ink [&>select]:text-ink [&>input]:font-semibold [&>select]:font-semibold [&>input]:transition-colors [&>select]:transition-colors [&>input:focus]:outline-none [&>select:focus]:outline-none [&>input:focus]:bg-surface [&>select:focus]:bg-surface [&>input:focus]:border-blue [&>select:focus]:border-blue ${
-          error ? "[&>input]:border-red-soft [&>select]:border-red-soft" : "[&>input]:border-line-2 [&>select]:border-line-2"
+        className={`[&>input,&>select]:w-full [&>input,&>select]:px-4 [&>input,&>select]:py-[14px] [&>input,&>select]:rounded-xs [&>input,&>select]:border-[1.5px] [&>input,&>select]:bg-surface-2 [&>input,&>select]:text-ink [&>input,&>select]:font-semibold [&>input,&>select]:transition-colors [&>input:focus,&>select:focus]:outline-none [&>input:focus,&>select:focus]:bg-surface [&>input:focus,&>select:focus]:border-blue ${
+          error ? "[&>input,&>select]:border-red-soft" : "[&>input,&>select]:border-line-2"
         }`}
       >
         {children}

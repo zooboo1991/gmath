@@ -51,7 +51,7 @@ export default function Navbar() {
               <Link
                 key={l.href}
                 href={l.href}
-                className={`font-bold text-[.97rem] px-[14px] py-[9px] rounded-full transition-colors ${
+                className={`font-bold text-[.97rem] px-[14px] py-[11px] rounded-full transition-colors ${
                   active ? "text-ink bg-blue-soft" : "text-ink-2 hover:text-ink hover:bg-blue-soft"
                 }`}
               >
@@ -77,7 +77,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={openLogin}
-                className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-[oklch(0.32_0.06_70)] shadow-gold px-[22px] py-[12px] transition-transform hover:bg-gold-strong hover:-translate-y-0.5"
+                className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[22px] py-[12px] transition-transform hover:bg-gold-strong hover:-translate-y-0.5"
               >
                 Нэвтрэх
               </button>
@@ -93,7 +93,7 @@ export default function Navbar() {
           aria-label="Цэс"
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="nav:hidden ml-auto w-11 h-11 shrink-0 rounded-[12px] border border-line-2 bg-surface relative z-[61] grid place-items-center"
+          className="nav:hidden ml-auto w-12 h-12 shrink-0 rounded-[12px] border border-line-2 bg-surface relative z-[61] grid place-items-center"
         >
           <span className="sr-only">Цэс</span>
           <div className="flex flex-col gap-[3px] items-center">
@@ -156,7 +156,7 @@ export default function Navbar() {
                 closeMenu();
                 openLogin();
               }}
-              className="flex-1 text-center font-extrabold rounded-full bg-gold text-[oklch(0.32_0.06_70)] shadow-gold px-[18px] py-[13px]"
+              className="flex-1 text-center font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[18px] py-[13px]"
             >
               Нэвтрэх
             </button>
@@ -166,7 +166,7 @@ export default function Navbar() {
                 closeMenu();
                 openRegister();
               }}
-              className="flex-1 text-center font-extrabold rounded-full text-ink shadow-[inset_0_0_0_1.5px_var(--color-line-2)] px-[18px] py-[13px]"
+              className="btn-ring flex-1 text-center font-extrabold rounded-full text-ink px-[18px] py-[13px]"
             >
               Бүртгүүлэх
             </button>

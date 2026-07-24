@@ -367,13 +367,13 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 type="button"
                 onClick={close}
                 aria-label="Хаах"
-                className="w-9 h-9 rounded-full bg-bg-soft grid place-items-center shrink-0"
+                className="w-11 h-11 rounded-full bg-bg-soft grid place-items-center shrink-0"
               >
                 <IconClose className="w-4 h-4 text-ink-2" />
               </button>
             </div>
 
-            {program && screen !== "success" && (
+            {program && screen !== "success" && screen !== "payment" && (
               <p className="text-[.85rem] font-semibold text-ink-3 mb-2">
                 {program.label} · {program.price}
               </p>
@@ -418,7 +418,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     setResetPhone(loginPhone);
                     setScreen("reset");
                   }}
-                  className="text-[.85rem] font-bold text-blue-strong -mt-2 mb-4"
+                  className="inline-block py-3 -mx-1 px-1 text-[.85rem] font-bold text-blue-strong -mt-1 mb-2"
                 >
                   Нууц үгээ мартсан уу?
                 </button>
@@ -433,7 +433,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 <button
                   type="button"
                   onClick={() => setScreen("register")}
-                  className="w-full text-center text-[.9rem] font-bold text-blue-strong mt-4"
+                  className="w-full text-center py-3 text-[.9rem] font-bold text-blue-strong mt-2"
                 >
                   Бүртгэлгүй юу? Шинээр бүртгүүлэх
                 </button>
@@ -483,7 +483,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   <button
                     type="button"
                     onClick={() => setScreen("login")}
-                    className="font-extrabold rounded-full bg-surface-2 text-ink-2 shadow-[inset_0_0_0_1.5px_var(--color-line-2)] px-[26px] py-4 transition-colors hover:text-ink"
+                    className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink"
                   >
                     ← Буцах
                   </button>
@@ -528,7 +528,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   <button
                     type="button"
                     onClick={() => setScreen("login")}
-                    className="font-extrabold rounded-full bg-surface-2 text-ink-2 shadow-[inset_0_0_0_1.5px_var(--color-line-2)] px-[26px] py-4 transition-colors hover:text-ink"
+                    className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink"
                   >
                     ← Буцах
                   </button>
@@ -587,7 +587,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   <button
                     type="button"
                     onClick={() => setRegisterStep(1)}
-                    className="font-extrabold rounded-full bg-surface-2 text-ink-2 shadow-[inset_0_0_0_1.5px_var(--color-line-2)] px-[26px] py-4 transition-colors hover:text-ink"
+                    className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink"
                   >
                     ← Буцах
                   </button>
@@ -627,7 +627,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   <button
                     type="button"
                     onClick={() => setRegisterStep(2)}
-                    className="font-extrabold rounded-full bg-surface-2 text-ink-2 shadow-[inset_0_0_0_1.5px_var(--color-line-2)] px-[26px] py-4 transition-colors hover:text-ink"
+                    className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink"
                   >
                     ← Буцах
                   </button>
@@ -649,6 +649,12 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   <p className="text-[.85rem] font-semibold text-ink-3 mb-3">
                     {sessionUser.lastName} {sessionUser.firstName} нэрээр бүртгэнэ
                   </p>
+                )}
+                {program && (
+                  <div className="flex items-center justify-between gap-4 bg-blue-soft rounded-md px-5 py-4 mb-5">
+                    <span className="font-bold text-ink-2 text-[.95rem]">{program.label}</span>
+                    <b className="text-[1.5rem] font-extrabold text-blue-strong shrink-0">{program.price}</b>
+                  </div>
                 )}
                 <p className="font-bold text-ink-2 mb-1">Төлбөрийн хэлбэр сонгоно уу</p>
                 <div className="flex flex-col gap-3 mt-1.5">
@@ -712,7 +718,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                       type="button"
                       disabled={submitting}
                       onClick={() => confirmPayment("qpay")}
-                      className="w-full font-extrabold rounded-full bg-gold text-[oklch(0.32_0.06_70)] shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50"
+                      className="w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50"
                     >
                       {submitting ? "Шалгаж байна…" : "Төлбөр шалгах →"}
                     </button>
@@ -721,7 +727,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                       type="button"
                       disabled={!payMethod || submitting}
                       onClick={() => confirmPayment("bank")}
-                      className="w-full font-extrabold rounded-full bg-gold text-[oklch(0.32_0.06_70)] shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50 disabled:pointer-events-none"
+                      className="w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50 disabled:pointer-events-none"
                     >
                       Төлбөр төлсөн →
                     </button>
@@ -754,7 +760,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   <button
                     type="button"
                     onClick={close}
-                    className="flex-1 font-extrabold rounded-full bg-surface text-ink shadow-[inset_0_0_0_1.5px_var(--color-line-2)] px-[26px] py-4 transition-colors hover:text-blue-strong"
+                    className="btn-ring flex-1 font-extrabold rounded-full bg-surface text-ink px-[26px] py-4 transition-colors hover:text-blue-strong"
                   >
                     Хаах
                   </button>

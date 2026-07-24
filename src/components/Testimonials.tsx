@@ -7,14 +7,14 @@ const testimonials = [
     initial: "О",
     name: "Д.Оюунчимэг",
     meta: "Өвөрхангай · С ангилал",
-    avatarBg: "bg-[linear-gradient(145deg,var(--color-blue),var(--color-navy))]",
+    avatarBg: "bg-blue",
   },
   {
     quote: "«Онлайн учир хөдөө орон нутгаас сургалтанд хамрагдсан.»",
     initial: "Б",
     name: "Б.Болормаа",
     meta: "Орхон · C ангилал",
-    avatarBg: "bg-[linear-gradient(145deg,var(--color-gold-strong),oklch(0.62_0.13_55))]",
+    avatarBg: "bg-gold-strong",
   },
   {
     quote:
@@ -22,7 +22,7 @@ const testimonials = [
     initial: "Э",
     name: "Г.Энхбаяр",
     meta: "Улаанбаата · D ангилал",
-    avatarBg: "bg-[linear-gradient(145deg,var(--color-green),oklch(0.50_0.10_175))]",
+    avatarBg: "bg-green",
   },
 ];
 
@@ -42,12 +42,9 @@ export default function Testimonials() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-[18px] mt-[28px]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-[18px] mt-[44px]">
           {testimonials.map((t) => (
-            <Reveal
-              key={t.name}
-              className="flex flex-col gap-[18px] bg-surface border border-line rounded-md px-[24px] py-[26px] shadow-xs"
-            >
+            <Reveal key={t.name} className="card-flat flex flex-col gap-[18px] px-[24px] py-[26px]">
               <div className="text-gold-strong tracking-[3px]">★★★★★</div>
               <p className="text-[1rem] leading-[1.6] text-ink font-semibold flex-1">{t.quote}</p>
               <div className="flex items-center gap-[12px]">

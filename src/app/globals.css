@@ -22,13 +22,26 @@
 
   --color-green: oklch(0.62 0.115 158);
   --color-green-soft: oklch(0.95 0.04 158);
-  --color-red-soft: oklch(0.62 0.13 25);
+  --color-red-soft: oklch(0.52 0.16 25);
+
+  --color-purple: oklch(0.52 0.15 300);
+  --color-purple-soft: oklch(0.93 0.04 300);
 
   --color-ink: oklch(0.27 0.025 264);
   --color-ink-2: oklch(0.44 0.022 264);
-  --color-ink-3: oklch(0.58 0.018 264);
+  --color-ink-3: oklch(0.5 0.02 264);
   --color-line: oklch(0.92 0.01 258);
   --color-line-2: oklch(0.88 0.012 258);
+
+  /* Text/icon tones for dark (navy) surfaces only — Footer, hero bands. */
+  --color-navy-ink-2: oklch(0.78 0.02 255);
+  --color-navy-ink-3: oklch(0.68 0.02 255);
+
+  /* Ink color used on gold buttons/badges — was repeated as a raw oklch()
+     arbitrary value at ~14 call sites; promoting it to a token means
+     Tailwind generates `text-gold-ink` and future palette tweaks happen
+     in one place. */
+  --color-gold-ink: oklch(0.32 0.06 70);
 
   /* ---- Radius ---- */
   --radius-xs: 10px;
@@ -37,13 +50,15 @@
   --radius-lg: 28px;
   --radius-xl: 36px;
 
-  /* ---- Shadow (blue-tinted) ---- */
+  /* ---- Shadow (blue-tinted) ----
+     Kept deliberately light — this is a flat, 2D-vector visual language,
+     so shadows are a faint cue for stacking order, not a light source. */
   --shadow-xs: 0 1px 2px rgba(30, 38, 76, 0.05), 0 1px 3px rgba(30, 38, 76, 0.06);
-  --shadow-sm: 0 2px 6px -2px rgba(30, 38, 76, 0.08), 0 4px 12px -4px rgba(30, 38, 76, 0.08);
-  --shadow-md: 0 8px 24px -8px rgba(30, 38, 76, 0.14), 0 2px 6px -2px rgba(30, 38, 76, 0.06);
-  --shadow-lg: 0 28px 60px -22px rgba(30, 38, 76, 0.3), 0 8px 24px -12px rgba(30, 38, 76, 0.14);
-  --shadow-gold: 0 14px 30px -10px rgba(224, 168, 0, 0.45);
-  --shadow-blue: 0 14px 30px -10px rgba(10, 74, 158, 0.42);
+  --shadow-sm: 0 2px 6px -2px rgba(30, 38, 76, 0.06), 0 3px 8px -4px rgba(30, 38, 76, 0.06);
+  --shadow-md: 0 6px 16px -8px rgba(30, 38, 76, 0.12), 0 2px 5px -2px rgba(30, 38, 76, 0.05);
+  --shadow-lg: 0 16px 32px -16px rgba(30, 38, 76, 0.2), 0 6px 14px -8px rgba(30, 38, 76, 0.1);
+  --shadow-gold: 0 8px 18px -8px rgba(224, 168, 0, 0.32);
+  --shadow-blue: 0 8px 18px -8px rgba(10, 74, 158, 0.3);
 
   /* ---- Layout ---- */
   --container-page: 1180px;
@@ -85,6 +100,58 @@
   }
   .section-pad {
     padding-block: clamp(64px, 9vw, 116px);
+  }
+
+  /* Shared "info card" recipe — was hand-copied (border + shadow-xs +
+     hover:shadow-md + hover:-translate-y-1) across ~6 components. One
+     definition means the hover escalation can be tuned once. */
+  .card-flat {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-xs);
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  }
+  .card-flat:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-sm);
+  }
+  /* One accent signal for a "recommended" card — a colored border only,
+     no extra shadow/gradient layered on top of .card-flat's. */
+  .card-flat--accent {
+    border-color: var(--color-gold);
+    border-width: 1.5px;
+  }
+
+  /* Shared "outline/ghost button" ring — was hand-copied as an inset
+     box-shadow arbitrary value at ~9 call sites. */
+  .btn-ring {
+    box-shadow: inset 0 0 0 1.5px var(--color-line-2);
+    transition: box-shadow 0.2s, color 0.2s;
+  }
+  .btn-ring:hover {
+    box-shadow: inset 0 0 0 1.5px var(--color-blue);
+  }
+
+  /* Shared navy hero background — four components each hand-rolled their
+     own 2-3 layer gradient stack with slightly different color values.
+     One flatter, 2-layer version used everywhere keeps them in sync and
+     reads as less "glowy". */
+  .hero-navy {
+    background: radial-gradient(90% 130% at 88% 0%, rgba(14, 95, 196, 0.32), transparent 60%),
+      linear-gradient(158deg, var(--color-navy), var(--color-navy-deep));
+  }
+  .hero-dotgrid {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 26px 26px;
+    -webkit-mask-image: linear-gradient(180deg, #000, transparent 70%);
+    mask-image: linear-gradient(180deg, #000, transparent 70%);
+  }
+
+  /* Shared blue promo-panel gradient — three components each hand-rolled
+     the same blue-to-navy diagonal at a slightly different angle. */
+  .panel-blue {
+    background: linear-gradient(145deg, var(--color-blue), var(--color-navy));
   }
 }
 

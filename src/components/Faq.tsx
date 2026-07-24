@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Reveal from "./Reveal";
-import { IconPlus, IconMessenger } from "./icons";
+import { IconPlus, IconMessenger, IconPhone } from "./icons";
 
 const faqs = [
   {
@@ -89,7 +89,7 @@ export default function Faq() {
 
           <Reveal
             as="aside"
-            className="bg-[linear-gradient(155deg,var(--color-blue),var(--color-navy))] text-white rounded-lg px-[30px] py-[32px] shadow-md nav:sticky nav:top-24"
+            className="panel-blue text-white rounded-lg px-[30px] py-[32px] shadow-sm nav:sticky nav:top-24"
           >
             <span className="w-[54px] h-[54px] rounded-2xl bg-white/18 grid place-items-center">
               <IconMessenger className="w-7 h-7" />
@@ -106,12 +106,15 @@ export default function Faq() {
             >
               <IconMessenger className="w-5 h-5" /> AI туслахтай чатлах
             </a>
-            <div className="mt-5 pt-5 border-t border-white/20">
-              <b className="text-[1.5rem] font-extrabold tracking-[.02em]">9077 7400</b>
-              <small className="block text-[.85rem] text-white/80 mt-1">
-                10:00–18:00 цагийн хооронд хариулна
-              </small>
-            </div>
+            <a href="tel:90777400" className="flex items-center gap-2 mt-5 pt-5 border-t border-white/20">
+              <IconPhone className="w-4 h-4 shrink-0 text-white/80" />
+              <span>
+                <span className="block text-[1.05rem] font-bold tracking-[.02em]">9077 7400</span>
+                <small className="block text-[.85rem] text-white/80 mt-0.5">
+                  10:00–18:00 цагийн хооронд хариулна
+                </small>
+              </span>
+            </a>
           </Reveal>
         </div>
       </div>

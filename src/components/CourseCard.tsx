@@ -26,18 +26,14 @@ export default function CourseCard({
 }: CourseCardProps) {
   const ctaClass = `flex items-center justify-center gap-[10px] w-full font-extrabold rounded-full px-[26px] py-[16px] transition-transform hover:-translate-y-0.5 ${
     featured
-      ? "bg-gold text-[oklch(0.32_0.06_70)] shadow-gold hover:bg-gold-strong"
-      : "bg-surface text-ink shadow-[inset_0_0_0_1.5px_var(--color-line-2)] hover:shadow-[inset_0_0_0_1.5px_var(--color-blue)] hover:text-blue-strong"
+      ? "bg-gold text-gold-ink shadow-gold hover:bg-gold-strong"
+      : "btn-ring bg-surface text-ink hover:text-blue-strong"
   }`;
   const label = ctaLabel ?? "Дэлгэрэнгүй";
 
   return (
     <Reveal
-      className={`relative flex flex-col rounded-lg px-[26px] py-[28px] shadow-xs transition-[transform,box-shadow] hover:-translate-y-1 hover:shadow-md ${
-        featured
-          ? "border-[1.5px] border-gold shadow-lg bg-[linear-gradient(180deg,var(--color-gold-soft)_0%,var(--color-surface)_22%)]"
-          : "border border-line bg-surface"
-      }`}
+      className={`card-flat relative flex flex-col px-[26px] py-[28px] ${featured ? "card-flat--accent" : ""}`}
     >
       <span className="text-[.76rem] font-extrabold tracking-[.1em] uppercase text-blue-strong">
         {tag}
