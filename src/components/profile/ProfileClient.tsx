@@ -35,10 +35,12 @@ export default function ProfileClient({
   return (
     <>
       <section className="relative">
-        <div className="h-[130px] sm:h-[160px] bg-[radial-gradient(120%_140%_at_85%_0%,rgba(14,95,196,.5),transparent_55%),linear-gradient(158deg,var(--color-navy),var(--color-navy-deep))]" />
+        <div className="relative h-[130px] sm:h-[160px] overflow-hidden bg-[radial-gradient(60%_120%_at_88%_60%,rgba(253,194,1,.65),transparent_60%),radial-gradient(50%_100%_at_15%_10%,rgba(14,95,196,.7),transparent_60%),linear-gradient(120deg,var(--color-navy-deep)_0%,var(--color-navy)_45%,var(--color-blue-strong)_100%)]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,.08)_1px,transparent_1px)] bg-[length:22px_22px] opacity-60 [mask-image:linear-gradient(180deg,#000,transparent_75%)]" />
+        </div>
         <div className="wrap">
           <div className="relative -mt-12 sm:-mt-14 pb-7">
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-surface border-[4px] border-surface shadow-md grid place-items-center shrink-0">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-surface border-[4px] border-surface shadow-[0_0_0_3px_rgba(253,194,1,.3),0_10px_24px_-8px_rgba(11,61,120,.45)] grid place-items-center shrink-0">
               <IconPerson className="w-11 h-11 sm:w-12 sm:h-12 text-ink-3" />
             </div>
             <div className="flex items-start justify-between gap-4 flex-wrap mt-4">
