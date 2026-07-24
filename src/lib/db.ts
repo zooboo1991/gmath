@@ -212,6 +212,24 @@ export async function updateUserPassword(userId: string, newPassword: string): P
   return data ? userFromRow(data as UserRow) : undefined;
 }
 
+export async function updateUserProfile(
+  userId: string,
+  input: Partial<Pick<User, "lastName" | "firstName" | "school" | "grade" | "email" | "facebook" | "zoom">>
+): Promise<User | undefined> {
+  const patch: Record<string, unknown> = {};
+  if (input.lastName !== undefined) patch.last_name = input.lastName;
+  if (input.firstName !== undefined) patch.first_name = input.firstName;
+  if (input.school !== undefined) patch.school = input.school;
+  if (input.grade !== undefined) patch.grade = input.grade || null;
+  if (input.email !== undefined) patch.email = input.email;
+  if (input.facebook !== undefined) patch.facebook = input.facebook || null;
+  if (input.zoom !== undefined) patch.zoom = input.zoom || null;
+
+  const { data, error } = await getSupabase().from("users").update(patch).eq("id", userId).select("*").maybeSingle();
+  if (error) throw error;
+  return data ? userFromRow(data as UserRow) : undefined;
+}
+
 export async function listCourses(kind?: CourseKind): Promise<Course[]> {
   let query = getSupabase().from("courses").select("*");
   if (kind) query = query.eq("kind", kind);

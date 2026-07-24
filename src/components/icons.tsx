@@ -243,6 +243,15 @@ export function IconBank(props: IconProps) {
   );
 }
 
+export function IconPencil(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>
+      <path d="M4 20l4.5-1 10-10a2.1 2.1 0 00-3-3l-10 10L4 20z" strokeLinejoin="round" />
+      <path d="M14 5l3 3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function IconClose(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} {...props}>
