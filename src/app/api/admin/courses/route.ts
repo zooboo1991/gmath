@@ -22,6 +22,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Заавал бөглөх талбарууд дутуу байна" }, { status: 400 });
   }
 
+  const lessons = Array.isArray(data.lessons)
+    ? data.lessons
+        .map((l: { topic?: string; schedule?: string }) => ({
+          topic: l.topic?.trim() ?? "",
+          schedule: l.schedule?.trim() || undefined,
+        }))
+        .filter((l: { topic: string }) => l.topic)
+    : [];
+
   const course = await addCourse({
     kind: data.kind,
     tag: data.tag.trim(),
@@ -31,6 +40,7 @@ export async function POST(request: Request) {
     period: data.period.trim(),
     startDate: data.startDate?.trim() || undefined,
     mode: data.mode?.trim() || undefined,
+    lessons,
   });
 
   return NextResponse.json({ ok: true, course });

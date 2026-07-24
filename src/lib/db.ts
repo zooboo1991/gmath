@@ -38,6 +38,11 @@ export function toPublicUser(user: User): PublicUser {
   return rest;
 }
 
+export type Lesson = {
+  topic: string;
+  schedule?: string;
+};
+
 export type Course = {
   id: string;
   kind: CourseKind;
@@ -48,6 +53,7 @@ export type Course = {
   period: string;
   startDate?: string;
   mode?: string;
+  lessons: Lesson[];
 };
 
 export type Registration = {
@@ -87,6 +93,7 @@ type CourseRow = {
   period: string;
   start_date: string | null;
   mode: string | null;
+  lessons: Lesson[] | null;
 };
 
 type RegistrationRow = {
@@ -129,6 +136,7 @@ function courseFromRow(row: CourseRow): Course {
     period: row.period,
     startDate: row.start_date ?? undefined,
     mode: row.mode ?? undefined,
+    lessons: row.lessons ?? [],
   };
 }
 
@@ -212,6 +220,12 @@ export async function listCourses(kind?: CourseKind): Promise<Course[]> {
   return (data as CourseRow[]).map(courseFromRow);
 }
 
+export async function findCourseById(id: string): Promise<Course | undefined> {
+  const { data, error } = await getSupabase().from("courses").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data ? courseFromRow(data as CourseRow) : undefined;
+}
+
 export async function addCourse(input: Omit<Course, "id">): Promise<Course> {
   const { data, error } = await getSupabase()
     .from("courses")
@@ -224,6 +238,7 @@ export async function addCourse(input: Omit<Course, "id">): Promise<Course> {
       period: input.period,
       start_date: input.startDate ?? null,
       mode: input.mode ?? null,
+      lessons: input.lessons ?? [],
     })
     .select("*")
     .single();
@@ -243,6 +258,7 @@ export async function updateCourse(
   if (input.period !== undefined) patch.period = input.period;
   if (input.startDate !== undefined) patch.start_date = input.startDate ?? null;
   if (input.mode !== undefined) patch.mode = input.mode ?? null;
+  if (input.lessons !== undefined) patch.lessons = input.lessons;
 
   const { data, error } = await getSupabase().from("courses").update(patch).eq("id", id).select("*").maybeSingle();
   if (error) throw error;

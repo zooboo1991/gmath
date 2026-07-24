@@ -4,37 +4,17 @@ import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import CourseCard, { CourseMeta, VodStatus } from "@/components/CourseCard";
 import { listCourses } from "@/lib/db";
+import { yearlyPrograms } from "@/lib/staticPrograms";
 
 export const metadata: Metadata = {
   title: "Сургалтууд — Б.Ганбат багш",
   description: "Б.Ганбат багшийн бүх сургалтын хөтөлбөрүүд — 1 жилийн хөтөлбөр, удахгүй эхлэх сургалтууд, бичлэгээр үзэх сургалтууд.",
 };
 
-// Course list is admin-editable (see /admin) and stored in data/db.json, so
-// this page must read it fresh on every request instead of being cached
-// as static output at build time.
+// Course list is admin-editable (see /admin) and stored in Supabase, so this
+// page must read it fresh on every request instead of being cached as
+// static output at build time.
 export const dynamic = "force-dynamic";
-
-const yearlyPrograms = [
-  {
-    tag: "C АНГИЛАЛ",
-    title: "1 жилийн хөтөлбөр",
-    topics:
-      "1 жил буюу 10 сарын хугацаанд +100 хичээлийг үзэж дотоодын болон олон улсын олимпиадад бэлдэнэ.",
-    price: "2,800,000₮",
-    period: "/ жил",
-    href: "/courses/c",
-  },
-  {
-    tag: "D АНГИЛАЛ",
-    title: "1 жилийн хөтөлбөр",
-    topics:
-      "1 жил буюу 10 сарын хугацаанд +100 хичээлийг үзэж дотоодын болон олон улсын олимпиадад бэлдэнэ.",
-    price: "2,800,000₮",
-    period: "/ жил",
-    href: "/courses/d",
-  },
-];
 
 export default async function CoursesPage() {
   const [upcomingCourses, vodCourses] = await Promise.all([
@@ -73,7 +53,8 @@ export default async function CoursesPage() {
                   topics={c.topics}
                   price={c.price}
                   period={c.period}
-                  enroll={{ id: c.id, label: `${c.title} (${c.tag})` }}
+                  ctaHref={`/courses/${c.id}`}
+                  ctaLabel="Дэлгэрэнгүй"
                   extra={<CourseMeta startDate={c.startDate ?? ""} mode={c.mode ?? ""} />}
                 />
               ))}
@@ -94,7 +75,8 @@ export default async function CoursesPage() {
                   topics={c.topics}
                   price={c.price}
                   period={c.period}
-                  enroll={{ id: c.id, label: `${c.title} (${c.tag})` }}
+                  ctaHref={`/courses/${c.id}`}
+                  ctaLabel="Дэлгэрэнгүй"
                   extra={<VodStatus />}
                 />
               ))}

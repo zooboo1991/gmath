@@ -1,5 +1,4 @@
 import Reveal from "./Reveal";
-import { RegisterTriggerButton } from "./program/ProgramRegister";
 import { IconCalendar, IconMonitor, IconPlay } from "./icons";
 
 type CourseCardProps = {
@@ -8,11 +7,10 @@ type CourseCardProps = {
   topics: string;
   price: string;
   period: string;
-  ctaHref?: string;
+  ctaHref: string;
   ctaLabel?: string;
   featured?: boolean;
   extra?: React.ReactNode;
-  enroll?: { id: string; label: string };
 };
 
 export default function CourseCard({
@@ -25,14 +23,13 @@ export default function CourseCard({
   ctaLabel,
   featured = false,
   extra,
-  enroll,
 }: CourseCardProps) {
   const ctaClass = `flex items-center justify-center gap-[10px] w-full font-extrabold rounded-full px-[26px] py-[16px] transition-transform hover:-translate-y-0.5 ${
     featured
       ? "bg-gold text-[oklch(0.32_0.06_70)] shadow-gold hover:bg-gold-strong"
       : "bg-surface text-ink shadow-[inset_0_0_0_1.5px_var(--color-line-2)] hover:shadow-[inset_0_0_0_1.5px_var(--color-blue)] hover:text-blue-strong"
   }`;
-  const label = ctaLabel ?? (enroll ? "Бүртгүүлэх" : "Дэлгэрэнгүй");
+  const label = ctaLabel ?? "Дэлгэрэнгүй";
 
   return (
     <Reveal
@@ -54,15 +51,9 @@ export default function CourseCard({
       <div className="h-px bg-line my-5" />
       {extra}
       <div className="mt-auto pt-[22px]">
-        {enroll ? (
-          <RegisterTriggerButton program={{ id: enroll.id, label: enroll.label, price }} className={ctaClass}>
-            {label} <span>→</span>
-          </RegisterTriggerButton>
-        ) : (
-          <a href={ctaHref} className={ctaClass}>
-            {label} <span>→</span>
-          </a>
-        )}
+        <a href={ctaHref} className={ctaClass}>
+          {label} <span>→</span>
+        </a>
       </div>
     </Reveal>
   );

@@ -28,8 +28,12 @@ create table if not exists courses (
   price text not null,
   period text not null,
   start_date text,
-  mode text
+  mode text,
+  lessons jsonb not null default '[]'::jsonb
 );
+
+-- Run this if the `courses` table already existed before `lessons` was added:
+alter table courses add column if not exists lessons jsonb not null default '[]'::jsonb;
 
 create table if not exists registrations (
   id uuid primary key default gen_random_uuid(),
@@ -56,3 +60,21 @@ values
   ('vod', 'C,D АНГИЛАЛ · ӨМНӨХ УЛИРАЛ', 'Гүнзгийрүүлсэн курс', 'Өмнөх жилийн бүрэн хичээлийн бичлэг, комбинаторик болон геометрийн модуль.', '480,000₮', '/ багц', null, null),
   ('vod', 'E АНГИЛАЛ · ӨМНӨХ УЛИРАЛ', 'Ахисан түвшний клуб', 'Улсын түвшний олимпиадад зориулсан бичлэг хэлбэрийн гүнзгийрүүлсэн бэлтгэл.', '350,000₮', '/ багц', null, null)
 on conflict do nothing;
+
+-- Sample lesson schedule for the demo "A АНГИЛАЛ СУРАГЧ" course, matching the
+-- course detail page template. Safe to edit/replace from /admin afterwards.
+update courses set lessons = '[
+  {"topic": "Тооны дараалал ба хэв маяг", "schedule": "2026.08.10 Даваа гараг · 18:00–20:00"},
+  {"topic": "Логикийн үндсэн бодлого", "schedule": "2026.08.12 Лхагва гараг · 18:00–20:00"},
+  {"topic": "Тооны мэдрэмж ба тооллын систем", "schedule": "2026.08.14 Баасан гараг · 18:00–20:00"},
+  {"topic": "Комбинаторикийн анхан шат", "schedule": "2026.08.17 Даваа гараг · 18:00–20:00"},
+  {"topic": "Геометрийн дүрс, талбай", "schedule": "2026.08.19 Лхагва гараг · 18:00–20:00"},
+  {"topic": "Логик бодлогын жишээ шинжилгээ", "schedule": "2026.08.21 Баасан гараг · 18:00–20:00"},
+  {"topic": "Тэгш ба сондгой тоон шинж чанар", "schedule": "2026.08.24 Даваа гараг · 18:00–20:00"},
+  {"topic": "Хэмжигдэхүүн, харьцаа", "schedule": "2026.08.26 Лхагва гараг · 18:00–20:00"},
+  {"topic": "Хүснэгт, график унших", "schedule": "2026.08.28 Баасан гараг · 18:00–20:00"},
+  {"topic": "Холимог бодлого шийдвэрлэх арга барил", "schedule": "2026.08.31 Даваа гараг · 18:00–20:00"},
+  {"topic": "Дасгал давтлага", "schedule": "2026.09.02 Лхагва гараг · 18:00–20:00"},
+  {"topic": "Мини олимпиад ба дүгнэлт", "schedule": "2026.09.04 Баасан гараг · 18:00–20:00"}
+]'::jsonb
+where tag = 'A АНГИЛАЛ СУРАГЧ' and title = '1 сарын сургалт';

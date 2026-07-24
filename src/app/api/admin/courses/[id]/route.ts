@@ -9,6 +9,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const data = await request.json();
 
+  const lessons = Array.isArray(data.lessons)
+    ? data.lessons
+        .map((l: { topic?: string; schedule?: string }) => ({
+          topic: l.topic?.trim() ?? "",
+          schedule: l.schedule?.trim() || undefined,
+        }))
+        .filter((l: { topic: string }) => l.topic)
+    : undefined;
+
   const course = await updateCourse(id, {
     tag: data.tag?.trim(),
     title: data.title?.trim(),
@@ -17,6 +26,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     period: data.period?.trim(),
     startDate: data.startDate?.trim() || undefined,
     mode: data.mode?.trim() || undefined,
+    lessons,
   });
 
   if (!course) {

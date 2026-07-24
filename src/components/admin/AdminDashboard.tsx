@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { Course, CourseKind, PublicUser, Registration } from "@/lib/db";
+import type { Course, CourseKind, Lesson, PublicUser, Registration } from "@/lib/db";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
@@ -16,6 +16,7 @@ const emptyCourseForm = {
   period: "",
   startDate: "",
   mode: "",
+  lessons: [] as Lesson[],
 };
 
 export default function AdminDashboard({
@@ -74,9 +75,25 @@ export default function AdminDashboard({
       period: course.period,
       startDate: course.startDate ?? "",
       mode: course.mode ?? "",
+      lessons: course.lessons,
     });
     setFormError(null);
     setShowForm(true);
+  };
+
+  const addLessonRow = () => {
+    setForm((f) => ({ ...f, lessons: [...f.lessons, { topic: "", schedule: "" }] }));
+  };
+
+  const updateLessonRow = (index: number, patch: Partial<Lesson>) => {
+    setForm((f) => ({
+      ...f,
+      lessons: f.lessons.map((l, i) => (i === index ? { ...l, ...patch } : l)),
+    }));
+  };
+
+  const removeLessonRow = (index: number) => {
+    setForm((f) => ({ ...f, lessons: f.lessons.filter((_, i) => i !== index) }));
   };
 
   const saveCourse = async () => {
@@ -257,6 +274,55 @@ export default function AdminDashboard({
                   </AdminField>
                 </div>
               )}
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[.85rem] font-extrabold text-ink">
+                    Хичээлийн хуваарь (дэлгэрэнгүй хуудсанд харагдана)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addLessonRow}
+                    className="text-[.8rem] font-extrabold text-blue-strong bg-blue-soft px-3 py-1.5 rounded-full shrink-0"
+                  >
+                    + Хичээл нэмэх
+                  </button>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {form.lessons.map((lesson, i) => (
+                    <div key={i} className="flex gap-2 items-start bg-bg-soft rounded-xs p-2.5">
+                      <span className="w-7 h-7 rounded-md bg-surface border border-line-2 grid place-items-center font-extrabold text-[.8rem] shrink-0 mt-0.5">
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 flex flex-col gap-1.5">
+                        <input
+                          value={lesson.topic}
+                          onChange={(e) => updateLessonRow(i, { topic: e.target.value })}
+                          placeholder="Хичээлийн сэдэв"
+                          className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.9rem] focus:outline-none focus:border-blue focus:bg-surface"
+                        />
+                        <input
+                          value={lesson.schedule ?? ""}
+                          onChange={(e) => updateLessonRow(i, { schedule: e.target.value })}
+                          placeholder="2026.08.10 Даваа гараг · 18:00–20:00 (заавал биш)"
+                          className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.85rem] focus:outline-none focus:border-blue focus:bg-surface"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeLessonRow(i)}
+                        aria-label="Хичээл устгах"
+                        className="w-7 h-7 rounded-full bg-surface border border-line-2 grid place-items-center shrink-0 mt-0.5"
+                      >
+                        <IconClose className="w-3 h-3 text-ink-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {form.lessons.length === 0 && (
+                    <p className="text-ink-3 font-semibold text-[.85rem]">Хичээл нэмээгүй байна.</p>
+                  )}
+                </div>
+              </div>
             </div>
 
             {formError && <p className="text-[.85rem] font-semibold text-red-soft mt-3">{formError}</p>}
