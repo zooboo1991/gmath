@@ -1,0 +1,95 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import ArticleCard from "@/components/ArticleCard";
+import { IconPerson } from "@/components/icons";
+import { findArticleById, listArticles } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("mn-MN", { year: "numeric", month: "long", day: "numeric" });
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const article = await findArticleById(id);
+  if (!article) return { title: "Нийтлэл олдсонгүй — Б.Ганбат багш" };
+  return {
+    title: `${article.title} — Б.Ганбат багш`,
+    description: article.excerpt,
+  };
+}
+
+export default async function ArticleDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const article = await findArticleById(id);
+  if (!article) notFound();
+
+  const allArticles = await listArticles();
+  const related = allArticles.filter((a) => a.id !== article.id).slice(0, 3);
+  const paragraphs = article.content.split("\n").map((p) => p.trim()).filter(Boolean);
+
+  return (
+    <>
+      <Navbar />
+      <main>
+        <div className="relative h-[260px] sm:h-[400px] overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={article.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(5,15,35,.55)_0%,rgba(5,15,35,.05)_60%)]" />
+        </div>
+
+        <section className="section-pad !pt-10">
+          <div className="wrap max-w-[720px] mx-auto">
+            <h1 className="text-[1.9rem] sm:text-[2.3rem] font-extrabold leading-[1.2] tracking-[-.01em]">
+              {article.title}
+            </h1>
+            <div className="flex items-center gap-2.5 mt-5">
+              <span className="w-8 h-8 rounded-full bg-bg-soft grid place-items-center shrink-0">
+                <IconPerson className="w-4 h-4 text-ink-3" />
+              </span>
+              <span className="text-[.92rem] text-ink-3 font-semibold">
+                {article.author} · {formatDate(article.createdAt)}
+              </span>
+            </div>
+
+            <div className="h-px bg-line my-8" />
+
+            <div className="flex flex-col gap-5">
+              {paragraphs.map((p, i) => (
+                <p key={i} className="text-[1.05rem] text-ink-2 leading-[1.75] font-medium">
+                  {p}
+                </p>
+              ))}
+            </div>
+
+            <Link
+              href="/articles"
+              className="inline-flex items-center gap-2 font-extrabold text-[.92rem] text-blue-strong mt-10"
+            >
+              ← Бүх нийтлэл
+            </Link>
+          </div>
+        </section>
+
+        {related.length > 0 && (
+          <section className="section-pad !pt-0">
+            <div className="wrap">
+              <div className="h-px bg-line mb-10" />
+              <h2 className="text-[1.3rem] font-extrabold tracking-[-.01em] mb-6">Бусад нийтлэл</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-10">
+                {related.map((a) => (
+                  <ArticleCard key={a.id} article={a} />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+      </main>
+      <Footer />
+    </>
+  );
+}

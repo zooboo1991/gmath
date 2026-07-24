@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { Course, CourseKind, Lesson, PublicUser, Registration } from "@/lib/db";
+import type { Article, Course, CourseKind, Lesson, PublicUser, Registration } from "@/lib/db";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
@@ -19,23 +19,40 @@ const emptyCourseForm = {
   lessons: [] as Lesson[],
 };
 
+const emptyArticleForm = {
+  title: "",
+  excerpt: "",
+  content: "",
+  coverImage: "",
+  author: "Б.Ганбат багш",
+  featured: false,
+};
+
 export default function AdminDashboard({
   initialRegistrations,
   initialCourses,
+  initialArticles,
 }: {
   initialRegistrations: RegistrationWithUser[];
   initialCourses: Course[];
+  initialArticles: Article[];
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"registrations" | "courses">("registrations");
+  const [tab, setTab] = useState<"registrations" | "courses" | "articles">("registrations");
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [courses, setCourses] = useState(initialCourses);
+  const [articles, setArticles] = useState(initialArticles);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyCourseForm);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const [showArticleForm, setShowArticleForm] = useState(false);
+  const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
+  const [articleForm, setArticleForm] = useState(emptyArticleForm);
+  const [articleFormError, setArticleFormError] = useState<string | null>(null);
 
   const logout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -133,6 +150,70 @@ export default function AdminDashboard({
     }
   };
 
+  const startAddArticle = () => {
+    setEditingArticleId(null);
+    setArticleForm(emptyArticleForm);
+    setArticleFormError(null);
+    setShowArticleForm(true);
+  };
+
+  const startEditArticle = (article: Article) => {
+    setEditingArticleId(article.id);
+    setArticleForm({
+      title: article.title,
+      excerpt: article.excerpt,
+      content: article.content,
+      coverImage: article.coverImage,
+      author: article.author,
+      featured: article.featured,
+    });
+    setArticleFormError(null);
+    setShowArticleForm(true);
+  };
+
+  const saveArticle = async () => {
+    if (
+      !articleForm.title.trim() ||
+      !articleForm.excerpt.trim() ||
+      !articleForm.content.trim() ||
+      !articleForm.coverImage.trim() ||
+      !articleForm.author.trim()
+    ) {
+      setArticleFormError("Заавал бөглөх талбаруудыг бөглөнө үү");
+      return;
+    }
+    setArticleFormError(null);
+    const url = editingArticleId ? `/api/admin/articles/${editingArticleId}` : "/api/admin/articles";
+    const method = editingArticleId ? "PUT" : "POST";
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(articleForm),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setArticleFormError(json.error ?? "Хадгалахад алдаа гарлаа");
+      return;
+    }
+    if (editingArticleId) {
+      setArticles((as) => as.map((a) => (a.id === editingArticleId ? json.article : a)));
+    } else {
+      setArticles((as) => [json.article, ...as]);
+    }
+    setShowArticleForm(false);
+  };
+
+  const removeArticle = async (id: string) => {
+    if (!confirm("Энэ нийтлэлийг устгах уу?")) return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/admin/articles/${id}`, { method: "DELETE" });
+      if (res.ok) setArticles((as) => as.filter((a) => a.id !== id));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const upcoming = courses.filter((c) => c.kind === "upcoming");
   const vod = courses.filter((c) => c.kind === "vod");
   const pendingCount = registrations.filter((r) => r.status === "pending").length;
@@ -167,6 +248,15 @@ export default function AdminDashboard({
             }`}
           >
             Сургалтууд
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("articles")}
+            className={`font-extrabold text-[.95rem] px-5 py-2.5 rounded-full transition-colors ${
+              tab === "articles" ? "bg-blue text-white" : "bg-surface text-ink-2"
+            }`}
+          >
+            Нийтлэл
           </button>
         </div>
 
@@ -222,6 +312,52 @@ export default function AdminDashboard({
                 onEdit={startEdit}
                 onDelete={removeCourse}
               />
+            </div>
+          </div>
+        )}
+
+        {tab === "articles" && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[1.15rem] font-extrabold">Нийтлэлүүд</h2>
+              <button
+                type="button"
+                onClick={startAddArticle}
+                className="text-[.85rem] font-extrabold text-blue-strong bg-blue-soft px-4 py-2 rounded-full"
+              >
+                + Нийтлэл нэмэх
+              </button>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {articles.length === 0 && <p className="text-ink-3 font-semibold text-[.9rem]">Одоогоор алга.</p>}
+              {articles.map((a) => (
+                <div key={a.id} className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    {a.featured && (
+                      <span className="text-[.72rem] font-extrabold tracking-[.08em] uppercase text-gold-strong">
+                        Онцлох
+                      </span>
+                    )}
+                    <b className="font-extrabold block">{a.title}</b>
+                    <span className="text-ink-3 font-semibold text-[.85rem]">
+                      {a.author} · {new Date(a.createdAt).toLocaleDateString("mn-MN")}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => startEditArticle(a)} className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full">
+                      Засах
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === a.id}
+                      onClick={() => removeArticle(a.id)}
+                      className="text-[.82rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-3.5 py-2 rounded-full disabled:opacity-50"
+                    >
+                      Устгах
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -337,6 +473,77 @@ export default function AdminDashboard({
           </div>
         </div>
       )}
+
+      {showArticleForm && (
+        <div
+          className="fixed inset-0 bg-[rgba(15,20,40,.6)] backdrop-blur-[3px] flex items-center justify-center z-[200] p-5"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowArticleForm(false);
+          }}
+        >
+          <div className="bg-surface rounded-lg w-full max-w-[480px] max-h-[88vh] overflow-y-auto shadow-lg px-[26px] py-7">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[1.2rem] font-extrabold">{editingArticleId ? "Нийтлэл засах" : "Шинэ нийтлэл"}</h3>
+              <button
+                type="button"
+                onClick={() => setShowArticleForm(false)}
+                className="w-8 h-8 rounded-full bg-bg-soft grid place-items-center"
+              >
+                <IconClose className="w-3.5 h-3.5 text-ink-2" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <AdminField label="Гарчиг">
+                <input value={articleForm.title} onChange={(e) => setArticleForm((f) => ({ ...f, title: e.target.value }))} />
+              </AdminField>
+              <AdminField label="Товч танилцуулга (жагсаалт, дэлгэрэнгүй хуудсанд харагдана)">
+                <textarea
+                  value={articleForm.excerpt}
+                  onChange={(e) => setArticleForm((f) => ({ ...f, excerpt: e.target.value }))}
+                  rows={2}
+                />
+              </AdminField>
+              <AdminField label="Нийтлэлийн бүрэн эх (мөр бүр шинэ параграф болно)">
+                <textarea
+                  value={articleForm.content}
+                  onChange={(e) => setArticleForm((f) => ({ ...f, content: e.target.value }))}
+                  rows={7}
+                />
+              </AdminField>
+              <AdminField label="Зургийн URL">
+                <input
+                  value={articleForm.coverImage}
+                  onChange={(e) => setArticleForm((f) => ({ ...f, coverImage: e.target.value }))}
+                  placeholder="https://..."
+                />
+              </AdminField>
+              <AdminField label="Зохиогч">
+                <input value={articleForm.author} onChange={(e) => setArticleForm((f) => ({ ...f, author: e.target.value }))} />
+              </AdminField>
+              <label className="flex items-center gap-2.5 font-extrabold text-[.9rem] text-ink cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={articleForm.featured}
+                  onChange={(e) => setArticleForm((f) => ({ ...f, featured: e.target.checked }))}
+                  className="w-4 h-4"
+                />
+                Онцлох нийтлэл болгож, жагсаалтын дээд банерт харуулах
+              </label>
+            </div>
+
+            {articleFormError && <p className="text-[.85rem] font-semibold text-red-soft mt-3">{articleFormError}</p>}
+
+            <button
+              type="button"
+              onClick={saveArticle}
+              className="w-full mt-6 font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5"
+            >
+              Хадгалах
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -405,7 +612,7 @@ function AdminField({ label, children }: { label: string; children: React.ReactN
   return (
     <div>
       <label className="block text-[.85rem] font-extrabold text-ink mb-1.5">{label}</label>
-      <div className="[&>input]:w-full [&>input]:px-3.5 [&>input]:py-3 [&>input]:rounded-xs [&>input]:border-[1.5px] [&>input]:border-line-2 [&>input]:bg-surface-2 [&>input]:text-ink [&>input]:font-semibold [&>input:focus]:outline-none [&>input:focus]:border-blue [&>input:focus]:bg-surface">
+      <div className="[&>input]:w-full [&>textarea]:w-full [&>input]:px-3.5 [&>textarea]:px-3.5 [&>input]:py-3 [&>textarea]:py-3 [&>input]:rounded-xs [&>textarea]:rounded-xs [&>input]:border-[1.5px] [&>textarea]:border-[1.5px] [&>input]:border-line-2 [&>textarea]:border-line-2 [&>input]:bg-surface-2 [&>textarea]:bg-surface-2 [&>input]:text-ink [&>textarea]:text-ink [&>input]:font-semibold [&>textarea]:font-semibold [&>textarea]:resize-y [&>input:focus]:outline-none [&>textarea:focus]:outline-none [&>input:focus]:border-blue [&>textarea:focus]:border-blue [&>input:focus]:bg-surface [&>textarea:focus]:bg-surface">
         {children}
       </div>
     </div>

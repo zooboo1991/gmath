@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import AdminDashboard from "@/components/admin/AdminDashboard";
-import { listAllRegistrations, listCourses } from "@/lib/db";
+import { listAllRegistrations, listArticles, listCourses } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,17 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
-  const [registrations, courses] = await Promise.all([listAllRegistrations(), listCourses()]);
+  const [registrations, courses, articles] = await Promise.all([
+    listAllRegistrations(),
+    listCourses(),
+    listArticles(),
+  ]);
 
-  return <AdminDashboard initialRegistrations={registrations} initialCourses={courses} />;
+  return (
+    <AdminDashboard
+      initialRegistrations={registrations}
+      initialCourses={courses}
+      initialArticles={articles}
+    />
+  );
 }

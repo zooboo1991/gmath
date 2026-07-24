@@ -48,6 +48,17 @@ create table if not exists registrations (
 
 create index if not exists registrations_user_id_idx on registrations(user_id);
 
+create table if not exists articles (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  excerpt text not null,
+  content text not null,
+  cover_image text not null,
+  author text not null,
+  featured boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
 -- Seed the same starter courses the site ships with today, so /courses
 -- isn't empty right after setup. Safe to edit/delete afterwards from /admin.
 insert into courses (kind, tag, title, topics, price, period, start_date, mode)

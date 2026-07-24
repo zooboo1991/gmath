@@ -56,6 +56,17 @@ export type Course = {
   lessons: Lesson[];
 };
 
+export type Article = {
+  id: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  coverImage: string;
+  author: string;
+  featured: boolean;
+  createdAt: string;
+};
+
 export type Registration = {
   id: string;
   userId: string;
@@ -94,6 +105,17 @@ type CourseRow = {
   start_date: string | null;
   mode: string | null;
   lessons: Lesson[] | null;
+};
+
+type ArticleRow = {
+  id: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  cover_image: string;
+  author: string;
+  featured: boolean;
+  created_at: string;
 };
 
 type RegistrationRow = {
@@ -137,6 +159,19 @@ function courseFromRow(row: CourseRow): Course {
     startDate: row.start_date ?? undefined,
     mode: row.mode ?? undefined,
     lessons: row.lessons ?? [],
+  };
+}
+
+function articleFromRow(row: ArticleRow): Article {
+  return {
+    id: row.id,
+    title: row.title,
+    excerpt: row.excerpt,
+    content: row.content,
+    coverImage: row.cover_image,
+    author: row.author,
+    featured: row.featured,
+    createdAt: row.created_at,
   };
 }
 
@@ -285,6 +320,61 @@ export async function updateCourse(
 
 export async function deleteCourse(id: string): Promise<boolean> {
   const { error, count } = await getSupabase().from("courses").delete({ count: "exact" }).eq("id", id);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
+export async function listArticles(): Promise<Article[]> {
+  const { data, error } = await getSupabase()
+    .from("articles")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as ArticleRow[]).map(articleFromRow);
+}
+
+export async function findArticleById(id: string): Promise<Article | undefined> {
+  const { data, error } = await getSupabase().from("articles").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data ? articleFromRow(data as ArticleRow) : undefined;
+}
+
+export async function addArticle(input: Omit<Article, "id" | "createdAt">): Promise<Article> {
+  const { data, error } = await getSupabase()
+    .from("articles")
+    .insert({
+      title: input.title,
+      excerpt: input.excerpt,
+      content: input.content,
+      cover_image: input.coverImage,
+      author: input.author,
+      featured: input.featured,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return articleFromRow(data as ArticleRow);
+}
+
+export async function updateArticle(
+  id: string,
+  input: Partial<Omit<Article, "id" | "createdAt">>
+): Promise<Article | undefined> {
+  const patch: Record<string, unknown> = {};
+  if (input.title !== undefined) patch.title = input.title;
+  if (input.excerpt !== undefined) patch.excerpt = input.excerpt;
+  if (input.content !== undefined) patch.content = input.content;
+  if (input.coverImage !== undefined) patch.cover_image = input.coverImage;
+  if (input.author !== undefined) patch.author = input.author;
+  if (input.featured !== undefined) patch.featured = input.featured;
+
+  const { data, error } = await getSupabase().from("articles").update(patch).eq("id", id).select("*").maybeSingle();
+  if (error) throw error;
+  return data ? articleFromRow(data as ArticleRow) : undefined;
+}
+
+export async function deleteArticle(id: string): Promise<boolean> {
+  const { error, count } = await getSupabase().from("articles").delete({ count: "exact" }).eq("id", id);
   if (error) throw error;
   return (count ?? 0) > 0;
 }
