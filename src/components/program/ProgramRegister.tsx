@@ -10,7 +10,6 @@ import {
   IconBank,
   IconClose,
   IconCheck,
-  IconPhone,
 } from "@/components/icons";
 
 type Role = "teacher" | "student";
@@ -365,11 +364,13 @@ export default function ProgramRegisterProvider({ children }: { children: React.
               </p>
             )}
 
-            <div className="flex gap-1.5 my-[18px]">
-              {[1, 2, 3, 4].map((n) => (
-                <i key={n} className={`flex-1 h-1 rounded-sm ${n <= stepIndex ? "bg-blue" : "bg-line-2"}`} />
-              ))}
-            </div>
+            {screen !== "login" && screen !== "reset" && (
+              <div className="flex gap-1.5 my-[18px]">
+                {[1, 2, 3, 4].map((n) => (
+                  <i key={n} className={`flex-1 h-1 rounded-sm ${n <= stepIndex ? "bg-blue" : "bg-line-2"}`} />
+                ))}
+              </div>
+            )}
 
             {screen === "gate" && (
               <div>
@@ -394,7 +395,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
             )}
 
             {screen === "login" && (
-              <div>
+              <div className="mt-[18px]">
                 <FormField label="Утасны дугаар" required error={loginError ? "e" : undefined}>
                   <input
                     value={loginPhone}
@@ -428,24 +429,14 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 >
                   Нууц үгээ мартсан уу?
                 </button>
-                <div className="flex gap-3.5">
-                  <button
-                    type="button"
-                    onClick={() => setScreen("gate")}
-                    className="font-extrabold rounded-full bg-surface-2 text-ink-2 shadow-[inset_0_0_0_1.5px_var(--color-line-2)] px-[26px] py-4 transition-colors hover:text-ink"
-                  >
-                    ← Буцах
-                  </button>
-                  <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={handleLogin}
-                    className="flex-1 flex items-center justify-center gap-2 font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
-                  >
-                    <IconPhone className="w-4 h-4" />
-                    {submitting ? "Шалгаж байна…" : "Нэвтрэх"}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={handleLogin}
+                  className="w-full font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+                >
+                  {submitting ? "Шалгаж байна…" : "Нэвтрэх"}
+                </button>
                 <button
                   type="button"
                   onClick={() => setScreen("register")}
@@ -457,7 +448,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
             )}
 
             {screen === "reset" && (
-              <div>
+              <div className="mt-[18px]">
                 <FormField label="Утасны дугаар" required error={resetError ? "e" : undefined}>
                   <input
                     value={resetPhone}

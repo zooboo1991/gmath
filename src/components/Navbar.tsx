@@ -39,7 +39,7 @@ export default function Navbar() {
             alt="Б.Ганбат багшийн математикийн сургалт"
             width={1087}
             height={200}
-            className="w-auto h-6 nav:h-[34px] object-contain"
+            className="w-auto h-9 nav:h-[34px] object-contain"
             priority
           />
         </Link>
@@ -117,7 +117,9 @@ export default function Navbar() {
       </div>
 
       <div
-        className="nav:hidden flex flex-col gap-1 px-[clamp(20px,5vw,48px)] pt-[10px] pb-[22px] border-t border-line bg-surface overflow-hidden transition-[max-height] duration-300 ease-in-out"
+        className={`nav:hidden flex flex-col gap-1 px-[clamp(20px,5vw,48px)] border-t bg-surface overflow-hidden transition-[max-height,padding] duration-300 ease-in-out ${
+          open ? "pt-[10px] pb-[22px] border-line" : "pt-0 pb-0 border-transparent"
+        }`}
         style={{ maxHeight: open ? 420 : 0 }}
       >
         {links.map((l) => {
