@@ -118,7 +118,7 @@ export default function ProgramDetail({
 
             <div className="mt-6">
               <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-[oklch(0.32_0.06_70)] shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
-                Бүртгүүлэх <span>→</span>
+                Сургалтанд бүртгүүлэх <span>→</span>
               </RegisterTriggerButton>
             </div>
           </div>
@@ -233,7 +233,7 @@ export default function ProgramDetail({
             -т хамрагдаж, нэг жилийн турш тогтмол хөгжинө.
           </div>
           <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-[oklch(0.32_0.06_70)] shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
-            Бүртгүүлэх <span>→</span>
+            Сургалтанд бүртгүүлэх <span>→</span>
           </RegisterTriggerButton>
         </div>
       </section>

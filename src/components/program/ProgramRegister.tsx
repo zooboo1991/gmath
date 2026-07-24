@@ -14,7 +14,7 @@ import {
 
 type Role = "teacher" | "student";
 type PayMethod = "qpay" | "bank";
-type Screen = "gate" | "login" | "register" | "reset" | "payment" | "success";
+type Screen = "login" | "register" | "reset" | "payment" | "success";
 
 type Program = { id: string; label: string; price: string };
 
@@ -112,7 +112,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const [sessionUser, setSessionUser] = useState<SessionUser>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [program, setProgram] = useState<Program | null>(null);
-  const [screen, setScreen] = useState<Screen>("gate");
+  const [screen, setScreen] = useState<Screen>("login");
 
   const [registerStep, setRegisterStep] = useState<1 | 2>(1);
   const [role, setRole] = useState<Role | null>(null);
@@ -160,7 +160,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const open = (p: Program) => {
     resetTransient();
     setProgram(p);
-    setScreen(sessionUser ? "payment" : "gate");
+    setScreen(sessionUser ? "payment" : "login");
     setIsOpen(true);
   };
   const openLogin = () => {
@@ -324,7 +324,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     }
   };
 
-  const stepIndex = { gate: 1, login: 2, reset: 2, register: registerStep, payment: 3, success: 4 }[screen];
+  const stepIndex = { login: 2, reset: 2, register: registerStep, payment: 3, success: 4 }[screen];
 
   return (
     <ModalCtx.Provider value={{ sessionUser, open, openLogin, openRegister, logout }}>
@@ -369,28 +369,6 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 {[1, 2, 3, 4].map((n) => (
                   <i key={n} className={`flex-1 h-1 rounded-sm ${n <= stepIndex ? "bg-blue" : "bg-line-2"}`} />
                 ))}
-              </div>
-            )}
-
-            {screen === "gate" && (
-              <div>
-                <p className="font-bold text-ink-2 mb-4">Та бүртгэлтэй юу?</p>
-                <div className="flex flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setScreen("login")}
-                    className="w-full font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5"
-                  >
-                    Нэвтрэх
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScreen("register")}
-                    className="w-full font-extrabold rounded-full bg-surface text-ink shadow-[inset_0_0_0_1.5px_var(--color-line-2)] px-[26px] py-4 transition-colors hover:text-blue-strong"
-                  >
-                    Шинээр бүртгүүлэх
-                  </button>
-                </div>
               </div>
             )}
 
@@ -522,7 +500,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 <div className="flex gap-3.5 mt-[26px]">
                   <button
                     type="button"
-                    onClick={() => setScreen(program ? "gate" : "login")}
+                    onClick={() => setScreen("login")}
                     className="font-extrabold rounded-full bg-surface-2 text-ink-2 shadow-[inset_0_0_0_1.5px_var(--color-line-2)] px-[26px] py-4 transition-colors hover:text-ink"
                   >
                     ← Буцах

@@ -157,6 +157,15 @@ export function IconPhone(props: IconProps) {
   );
 }
 
+export function IconLocation(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>
+      <path d="M12 21s-7-6.5-7-11a7 7 0 0114 0c0 4.5-7 11-7 11z" strokeLinejoin="round" />
+      <circle cx={12} cy={10} r={2.5} />
+    </svg>
+  );
+}
+
 export function IconInstagram(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>

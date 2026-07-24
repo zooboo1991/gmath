@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { IconMail, IconPhone, IconInstagram } from "./icons";
+import { IconMail, IconPhone, IconLocation, IconMessenger } from "./icons";
 
 export default function Footer() {
   return (
@@ -63,14 +63,21 @@ export default function Footer() {
             </h4>
             <ul className="flex flex-col gap-[11px]">
               <li className="flex items-center gap-[9px] text-[.96rem]">
-                <IconMail className="w-4 h-4 text-[oklch(0.62_0.05_255)]" /> math.ganbat@gmail.com
+                <IconMail className="w-4 h-4 text-[oklch(0.62_0.05_255)] shrink-0" /> math.ganbat@gmail.com
               </li>
               <li className="flex items-center gap-[9px] text-[.96rem]">
-                <IconPhone className="w-4 h-4 text-[oklch(0.62_0.05_255)]" /> 9939 5945
+                <IconPhone className="w-4 h-4 text-[oklch(0.62_0.05_255)] shrink-0" /> 9077 7400
+              </li>
+              <li className="flex items-start gap-[9px] text-[.96rem]">
+                <IconLocation className="w-4 h-4 text-[oklch(0.62_0.05_255)] shrink-0 mt-0.5" />
+                Улаанбаатар хот, Сүхбаатар дүүрэг, 1-р хороо, 1-р сургуулийн замын эсрэг талд, Чонон
+                бүрт төв, 406 тоот
               </li>
               <li className="flex items-center gap-[9px] text-[.96rem]">
-                <IconInstagram className="w-4 h-4 text-[oklch(0.62_0.05_255)]" /> Instagram ·
-                Facebook
+                <IconMessenger className="w-4 h-4 text-[oklch(0.62_0.05_255)] shrink-0" />
+                <a href="https://www.facebook.com/ganbat.surgalt/" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">
+                  Facebook
+                </a>
               </li>
             </ul>
           </div>

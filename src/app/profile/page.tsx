@@ -90,7 +90,7 @@ export default async function ProfilePage() {
                           {r.status === "active" ? (
                             <div className="mt-4 pt-4 border-t border-line grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <a
-                                href="https://facebook.com"
+                                href="https://www.facebook.com/ganbat.surgalt/"
                                 target="_blank"
                                 rel="noreferrer"
                                 className="flex items-center gap-2.5 bg-blue-soft text-blue-strong font-bold text-[.9rem] rounded-sm px-4 py-3"

@@ -99,7 +99,7 @@ export default function Faq() {
               Facebook хуудасны AI туслахтай холбогдож хүссэн зүйлээ асууж тодруулаарай.
             </p>
             <a
-              href="https://facebook.com"
+              href="https://www.facebook.com/ganbat.surgalt/"
               target="_blank"
               rel="noreferrer"
               className="flex items-center justify-center gap-[10px] w-full mt-[22px] bg-white text-blue-strong font-extrabold px-4 py-4 rounded-full shadow-sm transition-transform hover:-translate-y-0.5"
