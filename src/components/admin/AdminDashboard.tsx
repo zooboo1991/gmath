@@ -53,6 +53,8 @@ export default function AdminDashboard({
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
   const [articleForm, setArticleForm] = useState(emptyArticleForm);
   const [articleFormError, setArticleFormError] = useState<string | null>(null);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [coverUploadError, setCoverUploadError] = useState<string | null>(null);
 
   const logout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -154,6 +156,7 @@ export default function AdminDashboard({
     setEditingArticleId(null);
     setArticleForm(emptyArticleForm);
     setArticleFormError(null);
+    setCoverUploadError(null);
     setShowArticleForm(true);
   };
 
@@ -168,7 +171,31 @@ export default function AdminDashboard({
       featured: article.featured,
     });
     setArticleFormError(null);
+    setCoverUploadError(null);
     setShowArticleForm(true);
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setCoverUploading(true);
+    setCoverUploadError(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/admin/upload", { method: "POST", body });
+      const json = await res.json();
+      if (!res.ok) {
+        setCoverUploadError(json.error ?? "Байршуулахад алдаа гарлаа");
+        return;
+      }
+      setArticleForm((f) => ({ ...f, coverImage: json.url }));
+    } catch {
+      setCoverUploadError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setCoverUploading(false);
+    }
   };
 
   const saveArticle = async () => {
@@ -511,13 +538,20 @@ export default function AdminDashboard({
                   rows={7}
                 />
               </AdminField>
-              <AdminField label="Зургийн URL">
-                <input
-                  value={articleForm.coverImage}
-                  onChange={(e) => setArticleForm((f) => ({ ...f, coverImage: e.target.value }))}
-                  placeholder="https://..."
-                />
-              </AdminField>
+              <div>
+                <label className="block text-[.85rem] font-extrabold text-ink mb-1.5">Тэргүүн зураг</label>
+                {articleForm.coverImage && (
+                  <div className="w-full h-[140px] rounded-xs overflow-hidden bg-bg-soft mb-2.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={articleForm.coverImage} alt="" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <label className="inline-flex items-center gap-2 text-[.85rem] font-extrabold text-blue-strong bg-blue-soft px-4 py-2.5 rounded-full cursor-pointer">
+                  {coverUploading ? "Байршуулж байна…" : articleForm.coverImage ? "Зураг солих" : "Зураг сонгох"}
+                  <input type="file" accept="image/*" className="hidden" disabled={coverUploading} onChange={handleCoverUpload} />
+                </label>
+                {coverUploadError && <p className="text-[.82rem] font-semibold text-red-soft mt-1.5">{coverUploadError}</p>}
+              </div>
               <AdminField label="Зохиогч">
                 <input value={articleForm.author} onChange={(e) => setArticleForm((f) => ({ ...f, author: e.target.value }))} />
               </AdminField>
@@ -536,8 +570,9 @@ export default function AdminDashboard({
 
             <button
               type="button"
+              disabled={coverUploading}
               onClick={saveArticle}
-              className="w-full mt-6 font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5"
+              className="w-full mt-6 font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
             >
               Хадгалах
             </button>
