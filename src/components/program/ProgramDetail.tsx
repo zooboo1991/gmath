@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { RegisterTriggerButton } from "./ProgramRegister";
+import { staticProgramById } from "@/lib/staticPrograms";
 import { IconTrophy, IconPerson, IconClock, IconPlayBox, IconCheckCircle, IconPeopleHero, IconGraduationCap, IconGrid, IconDocument } from "@/components/icons";
 
 const whyItems = [
@@ -71,8 +72,9 @@ export default function ProgramDetail({
   categoryWord: string;
   grade: string;
 }) {
-  const price = "2,800,000₮";
-  const program = { id: `program-${category.toLowerCase()}`, label: `1 жилийн хөтөлбөр (${category} ангилал)`, price };
+  const programId = `program-${category.toLowerCase()}`;
+  const { label, price } = staticProgramById[programId];
+  const program = { id: programId, label, price };
 
   return (
     <>

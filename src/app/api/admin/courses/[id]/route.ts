@@ -1,6 +1,25 @@
 import { NextResponse } from "next/server";
 import { deleteCourse, updateCourse } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
+import { isTooLong, MAX_LEN } from "@/lib/validate";
+
+function validateCourseFields(data: Record<string, unknown>): string | null {
+  if (isTooLong(data.tag, MAX_LEN.courseTag)) return "Ангилал тэмдэглэгээ хэт урт байна";
+  if (isTooLong(data.title, MAX_LEN.courseTitle)) return "Гарчиг хэт урт байна";
+  if (isTooLong(data.topics, MAX_LEN.courseTopics)) return "Тайлбар хэт урт байна";
+  if (isTooLong(data.price, MAX_LEN.coursePrice)) return "Үнэ хэт урт байна";
+  if (isTooLong(data.period, MAX_LEN.coursePeriod)) return "Хугацааны нэгж хэт урт байна";
+  if (isTooLong(data.startDate, MAX_LEN.courseDate)) return "Хичээллэх өдөр хэт урт байна";
+  if (isTooLong(data.mode, MAX_LEN.courseMode)) return "Төрөл хэт урт байна";
+  if (Array.isArray(data.lessons)) {
+    for (const l of data.lessons as { topic?: string; schedule?: string }[]) {
+      if (isTooLong(l.topic, MAX_LEN.lessonTopic) || isTooLong(l.schedule, MAX_LEN.lessonSchedule)) {
+        return "Хичээлийн мэдээлэл хэт урт байна";
+      }
+    }
+  }
+  return null;
+}
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) {
@@ -8,6 +27,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
   const { id } = await params;
   const data = await request.json();
+
+  if (
+    (data.tag !== undefined && !data.tag.trim()) ||
+    (data.title !== undefined && !data.title.trim()) ||
+    (data.price !== undefined && !data.price.trim()) ||
+    (data.period !== undefined && !data.period.trim())
+  ) {
+    return NextResponse.json({ ok: false, error: "Заавал бөглөх талбаруудыг хоослож болохгүй" }, { status: 400 });
+  }
+  const lengthError = validateCourseFields(data);
+  if (lengthError) {
+    return NextResponse.json({ ok: false, error: lengthError }, { status: 400 });
+  }
 
   const lessons = Array.isArray(data.lessons)
     ? data.lessons

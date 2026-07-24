@@ -48,6 +48,10 @@ create table if not exists registrations (
 
 create index if not exists registrations_user_id_idx on registrations(user_id);
 
+-- Prevents a user from ending up with two registrations for the same
+-- program (double-click, retried request, two tabs racing, etc).
+create unique index if not exists registrations_user_program_unique on registrations(user_id, program_id);
+
 create table if not exists articles (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -57,6 +61,14 @@ create table if not exists articles (
   author text not null,
   featured boolean not null default false,
   created_at timestamptz not null default now()
+);
+
+-- Fixed-window rate limiting for login/register/reset-password (see
+-- src/lib/rateLimit.ts). Key is e.g. "login:<phone>" or "register:<ip>".
+create table if not exists rate_limits (
+  key text primary key,
+  attempts int not null default 0,
+  window_start timestamptz not null default now()
 );
 
 -- Seed the same starter courses the site ships with today, so /courses

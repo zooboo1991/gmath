@@ -14,9 +14,6 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) {
     return NextResponse.json({ ok: false, error: "Файл олдсонгүй" }, { status: 400 });
   }
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ ok: false, error: "Зөвхөн зураг оруулна уу" }, { status: 400 });
-  }
   if (file.size > MAX_SIZE) {
     return NextResponse.json({ ok: false, error: "Зургийн хэмжээ 5MB-ээс ихгүй байх ёстой" }, { status: 400 });
   }
@@ -24,7 +21,13 @@ export async function POST(request: Request) {
   try {
     const url = await uploadCoverImage(file);
     return NextResponse.json({ ok: true, url });
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message === "unsupported_image_type") {
+      return NextResponse.json(
+        { ok: false, error: "Зөвхөн PNG, JPG, GIF, WEBP форматын зураг оруулна уу" },
+        { status: 400 }
+      );
+    }
     return NextResponse.json({ ok: false, error: "Зураг байршуулахад алдаа гарлаа" }, { status: 500 });
   }
 }

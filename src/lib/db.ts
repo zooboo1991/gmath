@@ -8,6 +8,13 @@ import { hashPassword, verifyPassword as verifyPasswordHash } from "./password";
  * so callers just needed `await` added.
  */
 
+// Postgres' own "invalid input syntax for type uuid" error (22P02) — a
+// malformed id (e.g. from a mistyped URL or a forged session cookie) should
+// mean "not found", not a 500.
+function isInvalidUuidError(err: unknown): boolean {
+  return (err as { code?: string } | null)?.code === "22P02";
+}
+
 export type Role = "teacher" | "student";
 export type PayMethod = "qpay" | "bank";
 export type RegistrationStatus = "pending" | "active";
@@ -196,7 +203,10 @@ export async function findUserByPhone(phone: string): Promise<User | undefined> 
 
 export async function findUserById(id: string): Promise<User | undefined> {
   const { data, error } = await getSupabase().from("users").select("*").eq("id", id).maybeSingle();
-  if (error) throw error;
+  if (error) {
+    if (isInvalidUuidError(error)) return undefined;
+    throw error;
+  }
   return data ? userFromRow(data as UserRow) : undefined;
 }
 
@@ -275,7 +285,10 @@ export async function listCourses(kind?: CourseKind): Promise<Course[]> {
 
 export async function findCourseById(id: string): Promise<Course | undefined> {
   const { data, error } = await getSupabase().from("courses").select("*").eq("id", id).maybeSingle();
-  if (error) throw error;
+  if (error) {
+    if (isInvalidUuidError(error)) return undefined;
+    throw error;
+  }
   return data ? courseFromRow(data as CourseRow) : undefined;
 }
 
@@ -335,7 +348,10 @@ export async function listArticles(): Promise<Article[]> {
 
 export async function findArticleById(id: string): Promise<Article | undefined> {
   const { data, error } = await getSupabase().from("articles").select("*").eq("id", id).maybeSingle();
-  if (error) throw error;
+  if (error) {
+    if (isInvalidUuidError(error)) return undefined;
+    throw error;
+  }
   return data ? articleFromRow(data as ArticleRow) : undefined;
 }
 

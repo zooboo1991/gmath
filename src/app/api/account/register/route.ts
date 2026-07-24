@@ -1,23 +1,40 @@
 import { NextResponse } from "next/server";
 import { createUser, toPublicUser } from "@/lib/db";
 import { setSessionUser } from "@/lib/session";
+import { isTooLong, MAX_LEN } from "@/lib/validate";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 const PHONE_RE = /^[0-9]{8}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
 
 export async function POST(request: Request) {
+  const rate = await checkRateLimit(`register:${getClientIp(request)}`, 15, 10 * 60);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { ok: false, error: "Хэт олон удаа оролдлоо. Хэдэн минутын дараа дахин оролдоно уу." },
+      { status: 429 }
+    );
+  }
+
   const data = await request.json();
   const errors: Record<string, string> = {};
 
   if (data.role !== "teacher" && data.role !== "student") errors.role = "Төрлөө сонгоно уу";
   if (!data.lastName?.trim()) errors.lastName = "Овог заавал бөглөнө үү";
+  else if (isTooLong(data.lastName, MAX_LEN.name)) errors.lastName = "Овог хэт урт байна";
   if (!data.firstName?.trim()) errors.firstName = "Нэр заавал бөглөнө үү";
+  else if (isTooLong(data.firstName, MAX_LEN.name)) errors.firstName = "Нэр хэт урт байна";
   if (!data.school?.trim()) errors.school = "Сургуулийн нэрийг бөглөнө үү";
+  else if (isTooLong(data.school, MAX_LEN.school)) errors.school = "Сургуулийн нэр хэт урт байна";
   if (data.role === "student" && !data.grade?.trim()) errors.grade = "Ангийг бөглөнө үү";
+  if (isTooLong(data.grade, MAX_LEN.name)) errors.grade = "Анги хэт урт байна";
   if (!PHONE_RE.test(data.phone?.trim() ?? "")) errors.phone = "8 оронтой утасны дугаар оруулна уу";
-  if (!EMAIL_RE.test(data.email?.trim() ?? "")) errors.email = "И-мэйл хаяг буруу байна";
-  if (!PASSWORD_RE.test(data.password ?? ""))
+  if (!EMAIL_RE.test(data.email?.trim() ?? "") || isTooLong(data.email, MAX_LEN.email))
+    errors.email = "И-мэйл хаяг буруу байна";
+  if (isTooLong(data.facebook, MAX_LEN.social)) errors.facebook = "Facebook нэр хэт урт байна";
+  if (isTooLong(data.zoom, MAX_LEN.social)) errors.zoom = "Zoom нэр хэт урт байна";
+  if (!PASSWORD_RE.test(data.password ?? "") || isTooLong(data.password, MAX_LEN.password))
     errors.password = "Нууц үг том, жижиг үсэг, тоо орсон, дор хаяж 6 тэмдэгт байна";
   if (data.passwordConfirm !== data.password) errors.passwordConfirm = "Нууц үг таарахгүй байна";
 

@@ -1,28 +1,73 @@
 import { cookies } from "next/headers";
+import { createHmac, timingSafeEqual } from "crypto";
 import { findUserById, type User } from "./db";
 
 /**
- * Placeholder auth. The cookie just stores a user id in plain text — there
- * is no password, no signing, no expiry beyond maxAge. Good enough to demo
- * the "logged in?" branch from the registration flow; replace with real
- * auth (NextAuth, Supabase Auth, etc.) before this goes anywhere near
- * production.
+ * Placeholder auth: a signed cookie stands in for a real session store
+ * (NextAuth, Supabase Auth, etc). The signature stops a raw cookie value
+ * from being forged/replayed, but there's still no server-side revocation
+ * (changing a password doesn't invalidate existing sessions) — replace
+ * with real auth before this needs to withstand serious attack.
+ *
+ * If SESSION_SECRET isn't set, sessions fall back to unsigned (the old
+ * behavior) rather than crashing every page load — a missing env var on a
+ * fresh deploy shouldn't take the whole site down. Set SESSION_SECRET and
+ * redeploy to turn on real signing; every existing session is logged out
+ * the moment that happens (old raw-id cookies won't verify).
  */
 
 const SESSION_COOKIE = "session_user_id";
 const ADMIN_COOKIE = "admin_session";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ganbat-admin-2026";
+const ADMIN_MARKER = "admin-ok";
+
+function getSessionSecret(): string | null {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    console.error(
+      "[session] SESSION_SECRET is not set — sessions are UNSIGNED and forgeable. Set SESSION_SECRET and redeploy."
+    );
+    return null;
+  }
+  return secret;
+}
+
+function sign(value: string): string {
+  const secret = getSessionSecret();
+  if (!secret) return value;
+  const mac = createHmac("sha256", secret).update(value).digest("hex");
+  return `${value}.${mac}`;
+}
+
+function unsign(cookieValue: string): string | null {
+  const secret = getSessionSecret();
+  if (!secret) return cookieValue;
+
+  const idx = cookieValue.lastIndexOf(".");
+  if (idx === -1) return null;
+  const value = cookieValue.slice(0, idx);
+  const mac = cookieValue.slice(idx + 1);
+  const expectedMac = createHmac("sha256", secret).update(value).digest("hex");
+
+  const macBuffer = Buffer.from(mac, "hex");
+  const expectedBuffer = Buffer.from(expectedMac, "hex");
+  if (macBuffer.length !== expectedBuffer.length || !timingSafeEqual(macBuffer, expectedBuffer)) {
+    return null;
+  }
+  return value;
+}
 
 export async function getSessionUser(): Promise<User | null> {
   const store = await cookies();
-  const id = store.get(SESSION_COOKIE)?.value;
+  const raw = store.get(SESSION_COOKIE)?.value;
+  if (!raw) return null;
+  const id = unsign(raw);
   if (!id) return null;
   return (await findUserById(id)) ?? null;
 }
 
 export async function setSessionUser(userId: string) {
   const store = await cookies();
-  store.set(SESSION_COOKIE, userId, {
+  store.set(SESSION_COOKIE, sign(userId), {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
@@ -37,12 +82,14 @@ export async function clearSessionUser() {
 
 export async function isAdmin(): Promise<boolean> {
   const store = await cookies();
-  return store.get(ADMIN_COOKIE)?.value === "1";
+  const raw = store.get(ADMIN_COOKIE)?.value;
+  if (!raw) return false;
+  return unsign(raw) === ADMIN_MARKER;
 }
 
 export async function setAdminSession() {
   const store = await cookies();
-  store.set(ADMIN_COOKIE, "1", {
+  store.set(ADMIN_COOKIE, sign(ADMIN_MARKER), {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
@@ -56,5 +103,12 @@ export async function clearAdminSession() {
 }
 
 export function checkAdminPassword(password: string) {
-  return password === ADMIN_PASSWORD;
+  const expected = process.env.ADMIN_PASSWORD;
+  if (!expected) {
+    throw new Error("Missing ADMIN_PASSWORD environment variable.");
+  }
+  const a = Buffer.from(password);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }

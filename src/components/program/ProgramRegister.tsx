@@ -125,6 +125,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const [loginError, setLoginError] = useState<string | null>(null);
 
   const [resetPhone, setResetPhone] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
   const [resetPassword, setResetPassword] = useState("");
   const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
@@ -150,6 +151,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     setLoginPassword("");
     setLoginError(null);
     setResetPhone("");
+    setResetEmail("");
     setResetPassword("");
     setResetPasswordConfirm("");
     setResetError(null);
@@ -254,8 +256,12 @@ export default function ProgramRegisterProvider({ children }: { children: React.
       setResetError("8 оронтой утасны дугаар оруулна уу");
       return;
     }
-    if (resetPassword.length < 6) {
-      setResetError("Нууц үг дор хаяж 6 тэмдэгт байна");
+    if (!EMAIL_RE.test(resetEmail.trim())) {
+      setResetError("Бүртгүүлсэн и-мэйл хаягаа зөв оруулна уу");
+      return;
+    }
+    if (!PASSWORD_RE.test(resetPassword)) {
+      setResetError("Нууц үг том, жижиг үсэг, тоо орсон, дор хаяж 6 тэмдэгт байна");
       return;
     }
     if (resetPassword !== resetPasswordConfirm) {
@@ -267,7 +273,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
       const res = await fetch("/api/account/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: resetPhone.trim(), newPassword: resetPassword }),
+        body: JSON.stringify({ phone: resetPhone.trim(), email: resetEmail.trim(), newPassword: resetPassword }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -316,14 +322,12 @@ export default function ProgramRegisterProvider({ children }: { children: React.
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           programId: program.id,
-          programLabel: program.label,
-          price: program.price,
           payMethod: method,
         }),
       });
       const json = await res.json();
       if (!res.ok) {
-        setSubmitError("Илгээхэд алдаа гарлаа. Дахин оролдоно уу.");
+        setSubmitError(json.error ?? "Илгээхэд алдаа гарлаа. Дахин оролдоно уу.");
         return;
       }
       setRegistrationStatus(json.registration.status);
@@ -446,7 +450,19 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     inputMode="numeric"
                   />
                 </FormField>
-                <FormField label="Шинэ нууц үг" required error={resetError ? "e" : undefined}>
+                <FormField label="Бүртгүүлсэн и-мэйл хаяг" required error={resetError ? "e" : undefined}>
+                  <input
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="name@mail.com"
+                  />
+                </FormField>
+                <FormField
+                  label="Шинэ нууц үг"
+                  required
+                  error={resetError ? "e" : undefined}
+                  hint="том, жижиг үсэг, тоо орсон, дор хаяж 6 тэмдэгт"
+                >
                   <input
                     type="password"
                     value={resetPassword}

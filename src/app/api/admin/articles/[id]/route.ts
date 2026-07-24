@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { deleteArticle, updateArticle } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
+import { isTooLong, MAX_LEN } from "@/lib/validate";
+
+function validateArticleFields(data: Record<string, unknown>): string | null {
+  if (isTooLong(data.title, MAX_LEN.articleTitle)) return "Гарчиг хэт урт байна";
+  if (isTooLong(data.excerpt, MAX_LEN.articleExcerpt)) return "Товч танилцуулга хэт урт байна";
+  if (isTooLong(data.content, MAX_LEN.articleContent)) return "Нийтлэлийн эх хэт урт байна";
+  if (isTooLong(data.author, MAX_LEN.articleAuthor)) return "Зохиогчийн нэр хэт урт байна";
+  return null;
+}
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) {
@@ -8,6 +17,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
   const { id } = await params;
   const data = await request.json();
+
+  if (
+    (data.title !== undefined && !data.title.trim()) ||
+    (data.excerpt !== undefined && !data.excerpt.trim()) ||
+    (data.content !== undefined && !data.content.trim()) ||
+    (data.coverImage !== undefined && !data.coverImage.trim()) ||
+    (data.author !== undefined && !data.author.trim())
+  ) {
+    return NextResponse.json({ ok: false, error: "Заавал бөглөх талбаруудыг хоослож болохгүй" }, { status: 400 });
+  }
+  const lengthError = validateArticleFields(data);
+  if (lengthError) {
+    return NextResponse.json({ ok: false, error: lengthError }, { status: 400 });
+  }
 
   const article = await updateArticle(id, {
     title: data.title?.trim(),
