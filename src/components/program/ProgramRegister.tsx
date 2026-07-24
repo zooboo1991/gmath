@@ -55,6 +55,7 @@ const emptyFields: FieldData = {
 
 const PHONE_RE = /^[0-9]{8}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
 
 type Errors = Partial<Record<keyof FieldData, boolean>>;
 
@@ -114,7 +115,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const [program, setProgram] = useState<Program | null>(null);
   const [screen, setScreen] = useState<Screen>("login");
 
-  const [registerStep, setRegisterStep] = useState<1 | 2>(1);
+  const [registerStep, setRegisterStep] = useState<1 | 2 | 3>(1);
   const [role, setRole] = useState<Role | null>(null);
   const [fields, setFields] = useState<FieldData>(emptyFields);
   const [errors, setErrors] = useState<Errors>({});
@@ -188,7 +189,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     setErrors((e) => ({ ...e, [name]: undefined }));
   };
 
-  const validateFields = () => {
+  const validateInfoFields = () => {
     const next: Errors = {};
     if (!fields.lastName.trim()) next.lastName = true;
     if (!fields.firstName.trim()) next.firstName = true;
@@ -196,10 +197,20 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     if (role === "student" && !fields.grade.trim()) next.grade = true;
     if (!PHONE_RE.test(fields.phone.trim())) next.phone = true;
     if (!EMAIL_RE.test(fields.email.trim())) next.email = true;
-    if (fields.password.length < 6) next.password = true;
-    if (fields.passwordConfirm !== fields.password) next.passwordConfirm = true;
-    setErrors(next);
+    setErrors((e) => ({ ...e, ...next }));
     return Object.keys(next).length === 0;
+  };
+
+  const validatePasswordFields = () => {
+    const next: Errors = {};
+    if (!PASSWORD_RE.test(fields.password)) next.password = true;
+    if (fields.passwordConfirm !== fields.password) next.passwordConfirm = true;
+    setErrors((e) => ({ ...e, ...next }));
+    return Object.keys(next).length === 0;
+  };
+
+  const handleContinueToPassword = () => {
+    if (validateInfoFields()) setRegisterStep(3);
   };
 
   const afterAuthed = (user: SessionUser) => {
@@ -272,7 +283,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   };
 
   const handleRegisterSubmit = async () => {
-    if (!validateFields()) return;
+    if (!validatePasswordFields()) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -324,7 +335,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     }
   };
 
-  const stepIndex = { login: 2, reset: 2, register: registerStep, payment: 3, success: 4 }[screen];
+  const stepIndex = registerStep;
 
   return (
     <ModalCtx.Provider value={{ sessionUser, open, openLogin, openRegister, logout }}>
@@ -364,9 +375,9 @@ export default function ProgramRegisterProvider({ children }: { children: React.
               </p>
             )}
 
-            {screen !== "login" && screen !== "reset" && (
+            {screen === "register" && (
               <div className="flex gap-1.5 my-[18px]">
-                {[1, 2, 3, 4].map((n) => (
+                {[1, 2, 3].map((n) => (
                   <i key={n} className={`flex-1 h-1 rounded-sm ${n <= stepIndex ? "bg-blue" : "bg-line-2"}`} />
                 ))}
               </div>
@@ -548,19 +559,6 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   </FormField>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
-                  <FormField label="Нууц үг" required error={errors.password ? "e" : undefined} hint="дор хаяж 6 тэмдэгт">
-                    <input type="password" value={fields.password} onChange={(e) => setField("password", e.target.value)} placeholder="••••••••" />
-                  </FormField>
-                  <FormField label="Нууц үг давтах" required error={errors.passwordConfirm ? "e" : undefined}>
-                    <input
-                      type="password"
-                      value={fields.passwordConfirm}
-                      onChange={(e) => setField("passwordConfirm", e.target.value)}
-                      placeholder="••••••••"
-                    />
-                  </FormField>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
                   <FormField label="Facebook аккаунт нэр">
                     <input value={fields.facebook} onChange={(e) => setField("facebook", e.target.value)} placeholder="Facebook нэр" />
                   </FormField>
@@ -568,8 +566,6 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     <input value={fields.zoom} onChange={(e) => setField("zoom", e.target.value)} placeholder="Zoom нэр" />
                   </FormField>
                 </div>
-
-                {submitError && <p className="text-[.85rem] font-semibold text-red-soft mb-3">{submitError}</p>}
 
                 <div className="flex gap-3.5 mt-1.5">
                   <button
@@ -581,11 +577,51 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   </button>
                   <button
                     type="button"
+                    onClick={handleContinueToPassword}
+                    className="flex-1 font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5"
+                  >
+                    Үргэлжлүүлэх →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {screen === "register" && registerStep === 3 && (
+              <div>
+                <FormField
+                  label="Нууц үг"
+                  required
+                  error={errors.password ? "e" : undefined}
+                  hint="Том, жижиг үсэг, тоо орсон, дор хаяж 6 тэмдэгт"
+                >
+                  <input type="password" value={fields.password} onChange={(e) => setField("password", e.target.value)} placeholder="••••••••" />
+                </FormField>
+                <FormField label="Нууц үг давтах" required error={errors.passwordConfirm ? "e" : undefined}>
+                  <input
+                    type="password"
+                    value={fields.passwordConfirm}
+                    onChange={(e) => setField("passwordConfirm", e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </FormField>
+
+                {submitError && <p className="text-[.85rem] font-semibold text-red-soft mb-3">{submitError}</p>}
+
+                <div className="flex gap-3.5 mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setRegisterStep(2)}
+                    className="font-extrabold rounded-full bg-surface-2 text-ink-2 shadow-[inset_0_0_0_1.5px_var(--color-line-2)] px-[26px] py-4 transition-colors hover:text-ink"
+                  >
+                    ← Буцах
+                  </button>
+                  <button
+                    type="button"
                     disabled={submitting}
                     onClick={handleRegisterSubmit}
                     className="flex-1 font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
                   >
-                    {submitting ? "Илгээж байна…" : "Үргэлжлүүлэх →"}
+                    {submitting ? "Илгээж байна…" : "Бүртгүүлэх"}
                   </button>
                 </div>
               </div>

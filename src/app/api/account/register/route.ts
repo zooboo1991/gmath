@@ -4,6 +4,7 @@ import { setSessionUser } from "@/lib/session";
 
 const PHONE_RE = /^[0-9]{8}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
 
 export async function POST(request: Request) {
   const data = await request.json();
@@ -16,7 +17,9 @@ export async function POST(request: Request) {
   if (data.role === "student" && !data.grade?.trim()) errors.grade = "Ангийг бөглөнө үү";
   if (!PHONE_RE.test(data.phone?.trim() ?? "")) errors.phone = "8 оронтой утасны дугаар оруулна уу";
   if (!EMAIL_RE.test(data.email?.trim() ?? "")) errors.email = "И-мэйл хаяг буруу байна";
-  if (!data.password || String(data.password).length < 6) errors.password = "Нууц үг дор хаяж 6 тэмдэгт байна";
+  if (!PASSWORD_RE.test(data.password ?? ""))
+    errors.password = "Нууц үг том, жижиг үсэг, тоо орсон, дор хаяж 6 тэмдэгт байна";
+  if (data.passwordConfirm !== data.password) errors.passwordConfirm = "Нууц үг таарахгүй байна";
 
   if (Object.keys(errors).length > 0) {
     return NextResponse.json({ ok: false, errors }, { status: 400 });
