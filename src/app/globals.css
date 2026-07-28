@@ -209,6 +209,19 @@
   transform: translateY(26px);
   transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* The reveal class is only ever cleared by JS, so if the bundle fails to run
+   every wrapped element — including the whole course grid — stays invisible.
+   Belt and braces: reveal after a moment even if the observer never fires,
+   and show everything immediately when scripting is off entirely. */
+.reveal {
+  animation: reveal-fallback 0s linear 2.5s forwards;
+}
+@keyframes reveal-fallback {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 .reveal.in {
   opacity: 1;
   transform: none;

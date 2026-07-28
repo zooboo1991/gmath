@@ -62,6 +62,9 @@ type Errors = Partial<Record<keyof FieldData, boolean>>;
 
 type Ctx = {
   sessionUser: SessionUser;
+  /** False until /api/account/me has answered, so the header can avoid
+   *  rendering "Нэвтрэх" at a visitor who is in fact already signed in. */
+  sessionLoaded: boolean;
   open: (program: Program) => void;
   openLogin: () => void;
   openRegister: () => void;
@@ -112,6 +115,7 @@ export function AuthTriggerButton({
 
 export default function ProgramRegisterProvider({ children }: { children: React.ReactNode }) {
   const [sessionUser, setSessionUser] = useState<SessionUser>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [program, setProgram] = useState<Program | null>(null);
   const [screen, setScreen] = useState<Screen>("login");
@@ -141,7 +145,8 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     fetch("/api/account/me")
       .then((res) => res.json())
       .then((json) => setSessionUser(json.user))
-      .catch(() => setSessionUser(null));
+      .catch(() => setSessionUser(null))
+      .finally(() => setSessionLoaded(true));
   }, []);
 
   const resetTransient = () => {
@@ -377,7 +382,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   }, [isOpen]);
 
   return (
-    <ModalCtx.Provider value={{ sessionUser, open, openLogin, openRegister, logout }}>
+    <ModalCtx.Provider value={{ sessionUser, sessionLoaded, open, openLogin, openRegister, logout }}>
       {children}
 
       {isOpen && (

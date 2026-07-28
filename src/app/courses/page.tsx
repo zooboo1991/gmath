@@ -44,21 +44,25 @@ export default async function CoursesPage() {
               <h2 className="text-[1.4rem] font-extrabold">Удахгүй эхлэх сургалтууд</h2>
               <span className="text-[.9rem] font-bold text-ink-3">{upcomingCourses.length} хөтөлбөр</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 nav:grid-cols-3 gap-5">
-              {upcomingCourses.map((c) => (
-                <CourseCard
-                  key={c.id}
-                  tag={c.tag}
-                  title={c.title}
-                  topics={c.topics}
-                  price={c.price}
-                  period={c.period}
-                  ctaHref={`/courses/${c.id}`}
-                  ctaLabel="Дэлгэрэнгүй"
-                  extra={<CourseMeta startDate={c.startDate ?? ""} mode={c.mode ?? ""} />}
-                />
-              ))}
-            </div>
+            {upcomingCourses.length === 0 ? (
+              <CoursesEmpty text="Одоогоор элсэлт авч байгаа сургалт алга байна. Дээрх жилийн хөтөлбөрүүдээс сонгох, эсвэл удахгүй дахин зочилно уу." />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 nav:grid-cols-3 gap-5">
+                {upcomingCourses.map((c) => (
+                  <CourseCard
+                    key={c.id}
+                    tag={c.tag}
+                    title={c.title}
+                    topics={c.topics}
+                    price={c.price}
+                    period={c.period}
+                    ctaHref={`/courses/${c.id}`}
+                    ctaLabel="Дэлгэрэнгүй"
+                    extra={<CourseMeta startDate={c.startDate ?? ""} mode={c.mode ?? ""} />}
+                  />
+                ))}
+              </div>
+            )}
 
             <div className="flex items-baseline gap-3.5 mt-14 mb-[22px]">
               <h2 className="text-[1.4rem] font-extrabold">Бичлэгээр үзэх сургалтууд</h2>
@@ -66,25 +70,47 @@ export default async function CoursesPage() {
                 Хүссэн үедээ нөхөж үзэх боломжтой
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 nav:grid-cols-3 gap-5">
-              {vodCourses.map((c) => (
-                <CourseCard
-                  key={c.id}
-                  tag={c.tag}
-                  title={c.title}
-                  topics={c.topics}
-                  price={c.price}
-                  period={c.period}
-                  ctaHref={`/courses/${c.id}`}
-                  ctaLabel="Дэлгэрэнгүй"
-                  extra={<VodStatus />}
-                />
-              ))}
-            </div>
+            {vodCourses.length === 0 ? (
+              <CoursesEmpty text="Бичлэгээр үзэх сургалт удахгүй нэмэгдэнэ." />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 nav:grid-cols-3 gap-5">
+                {vodCourses.map((c) => (
+                  <CourseCard
+                    key={c.id}
+                    tag={c.tag}
+                    title={c.title}
+                    topics={c.topics}
+                    price={c.price}
+                    period={c.period}
+                    ctaHref={`/courses/${c.id}`}
+                    ctaLabel="Дэлгэрэнгүй"
+                    extra={<VodStatus />}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </main>
       <Footer />
     </>
+  );
+}
+
+// An empty list used to render as a bare gap under the heading, leaving the
+// visitor with nothing to read and nowhere to go.
+function CoursesEmpty({ text }: { text: string }) {
+  return (
+    <div className="bg-surface border border-line rounded-md px-6 py-10 text-center">
+      <p className="text-ink-2 font-medium max-w-[46ch] mx-auto">{text}</p>
+      <a
+        href="https://www.facebook.com/ganbat.surgalt/"
+        target="_blank"
+        rel="noreferrer"
+        className="btn-ring inline-flex items-center justify-center gap-2 font-extrabold rounded-full bg-surface text-ink px-[26px] py-[14px] mt-5 transition-colors hover:text-blue-strong"
+      >
+        Facebook хуудсаас мэдээлэл авах <span>→</span>
+      </a>
+    </div>
   );
 }

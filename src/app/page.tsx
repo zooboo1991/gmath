@@ -7,10 +7,12 @@ import Courses from "@/components/Courses";
 import Faq from "@/components/Faq";
 import FinalCta from "@/components/FinalCta";
 import Footer from "@/components/Footer";
+import JsonLd, { organizationSchema } from "@/components/JsonLd";
 
 export default function Home() {
   return (
     <>
+      <JsonLd data={organizationSchema} />
       <Navbar />
       <main id="top">
         <Hero />

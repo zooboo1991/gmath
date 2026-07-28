@@ -3,7 +3,7 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ArticleCard from "@/components/ArticleCard";
-import { listArticles } from "@/lib/db";
+import { listArticleSummaries } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ArticlesPage() {
-  const articles = await listArticles();
+  const articles = await listArticleSummaries();
 
   if (articles.length === 0) {
     return (

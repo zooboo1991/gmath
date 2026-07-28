@@ -4,10 +4,14 @@ import HashScroll from "@/components/HashScroll";
 import ProgramRegisterProvider from "@/components/program/ProgramRegister";
 import "./globals.css";
 
+// Cyrillic + latin means every weight here is two font files. 900 was used
+// by exactly one decorative number (now 800), so it is dropped; 400 stays as
+// the fallback weight for rich-text article bodies.
 const nunito = Nunito({
   variable: "--font-nunito",
   subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
 });
 
 const SITE_URL = "https://gmath.mn";
@@ -52,6 +56,9 @@ export default function RootLayout({
   return (
     <html lang="mn" className={`${nunito.variable} scroll-smooth scroll-pt-[76px]`}>
       <body className="bg-bg text-ink font-sans text-[17px] font-medium leading-[1.6] antialiased">
+        <noscript>
+          <style>{`.reveal{opacity:1!important;transform:none!important;animation:none!important}`}</style>
+        </noscript>
         <HashScroll />
         <ProgramRegisterProvider>{children}</ProgramRegisterProvider>
       </body>

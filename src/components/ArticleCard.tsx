@@ -1,13 +1,13 @@
 import Link from "next/link";
 import Reveal from "./Reveal";
 import { IconPerson } from "./icons";
-import type { Article } from "@/lib/db";
+import type { ArticleSummary } from "@/lib/db";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("mn-MN", { year: "numeric", month: "short", day: "numeric" });
 }
 
-export default function ArticleCard({ article }: { article: Article }) {
+export default function ArticleCard({ article }: { article: ArticleSummary }) {
   return (
     <Reveal>
       <Link href={`/articles/${article.id}`} className="group flex flex-col">

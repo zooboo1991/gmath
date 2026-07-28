@@ -297,6 +297,21 @@ export async function listCourses(
   return (data as CourseRow[]).map(courseFromRow);
 }
 
+/** Card-sized course: no lesson schedule, which is the bulky part of a row. */
+export type CourseSummary = Pick<Course, "id" | "tag" | "title" | "topics" | "price" | "period">;
+
+/** Used by the "related courses" strip, which never renders lessons. */
+export async function listPublishedCourseSummaries(limit?: number): Promise<CourseSummary[]> {
+  let query = getSupabase()
+    .from("courses")
+    .select("id, tag, title, topics, price, period")
+    .eq("status", "published");
+  if (limit) query = query.limit(limit);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as CourseSummary[];
+}
+
 export async function findCourseById(id: string): Promise<Course | undefined> {
   const { data, error } = await getSupabase().from("courses").select("*").eq("id", id).maybeSingle();
   if (error) {
@@ -364,6 +379,33 @@ export async function listArticles(): Promise<Article[]> {
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data as ArticleRow[]).map(articleFromRow);
+}
+
+/** Card-sized article: everything the listing needs, minus the body. */
+export type ArticleSummary = Omit<Article, "content">;
+
+/**
+ * Related/"other articles" strips only need card fields. Selecting the full
+ * `content` of every article — each one a rich-text HTML blob — just to render
+ * three cards is a lot of rows to haul over the wire for nothing.
+ */
+export async function listArticleSummaries(limit?: number): Promise<ArticleSummary[]> {
+  let query = getSupabase()
+    .from("articles")
+    .select("id, title, excerpt, cover_image, author, featured, created_at")
+    .order("created_at", { ascending: false });
+  if (limit) query = query.limit(limit);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data as Omit<ArticleRow, "content">[]).map((row) => ({
+    id: row.id,
+    title: row.title,
+    excerpt: row.excerpt,
+    coverImage: row.cover_image,
+    author: row.author,
+    featured: row.featured,
+    createdAt: row.created_at,
+  }));
 }
 
 export async function findArticleById(id: string): Promise<Article | undefined> {

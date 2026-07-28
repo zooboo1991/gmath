@@ -56,17 +56,25 @@ export default function CourseCard({
   );
 }
 
+// Start date and mode are optional on a course, so each row is dropped
+// entirely when empty — otherwise the card showed a bare "Хичээллэх өдөр:"
+// with nothing after the colon.
 export function CourseMeta({ startDate, mode }: { startDate: string; mode: string }) {
+  const formattedDate = formatCourseDate(startDate);
   return (
     <>
-      <div className="flex items-center gap-2 text-[.88rem] font-bold text-ink-2 mt-2">
-        <IconCalendar className="w-[15px] h-[15px] text-gold-strong shrink-0" />
-        Хичээллэх өдөр: {formatCourseDate(startDate)}
-      </div>
-      <div className="flex items-center gap-2 text-[.88rem] font-bold text-ink-2 mt-1.5">
-        <IconMonitor className="w-[15px] h-[15px] text-blue-strong shrink-0" />
-        Төрөл: {mode}
-      </div>
+      {formattedDate && (
+        <div className="flex items-center gap-2 text-[.88rem] font-bold text-ink-2 mt-2">
+          <IconCalendar className="w-[15px] h-[15px] text-gold-strong shrink-0" />
+          Хичээллэх өдөр: {formattedDate}
+        </div>
+      )}
+      {mode && (
+        <div className="flex items-center gap-2 text-[.88rem] font-bold text-ink-2 mt-1.5">
+          <IconMonitor className="w-[15px] h-[15px] text-blue-strong shrink-0" />
+          Төрөл: {mode}
+        </div>
+      )}
     </>
   );
 }

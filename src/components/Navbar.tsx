@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -18,9 +18,27 @@ export default function Navbar() {
   const scrolled = useScrolled(12);
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const { sessionUser, openLogin, openRegister } = useProgramRegister();
+  const { sessionUser, sessionLoaded, openLogin, openRegister } = useProgramRegister();
 
   const closeMenu = () => setOpen(false);
+
+  // The menu only closed when a link inside it was tapped, so it stayed open
+  // over the page after a back/forward navigation. Adjusted during render
+  // rather than in an effect, which would cause a cascading re-render.
+  const [menuPathname, setMenuPathname] = useState(pathname);
+  if (pathname !== menuPathname) {
+    setMenuPathname(pathname);
+    setOpen(false);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   return (
     <header
@@ -62,7 +80,12 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden nav:flex items-center gap-[10px] ml-2">
-          {sessionUser ? (
+          {!sessionLoaded ? (
+            // Placeholder of the same footprint: showing "Нэвтрэх" here first
+            // and swapping to the profile link a moment later told signed-in
+            // visitors they were signed out.
+            <div aria-hidden className="w-[180px] h-[46px] rounded-full bg-surface-2 animate-pulse" />
+          ) : sessionUser ? (
             <Link
               href="/profile"
               className="flex items-center gap-[10px] font-extrabold text-ink px-[8px] py-[6px] rounded-full hover:bg-blue-soft transition-colors"
@@ -137,7 +160,9 @@ export default function Navbar() {
             </Link>
           );
         })}
-        {sessionUser ? (
+        {!sessionLoaded ? (
+          <div aria-hidden className="h-[50px] mt-[10px] rounded-full bg-surface-2 animate-pulse" />
+        ) : sessionUser ? (
           <Link
             href="/profile"
             onClick={closeMenu}

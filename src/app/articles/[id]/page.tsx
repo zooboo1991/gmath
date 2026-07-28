@@ -5,7 +5,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ArticleCard from "@/components/ArticleCard";
 import { IconPerson } from "@/components/icons";
-import { findArticleById, listArticles } from "@/lib/db";
+import JsonLd, { SITE_URL } from "@/components/JsonLd";
+import { findArticleById, listArticleSummaries } from "@/lib/db";
 import { isHtmlContent } from "@/lib/articleContent";
 
 export const dynamic = "force-dynamic";
@@ -44,18 +45,44 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
   const article = await findArticleById(id);
   if (!article) notFound();
 
-  const allArticles = await listArticles();
-  const related = allArticles.filter((a) => a.id !== article.id).slice(0, 3);
+  // Fetch one extra so removing the current article still leaves three.
+  const related = (await listArticleSummaries(4)).filter((a) => a.id !== article.id).slice(0, 3);
   const isHtml = isHtmlContent(article.content);
   const paragraphs = isHtml ? [] : article.content.split("\n").map((p) => p.trim()).filter(Boolean);
 
   return (
     <>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: article.title,
+          description: article.excerpt,
+          inLanguage: "mn",
+          datePublished: article.createdAt,
+          author: { "@type": "Person", name: article.author },
+          publisher: {
+            "@type": "EducationalOrganization",
+            name: "Б.Ганбат багшийн математикийн сургалт",
+            url: SITE_URL,
+          },
+          mainEntityOfPage: `${SITE_URL}/articles/${article.id}`,
+          ...(article.coverImage ? { image: article.coverImage } : {}),
+        }}
+      />
       <Navbar />
       <main>
         <div className="relative h-[260px] sm:h-[400px] overflow-hidden">
+          {/* LCP element for this page — reserve its box and load it eagerly. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={article.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <img
+            src={article.coverImage}
+            alt=""
+            width={1600}
+            height={800}
+            fetchPriority="high"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
           <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(5,15,35,.55)_0%,rgba(5,15,35,.05)_60%)]" />
         </div>
 

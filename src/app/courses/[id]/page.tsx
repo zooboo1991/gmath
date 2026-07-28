@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CourseDetail, { type RelatedCourse } from "@/components/program/CourseDetail";
-import { findCourseById, listCourses } from "@/lib/db";
+import JsonLd, { SITE_URL } from "@/components/JsonLd";
+import { findCourseById, listPublishedCourseSummaries } from "@/lib/db";
+import { toIsoDate } from "@/lib/courseDate";
 import { yearlyPrograms } from "@/lib/staticPrograms";
 
 export const dynamic = "force-dynamic";
@@ -23,8 +25,8 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const course = await findCourseById(id);
   if (!course || course.status !== "published") notFound();
 
-  const allCourses = await listCourses();
-  const otherDbCourses = allCourses.filter((c) => c.id !== course.id);
+  // Four, so dropping the current course still leaves three to show.
+  const otherDbCourses = (await listPublishedCourseSummaries(4)).filter((c) => c.id !== course.id);
   const related: RelatedCourse[] = [
     ...otherDbCourses.map((c) => ({
       tag: c.tag,
@@ -39,6 +41,27 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
 
   return (
     <>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "Course",
+          name: course.title,
+          description: course.topics,
+          url: `${SITE_URL}/courses/${course.id}`,
+          inLanguage: "mn",
+          provider: {
+            "@type": "EducationalOrganization",
+            name: "Б.Ганбат багшийн математикийн сургалт",
+            url: SITE_URL,
+          },
+          ...(course.coverImage ? { image: course.coverImage } : {}),
+          hasCourseInstance: {
+            "@type": "CourseInstance",
+            courseMode: course.mode === "Онлайн" ? "online" : "blended",
+            ...(course.startDate ? { startDate: toIsoDate(course.startDate) } : {}),
+          },
+        }}
+      />
       <Navbar />
       <main>
         <CourseDetail course={course} related={related} />

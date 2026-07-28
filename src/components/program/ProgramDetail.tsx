@@ -172,7 +172,7 @@ export default function ProgramDetail({
                   <span className="w-[52px] h-[52px] rounded-[14px] bg-white/16 grid place-items-center shrink-0">
                     {s.icon}
                   </span>
-                  <span className="text-[1.4rem] font-black opacity-50 tracking-[-.02em]">
+                  <span className="text-[1.4rem] font-extrabold opacity-50 tracking-[-.02em]">
                     0{i + 1}
                   </span>
                 </div>
