@@ -4,7 +4,7 @@ import Footer from "@/components/Footer";
 import ProgramDetail from "@/components/program/ProgramDetail";
 
 export const metadata: Metadata = {
-  title: "1 жилийн хөтөлбөр — D ангилал — Б.Ганбат багш",
+  title: "1 жилийн хөтөлбөр — D ангилал",
   description:
     "D ангилал (7–8-р анги) сурагчдад зориулсан, бүтэн жилийн хугацаанд дотоодын болон олон улсын олимпиадад бэлдэх онлайн, танхим хосолсон хөтөлбөр.",
 };

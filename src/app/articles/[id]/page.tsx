@@ -17,10 +17,25 @@ function formatDate(iso: string) {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const article = await findArticleById(id);
-  if (!article) return { title: "Нийтлэл олдсонгүй — Б.Ганбат багш" };
+  if (!article) return { title: "Нийтлэл олдсонгүй" };
   return {
-    title: `${article.title} — Б.Ганбат багш`,
+    title: article.title,
     description: article.excerpt,
+    alternates: { canonical: `/articles/${article.id}` },
+    openGraph: {
+      type: "article",
+      title: article.title,
+      description: article.excerpt,
+      publishedTime: article.createdAt,
+      authors: [article.author],
+      images: article.coverImage ? [{ url: article.coverImage, alt: article.title }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: article.title,
+      description: article.excerpt,
+      images: article.coverImage ? [article.coverImage] : undefined,
+    },
   };
 }
 

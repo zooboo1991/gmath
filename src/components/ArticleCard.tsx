@@ -16,6 +16,10 @@ export default function ArticleCard({ article }: { article: Article }) {
           <img
             src={article.coverImage}
             alt=""
+            width={640}
+            height={480}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         </div>

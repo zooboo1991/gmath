@@ -11,9 +11,9 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const course = await findCourseById(id);
-  if (!course || course.status !== "published") return { title: "Сургалт олдсонгүй — Б.Ганбат багш" };
+  if (!course || course.status !== "published") return { title: "Сургалт олдсонгүй" };
   return {
-    title: `${course.tag} — ${course.title} — Б.Ганбат багш`,
+    title: `${course.title} — ${course.tag}`,
     description: course.topics,
   };
 }

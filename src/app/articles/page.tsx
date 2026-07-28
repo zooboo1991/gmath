@@ -8,7 +8,7 @@ import { listArticles } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Нийтлэл — Б.Ганбат багш",
+  title: "Нийтлэл",
   description: "Б.Ганбат багшийн олимпиадын математикийн сургалттай холбоотой нийтлэл, зөвлөгөөнүүд.",
 };
 
@@ -52,14 +52,25 @@ export default async function ArticlesPage() {
       <main>
         <section className="section-pad !pb-0">
           <div className="wrap">
+            {/* The page had no h1 at all — the featured article's title was an
+                h2, leaving the document with no top-level heading for search
+                engines or screen readers. */}
+            <h1 className="text-[clamp(1.7rem,3.4vw,2.3rem)] font-extrabold tracking-[-.02em] mb-7">
+              Нийтлэл, зөвлөгөө
+            </h1>
             <Link
               href={`/articles/${featured.id}`}
               className="group relative flex flex-col justify-end min-h-[420px] sm:min-h-[480px] rounded-lg overflow-hidden shadow-md"
             >
+              {/* This is the page's LCP element: decode it eagerly and reserve
+                  its box so an admin-uploaded cover cannot shift the layout. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={featured.coverImage}
                 alt=""
+                width={1200}
+                height={630}
+                fetchPriority="high"
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(5,15,35,.88)_0%,rgba(5,15,35,.35)_55%,rgba(5,15,35,.05)_100%)]" />

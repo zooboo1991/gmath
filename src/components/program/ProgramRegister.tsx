@@ -345,6 +345,37 @@ export default function ProgramRegisterProvider({ children }: { children: React.
 
   const stepIndex = registerStep;
 
+  // Enter used to do nothing anywhere in this modal, because the fields were
+  // never inside a <form>. Routing submit by screen restores the keyboard
+  // flow a parent expects (fill phone -> password -> Enter).
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+    if (screen === "login") return void handleLogin();
+    if (screen === "reset") return void handleReset();
+    if (screen === "register") {
+      if (registerStep === 1 && role) setRegisterStep(2);
+      else if (registerStep === 2) handleContinueToPassword();
+      else if (registerStep === 3) void handleRegisterSubmit();
+    }
+  };
+
+  // Escape to close, and stop the page behind from scrolling while open —
+  // on mobile the background used to scroll away under the modal.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
   return (
     <ModalCtx.Provider value={{ sessionUser, open, openLogin, openRegister, logout }}>
       {children}
@@ -356,9 +387,15 @@ export default function ProgramRegisterProvider({ children }: { children: React.
             if (e.target === e.currentTarget) close();
           }}
         >
-          <div className="bg-surface rounded-lg w-full max-w-[520px] max-h-[88vh] overflow-y-auto shadow-lg px-[30px] py-8">
+          <form
+            onSubmit={handleSubmit}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="register-modal-title"
+            className="bg-surface rounded-lg w-full max-w-[520px] max-h-[88vh] overflow-y-auto shadow-lg px-[30px] py-8"
+          >
             <div className="flex items-center justify-between mb-1.5">
-              <h3 className="text-[1.35rem] font-extrabold">
+              <h3 id="register-modal-title" className="text-[1.35rem] font-extrabold">
                 {screen === "success"
                   ? "Амжилттай бүртгэгдлээ"
                   : screen === "login"
@@ -402,6 +439,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     }}
                     placeholder="99XXXXXX"
                     inputMode="numeric"
+                    autoComplete="username"
                   />
                 </FormField>
                 <FormField label="Нууц үг" required error={loginError ? "e" : undefined}>
@@ -413,6 +451,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                       setLoginError(null);
                     }}
                     placeholder="••••••••"
+                    autoComplete="current-password"
                   />
                 </FormField>
                 {loginError && <p className="text-[.85rem] font-semibold text-red-soft -mt-3 mb-4">{loginError}</p>}
@@ -472,6 +511,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     value={resetPassword}
                     onChange={(e) => setResetPassword(e.target.value)}
                     placeholder="••••••••"
+                    autoComplete="new-password"
                   />
                 </FormField>
                 <FormField label="Шинэ нууц үг давтах" required error={resetError ? "e" : undefined}>
@@ -480,6 +520,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     value={resetPasswordConfirm}
                     onChange={(e) => setResetPasswordConfirm(e.target.value)}
                     placeholder="••••••••"
+                    autoComplete="new-password"
                   />
                 </FormField>
                 {resetError && <p className="text-[.85rem] font-semibold text-red-soft mb-3">{resetError}</p>}
@@ -621,7 +662,13 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   error={errors.password ? "e" : undefined}
                   hint="Том, жижиг үсэг, тоо орсон, дор хаяж 6 тэмдэгт"
                 >
-                  <input type="password" value={fields.password} onChange={(e) => setField("password", e.target.value)} placeholder="••••••••" />
+                  <input
+                    type="password"
+                    value={fields.password}
+                    onChange={(e) => setField("password", e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                  />
                 </FormField>
                 <FormField label="Нууц үг давтах" required error={errors.passwordConfirm ? "e" : undefined}>
                   <input
@@ -629,6 +676,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     value={fields.passwordConfirm}
                     onChange={(e) => setField("passwordConfirm", e.target.value)}
                     placeholder="••••••••"
+                    autoComplete="new-password"
                   />
                 </FormField>
 
@@ -800,7 +848,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 </div>
               </div>
             )}
-          </div>
+          </form>
         </div>
       )}
     </ModalCtx.Provider>

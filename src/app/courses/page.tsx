@@ -7,7 +7,7 @@ import { listCourses } from "@/lib/db";
 import { yearlyPrograms } from "@/lib/staticPrograms";
 
 export const metadata: Metadata = {
-  title: "Сургалтууд — Б.Ганбат багш",
+  title: "Сургалтууд",
   description: "Б.Ганбат багшийн бүх сургалтын хөтөлбөрүүд — 1 жилийн хөтөлбөр, удахгүй эхлэх сургалтууд, бичлэгээр үзэх сургалтууд.",
 };
 

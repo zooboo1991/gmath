@@ -11,7 +11,7 @@ import { getSessionUser } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Миний профайл — Б.Ганбат багш",
+  title: "Миний профайл",
 };
 
 export default async function ProfilePage() {

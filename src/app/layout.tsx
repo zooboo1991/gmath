@@ -10,10 +10,38 @@ const nunito = Nunito({
   weight: ["400", "500", "600", "700", "800", "900"],
 });
 
+const SITE_URL = "https://gmath.mn";
+const SITE_NAME = "Б.Ганбат багшийн математикийн сургалт";
+const DESCRIPTION =
+  "4–12-р ангийн сурагчдад зориулсан олимпиадын математикийн онлайн сургалт. Б.Ганбат багшийн 10 жилийн туршлагад суурилсан системтэй хөтөлбөр.";
+
+// The site is shared almost entirely through Facebook, where a link with no
+// Open Graph tags renders as a bare grey box. metadataBase also lets every
+// page's own metadata use relative image paths.
 export const metadata: Metadata = {
-  title: "Ганбат багш — Олимпиадын математикийн онлайн сургалт",
-  description:
-    "4–12-р ангийн сурагчдад зориулсан олимпиадын математикийн онлайн сургалт. Б.Ганбат багшийн 10 жилийн туршлагад суурилсан системтэй хөтөлбөр.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Ганбат багш — Олимпиадын математикийн онлайн сургалт",
+    template: "%s — Б.Ганбат багш",
+  },
+  description: DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "mn_MN",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: "Ганбат багш — Олимпиадын математикийн онлайн сургалт",
+    description: DESCRIPTION,
+    images: [{ url: "/images/mascot-single.png", width: 1350, height: 1552, alt: SITE_NAME }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ганбат багш — Олимпиадын математикийн онлайн сургалт",
+    description: DESCRIPTION,
+    images: ["/images/mascot-single.png"],
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({

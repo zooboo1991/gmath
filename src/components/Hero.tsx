@@ -7,17 +7,19 @@ export default function Hero() {
     <section className="hero-navy relative text-white overflow-hidden">
       <div className="hero-dotgrid pointer-events-none absolute inset-0 opacity-50" />
 
-      <div className="wrap relative z-[2] grid grid-cols-1 nav:grid-cols-[1.05fr_.95fr] gap-[30px] nav:gap-[48px] items-center py-[clamp(48px,7vw,92px)]">
+      <div className="wrap relative z-[2] grid grid-cols-1 nav:grid-cols-[1.05fr_.95fr] gap-[22px] nav:gap-[48px] items-center py-[clamp(28px,7vw,92px)]">
         <div>
-          <h1 className="text-[36px] font-extrabold leading-[1.06] tracking-[-.025em] text-balance">
-            Хүүхдийнхээ математикийн мэдлэгт хөрөнгө оруулна гэдэг ирээдүйд нь
-            <br />
+          {/* Fluid, not a fixed 36px: at desktop this now outranks the section
+              headings below (which cap at 2.6rem), and on a 375px phone it
+              stays short enough to keep the CTA above the fold. */}
+          <h1 className="text-[clamp(1.6rem,5.4vw,2.75rem)] font-extrabold leading-[1.08] tracking-[-.025em] text-balance">
+            Хүүхдийнхээ математикийн мэдлэгт хөрөнгө оруулна гэдэг ирээдүйд нь{" "}
             <span className="text-gold">хөрөнгө оруулж</span> байна гэсэн үг
           </h1>
-          <p className="text-[1.02rem] text-navy-ink-2 mt-[14px] max-w-[407px] font-medium">
+          <p className="text-[1.02rem] text-navy-ink-2 mt-[14px] max-w-[46ch] font-medium">
             Б.Ганбат багшийн 10 жилийн туршлагад суурилсан системтэй хөтөлбөр.
           </p>
-          <div className="flex flex-wrap gap-[14px] mt-[30px]">
+          <div className="flex flex-wrap gap-[14px] mt-[22px] nav:mt-[30px]">
             <Link
               href="/courses"
               className="group inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:bg-gold-strong hover:-translate-y-0.5"
@@ -28,8 +30,8 @@ export default function Hero() {
           </div>
         </div>
 
-        <div className="relative order-first nav:order-none min-h-[320px] nav:min-h-[380px] flex items-center justify-center px-[6px] nav:px-0 overflow-hidden nav:overflow-visible">
-          <div className="relative w-[min(300px,68%)] aspect-[1350/1552] grid place-items-center">
+        <div className="relative order-first nav:order-none min-h-[228px] nav:min-h-[380px] flex items-center justify-center px-[6px] nav:px-0 overflow-hidden nav:overflow-visible">
+          <div className="relative w-[min(300px,52%)] nav:w-[min(300px,68%)] aspect-[1350/1552] grid place-items-center">
             <div className="absolute inset-[8%] rounded-full bg-[radial-gradient(circle_at_50%_40%,oklch(0.55_0.12_256_/_.55),oklch(0.30_0.08_262_/_0)_70%)] blur-[2px]" />
             <Image
               src="/images/mascot-single.png"
