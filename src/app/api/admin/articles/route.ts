@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { addArticle, listArticles } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
-import { isTooLong, MAX_LEN } from "@/lib/validate";
+import { isEmptyHtml, isTooLong, MAX_LEN } from "@/lib/validate";
+import { sanitizeArticleContent } from "@/lib/sanitize";
 
 function validateArticleFields(data: Record<string, unknown>): string | null {
   if (isTooLong(data.title, MAX_LEN.articleTitle)) return "Гарчиг хэт урт байна";
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   }
   const data = await request.json();
 
-  if (!data.title?.trim() || !data.excerpt?.trim() || !data.content?.trim() || !data.coverImage?.trim() || !data.author?.trim()) {
+  if (!data.title?.trim() || !data.excerpt?.trim() || isEmptyHtml(data.content) || !data.coverImage?.trim() || !data.author?.trim()) {
     return NextResponse.json({ ok: false, error: "Заавал бөглөх талбарууд дутуу байна" }, { status: 400 });
   }
   const lengthError = validateArticleFields(data);
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
   const article = await addArticle({
     title: data.title.trim(),
     excerpt: data.excerpt.trim(),
-    content: data.content.trim(),
+    content: sanitizeArticleContent(data.content),
     coverImage: data.coverImage.trim(),
     author: data.author.trim(),
     featured: Boolean(data.featured),

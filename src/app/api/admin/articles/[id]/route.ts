@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { deleteArticle, updateArticle } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
-import { isTooLong, MAX_LEN } from "@/lib/validate";
+import { isEmptyHtml, isTooLong, MAX_LEN } from "@/lib/validate";
+import { sanitizeArticleContent } from "@/lib/sanitize";
 
 function validateArticleFields(data: Record<string, unknown>): string | null {
   if (isTooLong(data.title, MAX_LEN.articleTitle)) return "Гарчиг хэт урт байна";
@@ -21,7 +22,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (
     (data.title !== undefined && !data.title.trim()) ||
     (data.excerpt !== undefined && !data.excerpt.trim()) ||
-    (data.content !== undefined && !data.content.trim()) ||
+    (data.content !== undefined && isEmptyHtml(data.content)) ||
     (data.coverImage !== undefined && !data.coverImage.trim()) ||
     (data.author !== undefined && !data.author.trim())
   ) {
@@ -35,7 +36,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const article = await updateArticle(id, {
     title: data.title?.trim(),
     excerpt: data.excerpt?.trim(),
-    content: data.content?.trim(),
+    content: data.content !== undefined ? sanitizeArticleContent(data.content) : undefined,
     coverImage: data.coverImage?.trim(),
     author: data.author?.trim(),
     featured: typeof data.featured === "boolean" ? data.featured : undefined,

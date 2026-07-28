@@ -563,7 +563,14 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 </FormField>
                 {role === "student" && (
                   <FormField label="Анги" required error={errors.grade ? "e" : undefined}>
-                    <input value={fields.grade} onChange={(e) => setField("grade", e.target.value)} placeholder="Жишээ: 6-р анги" />
+                    <select value={fields.grade} onChange={(e) => setField("grade", e.target.value)}>
+                      <option value="">Ангиа сонгоно уу</option>
+                      {Array.from({ length: 9 }, (_, i) => i + 4).map((g) => (
+                        <option key={g} value={`${g}-р анги`}>
+                          {g}-р анги
+                        </option>
+                      ))}
+                    </select>
                   </FormField>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">

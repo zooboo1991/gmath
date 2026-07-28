@@ -15,10 +15,20 @@ export const MAX_LEN = {
   lessonSchedule: 200,
   articleTitle: 200,
   articleExcerpt: 500,
-  articleContent: 20000,
+  articleContent: 60000,
   articleAuthor: 100,
 } as const;
 
 export function isTooLong(value: unknown, max: number): boolean {
   return typeof value === "string" && value.length > max;
+}
+
+// Tiptap's "empty" editor state is still non-empty HTML (e.g. "<p></p>"),
+// so a plain string-emptiness check always passes. Strip tags before
+// judging whether there's actually anything there (an image with no
+// caption text still counts as real content).
+export function isEmptyHtml(html: unknown): boolean {
+  if (typeof html !== "string" || !html) return true;
+  if (/<img[\s>]/i.test(html)) return false;
+  return html.replace(/<[^>]*>/g, "").trim().length === 0;
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import { listAllRegistrations, listArticles, listCourses } from "@/lib/db";
@@ -22,10 +23,12 @@ export default async function AdminPage() {
   ]);
 
   return (
-    <AdminDashboard
-      initialRegistrations={registrations}
-      initialCourses={courses}
-      initialArticles={articles}
-    />
+    <Suspense fallback={null}>
+      <AdminDashboard
+        initialRegistrations={registrations}
+        initialCourses={courses}
+        initialArticles={articles}
+      />
+    </Suspense>
   );
 }

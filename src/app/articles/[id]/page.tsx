@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import ArticleCard from "@/components/ArticleCard";
 import { IconPerson } from "@/components/icons";
 import { findArticleById, listArticles } from "@/lib/db";
+import { isHtmlContent } from "@/lib/articleContent";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,8 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
 
   const allArticles = await listArticles();
   const related = allArticles.filter((a) => a.id !== article.id).slice(0, 3);
-  const paragraphs = article.content.split("\n").map((p) => p.trim()).filter(Boolean);
+  const isHtml = isHtmlContent(article.content);
+  const paragraphs = isHtml ? [] : article.content.split("\n").map((p) => p.trim()).filter(Boolean);
 
   return (
     <>
@@ -58,13 +60,20 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
 
             <div className="h-px bg-line my-8" />
 
-            <div className="flex flex-col gap-5">
-              {paragraphs.map((p, i) => (
-                <p key={i} className="text-[1.05rem] text-ink-2 leading-[1.75] font-medium">
-                  {p}
-                </p>
-              ))}
-            </div>
+            {isHtml ? (
+              <div
+                className="prose prose-lg max-w-none prose-headings:font-extrabold prose-p:text-ink-2 prose-p:leading-[1.75] prose-li:text-ink-2 prose-a:text-blue-strong prose-img:rounded-md"
+                dangerouslySetInnerHTML={{ __html: article.content }}
+              />
+            ) : (
+              <div className="flex flex-col gap-5">
+                {paragraphs.map((p, i) => (
+                  <p key={i} className="text-[1.05rem] text-ink-2 leading-[1.75] font-medium">
+                    {p}
+                  </p>
+                ))}
+              </div>
+            )}
 
             <Link
               href="/articles"

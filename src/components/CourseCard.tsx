@@ -1,5 +1,6 @@
 import Reveal from "./Reveal";
 import { IconCalendar, IconMonitor, IconPlay } from "./icons";
+import { formatCourseDate } from "@/lib/courseDate";
 
 type CourseCardProps = {
   tag: string;
@@ -60,7 +61,7 @@ export function CourseMeta({ startDate, mode }: { startDate: string; mode: strin
     <>
       <div className="flex items-center gap-2 text-[.88rem] font-bold text-ink-2 mt-2">
         <IconCalendar className="w-[15px] h-[15px] text-gold-strong shrink-0" />
-        Хичээллэх өдөр: {startDate}
+        Хичээллэх өдөр: {formatCourseDate(startDate)}
       </div>
       <div className="flex items-center gap-2 text-[.88rem] font-bold text-ink-2 mt-1.5">
         <IconMonitor className="w-[15px] h-[15px] text-blue-strong shrink-0" />

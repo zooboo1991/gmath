@@ -2,6 +2,7 @@ import type { Course } from "@/lib/db";
 import Reveal from "@/components/Reveal";
 import { RegisterTriggerButton } from "./ProgramRegister";
 import CourseCard from "@/components/CourseCard";
+import { formatCourseDate } from "@/lib/courseDate";
 import {
   IconCalendar,
   IconMonitor,
@@ -84,7 +85,7 @@ export default function CourseDetail({ course, related }: { course: Course; rela
               <div className="flex items-center gap-[10px]">
                 <IconCalendar className="w-[22px] h-[22px] text-gold" />
                 <div>
-                  <b className="text-[1.3rem] font-extrabold block leading-none">{course.startDate}</b>
+                  <b className="text-[1.3rem] font-extrabold block leading-none">{formatCourseDate(course.startDate)}</b>
                   <small className="text-navy-ink-2 font-bold text-[.78rem]">эхлэх огноо</small>
                 </div>
               </div>
@@ -184,7 +185,7 @@ export default function CourseDetail({ course, related }: { course: Course; rela
               {course.price} <span className="text-[1rem] text-ink-3 font-bold">{course.period}</span>
             </b>
             <p className="text-ink-3 font-semibold text-[.92rem] mt-3">
-              {course.startDate && `Эхлэх огноо: ${course.startDate}. `}Суудлын тоо хязгаарлагдмал тул эрт
+              {course.startDate && `Эхлэх огноо: ${formatCourseDate(course.startDate)}. `}Суудлын тоо хязгаарлагдмал тул эрт
               бүртгүүлсэн сурагч урьтал эдэлнэ.
             </p>
             <div className="mt-6">
