@@ -11,6 +11,7 @@ export const MAX_LEN = {
   coursePeriod: 30,
   courseMode: 50,
   courseDate: 30,
+  courseFacebookGroup: 300,
   lessonTopic: 200,
   lessonSchedule: 200,
   articleTitle: 200,
@@ -21,6 +22,19 @@ export const MAX_LEN = {
 
 export function isTooLong(value: unknown, max: number): boolean {
   return typeof value === "string" && value.length > max;
+}
+
+// Links supplied by an admin end up as `href` values, so anything other than
+// a plain http(s) URL (e.g. a `javascript:` URL) must be rejected before it
+// is stored.
+export function isValidHttpUrl(value: unknown): boolean {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const { protocol } = new URL(value.trim());
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 // Tiptap's "empty" editor state is still non-empty HTML (e.g. "<p></p>"),

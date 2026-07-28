@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import FormField from "@/components/FormField";
-import type { PublicUser, Registration } from "@/lib/db";
+import type { PublicUser, RegistrationWithGroup } from "@/lib/db";
 import {
   IconCheckCircle,
   IconClock,
@@ -22,7 +22,7 @@ export default function ProfileClient({
   registrations,
 }: {
   user: PublicUser;
-  registrations: Registration[];
+  registrations: RegistrationWithGroup[];
 }) {
   const [user, setUser] = useState(initialUser);
   const [tab, setTab] = useState<Tab>("active");
@@ -111,14 +111,20 @@ export default function ProfileClient({
 
                   {r.status === "active" ? (
                     <div className="mt-4 pt-4 border-t border-line grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <a
-                        href="https://www.facebook.com/ganbat.surgalt/"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-2.5 bg-blue-soft text-blue-strong font-bold text-[.9rem] rounded-sm px-4 py-3"
-                      >
-                        <IconMessenger className="w-[18px] h-[18px] shrink-0" /> Facebook группын линк
-                      </a>
+                      {r.facebookGroup ? (
+                        <a
+                          href={r.facebookGroup}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2.5 bg-blue-soft text-blue-strong font-bold text-[.9rem] rounded-sm px-4 py-3"
+                        >
+                          <IconMessenger className="w-[18px] h-[18px] shrink-0" /> Facebook группт нэгдэх
+                        </a>
+                      ) : (
+                        <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
+                          <IconMessenger className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Facebook групп тун удахгүй
+                        </div>
+                      )}
                       <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
                         <IconClock className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Хуваарь тун удахгүй
                       </div>

@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { addCourse, listCourses } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
-import { isTooLong, MAX_LEN } from "@/lib/validate";
+import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
 
 function validateCourseFields(data: Record<string, unknown>): string | null {
+  if (isTooLong(data.facebookGroup, MAX_LEN.courseFacebookGroup)) return "Facebook группын холбоос хэт урт байна";
+  if (typeof data.facebookGroup === "string" && data.facebookGroup.trim() && !isValidHttpUrl(data.facebookGroup)) {
+    return "Facebook группын холбоос буруу байна (http:// эсвэл https:// -ээр эхэлнэ)";
+  }
   if (isTooLong(data.tag, MAX_LEN.courseTag)) return "Ангилал тэмдэглэгээ хэт урт байна";
   if (isTooLong(data.title, MAX_LEN.courseTitle)) return "Гарчиг хэт урт байна";
   if (isTooLong(data.topics, MAX_LEN.courseTopics)) return "Тайлбар хэт урт байна";
@@ -70,6 +74,7 @@ export async function POST(request: Request) {
     startDate: data.startDate?.trim() || undefined,
     mode: data.mode?.trim() || undefined,
     coverImage: data.coverImage?.trim() || undefined,
+    facebookGroup: data.facebookGroup?.trim() || undefined,
     lessons,
   });
 

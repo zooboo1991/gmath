@@ -25,6 +25,7 @@ export async function POST(request: Request) {
   // otherwise a request could be hand-crafted to register at any amount.
   let programLabel: string;
   let price: string;
+  let facebookGroup: string | undefined;
 
   const staticProgram = staticProgramById[programId];
   if (staticProgram) {
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
     }
     programLabel = `${course.title} (${course.tag})`;
     price = course.price;
+    facebookGroup = course.facebookGroup;
   } else {
     return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
   }
@@ -55,7 +57,13 @@ export async function POST(request: Request) {
       payMethod,
       status,
     });
-    return NextResponse.json({ ok: true, registration });
+    // Only a confirmed (active) registration earns the group link; a pending
+    // one gets it later, from /profile, once an admin approves the payment.
+    return NextResponse.json({
+      ok: true,
+      registration,
+      facebookGroup: status === "active" ? facebookGroup : undefined,
+    });
   } catch (err) {
     if ((err as { code?: string } | null)?.code === "23505") {
       return NextResponse.json(

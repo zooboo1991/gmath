@@ -63,6 +63,7 @@ export type Course = {
   startDate?: string;
   mode?: string;
   coverImage?: string;
+  facebookGroup?: string;
   lessons: Lesson[];
 };
 
@@ -116,6 +117,7 @@ type CourseRow = {
   start_date: string | null;
   mode: string | null;
   cover_image: string | null;
+  facebook_group: string | null;
   lessons: Lesson[] | null;
 };
 
@@ -172,6 +174,7 @@ function courseFromRow(row: CourseRow): Course {
     startDate: row.start_date ?? undefined,
     mode: row.mode ?? undefined,
     coverImage: row.cover_image ?? undefined,
+    facebookGroup: row.facebook_group ?? undefined,
     lessons: row.lessons ?? [],
   };
 }
@@ -317,6 +320,7 @@ export async function addCourse(input: Omit<Course, "id">): Promise<Course> {
       start_date: input.startDate ?? null,
       mode: input.mode ?? null,
       cover_image: input.coverImage ?? null,
+      facebook_group: input.facebookGroup ?? null,
       lessons: input.lessons ?? [],
     })
     .select("*")
@@ -339,6 +343,7 @@ export async function updateCourse(
   if (input.startDate !== undefined) patch.start_date = input.startDate ?? null;
   if (input.mode !== undefined) patch.mode = input.mode ?? null;
   if (input.coverImage !== undefined) patch.cover_image = input.coverImage || null;
+  if (input.facebookGroup !== undefined) patch.facebook_group = input.facebookGroup || null;
   if (input.lessons !== undefined) patch.lessons = input.lessons;
 
   const { data, error } = await getSupabase().from("courses").update(patch).eq("id", id).select("*").maybeSingle();
@@ -427,10 +432,41 @@ export async function addRegistration(input: Omit<Registration, "id" | "createdA
   return registrationFromRow(data as RegistrationRow);
 }
 
-export async function listRegistrationsByUser(userId: string): Promise<Registration[]> {
+/** A registration plus the course's Facebook group link, when the student is entitled to it. */
+export type RegistrationWithGroup = Registration & { facebookGroup?: string };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function listRegistrationsByUser(userId: string): Promise<RegistrationWithGroup[]> {
   const { data, error } = await getSupabase().from("registrations").select("*").eq("user_id", userId);
   if (error) throw error;
-  return (data as RegistrationRow[]).map(registrationFromRow);
+  const registrations = (data as RegistrationRow[]).map(registrationFromRow);
+
+  // The group link is a perk of a confirmed registration, so it is attached
+  // server-side only for active ones — a pending registration never carries
+  // the link in its payload at all. Static yearly programs have no course
+  // row (and so no group link).
+  const courseIds = [
+    ...new Set(
+      registrations.filter((r) => r.status === "active" && UUID_RE.test(r.programId)).map((r) => r.programId)
+    ),
+  ];
+  if (courseIds.length === 0) return registrations;
+
+  const { data: courseRows, error: courseError } = await getSupabase()
+    .from("courses")
+    .select("id, facebook_group")
+    .in("id", courseIds);
+  if (courseError) throw courseError;
+
+  const groupById = new Map(
+    (courseRows as { id: string; facebook_group: string | null }[]).map((c) => [c.id, c.facebook_group])
+  );
+  return registrations.map((r) =>
+    r.status === "active" && groupById.get(r.programId)
+      ? { ...r, facebookGroup: groupById.get(r.programId) as string }
+      : r
+  );
 }
 
 export async function listAllRegistrations(): Promise<(Registration & { user?: PublicUser })[]> {

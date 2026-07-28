@@ -10,6 +10,7 @@ import {
   IconBank,
   IconClose,
   IconCheck,
+  IconMessenger,
 } from "@/components/icons";
 
 type Role = "teacher" | "student";
@@ -134,6 +135,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [registrationStatus, setRegistrationStatus] = useState<"active" | "pending" | null>(null);
+  const [facebookGroup, setFacebookGroup] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/account/me")
@@ -158,6 +160,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     setPayMethod(null);
     setSubmitError(null);
     setRegistrationStatus(null);
+    setFacebookGroup(null);
   };
 
   const open = (p: Program) => {
@@ -331,6 +334,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
         return;
       }
       setRegistrationStatus(json.registration.status);
+      setFacebookGroup(json.facebookGroup ?? null);
       setScreen("success");
     } catch {
       setSubmitError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
@@ -752,7 +756,9 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   <>
                     <h3 className="text-[1.4rem] font-extrabold">Бүртгэл идэвхжлээ!</h3>
                     <p className="text-ink-2 mt-2.5 font-medium">
-                      Та одоо профайл хэсгээсээ хичээлийн хуваарь, Facebook группын холбоосыг харах боломжтой.
+                      {facebookGroup
+                        ? "Сургалтын Facebook группт нэгдээрэй. Холбоосыг профайл хэсгээсээ хэдийд ч дахин олж болно."
+                        : "Та одоо профайл хэсгээсээ хичээлийн хуваарь, Facebook группын холбоосыг харах боломжтой."}
                     </p>
                   </>
                 ) : (
@@ -763,6 +769,19 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     </p>
                   </>
                 )}
+
+                {facebookGroup && (
+                  <a
+                    href={facebookGroup}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2.5 bg-blue-soft text-blue-strong font-extrabold rounded-sm px-5 py-4 mt-5"
+                  >
+                    <IconMessenger className="w-[18px] h-[18px] shrink-0" />
+                    Facebook группт нэгдэх
+                  </a>
+                )}
+
                 <div className="flex gap-3.5 mt-5">
                   <button
                     type="button"

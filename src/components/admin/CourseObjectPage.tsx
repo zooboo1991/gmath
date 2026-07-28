@@ -87,6 +87,7 @@ export default function CourseObjectPage({
     startDate: toIsoDate(course?.startDate),
     mode: normalizeMode(course?.mode ?? ""),
     coverImage: course?.coverImage ?? "",
+    facebookGroup: course?.facebookGroup ?? "",
     lessons: course?.lessons ?? ([] as Lesson[]),
   });
   const parsedTag = parseCourseTag(course?.tag ?? "");
@@ -382,6 +383,13 @@ export default function CourseObjectPage({
                     </AdminField>
                   </div>
                 )}
+                <AdminField label="Facebook группын холбоос (бүртгэл баталгаажсан сурагчид харагдана)">
+                  <input
+                    value={form.facebookGroup}
+                    onChange={(e) => setForm((f) => ({ ...f, facebookGroup: e.target.value }))}
+                    placeholder="https://www.facebook.com/groups/..."
+                  />
+                </AdminField>
               </div>
             </Card>
 

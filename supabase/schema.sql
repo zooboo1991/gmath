@@ -31,6 +31,7 @@ create table if not exists courses (
   start_date text,
   mode text,
   cover_image text,
+  facebook_group text,
   lessons jsonb not null default '[]'::jsonb
 );
 
@@ -44,6 +45,10 @@ alter table courses add column if not exists lessons jsonb not null default '[]'
 -- a 'draft'.
 alter table courses add column if not exists status text not null default 'published' check (status in ('draft', 'published'));
 alter table courses add column if not exists cover_image text;
+
+-- Per-course Facebook group link, shown to a student once their registration
+-- is confirmed (see listRegistrationsByUser in src/lib/db.ts).
+alter table courses add column if not exists facebook_group text;
 
 create table if not exists registrations (
   id uuid primary key default gen_random_uuid(),
