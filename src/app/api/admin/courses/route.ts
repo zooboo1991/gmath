@@ -54,8 +54,14 @@ export async function POST(request: Request) {
         .filter((l: { topic: string }) => l.topic)
     : [];
 
+  // New objects are created as drafts by default — an admin must explicitly
+  // publish them from the course Object Page, matching the Fiori "create as
+  // draft" pattern. Existing rows are unaffected (see schema.sql).
+  const status = data.status === "published" ? "published" : "draft";
+
   const course = await addCourse({
     kind: data.kind,
+    status,
     tag: data.tag.trim(),
     title: data.title.trim(),
     topics: data.topics?.trim() ?? "",
@@ -63,6 +69,7 @@ export async function POST(request: Request) {
     period: data.period.trim(),
     startDate: data.startDate?.trim() || undefined,
     mode: data.mode?.trim() || undefined,
+    coverImage: data.coverImage?.trim() || undefined,
     lessons,
   });
 

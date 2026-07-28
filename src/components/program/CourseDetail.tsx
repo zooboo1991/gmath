@@ -115,6 +115,13 @@ export default function CourseDetail({ course, related }: { course: Course; rela
               Сургалтанд бүртгүүлэх <span>→</span>
             </RegisterTriggerButton>
           </div>
+
+          {course.coverImage && (
+            <div className="mt-9 rounded-lg overflow-hidden border border-white/10 max-w-[420px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={course.coverImage} alt={course.title} className="w-full h-auto object-cover" />
+            </div>
+          )}
         </div>
       </section>
 

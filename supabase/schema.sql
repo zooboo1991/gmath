@@ -22,6 +22,7 @@ create table if not exists users (
 create table if not exists courses (
   id uuid primary key default gen_random_uuid(),
   kind text not null check (kind in ('upcoming', 'vod')),
+  status text not null default 'published' check (status in ('draft', 'published')),
   tag text not null,
   title text not null,
   topics text not null,
@@ -29,11 +30,20 @@ create table if not exists courses (
   period text not null,
   start_date text,
   mode text,
+  cover_image text,
   lessons jsonb not null default '[]'::jsonb
 );
 
 -- Run this if the `courses` table already existed before `lessons` was added:
 alter table courses add column if not exists lessons jsonb not null default '[]'::jsonb;
+
+-- Run this if the `courses` table already existed before `status`/`cover_image`
+-- were added. Default 'published' means every pre-existing course keeps
+-- showing on the public site exactly as before — only courses created (or
+-- explicitly unpublished) afterwards from the new admin Object Page can be
+-- a 'draft'.
+alter table courses add column if not exists status text not null default 'published' check (status in ('draft', 'published'));
+alter table courses add column if not exists cover_image text;
 
 create table if not exists registrations (
   id uuid primary key default gen_random_uuid(),

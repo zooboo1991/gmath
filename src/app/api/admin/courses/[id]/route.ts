@@ -36,6 +36,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   ) {
     return NextResponse.json({ ok: false, error: "Заавал бөглөх талбаруудыг хоослож болохгүй" }, { status: 400 });
   }
+  if (data.status !== undefined && data.status !== "draft" && data.status !== "published") {
+    return NextResponse.json({ ok: false, error: "Статус буруу байна" }, { status: 400 });
+  }
   const lengthError = validateCourseFields(data);
   if (lengthError) {
     return NextResponse.json({ ok: false, error: lengthError }, { status: 400 });
@@ -51,6 +54,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     : undefined;
 
   const course = await updateCourse(id, {
+    status: data.status,
     tag: data.tag?.trim(),
     title: data.title?.trim(),
     topics: data.topics?.trim(),
@@ -58,6 +62,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     period: data.period?.trim(),
     startDate: data.startDate?.trim() || undefined,
     mode: data.mode?.trim() || undefined,
+    coverImage: data.coverImage !== undefined ? data.coverImage?.trim() || "" : undefined,
     lessons,
   });
 

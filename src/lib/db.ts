@@ -19,6 +19,7 @@ export type Role = "teacher" | "student";
 export type PayMethod = "qpay" | "bank";
 export type RegistrationStatus = "pending" | "active";
 export type CourseKind = "upcoming" | "vod";
+export type CourseStatus = "draft" | "published";
 
 export type User = {
   id: string;
@@ -53,6 +54,7 @@ export type Lesson = {
 export type Course = {
   id: string;
   kind: CourseKind;
+  status: CourseStatus;
   tag: string;
   title: string;
   topics: string;
@@ -60,6 +62,7 @@ export type Course = {
   period: string;
   startDate?: string;
   mode?: string;
+  coverImage?: string;
   lessons: Lesson[];
 };
 
@@ -104,6 +107,7 @@ type UserRow = {
 type CourseRow = {
   id: string;
   kind: CourseKind;
+  status: CourseStatus;
   tag: string;
   title: string;
   topics: string;
@@ -111,6 +115,7 @@ type CourseRow = {
   period: string;
   start_date: string | null;
   mode: string | null;
+  cover_image: string | null;
   lessons: Lesson[] | null;
 };
 
@@ -158,6 +163,7 @@ function courseFromRow(row: CourseRow): Course {
   return {
     id: row.id,
     kind: row.kind,
+    status: row.status,
     tag: row.tag,
     title: row.title,
     topics: row.topics,
@@ -165,6 +171,7 @@ function courseFromRow(row: CourseRow): Course {
     period: row.period,
     startDate: row.start_date ?? undefined,
     mode: row.mode ?? undefined,
+    coverImage: row.cover_image ?? undefined,
     lessons: row.lessons ?? [],
   };
 }
@@ -275,9 +282,13 @@ export async function updateUserProfile(
   return data ? userFromRow(data as UserRow) : undefined;
 }
 
-export async function listCourses(kind?: CourseKind): Promise<Course[]> {
+export async function listCourses(
+  kind?: CourseKind,
+  opts?: { includeDrafts?: boolean }
+): Promise<Course[]> {
   let query = getSupabase().from("courses").select("*");
   if (kind) query = query.eq("kind", kind);
+  if (!opts?.includeDrafts) query = query.eq("status", "published");
   const { data, error } = await query;
   if (error) throw error;
   return (data as CourseRow[]).map(courseFromRow);
@@ -297,6 +308,7 @@ export async function addCourse(input: Omit<Course, "id">): Promise<Course> {
     .from("courses")
     .insert({
       kind: input.kind,
+      status: input.status,
       tag: input.tag,
       title: input.title,
       topics: input.topics,
@@ -304,6 +316,7 @@ export async function addCourse(input: Omit<Course, "id">): Promise<Course> {
       period: input.period,
       start_date: input.startDate ?? null,
       mode: input.mode ?? null,
+      cover_image: input.coverImage ?? null,
       lessons: input.lessons ?? [],
     })
     .select("*")
@@ -317,6 +330,7 @@ export async function updateCourse(
   input: Partial<Omit<Course, "id">>
 ): Promise<Course | undefined> {
   const patch: Record<string, unknown> = {};
+  if (input.status !== undefined) patch.status = input.status;
   if (input.tag !== undefined) patch.tag = input.tag;
   if (input.title !== undefined) patch.title = input.title;
   if (input.topics !== undefined) patch.topics = input.topics;
@@ -324,6 +338,7 @@ export async function updateCourse(
   if (input.period !== undefined) patch.period = input.period;
   if (input.startDate !== undefined) patch.start_date = input.startDate ?? null;
   if (input.mode !== undefined) patch.mode = input.mode ?? null;
+  if (input.coverImage !== undefined) patch.cover_image = input.coverImage || null;
   if (input.lessons !== undefined) patch.lessons = input.lessons;
 
   const { data, error } = await getSupabase().from("courses").update(patch).eq("id", id).select("*").maybeSingle();
@@ -422,6 +437,25 @@ export async function listAllRegistrations(): Promise<(Registration & { user?: P
   const { data, error } = await getSupabase()
     .from("registrations")
     .select("*, users(*)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  return (data as (RegistrationRow & { users: UserRow | null })[]).map((row) => {
+    const { users, ...regRow } = row;
+    return {
+      ...registrationFromRow(regRow),
+      user: users ? toPublicUser(userFromRow(users)) : undefined,
+    };
+  });
+}
+
+export async function listRegistrationsByProgram(
+  programId: string
+): Promise<(Registration & { user?: PublicUser })[]> {
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .select("*, users(*)")
+    .eq("program_id", programId)
     .order("created_at", { ascending: false });
   if (error) throw error;
 
