@@ -14,7 +14,7 @@ import {
   IconVideoCamera,
   IconPlay,
 } from "@/components/icons";
-import { getLessonStates, getLessonStatus, type LessonWithState } from "@/lib/lessonSchedule";
+import { getLessonStates, type LessonWithState } from "@/lib/lessonSchedule";
 
 type Tab = "active" | "pending";
 
@@ -83,7 +83,9 @@ export default function ProfileClient({
         </div>
       </div>
 
-      <section className="section-pad">
+      {/* section-pad's ~116px top gap left the tabs floating far above the
+          first course; the list should start right under them. */}
+      <section className="pt-7 pb-[clamp(48px,7vw,96px)]">
         <div className="wrap max-w-[760px] mx-auto">
           {list.length === 0 ? (
             <p className="text-ink-2 font-medium bg-bg-soft border border-line rounded-md px-6 py-8 text-center">
@@ -114,7 +116,6 @@ export default function ProfileClient({
 
                   {r.status === "active" ? (
                     <div className="mt-4 pt-4 border-t border-line flex flex-col gap-3">
-                      <ZoomJoin registration={r} />
                       {r.facebookGroup ? (
                         <a
                           href={r.facebookGroup}
@@ -181,71 +182,34 @@ function useNow(): Date | null {
   return tick === null ? null : new Date();
 }
 
-function ZoomJoin({ registration }: { registration: RegistrationWithGroup }) {
-  const now = useNow();
-
-  if (!registration.zoomLink) return null;
-
-  const status = now ? getLessonStatus(registration.lessons, now) : null;
-  const isLive = Boolean(status?.live);
-
-  return (
-    <div
-      className={`rounded-sm px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap ${
-        isLive ? "bg-green-soft" : "bg-bg-soft"
-      }`}
-    >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <IconVideoCamera className={`w-[18px] h-[18px] shrink-0 ${isLive ? "text-green" : "text-ink-3"}`} />
-          <b className="font-extrabold text-[.95rem]">
-            {isLive ? "Хичээл эхэлж байна" : "Zoom хичээл"}
-          </b>
-        </div>
-        <span className="block text-[.84rem] font-semibold text-ink-3 mt-1">
-          {isLive
-            ? status?.live?.topic
-            : status?.nextLabel
-              ? `Дараагийн хичээл: ${status.nextLabel}`
-              : "Хуваарь удахгүй зарлагдана"}
-        </span>
-        {(registration.zoomMeetingId || registration.zoomPasscode) && (
-          <span className="block text-[.78rem] font-semibold text-ink-3 mt-1.5">
-            {registration.zoomMeetingId && `ID: ${registration.zoomMeetingId}`}
-            {registration.zoomMeetingId && registration.zoomPasscode && " · "}
-            {registration.zoomPasscode && `Код: ${registration.zoomPasscode}`}
-          </span>
-        )}
-      </div>
-      {/* Deliberately never disabled: a student may join late, or the teacher
-          may open the room outside the published schedule. */}
-      <a
-        href={registration.zoomLink}
-        target="_blank"
-        rel="noreferrer"
-        className={`shrink-0 font-extrabold rounded-full px-6 py-3 text-[.92rem] transition-transform hover:-translate-y-0.5 ${
-          isLive ? "bg-green text-white" : "bg-blue text-white shadow-blue"
-        }`}
-      >
-        Хичээлд орох →
-      </a>
-    </div>
-  );
-}
-
 /**
  * The course's lessons, each offering exactly what is useful at that moment:
  * a recording once the lesson is over, the room while it is on, and nothing at
- * all for lessons that have not come round yet.
+ * all for lessons that have not come round yet. Joining lives here rather than
+ * in a separate card above, so there is one place to look.
  */
 function LessonSchedule({ registration }: { registration: RegistrationWithGroup }) {
   const now = useNow();
   const lessons = registration.lessons ?? [];
 
   if (lessons.length === 0) {
+    // No schedule entered yet. If the course still has a room, keep a way in —
+    // otherwise removing the card above would have locked these students out.
     return (
-      <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
-        <IconClock className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Хуваарь тун удахгүй
+      <div className="flex items-center justify-between gap-3 flex-wrap bg-bg-soft rounded-sm px-4 py-3">
+        <span className="flex items-center gap-2.5 text-ink-2 font-bold text-[.9rem]">
+          <IconClock className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Хуваарь тун удахгүй
+        </span>
+        {registration.zoomLink && (
+          <a
+            href={registration.zoomLink}
+            target="_blank"
+            rel="noreferrer"
+            className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-white bg-blue shadow-blue rounded-full px-5 py-2.5 transition-transform hover:-translate-y-0.5"
+          >
+            <IconVideoCamera className="w-4 h-4" /> Хичээлд орох
+          </a>
+        )}
       </div>
     );
   }
@@ -256,7 +220,17 @@ function LessonSchedule({ registration }: { registration: RegistrationWithGroup 
 
   return (
     <div className="bg-bg-soft rounded-sm px-4 py-3.5">
-      <b className="font-extrabold text-[.9rem] block mb-2.5">Хичээлийн хуваарь ({lessons.length})</b>
+      <div className="mb-2.5">
+        <b className="font-extrabold text-[.9rem] block">Хичээлийн хуваарь ({lessons.length})</b>
+        {/* Some students join from the Zoom app by ID rather than the link. */}
+        {(registration.zoomMeetingId || registration.zoomPasscode) && (
+          <span className="block text-[.78rem] font-semibold text-ink-3 mt-0.5">
+            {registration.zoomMeetingId && `ID: ${registration.zoomMeetingId}`}
+            {registration.zoomMeetingId && registration.zoomPasscode && " · "}
+            {registration.zoomPasscode && `Код: ${registration.zoomPasscode}`}
+          </span>
+        )}
+      </div>
       <div className="flex flex-col">
         {lessons.map((lesson, i) => {
           const info = states?.[i];
@@ -326,9 +300,9 @@ function LessonAction({
         href={href}
         target="_blank"
         rel="noreferrer"
-        className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.8rem] text-white bg-green rounded-full px-3.5 py-2"
+        className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-white bg-green rounded-full px-5 py-2.5 shadow-sm transition-transform hover:-translate-y-0.5"
       >
-        <IconVideoCamera className="w-3.5 h-3.5" /> Хичээлд орох
+        <IconVideoCamera className="w-4 h-4" /> Хичээлд орох →
       </a>
     );
   }

@@ -32,15 +32,6 @@ type ScheduledLesson = {
   recordingLink?: string;
 };
 
-export type LessonStatus = {
-  /** The lesson happening right now, if any. */
-  live: ScheduledLesson | null;
-  /** The soonest lesson still to come. */
-  next: ScheduledLesson | null;
-  /** e.g. "08-р сарын 24, Даваа 18:00" */
-  nextLabel: string;
-};
-
 /**
  * `live` opens the room a quarter of an hour early, `past` means the recording
  * is what the student wants, and `upcoming` deliberately offers no link at all.
@@ -116,28 +107,6 @@ export function getLessonStates(lessons: ScheduledLesson[] | undefined, now: Dat
   });
 }
 
-/**
- * Works out which lesson is on now and which is up next. `now` is injected so
- * the caller controls the clock (and so this is testable).
- */
-export function getLessonStatus(lessons: ScheduledLesson[] | undefined, now: Date): LessonStatus {
-  const empty: LessonStatus = { live: null, next: null, nextLabel: "" };
-  if (!lessons?.length) return empty;
-
-  const timed = withTimes(lessons).sort((a, b) => a.start.getTime() - b.start.getTime());
-  if (timed.length === 0) return empty;
-
-  const ms = now.getTime();
-  const live = timed.find((t) => ms >= t.start.getTime() - JOIN_EARLY_MS && ms <= t.end.getTime());
-  const next = timed.find((t) => t.start.getTime() > ms);
-
-  return {
-    live: live?.lesson ?? null,
-    next: next?.lesson ?? null,
-    nextLabel: next ? formatLessonStart(next.start) : "",
-  };
-}
-
 function formatLessonDate(start: Date): string {
   const weekday = WEEKDAY_NAMES_MN[start.getDay()];
   const month = String(start.getMonth() + 1).padStart(2, "0");
@@ -149,15 +118,6 @@ function formatTimeRange(start: Date, endTime: string): string {
   const hh = String(start.getHours()).padStart(2, "0");
   const mm = String(start.getMinutes()).padStart(2, "0");
   return endTime ? `${hh}:${mm}–${endTime}` : `${hh}:${mm}`;
-}
-
-function formatLessonStart(start: Date): string {
-  const weekday = WEEKDAY_NAMES_MN[start.getDay()];
-  const month = String(start.getMonth() + 1).padStart(2, "0");
-  const day = String(start.getDate()).padStart(2, "0");
-  const hh = String(start.getHours()).padStart(2, "0");
-  const mm = String(start.getMinutes()).padStart(2, "0");
-  return `${month}-р сарын ${day}, ${weekday} ${hh}:${mm}`;
 }
 
 const WEEKDAY_NAMES_MN = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
