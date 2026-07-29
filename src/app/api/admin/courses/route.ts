@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { addCourse, listCourses } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
+import { normalizeLessons, validateLessons } from "@/lib/lessonInput";
 
 function validateCourseFields(data: Record<string, unknown>): string | null {
   if (isTooLong(data.facebookGroup, MAX_LEN.courseFacebookGroup)) return "Facebook группын холбоос хэт урт байна";
@@ -21,21 +22,15 @@ function validateCourseFields(data: Record<string, unknown>): string | null {
   if (isTooLong(data.period, MAX_LEN.coursePeriod)) return "Хугацааны нэгж хэт урт байна";
   if (isTooLong(data.startDate, MAX_LEN.courseDate)) return "Хичээллэх өдөр хэт урт байна";
   if (isTooLong(data.mode, MAX_LEN.courseMode)) return "Төрөл хэт урт байна";
-  if (Array.isArray(data.lessons)) {
-    for (const l of data.lessons as { topic?: string; schedule?: string }[]) {
-      if (isTooLong(l.topic, MAX_LEN.lessonTopic) || isTooLong(l.schedule, MAX_LEN.lessonSchedule)) {
-        return "Хичээлийн мэдээлэл хэт урт байна";
-      }
-    }
-  }
-  return null;
+  return validateLessons(data.lessons);
 }
 
 export async function GET() {
   if (!(await isAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
-  return NextResponse.json({ ok: true, courses: await listCourses() });
+  // Admin listings include drafts; only the public pages filter them out.
+  return NextResponse.json({ ok: true, courses: await listCourses(undefined, { includeDrafts: true }) });
 }
 
 export async function POST(request: Request) {
@@ -55,14 +50,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: lengthError }, { status: 400 });
   }
 
-  const lessons = Array.isArray(data.lessons)
-    ? data.lessons
-        .map((l: { topic?: string; schedule?: string }) => ({
-          topic: l.topic?.trim() ?? "",
-          schedule: l.schedule?.trim() || undefined,
-        }))
-        .filter((l: { topic: string }) => l.topic)
-    : [];
+  const lessons = normalizeLessons(data.lessons) ?? [];
 
   // New objects are created as drafts by default — an admin must explicitly
   // publish them from the course Object Page, matching the Fiori "create as

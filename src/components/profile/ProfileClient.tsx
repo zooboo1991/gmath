@@ -12,8 +12,9 @@ import {
   IconPencil,
   IconClose,
   IconVideoCamera,
+  IconPlay,
 } from "@/components/icons";
-import { getLessonStatus } from "@/lib/lessonSchedule";
+import { getLessonStates, getLessonStatus, type LessonWithState } from "@/lib/lessonSchedule";
 
 type Tab = "active" | "pending";
 
@@ -114,23 +115,21 @@ export default function ProfileClient({
                   {r.status === "active" ? (
                     <div className="mt-4 pt-4 border-t border-line flex flex-col gap-3">
                       <ZoomJoin registration={r} />
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {r.facebookGroup ? (
-                          <a
-                            href={r.facebookGroup}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center gap-2.5 bg-blue-soft text-blue-strong font-bold text-[.9rem] rounded-sm px-4 py-3"
-                          >
-                            <IconMessenger className="w-[18px] h-[18px] shrink-0" /> Facebook группт нэгдэх
-                          </a>
-                        ) : (
-                          <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
-                            <IconMessenger className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Facebook групп тун удахгүй
-                          </div>
-                        )}
-                        <ScheduleSummary registration={r} />
-                      </div>
+                      {r.facebookGroup ? (
+                        <a
+                          href={r.facebookGroup}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2.5 bg-blue-soft text-blue-strong font-bold text-[.9rem] rounded-sm px-4 py-3"
+                        >
+                          <IconMessenger className="w-[18px] h-[18px] shrink-0" /> Facebook группт нэгдэх
+                        </a>
+                      ) : (
+                        <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
+                          <IconMessenger className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Facebook групп тун удахгүй
+                        </div>
+                      )}
+                      <LessonSchedule registration={r} />
                     </div>
                   ) : (
                     <p className="mt-3 text-[.88rem] text-ink-3 font-semibold">
@@ -234,14 +233,108 @@ function ZoomJoin({ registration }: { registration: RegistrationWithGroup }) {
   );
 }
 
-function ScheduleSummary({ registration }: { registration: RegistrationWithGroup }) {
-  const total = registration.lessons?.length ?? 0;
+/**
+ * The course's lessons, each offering exactly what is useful at that moment:
+ * a recording once the lesson is over, the room while it is on, and nothing at
+ * all for lessons that have not come round yet.
+ */
+function LessonSchedule({ registration }: { registration: RegistrationWithGroup }) {
+  const now = useNow();
+  const lessons = registration.lessons ?? [];
+
+  if (lessons.length === 0) {
+    return (
+      <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
+        <IconClock className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Хуваарь тун удахгүй
+      </div>
+    );
+  }
+
+  // Until hydration `now` is null, so every row renders in its neutral state
+  // and the server and client markup match.
+  const states = now ? getLessonStates(lessons, now) : null;
+
   return (
-    <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
-      <IconClock className="w-[18px] h-[18px] shrink-0 text-ink-3" />
-      {total > 0 ? `Нийт ${total} хичээл` : "Хуваарь тун удахгүй"}
+    <div className="bg-bg-soft rounded-sm px-4 py-3.5">
+      <b className="font-extrabold text-[.9rem] block mb-2.5">Хичээлийн хуваарь ({lessons.length})</b>
+      <div className="flex flex-col">
+        {lessons.map((lesson, i) => {
+          const info = states?.[i];
+          return (
+            // The topic gets the full row width; the date and the action share
+            // the line below it, so nothing has to be truncated on a phone.
+            <div key={i} className="flex gap-3 py-2.5 border-b border-line last:border-0">
+              <span
+                className={`w-6 h-6 rounded-md grid place-items-center font-extrabold text-[.72rem] shrink-0 mt-0.5 ${
+                  info?.state === "live"
+                    ? "bg-green text-white"
+                    : "bg-surface text-ink-2 border border-line-2"
+                }`}
+              >
+                {i + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <span className="block font-bold text-[.88rem] text-ink">{lesson.topic}</span>
+                <div className="flex items-center justify-between gap-3 flex-wrap mt-1">
+                  <span className="text-[.78rem] font-semibold text-ink-3">
+                    {info?.dateLabel}
+                    {info?.dateLabel && info?.timeLabel && " · "}
+                    {info?.timeLabel}
+                  </span>
+                  <LessonAction info={info} courseZoomLink={registration.zoomLink} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
+}
+
+function LessonAction({
+  info,
+  courseZoomLink,
+}: {
+  info: LessonWithState | undefined;
+  courseZoomLink?: string;
+}) {
+  if (!info) return null;
+
+  if (info.state === "past") {
+    return info.lesson.recordingLink ? (
+      <a
+        href={info.lesson.recordingLink}
+        target="_blank"
+        rel="noreferrer"
+        className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.8rem] text-blue-strong bg-blue-soft rounded-full px-3.5 py-2"
+      >
+        <IconPlay className="w-3 h-3" /> Бичлэг үзэх
+      </a>
+    ) : (
+      <span className="shrink-0 font-bold text-[.78rem] text-ink-3">Бичлэг удахгүй</span>
+    );
+  }
+
+  if (info.state === "live") {
+    // A lesson may override the course's room; otherwise the course link is
+    // the one recurring meeting they all share.
+    const href = info.lesson.zoomLink || courseZoomLink;
+    if (!href) return null;
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.8rem] text-white bg-green rounded-full px-3.5 py-2"
+      >
+        <IconVideoCamera className="w-3.5 h-3.5" /> Хичээлд орох
+      </a>
+    );
+  }
+
+  // Upcoming and undated lessons deliberately carry no link.
+  return null;
 }
 
 function Pill({ children }: { children: React.ReactNode }) {

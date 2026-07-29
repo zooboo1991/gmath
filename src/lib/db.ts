@@ -50,6 +50,10 @@ export function toPublicUser(user: User): PublicUser {
 export type Lesson = {
   topic: string;
   schedule?: string;
+  /** Room for this lesson. Falls back to the course's link when unset. */
+  zoomLink?: string;
+  /** Filled in after the lesson, and shown instead of the room once it ends. */
+  recordingLink?: string;
 };
 
 export type Course = {

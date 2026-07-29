@@ -25,7 +25,12 @@ export function parseScheduleString(schedule: string): { date: string; startTime
   return { date: `${year}-${month}-${day}`, startTime: startTime ?? "", endTime: endTime ?? "" };
 }
 
-type ScheduledLesson = { topic: string; schedule?: string };
+type ScheduledLesson = {
+  topic: string;
+  schedule?: string;
+  zoomLink?: string;
+  recordingLink?: string;
+};
 
 export type LessonStatus = {
   /** The lesson happening right now, if any. */
@@ -36,8 +41,24 @@ export type LessonStatus = {
   nextLabel: string;
 };
 
-/** A lesson counts as "live" from ten minutes before it starts. */
-const JOIN_EARLY_MS = 10 * 60 * 1000;
+/**
+ * `live` opens the room a quarter of an hour early, `past` means the recording
+ * is what the student wants, and `upcoming` deliberately offers no link at all.
+ * `unscheduled` is a lesson the teacher has not dated yet.
+ */
+export type LessonState = "past" | "live" | "upcoming" | "unscheduled";
+
+export type LessonWithState = {
+  lesson: ScheduledLesson;
+  state: LessonState;
+  /** "08-р сарын 24, Даваа" — empty when the lesson has no date. */
+  dateLabel: string;
+  /** "18:00–20:00" — empty when the lesson has no time. */
+  timeLabel: string;
+};
+
+/** A lesson counts as "live" from fifteen minutes before it starts. */
+const JOIN_EARLY_MS = 15 * 60 * 1000;
 /** How long a lesson is assumed to run when no end time was entered. */
 const ASSUMED_LENGTH_MS = 2 * 60 * 60 * 1000;
 
@@ -52,6 +73,49 @@ function toLocalDate(isoDate: string, time: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+type TimedLesson = { lesson: ScheduledLesson; start: Date; end: Date; endTime: string };
+
+function withTimes(lessons: ScheduledLesson[]): TimedLesson[] {
+  return lessons
+    .map((lesson) => {
+      const { date, startTime, endTime } = parseScheduleString(lesson.schedule ?? "");
+      const start = toLocalDate(date, startTime);
+      if (!start) return null;
+      const end = toLocalDate(date, endTime) ?? new Date(start.getTime() + ASSUMED_LENGTH_MS);
+      return { lesson, start, end, endTime };
+    })
+    .filter((x): x is TimedLesson => x !== null);
+}
+
+/**
+ * Annotates every lesson with where it sits relative to `now`, keeping the
+ * teacher's original ordering — that is the curriculum order students expect,
+ * not chronological order.
+ */
+export function getLessonStates(lessons: ScheduledLesson[] | undefined, now: Date): LessonWithState[] {
+  if (!lessons?.length) return [];
+  const ms = now.getTime();
+
+  return lessons.map((lesson) => {
+    const [timed] = withTimes([lesson]);
+    if (!timed) {
+      return { lesson, state: "unscheduled" as const, dateLabel: "", timeLabel: "" };
+    }
+    const state: LessonState =
+      ms > timed.end.getTime()
+        ? "past"
+        : ms >= timed.start.getTime() - JOIN_EARLY_MS
+          ? "live"
+          : "upcoming";
+    return {
+      lesson,
+      state,
+      dateLabel: formatLessonDate(timed.start),
+      timeLabel: formatTimeRange(timed.start, timed.endTime),
+    };
+  });
+}
+
 /**
  * Works out which lesson is on now and which is up next. `now` is injected so
  * the caller controls the clock (and so this is testable).
@@ -60,17 +124,7 @@ export function getLessonStatus(lessons: ScheduledLesson[] | undefined, now: Dat
   const empty: LessonStatus = { live: null, next: null, nextLabel: "" };
   if (!lessons?.length) return empty;
 
-  const timed = lessons
-    .map((lesson) => {
-      const { date, startTime, endTime } = parseScheduleString(lesson.schedule ?? "");
-      const start = toLocalDate(date, startTime);
-      if (!start) return null;
-      const end = toLocalDate(date, endTime) ?? new Date(start.getTime() + ASSUMED_LENGTH_MS);
-      return { lesson, start, end };
-    })
-    .filter((x): x is { lesson: ScheduledLesson; start: Date; end: Date } => x !== null)
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
-
+  const timed = withTimes(lessons).sort((a, b) => a.start.getTime() - b.start.getTime());
   if (timed.length === 0) return empty;
 
   const ms = now.getTime();
@@ -82,6 +136,19 @@ export function getLessonStatus(lessons: ScheduledLesson[] | undefined, now: Dat
     next: next?.lesson ?? null,
     nextLabel: next ? formatLessonStart(next.start) : "",
   };
+}
+
+function formatLessonDate(start: Date): string {
+  const weekday = WEEKDAY_NAMES_MN[start.getDay()];
+  const month = String(start.getMonth() + 1).padStart(2, "0");
+  const day = String(start.getDate()).padStart(2, "0");
+  return `${month}-р сарын ${day}, ${weekday}`;
+}
+
+function formatTimeRange(start: Date, endTime: string): string {
+  const hh = String(start.getHours()).padStart(2, "0");
+  const mm = String(start.getMinutes()).padStart(2, "0");
+  return endTime ? `${hh}:${mm}–${endTime}` : `${hh}:${mm}`;
 }
 
 function formatLessonStart(start: Date): string {

@@ -389,10 +389,11 @@ export default function CourseObjectPage({
               </div>
             </Card>
 
-            <Card title="Zoom хичээл">
+            <Card title="Zoom өрөө (бүх хичээлд)">
               <p className="text-ink-3 font-semibold text-[.85rem] -mt-2 mb-3.5">
-                Энэ сургалтын Zoom өрөө. Төлбөрөө баталгаажуулсан сурагчид л профайл хуудсандаа
-                &quot;Хичээлд орох&quot; товч харна.
+                Давтагдах уулзалтын нэг холбоосыг энд оруулбал бүх хичээлд хэрэглэгдэнэ. Тодорхой
+                хичээл өөр холбоостой бол доорх хуваарийн мөрөнд нь бичнэ. Төлбөрөө баталгаажуулсан
+                сурагчид л харна.
               </p>
               <div className="flex flex-col gap-3">
                 <AdminField label="Zoom холбоос">
@@ -504,6 +505,20 @@ export default function CourseObjectPage({
                             value={parsed.endTime}
                             onChange={(e) => updateSchedule({ endTime: e.target.value })}
                             className="px-2.5 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          <input
+                            value={lesson.zoomLink ?? ""}
+                            onChange={(e) => updateLessonRow(i, { zoomLink: e.target.value })}
+                            placeholder={form.zoomLink ? "Zoom (сургалтын ерөнхийг ашиглана)" : "Zoom холбоос"}
+                            className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
+                          />
+                          <input
+                            value={lesson.recordingLink ?? ""}
+                            onChange={(e) => updateLessonRow(i, { recordingLink: e.target.value })}
+                            placeholder="Бичлэгийн холбоос (хичээл орсны дараа)"
+                            className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
                           />
                         </div>
                       </div>
