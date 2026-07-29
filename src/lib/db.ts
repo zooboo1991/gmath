@@ -386,7 +386,17 @@ export async function updateCourse(
   return data ? courseFromRow(data as CourseRow) : undefined;
 }
 
+/**
+ * `registrations.program_id` is plain text with no foreign key (it also holds
+ * ids of the static yearly programmes, which have no course row). Nothing
+ * cascades, so deleting a course used to leave its registrations behind and
+ * students kept seeing a course that no longer existed, with no schedule and
+ * no way to clear it. The registrations go with it.
+ */
 export async function deleteCourse(id: string): Promise<boolean> {
+  const { error: regError } = await getSupabase().from("registrations").delete().eq("program_id", id);
+  if (regError) throw regError;
+
   const { error, count } = await getSupabase().from("courses").delete({ count: "exact" }).eq("id", id);
   if (error) throw error;
   return (count ?? 0) > 0;

@@ -189,7 +189,10 @@ export default function CourseObjectPage({
 
   const remove = async () => {
     if (!isEditing) return;
-    if (!confirm("Энэ сургалтыг устгах уу? Энэ үйлдлийг буцаах боломжгүй.")) return;
+    // The course's registrations are deleted with it, so name the cost.
+    const attached = registrations.length;
+    const warning = attached > 0 ? ` Энэ сургалтын ${attached} бүртгэл хамт устана.` : "";
+    if (!confirm(`Энэ сургалтыг устгах уу?${warning} Энэ үйлдлийг буцаах боломжгүй.`)) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/admin/courses/${course.id}`, { method: "DELETE" });

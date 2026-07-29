@@ -65,6 +65,9 @@ type Ctx = {
   /** False until /api/account/me has answered, so the header can avoid
    *  rendering "Нэвтрэх" at a visitor who is in fact already signed in. */
   sessionLoaded: boolean;
+  /** Programme ids this user is already signed up for, so a course page can
+   *  offer to open it instead of selling it to them again. */
+  enrolledProgramIds: Set<string>;
   open: (program: Program) => void;
   openLogin: () => void;
   openRegister: () => void;
@@ -88,7 +91,17 @@ export function RegisterTriggerButton({
   className: string;
   children: React.ReactNode;
 }) {
-  const { open } = useProgramRegister();
+  const { open, enrolledProgramIds } = useProgramRegister();
+
+  // Already paid for this one — send them to it rather than through checkout.
+  if (enrolledProgramIds.has(program.id)) {
+    return (
+      <Link href="/profile" className={className}>
+        Сургалт харах <span>→</span>
+      </Link>
+    );
+  }
+
   return (
     <button type="button" onClick={() => open(program)} className={className}>
       {children}
@@ -116,6 +129,7 @@ export function AuthTriggerButton({
 export default function ProgramRegisterProvider({ children }: { children: React.ReactNode }) {
   const [sessionUser, setSessionUser] = useState<SessionUser>(null);
   const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [enrolledProgramIds, setEnrolledProgramIds] = useState<Set<string>>(new Set());
   const [isOpen, setIsOpen] = useState(false);
   const [program, setProgram] = useState<Program | null>(null);
   const [screen, setScreen] = useState<Screen>("login");
@@ -148,6 +162,17 @@ export default function ProgramRegisterProvider({ children }: { children: React.
       .catch(() => setSessionUser(null))
       .finally(() => setSessionLoaded(true));
   }, []);
+
+  // Signed-out visitors get a 401 here, which is fine: the empty set just
+  // means every course keeps its "бүртгүүлэх" call to action.
+  const refreshEnrolments = () => {
+    fetch("/api/account/registrations")
+      .then((res) => (res.ok ? res.json() : { registrations: [] }))
+      .then((json) => setEnrolledProgramIds(new Set<string>((json.registrations ?? []).map((r: { programId: string }) => r.programId))))
+      .catch(() => setEnrolledProgramIds(new Set()));
+  };
+
+  useEffect(refreshEnrolments, [sessionUser?.id]);
 
   const resetTransient = () => {
     setRegisterStep(1);
@@ -340,6 +365,8 @@ export default function ProgramRegisterProvider({ children }: { children: React.
       }
       setRegistrationStatus(json.registration.status);
       setFacebookGroup(json.facebookGroup ?? null);
+      // So the course page they came from now offers to open it.
+      setEnrolledProgramIds((ids) => new Set(ids).add(program.id));
       setScreen("success");
     } catch {
       setSubmitError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
@@ -382,7 +409,9 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   }, [isOpen]);
 
   return (
-    <ModalCtx.Provider value={{ sessionUser, sessionLoaded, open, openLogin, openRegister, logout }}>
+    <ModalCtx.Provider
+      value={{ sessionUser, sessionLoaded, enrolledProgramIds, open, openLogin, openRegister, logout }}
+    >
       {children}
 
       {isOpen && (

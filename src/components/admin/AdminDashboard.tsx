@@ -52,11 +52,18 @@ export default function AdminDashboard({
   };
 
   const removeCourse = async (id: string) => {
-    if (!confirm("Энэ сургалтыг устгах уу?")) return;
+    // Deleting a course also deletes its registrations, so say how many are
+    // about to go — otherwise it is silent data loss.
+    const attached = registrations.filter((r) => r.programId === id).length;
+    const warning = attached > 0 ? `\n\nЭнэ сургалтын ${attached} бүртгэл хамт устана.` : "";
+    if (!confirm(`Энэ сургалтыг устгах уу?${warning}`)) return;
     setBusyId(id);
     try {
       const res = await fetch(`/api/admin/courses/${id}`, { method: "DELETE" });
-      if (res.ok) setCourses((cs) => cs.filter((c) => c.id !== id));
+      if (res.ok) {
+        setCourses((cs) => cs.filter((c) => c.id !== id));
+        setRegistrations((rs) => rs.filter((r) => r.programId !== id));
+      }
     } finally {
       setBusyId(null);
     }

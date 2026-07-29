@@ -255,7 +255,7 @@ function LessonSchedule({ registration }: { registration: RegistrationWithGroup 
                     {info?.dateLabel && info?.timeLabel && " · "}
                     {info?.timeLabel}
                   </span>
-                  <LessonAction info={info} courseZoomLink={registration.zoomLink} />
+                  <LessonAction info={info} />
                 </div>
               </div>
             </div>
@@ -267,20 +267,14 @@ function LessonSchedule({ registration }: { registration: RegistrationWithGroup 
 }
 
 /**
- * Deliberately manual: whichever link the teacher has actually typed in wins,
- * with no date-based gating. A link entered for a lesson three weeks out
- * shows immediately — waiting for a 15-minute window before honouring it
- * left the teacher unable to confirm they had even saved it correctly.
+ * Entirely driven by what the teacher typed on the lesson itself — no
+ * date gating and no falling back to the course-level room. A lesson shows a
+ * join button only once it has been given its own Zoom link, so the schedule
+ * reads as a checklist of what has actually been set up.
  * The one date check that remains: a *past* lesson without a recording says
  * so instead of offering a join button to a room that has already closed.
  */
-function LessonAction({
-  info,
-  courseZoomLink,
-}: {
-  info: LessonWithState | undefined;
-  courseZoomLink?: string;
-}) {
+function LessonAction({ info }: { info: LessonWithState | undefined }) {
   if (!info) return null;
 
   if (info.lesson.recordingLink) {
@@ -300,9 +294,7 @@ function LessonAction({
     return <span className="shrink-0 font-bold text-[.78rem] text-ink-3">Бичлэг удахгүй</span>;
   }
 
-  // A lesson may override the course's room; otherwise the course link is the
-  // one recurring meeting all of its lessons share.
-  const href = info.lesson.zoomLink || courseZoomLink;
+  const href = info.lesson.zoomLink;
   if (!href) return null;
 
   const isLive = info.state === "live";
