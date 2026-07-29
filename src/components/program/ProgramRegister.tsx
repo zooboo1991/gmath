@@ -10,7 +10,7 @@ import {
   IconBank,
   IconClose,
   IconCheck,
-  IconMessenger,
+  IconFacebook,
 } from "@/components/icons";
 
 type Role = "teacher" | "student";
@@ -830,7 +830,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     rel="noreferrer"
                     className="flex items-center justify-center gap-2.5 bg-blue-soft text-blue-strong font-extrabold rounded-sm px-5 py-4 mt-5"
                   >
-                    <IconMessenger className="w-[18px] h-[18px] shrink-0" />
+                    <IconFacebook className="w-[18px] h-[18px] shrink-0" />
                     Facebook группт нэгдэх
                   </a>
                 )}

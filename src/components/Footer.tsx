@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { IconMail, IconPhone, IconLocation, IconMessenger } from "./icons";
+import { IconMail, IconPhone, IconLocation, IconFacebook } from "./icons";
 
 export default function Footer() {
   return (
@@ -74,7 +74,7 @@ export default function Footer() {
                 бүрт төв, 406 тоот
               </li>
               <li className="flex items-center gap-[9px] text-[.96rem] -ml-1">
-                <IconMessenger className="w-4 h-4 text-navy-ink-3 shrink-0 ml-1" />
+                <IconFacebook className="w-4 h-4 text-navy-ink-3 shrink-0 ml-1" />
                 <a
                   href="https://www.facebook.com/ganbat.surgalt/"
                   target="_blank"

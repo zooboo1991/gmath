@@ -10,7 +10,7 @@ import {
   IconPlayBox,
   IconPeopleHero,
   IconTarget,
-  IconMessenger,
+  IconFacebook,
 } from "@/components/icons";
 
 const aboutItems = (lessonCount: number) => [
@@ -45,7 +45,7 @@ const aboutItems = (lessonCount: number) => [
     text: "Практик буюу олимпиадад ирдэг бодлогуудыг хэрхэн бодох талаар бодлого дээр суурилж заадаг.",
   },
   {
-    icon: <IconMessenger className="w-6 h-6" />,
+    icon: <IconFacebook className="w-6 h-6" />,
     iconBg: "bg-gold-soft text-gold-strong",
     text: "Сургалтын фэйсбүүк групп үүсгэх ба группт сургалтын талаарх зүйлсээ чөлөөтэй ярилцдаг.",
     title: "Facebook групп",

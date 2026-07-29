@@ -7,7 +7,7 @@ import type { PublicUser, RegistrationWithGroup } from "@/lib/db";
 import {
   IconCheckCircle,
   IconClock,
-  IconMessenger,
+  IconFacebook,
   IconPerson,
   IconPencil,
   IconClose,
@@ -122,11 +122,11 @@ export default function ProfileClient({
                           rel="noreferrer"
                           className="flex items-center gap-2.5 bg-blue-soft text-blue-strong font-bold text-[.9rem] rounded-sm px-4 py-3"
                         >
-                          <IconMessenger className="w-[18px] h-[18px] shrink-0" /> Facebook группт нэгдэх
+                          <IconFacebook className="w-[18px] h-[18px] shrink-0" /> Facebook группт нэгдэх
                         </a>
                       ) : (
                         <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
-                          <IconMessenger className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Facebook групп тун удахгүй
+                          <IconFacebook className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Facebook групп тун удахгүй
                         </div>
                       )}
                       <LessonSchedule registration={r} />
