@@ -1,5 +1,6 @@
 import { getSupabase } from "./supabase";
 import { hashPassword, verifyPassword as verifyPasswordHash } from "./password";
+import { parsePriceToNumber } from "./price";
 
 /**
  * Persistence layer backed by Supabase Postgres (see supabase/schema.sql
@@ -595,4 +596,138 @@ export async function approveRegistration(id: string): Promise<Registration | un
     .maybeSingle();
   if (error) throw error;
   return data ? registrationFromRow(data as RegistrationRow) : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Admin dashboard
+// ---------------------------------------------------------------------------
+
+export type DashboardStats = {
+  students: number;
+  teachers: number;
+  /** Distinct students with at least one confirmed registration. */
+  studentsInClass: number;
+  /** Distinct teachers with at least one confirmed registration. */
+  teachersInClass: number;
+  courses: number;
+  coursesPublished: number;
+  coursesDraft: number;
+  coursesUpcoming: number;
+  coursesVod: number;
+  articles: number;
+  activeRegistrations: number;
+  pendingRegistrations: number;
+  /** Value of confirmed registrations. */
+  revenue: number;
+  /** Value still waiting on an admin to confirm payment. */
+  pendingRevenue: number;
+  qpayCount: number;
+  bankCount: number;
+  /** Busiest courses by confirmed registrations. */
+  topCourses: { label: string; active: number; pending: number }[];
+};
+
+async function countRows(table: string, filters: Record<string, string> = {}): Promise<number> {
+  let query = getSupabase().from(table).select("*", { count: "exact", head: true });
+  for (const [column, value] of Object.entries(filters)) query = query.eq(column, value);
+  const { count, error } = await query;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
+ * Every figure on the admin dashboard, in one round of queries.
+ *
+ * Counts come back as head-only queries (no rows transferred). Registrations
+ * are the exception: "how many distinct students are in class" needs each
+ * row's user and role, so those are fetched and reduced here. That is fine at
+ * this school's size; if registrations ever reach tens of thousands this
+ * should become a Postgres view.
+ */
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const [students, teachers, courses, coursesPublished, coursesUpcoming, coursesVod, articles] =
+    await Promise.all([
+      countRows("users", { role: "student" }),
+      countRows("users", { role: "teacher" }),
+      countRows("courses"),
+      countRows("courses", { status: "published" }),
+      countRows("courses", { kind: "upcoming" }),
+      countRows("courses", { kind: "vod" }),
+      countRows("articles"),
+    ]);
+
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .select("user_id, program_label, price, pay_method, status, users(role)");
+  if (error) throw error;
+
+  // A registration belongs to exactly one user, but the client types an
+  // embedded relation as an array, so accept either shape.
+  type JoinedUser = { role: Role } | { role: Role }[] | null;
+  const rows = data as unknown as {
+    user_id: string;
+    program_label: string;
+    price: string;
+    pay_method: PayMethod;
+    status: RegistrationStatus;
+    users: JoinedUser;
+  }[];
+  const roleOf = (users: JoinedUser): Role | undefined =>
+    (Array.isArray(users) ? users[0] : users)?.role;
+
+  const activeStudentIds = new Set<string>();
+  const activeTeacherIds = new Set<string>();
+  const byCourse = new Map<string, { active: number; pending: number }>();
+  let activeRegistrations = 0;
+  let pendingRegistrations = 0;
+  let revenue = 0;
+  let pendingRevenue = 0;
+  let qpayCount = 0;
+  let bankCount = 0;
+
+  for (const row of rows) {
+    const amount = parsePriceToNumber(row.price);
+    const bucket = byCourse.get(row.program_label) ?? { active: 0, pending: 0 };
+
+    if (row.status === "active") {
+      activeRegistrations += 1;
+      revenue += amount;
+      bucket.active += 1;
+      if (roleOf(row.users) === "teacher") activeTeacherIds.add(row.user_id);
+      else activeStudentIds.add(row.user_id);
+    } else {
+      pendingRegistrations += 1;
+      pendingRevenue += amount;
+      bucket.pending += 1;
+    }
+
+    byCourse.set(row.program_label, bucket);
+    if (row.pay_method === "qpay") qpayCount += 1;
+    else bankCount += 1;
+  }
+
+  const topCourses = [...byCourse.entries()]
+    .map(([label, counts]) => ({ label, ...counts }))
+    .sort((a, b) => b.active + b.pending - (a.active + a.pending))
+    .slice(0, 6);
+
+  return {
+    students,
+    teachers,
+    studentsInClass: activeStudentIds.size,
+    teachersInClass: activeTeacherIds.size,
+    courses,
+    coursesPublished,
+    coursesDraft: courses - coursesPublished,
+    coursesUpcoming,
+    coursesVod,
+    articles,
+    activeRegistrations,
+    pendingRegistrations,
+    revenue,
+    pendingRevenue,
+    qpayCount,
+    bankCount,
+    topCourses,
+  };
 }

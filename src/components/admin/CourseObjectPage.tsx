@@ -14,6 +14,7 @@ import {
 } from "@/lib/courseTag";
 import { toIsoDate, getWeekdayNameMn } from "@/lib/courseDate";
 import { buildScheduleString, parseScheduleString } from "@/lib/lessonSchedule";
+import { parsePriceToNumber, formatMnt } from "@/lib/price";
 import AdminField from "./AdminField";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
@@ -36,14 +37,6 @@ function normalizeMode(mode: string): string {
   if (hasInPerson) return "Танхим";
   if (hasOnline) return "Онлайн";
   return "";
-}
-
-function parsePriceToNumber(price: string): number {
-  return Number(price.replace(/[^\d]/g, "")) || 0;
-}
-
-function formatMnt(value: number): string {
-  return `${value.toLocaleString("en-US")}₮`;
 }
 
 function StatusBadge({ status }: { status: CourseStatus }) {
