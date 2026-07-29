@@ -299,6 +299,15 @@ export async function updateUserProfile(
   return data ? userFromRow(data as UserRow) : undefined;
 }
 
+export async function listUsers(): Promise<PublicUser[]> {
+  const { data, error } = await getSupabase()
+    .from("users")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as UserRow[]).map((row) => toPublicUser(userFromRow(row)));
+}
+
 export async function listCourses(
   kind?: CourseKind,
   opts?: { includeDrafts?: boolean }

@@ -9,17 +9,19 @@ import { formatCourseDate } from "@/lib/courseDate";
 import { formatMnt } from "@/lib/price";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
-type Tab = "dashboard" | "registrations" | "courses" | "articles";
+type Tab = "dashboard" | "registrations" | "courses" | "articles" | "users";
 
 export default function AdminDashboard({
   initialRegistrations,
   initialCourses,
   initialArticles,
+  initialUsers,
   stats,
 }: {
   initialRegistrations: RegistrationWithUser[];
   initialCourses: Course[];
   initialArticles: Article[];
+  initialUsers: PublicUser[];
   stats: DashboardStats;
 }) {
   const router = useRouter();
@@ -29,6 +31,7 @@ export default function AdminDashboard({
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [courses, setCourses] = useState(initialCourses);
   const [articles] = useState(initialArticles);
+  const [users] = useState(initialUsers);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const logout = async () => {
@@ -133,6 +136,15 @@ export default function AdminDashboard({
           >
             Нийтлэл
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("users")}
+            className={`font-extrabold text-[.95rem] px-5 py-2.5 rounded-full transition-colors shrink-0 ${
+              tab === "users" ? "bg-blue text-white" : "bg-surface text-ink-2"
+            }`}
+          >
+            Хэрэглэгчид
+          </button>
         </div>
 
         {tab === "dashboard" && <DashboardPanel stats={stats} onOpenPending={() => setTab("registrations")} />}
@@ -235,6 +247,51 @@ export default function AdminDashboard({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "users" && (
+          <div>
+            <h2 className="text-[1.15rem] font-extrabold mb-3">Хэрэглэгчид ({users.length})</h2>
+            <div className="flex flex-col gap-2.5">
+              {users.length === 0 && <p className="text-ink-3 font-semibold text-[.9rem]">Одоогоор алга.</p>}
+              {users.map((u) => {
+                const regCount = registrations.filter((r) => r.user?.id === u.id).length;
+                return (
+                  <Link
+                    key={u.id}
+                    href={`/admin/users/${u.id}`}
+                    className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 flex items-center justify-between gap-4 flex-wrap hover:border-blue transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`text-[.7rem] font-extrabold px-2 py-0.5 rounded-full ${
+                            u.role === "teacher" ? "text-gold-strong bg-gold-soft" : "text-blue-strong bg-blue-soft"
+                          }`}
+                        >
+                          {u.role === "teacher" ? "Багш" : "Сурагч"}
+                        </span>
+                        {regCount > 0 && (
+                          <span className="text-[.7rem] font-extrabold text-green bg-green-soft px-2 py-0.5 rounded-full">
+                            {regCount} бүртгэл
+                          </span>
+                        )}
+                      </div>
+                      <b className="font-extrabold block">
+                        {u.lastName} {u.firstName}
+                      </b>
+                      <span className="text-ink-3 font-semibold text-[.85rem]">
+                        {u.phone} · {u.email}
+                        {u.school && ` · ${u.school}`}
+                        {u.grade && ` · ${u.grade}`}
+                      </span>
+                    </div>
+                    <span className="text-[.82rem] font-extrabold text-ink-2 shrink-0">Дэлгэрэнгүй →</span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}
