@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Article, Course, DashboardStats, PublicUser, Registration } from "@/lib/db";
 import { IconCheckCircle, IconClock } from "@/components/icons";
 import { formatCourseDate } from "@/lib/courseDate";
@@ -251,50 +251,7 @@ export default function AdminDashboard({
           </div>
         )}
 
-        {tab === "users" && (
-          <div>
-            <h2 className="text-[1.15rem] font-extrabold mb-3">Хэрэглэгчид ({users.length})</h2>
-            <div className="flex flex-col gap-2.5">
-              {users.length === 0 && <p className="text-ink-3 font-semibold text-[.9rem]">Одоогоор алга.</p>}
-              {users.map((u) => {
-                const regCount = registrations.filter((r) => r.user?.id === u.id).length;
-                return (
-                  <Link
-                    key={u.id}
-                    href={`/admin/users/${u.id}`}
-                    className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 flex items-center justify-between gap-4 flex-wrap hover:border-blue transition-colors"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className={`text-[.7rem] font-extrabold px-2 py-0.5 rounded-full ${
-                            u.role === "teacher" ? "text-gold-strong bg-gold-soft" : "text-blue-strong bg-blue-soft"
-                          }`}
-                        >
-                          {u.role === "teacher" ? "Багш" : "Сурагч"}
-                        </span>
-                        {regCount > 0 && (
-                          <span className="text-[.7rem] font-extrabold text-green bg-green-soft px-2 py-0.5 rounded-full">
-                            {regCount} бүртгэл
-                          </span>
-                        )}
-                      </div>
-                      <b className="font-extrabold block">
-                        {u.lastName} {u.firstName}
-                      </b>
-                      <span className="text-ink-3 font-semibold text-[.85rem]">
-                        {u.phone} · {u.email}
-                        {u.school && ` · ${u.school}`}
-                        {u.grade && ` · ${u.grade}`}
-                      </span>
-                    </div>
-                    <span className="text-[.82rem] font-extrabold text-ink-2 shrink-0">Дэлгэрэнгүй →</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {tab === "users" && <UsersPanel users={users} registrations={registrations} />}
       </div>
     </div>
   );
@@ -512,6 +469,149 @@ function CourseGroup({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+const FILTER_INPUT_CLASS =
+  "w-full px-3.5 py-2.5 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.88rem] focus:outline-none focus:border-blue focus:bg-surface";
+
+function UsersPanel({
+  users,
+  registrations,
+}: {
+  users: PublicUser[];
+  registrations: RegistrationWithUser[];
+}) {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [school, setSchool] = useState("");
+  const [role, setRole] = useState<"" | "teacher" | "student">("");
+
+  const schools = useMemo(
+    () => [...new Set(users.map((u) => u.school).filter(Boolean))].sort((a, b) => a.localeCompare(b, "mn")),
+    [users]
+  );
+
+  const regCountByUser = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of registrations) {
+      if (!r.user) continue;
+      counts.set(r.user.id, (counts.get(r.user.id) ?? 0) + 1);
+    }
+    return counts;
+  }, [registrations]);
+
+  const filtered = useMemo(() => {
+    const nameQuery = name.trim().toLowerCase();
+    const phoneQuery = phone.trim().toLowerCase();
+    const emailQuery = email.trim().toLowerCase();
+    return users.filter((u) => {
+      if (nameQuery && !`${u.lastName} ${u.firstName}`.toLowerCase().includes(nameQuery)) return false;
+      if (phoneQuery && !u.phone.toLowerCase().includes(phoneQuery)) return false;
+      if (emailQuery && !u.email.toLowerCase().includes(emailQuery)) return false;
+      if (school && u.school !== school) return false;
+      if (role && u.role !== role) return false;
+      return true;
+    });
+  }, [users, name, phone, email, school, role]);
+
+  return (
+    <div>
+      <h2 className="text-[1.15rem] font-extrabold mb-3">
+        Хэрэглэгчид ({filtered.length}
+        {filtered.length !== users.length && ` / ${users.length}`})
+      </h2>
+
+      <div className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 mb-4 grid grid-cols-1 nav:grid-cols-5 gap-3">
+        <input
+          type="text"
+          placeholder="Нэрээр хайх"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className={FILTER_INPUT_CLASS}
+        />
+        <input
+          type="text"
+          placeholder="Утасны дугаараар хайх"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className={FILTER_INPUT_CLASS}
+        />
+        <input
+          type="text"
+          placeholder="Имэйлээр хайх"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className={FILTER_INPUT_CLASS}
+        />
+        <select value={school} onChange={(e) => setSchool(e.target.value)} className={FILTER_INPUT_CLASS}>
+          <option value="">Бүх сургууль</option>
+          {schools.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as "" | "teacher" | "student")}
+          className={FILTER_INPUT_CLASS}
+        >
+          <option value="">Бүх төрөл</option>
+          <option value="student">Сурагч</option>
+          <option value="teacher">Багш</option>
+        </select>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-ink-3 font-semibold text-[.9rem] text-center py-10">Тохирох хэрэглэгч алга байна.</p>
+      ) : (
+        <div className="bg-surface border border-line rounded-md shadow-xs overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[720px]">
+            <thead>
+              <tr className="text-ink-3 text-[.76rem] font-extrabold tracking-[.05em] uppercase">
+                <th className="px-4 py-3">Нэр</th>
+                <th className="px-4 py-3">Төрөл</th>
+                <th className="px-4 py-3">Утас</th>
+                <th className="px-4 py-3">Имэйл</th>
+                <th className="px-4 py-3">Сургууль</th>
+                <th className="px-4 py-3">Анги</th>
+                <th className="px-4 py-3">Бүртгэл</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((u) => (
+                <tr
+                  key={u.id}
+                  onClick={() => router.push(`/admin/users/${u.id}`)}
+                  className="border-t border-line cursor-pointer hover:bg-bg-soft transition-colors"
+                >
+                  <td className="px-4 py-3 font-extrabold text-[.9rem]">
+                    {u.lastName} {u.firstName}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`text-[.7rem] font-extrabold px-2 py-0.5 rounded-full ${
+                        u.role === "teacher" ? "text-gold-strong bg-gold-soft" : "text-blue-strong bg-blue-soft"
+                      }`}
+                    >
+                      {u.role === "teacher" ? "Багш" : "Сурагч"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.phone}</td>
+                  <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.email}</td>
+                  <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.school || "—"}</td>
+                  <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.grade || "—"}</td>
+                  <td className="px-4 py-3 font-extrabold text-[.88rem]">{regCountByUser.get(u.id) ?? 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
