@@ -3,7 +3,6 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
-import LogoutButton from "@/components/LogoutButton";
 import ProfileClient from "@/components/profile/ProfileClient";
 import { listRegistrationsByUser, toPublicUser } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
@@ -53,9 +52,6 @@ export default async function ProfilePage() {
       <Navbar />
       <main>
         <ProfileClient user={toPublicUser(user)} registrations={registrations} />
-        <div className="wrap max-w-[760px] mx-auto pb-8 flex justify-center">
-          <LogoutButton />
-        </div>
       </main>
       <Footer />
     </>

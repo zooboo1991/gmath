@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import useScrolled from "@/hooks/useScrolled";
 import { useProgramRegister } from "@/components/program/ProgramRegister";
 import { IconPerson } from "@/components/icons";
@@ -17,8 +17,12 @@ const links = [
 export default function Navbar() {
   const scrolled = useScrolled(12);
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const { sessionUser, sessionLoaded, openLogin, openRegister } = useProgramRegister();
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const { sessionUser, sessionLoaded, openLogin, openRegister, logout } = useProgramRegister();
 
   const closeMenu = () => setOpen(false);
 
@@ -29,6 +33,7 @@ export default function Navbar() {
   if (pathname !== menuPathname) {
     setMenuPathname(pathname);
     setOpen(false);
+    setProfileMenuOpen(false);
   }
 
   useEffect(() => {
@@ -39,6 +44,32 @@ export default function Navbar() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setProfileMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [profileMenuOpen]);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    await logout();
+    setProfileMenuOpen(false);
+    router.push("/");
+    router.refresh();
+  };
 
   return (
     <header
@@ -86,15 +117,39 @@ export default function Navbar() {
             // visitors they were signed out.
             <div aria-hidden className="w-[180px] h-[46px] rounded-full bg-surface-2 animate-pulse" />
           ) : sessionUser ? (
-            <Link
-              href="/profile"
-              className="flex items-center gap-[10px] font-extrabold text-ink px-[8px] py-[6px] rounded-full hover:bg-blue-soft transition-colors"
-            >
-              <span className="w-9 h-9 rounded-full bg-blue-soft text-blue-strong grid place-items-center shrink-0">
-                <IconPerson className="w-[18px] h-[18px]" />
-              </span>
-              {sessionUser.firstName}
-            </Link>
+            <div ref={profileMenuRef} className="relative">
+              <button
+                type="button"
+                aria-expanded={profileMenuOpen}
+                onClick={() => setProfileMenuOpen((o) => !o)}
+                className="flex items-center gap-[10px] font-extrabold text-ink px-[8px] py-[6px] rounded-full hover:bg-blue-soft transition-colors"
+              >
+                <span className="w-9 h-9 rounded-full bg-blue-soft text-blue-strong grid place-items-center shrink-0">
+                  <IconPerson className="w-[18px] h-[18px]" />
+                </span>
+                {sessionUser.firstName}
+              </button>
+
+              {profileMenuOpen && (
+                <div className="absolute right-0 top-[calc(100%+8px)] w-[200px] bg-surface border border-line rounded-md shadow-md py-2 z-[70]">
+                  <Link
+                    href="/profile"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="block font-bold text-[.92rem] text-ink px-4 py-2.5 hover:bg-blue-soft"
+                  >
+                    Профайл
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    disabled={loggingOut}
+                    className="block w-full text-left font-bold text-[.92rem] text-red-soft px-4 py-2.5 hover:bg-blue-soft disabled:opacity-50"
+                  >
+                    {loggingOut ? "…" : "Гарах"}
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <button
@@ -163,16 +218,29 @@ export default function Navbar() {
         {!sessionLoaded ? (
           <div aria-hidden className="h-[50px] mt-[10px] rounded-full bg-surface-2 animate-pulse" />
         ) : sessionUser ? (
-          <Link
-            href="/profile"
-            onClick={closeMenu}
-            className="flex items-center gap-[10px] font-extrabold text-ink px-[6px] py-[12px] mt-[10px] rounded-xs hover:bg-blue-soft"
-          >
-            <span className="w-8 h-8 rounded-full bg-blue-soft text-blue-strong grid place-items-center shrink-0">
-              <IconPerson className="w-4 h-4" />
-            </span>
-            {sessionUser.firstName}
-          </Link>
+          <>
+            <Link
+              href="/profile"
+              onClick={closeMenu}
+              className="flex items-center gap-[10px] font-extrabold text-ink px-[6px] py-[12px] mt-[10px] rounded-xs hover:bg-blue-soft"
+            >
+              <span className="w-8 h-8 rounded-full bg-blue-soft text-blue-strong grid place-items-center shrink-0">
+                <IconPerson className="w-4 h-4" />
+              </span>
+              {sessionUser.firstName}
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                closeMenu();
+                handleLogout();
+              }}
+              disabled={loggingOut}
+              className="text-left font-extrabold text-red-soft px-[6px] py-[12px] rounded-xs hover:bg-blue-soft disabled:opacity-50"
+            >
+              {loggingOut ? "…" : "Гарах"}
+            </button>
+          </>
         ) : (
           <div className="flex gap-[10px] mt-[10px]">
             <button
