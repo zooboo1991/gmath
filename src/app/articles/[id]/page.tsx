@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ArticleCard from "@/components/ArticleCard";
-import { IconPerson } from "@/components/icons";
+import { IconFacebook, IconPerson } from "@/components/icons";
 import JsonLd, { SITE_URL } from "@/components/JsonLd";
 import { findArticleById, listArticleSummaries } from "@/lib/db";
 import { isHtmlContent } from "@/lib/articleContent";
@@ -50,6 +50,9 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
   const isHtml = isHtmlContent(article.content);
   const paragraphs = isHtml ? [] : article.content.split("\n").map((p) => p.trim()).filter(Boolean);
 
+  const articleUrl = `${SITE_URL}/articles/${article.id}`;
+  const facebookShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(articleUrl)}`;
+
   return (
     <>
       <JsonLd
@@ -91,13 +94,23 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
             <h1 className="text-[1.9rem] sm:text-[2.3rem] font-extrabold leading-[1.2] tracking-[-.01em]">
               {article.title}
             </h1>
-            <div className="flex items-center gap-2.5 mt-5">
-              <span className="w-8 h-8 rounded-full bg-bg-soft grid place-items-center shrink-0">
-                <IconPerson className="w-4 h-4 text-ink-3" />
-              </span>
-              <span className="text-[.92rem] text-ink-3 font-semibold">
-                {article.author} · {formatDate(article.createdAt)}
-              </span>
+            <div className="flex items-center justify-between gap-4 flex-wrap mt-5">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-full bg-bg-soft grid place-items-center shrink-0">
+                  <IconPerson className="w-4 h-4 text-ink-3" />
+                </span>
+                <span className="text-[.92rem] text-ink-3 font-semibold">
+                  {article.author} · {formatDate(article.createdAt)}
+                </span>
+              </div>
+              <a
+                href={facebookShareUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft px-4 py-2 rounded-full shrink-0"
+              >
+                <IconFacebook className="w-4 h-4" /> Facebook-т хуваалцах
+              </a>
             </div>
 
             <div className="h-px bg-line my-8" />
