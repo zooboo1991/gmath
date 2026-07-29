@@ -266,6 +266,14 @@ function LessonSchedule({ registration }: { registration: RegistrationWithGroup 
   );
 }
 
+/**
+ * Deliberately manual: whichever link the teacher has actually typed in wins,
+ * with no date-based gating. A link entered for a lesson three weeks out
+ * shows immediately — waiting for a 15-minute window before honouring it
+ * left the teacher unable to confirm they had even saved it correctly.
+ * The one date check that remains: a *past* lesson without a recording says
+ * so instead of offering a join button to a room that has already closed.
+ */
 function LessonAction({
   info,
   courseZoomLink,
@@ -275,8 +283,8 @@ function LessonAction({
 }) {
   if (!info) return null;
 
-  if (info.state === "past") {
-    return info.lesson.recordingLink ? (
+  if (info.lesson.recordingLink) {
+    return (
       <a
         href={info.lesson.recordingLink}
         target="_blank"
@@ -285,30 +293,31 @@ function LessonAction({
       >
         <IconPlay className="w-3 h-3" /> Бичлэг үзэх
       </a>
-    ) : (
-      <span className="shrink-0 font-bold text-[.78rem] text-ink-3">Бичлэг удахгүй</span>
     );
   }
 
-  if (info.state === "live") {
-    // A lesson may override the course's room; otherwise the course link is
-    // the one recurring meeting they all share.
-    const href = info.lesson.zoomLink || courseZoomLink;
-    if (!href) return null;
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-white bg-green rounded-full px-5 py-2.5 shadow-sm transition-transform hover:-translate-y-0.5"
-      >
-        <IconVideoCamera className="w-4 h-4" /> Хичээлд орох →
-      </a>
-    );
+  if (info.state === "past") {
+    return <span className="shrink-0 font-bold text-[.78rem] text-ink-3">Бичлэг удахгүй</span>;
   }
 
-  // Upcoming and undated lessons deliberately carry no link.
-  return null;
+  // A lesson may override the course's room; otherwise the course link is the
+  // one recurring meeting all of its lessons share.
+  const href = info.lesson.zoomLink || courseZoomLink;
+  if (!href) return null;
+
+  const isLive = info.state === "live";
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className={`shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-white rounded-full px-5 py-2.5 transition-transform hover:-translate-y-0.5 ${
+        isLive ? "bg-green shadow-sm" : "bg-blue shadow-blue"
+      }`}
+    >
+      <IconVideoCamera className="w-4 h-4" /> Хичээлд орох{isLive ? " →" : ""}
+    </a>
+  );
 }
 
 function Pill({ children }: { children: React.ReactNode }) {
