@@ -88,6 +88,9 @@ export default function CourseObjectPage({
     mode: normalizeMode(course?.mode ?? ""),
     coverImage: course?.coverImage ?? "",
     facebookGroup: course?.facebookGroup ?? "",
+    zoomLink: course?.zoomLink ?? "",
+    zoomMeetingId: course?.zoomMeetingId ?? "",
+    zoomPasscode: course?.zoomPasscode ?? "",
     lessons: course?.lessons ?? ([] as Lesson[]),
   });
   const parsedTag = parseCourseTag(course?.tag ?? "");
@@ -390,6 +393,38 @@ export default function CourseObjectPage({
                     placeholder="https://www.facebook.com/groups/..."
                   />
                 </AdminField>
+              </div>
+            </Card>
+
+            <Card title="Zoom хичээл">
+              <p className="text-ink-3 font-semibold text-[.85rem] -mt-2 mb-3.5">
+                Энэ сургалтын Zoom өрөө. Төлбөрөө баталгаажуулсан сурагчид л профайл хуудсандаа
+                &quot;Хичээлд орох&quot; товч харна.
+              </p>
+              <div className="flex flex-col gap-3">
+                <AdminField label="Zoom холбоос">
+                  <input
+                    value={form.zoomLink}
+                    onChange={(e) => setForm((f) => ({ ...f, zoomLink: e.target.value }))}
+                    placeholder="https://us02web.zoom.us/j/..."
+                  />
+                </AdminField>
+                <div className="grid grid-cols-2 gap-3">
+                  <AdminField label="Meeting ID (заавал биш)">
+                    <input
+                      value={form.zoomMeetingId}
+                      onChange={(e) => setForm((f) => ({ ...f, zoomMeetingId: e.target.value }))}
+                      placeholder="123 4567 8901"
+                    />
+                  </AdminField>
+                  <AdminField label="Нэвтрэх код (заавал биш)">
+                    <input
+                      value={form.zoomPasscode}
+                      onChange={(e) => setForm((f) => ({ ...f, zoomPasscode: e.target.value }))}
+                      placeholder="123456"
+                    />
+                  </AdminField>
+                </div>
               </div>
             </Card>
 

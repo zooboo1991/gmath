@@ -64,6 +64,9 @@ export type Course = {
   mode?: string;
   coverImage?: string;
   facebookGroup?: string;
+  zoomLink?: string;
+  zoomMeetingId?: string;
+  zoomPasscode?: string;
   lessons: Lesson[];
 };
 
@@ -118,6 +121,9 @@ type CourseRow = {
   mode: string | null;
   cover_image: string | null;
   facebook_group: string | null;
+  zoom_link: string | null;
+  zoom_meeting_id: string | null;
+  zoom_passcode: string | null;
   lessons: Lesson[] | null;
 };
 
@@ -175,6 +181,9 @@ function courseFromRow(row: CourseRow): Course {
     mode: row.mode ?? undefined,
     coverImage: row.cover_image ?? undefined,
     facebookGroup: row.facebook_group ?? undefined,
+    zoomLink: row.zoom_link ?? undefined,
+    zoomMeetingId: row.zoom_meeting_id ?? undefined,
+    zoomPasscode: row.zoom_passcode ?? undefined,
     lessons: row.lessons ?? [],
   };
 }
@@ -336,6 +345,9 @@ export async function addCourse(input: Omit<Course, "id">): Promise<Course> {
       mode: input.mode ?? null,
       cover_image: input.coverImage ?? null,
       facebook_group: input.facebookGroup ?? null,
+      zoom_link: input.zoomLink ?? null,
+      zoom_meeting_id: input.zoomMeetingId ?? null,
+      zoom_passcode: input.zoomPasscode ?? null,
       lessons: input.lessons ?? [],
     })
     .select("*")
@@ -359,6 +371,9 @@ export async function updateCourse(
   if (input.mode !== undefined) patch.mode = input.mode ?? null;
   if (input.coverImage !== undefined) patch.cover_image = input.coverImage || null;
   if (input.facebookGroup !== undefined) patch.facebook_group = input.facebookGroup || null;
+  if (input.zoomLink !== undefined) patch.zoom_link = input.zoomLink || null;
+  if (input.zoomMeetingId !== undefined) patch.zoom_meeting_id = input.zoomMeetingId || null;
+  if (input.zoomPasscode !== undefined) patch.zoom_passcode = input.zoomPasscode || null;
   if (input.lessons !== undefined) patch.lessons = input.lessons;
 
   const { data, error } = await getSupabase().from("courses").update(patch).eq("id", id).select("*").maybeSingle();
@@ -474,20 +489,39 @@ export async function addRegistration(input: Omit<Registration, "id" | "createdA
   return registrationFromRow(data as RegistrationRow);
 }
 
-/** A registration plus the course's Facebook group link, when the student is entitled to it. */
-export type RegistrationWithGroup = Registration & { facebookGroup?: string };
+/**
+ * A registration plus the parts of its course a paid-up student is entitled
+ * to: the Facebook group, the Zoom room, and the lesson schedule.
+ */
+export type RegistrationWithGroup = Registration & {
+  facebookGroup?: string;
+  zoomLink?: string;
+  zoomMeetingId?: string;
+  zoomPasscode?: string;
+  lessons?: Lesson[];
+};
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type CoursePerksRow = {
+  id: string;
+  facebook_group: string | null;
+  zoom_link: string | null;
+  zoom_meeting_id: string | null;
+  zoom_passcode: string | null;
+  lessons: Lesson[] | null;
+};
 
 export async function listRegistrationsByUser(userId: string): Promise<RegistrationWithGroup[]> {
   const { data, error } = await getSupabase().from("registrations").select("*").eq("user_id", userId);
   if (error) throw error;
   const registrations = (data as RegistrationRow[]).map(registrationFromRow);
 
-  // The group link is a perk of a confirmed registration, so it is attached
-  // server-side only for active ones — a pending registration never carries
-  // the link in its payload at all. Static yearly programs have no course
-  // row (and so no group link).
+  // The group and Zoom links are perks of a confirmed registration, so they
+  // are attached server-side only for active ones — a pending registration
+  // never carries them in its payload at all, which is what stops an unpaid
+  // student from reading the class link out of the network response. Static
+  // yearly programs have no course row, and so no perks.
   const courseIds = [
     ...new Set(
       registrations.filter((r) => r.status === "active" && UUID_RE.test(r.programId)).map((r) => r.programId)
@@ -497,18 +531,24 @@ export async function listRegistrationsByUser(userId: string): Promise<Registrat
 
   const { data: courseRows, error: courseError } = await getSupabase()
     .from("courses")
-    .select("id, facebook_group")
+    .select("id, facebook_group, zoom_link, zoom_meeting_id, zoom_passcode, lessons")
     .in("id", courseIds);
   if (courseError) throw courseError;
 
-  const groupById = new Map(
-    (courseRows as { id: string; facebook_group: string | null }[]).map((c) => [c.id, c.facebook_group])
-  );
-  return registrations.map((r) =>
-    r.status === "active" && groupById.get(r.programId)
-      ? { ...r, facebookGroup: groupById.get(r.programId) as string }
-      : r
-  );
+  const byId = new Map((courseRows as CoursePerksRow[]).map((c) => [c.id, c]));
+  return registrations.map((r) => {
+    if (r.status !== "active") return r;
+    const course = byId.get(r.programId);
+    if (!course) return r;
+    return {
+      ...r,
+      facebookGroup: course.facebook_group ?? undefined,
+      zoomLink: course.zoom_link ?? undefined,
+      zoomMeetingId: course.zoom_meeting_id ?? undefined,
+      zoomPasscode: course.zoom_passcode ?? undefined,
+      lessons: course.lessons ?? [],
+    };
+  });
 }
 
 export async function listAllRegistrations(): Promise<(Registration & { user?: PublicUser })[]> {

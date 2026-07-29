@@ -8,6 +8,12 @@ function validateCourseFields(data: Record<string, unknown>): string | null {
   if (typeof data.facebookGroup === "string" && data.facebookGroup.trim() && !isValidHttpUrl(data.facebookGroup)) {
     return "Facebook группын холбоос буруу байна (http:// эсвэл https:// -ээр эхэлнэ)";
   }
+  if (isTooLong(data.zoomLink, MAX_LEN.courseZoomLink)) return "Zoom холбоос хэт урт байна";
+  if (typeof data.zoomLink === "string" && data.zoomLink.trim() && !isValidHttpUrl(data.zoomLink)) {
+    return "Zoom холбоос буруу байна (http:// эсвэл https:// -ээр эхэлнэ)";
+  }
+  if (isTooLong(data.zoomMeetingId, MAX_LEN.courseZoomMeetingId)) return "Zoom Meeting ID хэт урт байна";
+  if (isTooLong(data.zoomPasscode, MAX_LEN.courseZoomPasscode)) return "Zoom нэвтрэх код хэт урт байна";
   if (isTooLong(data.tag, MAX_LEN.courseTag)) return "Ангилал тэмдэглэгээ хэт урт байна";
   if (isTooLong(data.title, MAX_LEN.courseTitle)) return "Гарчиг хэт урт байна";
   if (isTooLong(data.topics, MAX_LEN.courseTopics)) return "Тайлбар хэт урт байна";
@@ -75,6 +81,9 @@ export async function POST(request: Request) {
     mode: data.mode?.trim() || undefined,
     coverImage: data.coverImage?.trim() || undefined,
     facebookGroup: data.facebookGroup?.trim() || undefined,
+    zoomLink: data.zoomLink?.trim() || undefined,
+    zoomMeetingId: data.zoomMeetingId?.trim() || undefined,
+    zoomPasscode: data.zoomPasscode?.trim() || undefined,
     lessons,
   });
 

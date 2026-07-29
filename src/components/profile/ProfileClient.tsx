@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import FormField from "@/components/FormField";
 import type { PublicUser, RegistrationWithGroup } from "@/lib/db";
@@ -11,7 +11,9 @@ import {
   IconPerson,
   IconPencil,
   IconClose,
+  IconVideoCamera,
 } from "@/components/icons";
+import { getLessonStatus } from "@/lib/lessonSchedule";
 
 type Tab = "active" | "pending";
 
@@ -110,23 +112,24 @@ export default function ProfileClient({
                   </div>
 
                   {r.status === "active" ? (
-                    <div className="mt-4 pt-4 border-t border-line grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {r.facebookGroup ? (
-                        <a
-                          href={r.facebookGroup}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-2.5 bg-blue-soft text-blue-strong font-bold text-[.9rem] rounded-sm px-4 py-3"
-                        >
-                          <IconMessenger className="w-[18px] h-[18px] shrink-0" /> Facebook группт нэгдэх
-                        </a>
-                      ) : (
-                        <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
-                          <IconMessenger className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Facebook групп тун удахгүй
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
-                        <IconClock className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Хуваарь тун удахгүй
+                    <div className="mt-4 pt-4 border-t border-line flex flex-col gap-3">
+                      <ZoomJoin registration={r} />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {r.facebookGroup ? (
+                          <a
+                            href={r.facebookGroup}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-2.5 bg-blue-soft text-blue-strong font-bold text-[.9rem] rounded-sm px-4 py-3"
+                          >
+                            <IconMessenger className="w-[18px] h-[18px] shrink-0" /> Facebook группт нэгдэх
+                          </a>
+                        ) : (
+                          <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
+                            <IconMessenger className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Facebook групп тун удахгүй
+                          </div>
+                        )}
+                        <ScheduleSummary registration={r} />
                       </div>
                     </div>
                   ) : (
@@ -153,6 +156,91 @@ export default function ProfileClient({
         />
       )}
     </>
+  );
+}
+
+/**
+ * The Zoom room for a paid-up course. The live/next calculation runs here, in
+ * the browser, so it uses the student's own clock rather than the server's UTC.
+ */
+const TICK_MS = 30_000;
+
+/**
+ * The wall clock as an external store: null while rendering on the server (so
+ * hydration matches), then ticking every half minute so a student who leaves
+ * the page open sees the button go live when the lesson actually starts.
+ */
+function useNow(): Date | null {
+  const tick = useSyncExternalStore(
+    (onStoreChange) => {
+      const id = setInterval(onStoreChange, TICK_MS);
+      return () => clearInterval(id);
+    },
+    () => Math.floor(Date.now() / TICK_MS),
+    () => null
+  );
+  return tick === null ? null : new Date();
+}
+
+function ZoomJoin({ registration }: { registration: RegistrationWithGroup }) {
+  const now = useNow();
+
+  if (!registration.zoomLink) return null;
+
+  const status = now ? getLessonStatus(registration.lessons, now) : null;
+  const isLive = Boolean(status?.live);
+
+  return (
+    <div
+      className={`rounded-sm px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap ${
+        isLive ? "bg-green-soft" : "bg-bg-soft"
+      }`}
+    >
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <IconVideoCamera className={`w-[18px] h-[18px] shrink-0 ${isLive ? "text-green" : "text-ink-3"}`} />
+          <b className="font-extrabold text-[.95rem]">
+            {isLive ? "Хичээл эхэлж байна" : "Zoom хичээл"}
+          </b>
+        </div>
+        <span className="block text-[.84rem] font-semibold text-ink-3 mt-1">
+          {isLive
+            ? status?.live?.topic
+            : status?.nextLabel
+              ? `Дараагийн хичээл: ${status.nextLabel}`
+              : "Хуваарь удахгүй зарлагдана"}
+        </span>
+        {(registration.zoomMeetingId || registration.zoomPasscode) && (
+          <span className="block text-[.78rem] font-semibold text-ink-3 mt-1.5">
+            {registration.zoomMeetingId && `ID: ${registration.zoomMeetingId}`}
+            {registration.zoomMeetingId && registration.zoomPasscode && " · "}
+            {registration.zoomPasscode && `Код: ${registration.zoomPasscode}`}
+          </span>
+        )}
+      </div>
+      {/* Deliberately never disabled: a student may join late, or the teacher
+          may open the room outside the published schedule. */}
+      <a
+        href={registration.zoomLink}
+        target="_blank"
+        rel="noreferrer"
+        className={`shrink-0 font-extrabold rounded-full px-6 py-3 text-[.92rem] transition-transform hover:-translate-y-0.5 ${
+          isLive ? "bg-green text-white" : "bg-blue text-white shadow-blue"
+        }`}
+      >
+        Хичээлд орох →
+      </a>
+    </div>
+  );
+}
+
+function ScheduleSummary({ registration }: { registration: RegistrationWithGroup }) {
+  const total = registration.lessons?.length ?? 0;
+  return (
+    <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
+      <IconClock className="w-[18px] h-[18px] shrink-0 text-ink-3" />
+      {total > 0 ? `Нийт ${total} хичээл` : "Хуваарь тун удахгүй"}
+    </div>
   );
 }
 

@@ -8,7 +8,7 @@ import { isAdmin } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Админ хэсэг — Б.Ганбат багш",
+  title: "Админ хэсэг",
 };
 
 export default async function AdminPage() {

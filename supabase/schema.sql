@@ -32,6 +32,9 @@ create table if not exists courses (
   mode text,
   cover_image text,
   facebook_group text,
+  zoom_link text,
+  zoom_meeting_id text,
+  zoom_passcode text,
   lessons jsonb not null default '[]'::jsonb
 );
 
@@ -49,6 +52,12 @@ alter table courses add column if not exists cover_image text;
 -- Per-course Facebook group link, shown to a student once their registration
 -- is confirmed (see listRegistrationsByUser in src/lib/db.ts).
 alter table courses add column if not exists facebook_group text;
+
+-- Zoom room for the course. Like the group link, these are only ever sent to
+-- a student whose registration is active (see listRegistrationsByUser).
+alter table courses add column if not exists zoom_link text;
+alter table courses add column if not exists zoom_meeting_id text;
+alter table courses add column if not exists zoom_passcode text;
 
 create table if not exists registrations (
   id uuid primary key default gen_random_uuid(),

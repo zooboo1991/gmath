@@ -259,3 +259,12 @@ export function IconClose(props: IconProps) {
     </svg>
   );
 }
+
+export function IconVideoCamera(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>
+      <rect x={2.5} y={6} width={13} height={12} rx={3} />
+      <path d="M15.5 11l4.2-2.7a.7.7 0 011.1.6v6.2a.7.7 0 01-1.1.6L15.5 13z" />
+    </svg>
+  );
+}
