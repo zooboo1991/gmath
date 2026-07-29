@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import type { Article, Course, DashboardStats, PublicUser, Registration } from "@/lib/db";
+import type { AnalyticsStats, Article, Course, DashboardStats, PublicUser, Registration } from "@/lib/db";
 import { IconCheckCircle, IconClock } from "@/components/icons";
 import { formatCourseDate } from "@/lib/courseDate";
 import { formatMnt } from "@/lib/price";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
-type Tab = "dashboard" | "registrations" | "courses" | "articles" | "users";
+type Tab = "dashboard" | "registrations" | "courses" | "articles" | "users" | "analytics";
 
 export default function AdminDashboard({
   initialRegistrations,
@@ -17,12 +17,14 @@ export default function AdminDashboard({
   initialArticles,
   initialUsers,
   stats,
+  analytics,
 }: {
   initialRegistrations: RegistrationWithUser[];
   initialCourses: Course[];
   initialArticles: Article[];
   initialUsers: PublicUser[];
   stats: DashboardStats;
+  analytics: AnalyticsStats;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -145,6 +147,15 @@ export default function AdminDashboard({
           >
             Хэрэглэгчид
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("analytics")}
+            className={`font-extrabold text-[.95rem] px-5 py-2.5 rounded-full transition-colors shrink-0 ${
+              tab === "analytics" ? "bg-blue text-white" : "bg-surface text-ink-2"
+            }`}
+          >
+            Хандалт
+          </button>
         </div>
 
         {tab === "dashboard" && <DashboardPanel stats={stats} onOpenPending={() => setTab("registrations")} />}
@@ -252,6 +263,8 @@ export default function AdminDashboard({
         )}
 
         {tab === "users" && <UsersPanel users={users} registrations={registrations} />}
+
+        {tab === "analytics" && <AnalyticsPanel data={analytics} />}
       </div>
     </div>
   );
@@ -612,6 +625,91 @@ function UsersPanel({
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function AnalyticsPanel({ data }: { data: AnalyticsStats }) {
+  const maxDaily = Math.max(1, ...data.daily.map((d) => d.views));
+  const hasDaily = data.daily.some((d) => d.views > 0);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <StatSection title="Хуудас үзэлт">
+        <StatTile label="Өнөөдөр" value={data.viewsToday} />
+        <StatTile label="Сүүлийн 7 хоног" value={data.viewsWeek} />
+        <StatTile label="Сүүлийн 30 хоног" value={data.viewsMonth} />
+        <StatTile label="Нийт (бүх цаг)" value={data.viewsAllTime} tone="blue" />
+      </StatSection>
+
+      <StatSection title="Давхардалгүй хэрэглэгч (cookie-оор)">
+        <StatTile label="Өнөөдөр" value={data.visitorsToday} tone="green" />
+        <StatTile label="Сүүлийн 7 хоног" value={data.visitorsWeek} tone="green" />
+        <StatTile label="Сүүлийн 30 хоног" value={data.visitorsMonth} tone="green" />
+      </StatSection>
+
+      <div className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
+        <h3 className="font-extrabold text-[1rem] mb-4">Өдөр тутмын үзэлт (сүүлийн 30 хоног)</h3>
+        {!hasDaily ? (
+          <p className="text-ink-3 font-semibold text-[.9rem]">Мэдээлэл алга байна.</p>
+        ) : (
+          <div className="flex items-end gap-1 h-28 overflow-x-auto">
+            {data.daily.map((d) => (
+              <div
+                key={d.date}
+                title={`${d.date}: ${d.views}`}
+                className="w-3 shrink-0 bg-blue rounded-t-xs"
+                style={{ height: `${Math.max(2, Math.round((d.views / maxDaily) * 100))}%` }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 nav:grid-cols-2 gap-4">
+        <div className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
+          <h3 className="font-extrabold text-[1rem] mb-4">Хамгийн их үзсэн хуудас</h3>
+          {data.topPages.length === 0 ? (
+            <p className="text-ink-3 font-semibold text-[.9rem]">Мэдээлэл алга байна.</p>
+          ) : (
+            <div className="flex flex-col">
+              {data.topPages.map((p) => (
+                <div
+                  key={p.path}
+                  className="flex items-center justify-between gap-4 py-2.5 border-b border-line last:border-0"
+                >
+                  <span className="font-bold text-[.88rem] text-ink-2 truncate">{p.path}</span>
+                  <span className="shrink-0 font-extrabold text-[.85rem]">{p.views}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
+          <h3 className="font-extrabold text-[1rem] mb-4">Эх сурвалж</h3>
+          {data.topReferrers.length === 0 ? (
+            <p className="text-ink-3 font-semibold text-[.9rem]">Мэдээлэл алга байна.</p>
+          ) : (
+            <div className="flex flex-col">
+              {data.topReferrers.map((r) => (
+                <div
+                  key={r.referrer}
+                  className="flex items-center justify-between gap-4 py-2.5 border-b border-line last:border-0"
+                >
+                  <span className="font-bold text-[.88rem] text-ink-2 truncate">{r.referrer}</span>
+                  <span className="shrink-0 font-extrabold text-[.85rem]">{r.views}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <p className="text-ink-3 font-semibold text-[.78rem]">
+        Өдөр тутмын жагсаалт, хамгийн их үзсэн хуудас, эх сурвалж — эдгээр бүгд сүүлийн 30 хоногийн мэдээлэл дээр
+        суурилсан. &quot;Нийт (бүх цаг)&quot; ганцаараа бүх түүхэн дүн.
+      </p>
     </div>
   );
 }

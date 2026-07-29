@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Nunito } from "next/font/google";
+import Analytics from "@/components/Analytics";
 import HashScroll from "@/components/HashScroll";
 import ProgramRegisterProvider from "@/components/program/ProgramRegister";
 import "./globals.css";
@@ -60,6 +61,7 @@ export default function RootLayout({
           <style>{`.reveal{opacity:1!important;transform:none!important;animation:none!important}`}</style>
         </noscript>
         <HashScroll />
+        <Analytics />
         <ProgramRegisterProvider>{children}</ProgramRegisterProvider>
       </body>
     </html>

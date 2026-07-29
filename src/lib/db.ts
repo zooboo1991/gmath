@@ -16,6 +16,14 @@ function isInvalidUuidError(err: unknown): boolean {
   return (err as { code?: string } | null)?.code === "22P02";
 }
 
+function parseHostname(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
 export type Role = "teacher" | "student";
 export type PayMethod = "qpay" | "bank";
 export type RegistrationStatus = "pending" | "active";
@@ -752,5 +760,121 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     qpayCount,
     bankCount,
     topCourses,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Analytics (pageviews)
+// ---------------------------------------------------------------------------
+
+export async function logPageView(input: { path: string; referrer: string | null; visitorId: string }): Promise<void> {
+  const { error } = await getSupabase().from("page_views").insert({
+    path: input.path,
+    referrer: input.referrer,
+    visitor_id: input.visitorId,
+  });
+  if (error) throw error;
+}
+
+export type AnalyticsStats = {
+  viewsAllTime: number;
+  viewsToday: number;
+  viewsWeek: number;
+  viewsMonth: number;
+  visitorsToday: number;
+  visitorsWeek: number;
+  visitorsMonth: number;
+  topPages: { path: string; views: number }[];
+  topReferrers: { referrer: string; views: number }[];
+  /** One entry per day, oldest first, covering the last 30 days. */
+  daily: { date: string; views: number }[];
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Reads the last 30 days of raw rows once and derives every breakdown from
+ * that in memory — cheap at this school's traffic, and it avoids needing a
+ * separate round trip (or a Postgres view) per stat. viewsAllTime is the one
+ * figure that reaches further back, so it's a head-only count instead of a
+ * row fetch.
+ */
+export async function getAnalyticsStats(): Promise<AnalyticsStats> {
+  const now = Date.now();
+  const since = new Date(now - 30 * DAY_MS).toISOString();
+
+  const [viewsAllTime, recent] = await Promise.all([
+    countRows("page_views"),
+    getSupabase()
+      .from("page_views")
+      .select("path, referrer, visitor_id, created_at")
+      .gte("created_at", since)
+      .then(({ data, error }) => {
+        if (error) throw error;
+        return data as { path: string; referrer: string | null; visitor_id: string; created_at: string }[];
+      }),
+  ]);
+
+  const todayStart = now - DAY_MS;
+  const weekStart = now - 7 * DAY_MS;
+
+  let viewsToday = 0;
+  let viewsWeek = 0;
+  let viewsMonth = 0;
+  const visitorsToday = new Set<string>();
+  const visitorsWeek = new Set<string>();
+  const visitorsMonth = new Set<string>();
+  const byPage = new Map<string, number>();
+  const byReferrer = new Map<string, number>();
+  const byDay = new Map<string, number>();
+
+  for (const row of recent) {
+    const t = new Date(row.created_at).getTime();
+    viewsMonth += 1;
+    visitorsMonth.add(row.visitor_id);
+    if (t >= weekStart) {
+      viewsWeek += 1;
+      visitorsWeek.add(row.visitor_id);
+    }
+    if (t >= todayStart) {
+      viewsToday += 1;
+      visitorsToday.add(row.visitor_id);
+    }
+
+    byPage.set(row.path, (byPage.get(row.path) ?? 0) + 1);
+
+    const referrerLabel = row.referrer ? (parseHostname(row.referrer) ?? "Бусад") : "Шууд орсон";
+    byReferrer.set(referrerLabel, (byReferrer.get(referrerLabel) ?? 0) + 1);
+
+    const day = row.created_at.slice(0, 10);
+    byDay.set(day, (byDay.get(day) ?? 0) + 1);
+  }
+
+  const daily: { date: string; views: number }[] = [];
+  for (let i = 29; i >= 0; i--) {
+    const date = new Date(now - i * DAY_MS).toISOString().slice(0, 10);
+    daily.push({ date, views: byDay.get(date) ?? 0 });
+  }
+
+  const topPages = [...byPage.entries()]
+    .map(([path, views]) => ({ path, views }))
+    .sort((a, b) => b.views - a.views)
+    .slice(0, 8);
+  const topReferrers = [...byReferrer.entries()]
+    .map(([referrer, views]) => ({ referrer, views }))
+    .sort((a, b) => b.views - a.views)
+    .slice(0, 6);
+
+  return {
+    viewsAllTime,
+    viewsToday,
+    viewsWeek,
+    viewsMonth,
+    visitorsToday: visitorsToday.size,
+    visitorsWeek: visitorsWeek.size,
+    visitorsMonth: visitorsMonth.size,
+    topPages,
+    topReferrers,
+    daily,
   };
 }

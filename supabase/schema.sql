@@ -95,6 +95,20 @@ create table if not exists rate_limits (
   window_start timestamptz not null default now()
 );
 
+-- Pageviews for the admin analytics tab (see src/components/Analytics.tsx).
+-- visitor_id is a random id in a first-party cookie, not tied to any
+-- account — it exists only to tell "1 visitor, 3 pages" from "3 visitors,
+-- 1 page each" and carries no personal data.
+create table if not exists page_views (
+  id uuid primary key default gen_random_uuid(),
+  path text not null,
+  referrer text,
+  visitor_id text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists page_views_created_at_idx on page_views(created_at);
+
 -- Seed the same starter courses the site ships with today, so /courses
 -- isn't empty right after setup. Safe to edit/delete afterwards from /admin.
 insert into courses (kind, tag, title, topics, price, period, start_date, mode)
