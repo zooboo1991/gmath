@@ -118,11 +118,19 @@ create table if not exists certificates (
   certificate_number text not null unique,
   last_name text not null,
   first_name text not null,
+  phone text not null,
   category text not null,
   course text not null,
   issued_date text not null,
   created_at timestamptz not null default now()
 );
+
+-- Run this if `certificates` already existed before `phone` was added, so a
+-- student's own registered phone number can be matched against the ones the
+-- admin's spreadsheet imports.
+alter table certificates add column if not exists phone text not null default '';
+
+create index if not exists certificates_phone_idx on certificates(phone);
 
 -- Seed the same starter courses the site ships with today, so /courses
 -- isn't empty right after setup. Safe to edit/delete afterwards from /admin.

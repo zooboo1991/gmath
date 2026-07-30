@@ -786,7 +786,10 @@ function CertificatesPanel({
     const q = search.trim().toLowerCase();
     if (!q) return certificates;
     return certificates.filter(
-      (c) => c.certificateNumber.toLowerCase().includes(q) || `${c.lastName} ${c.firstName}`.toLowerCase().includes(q)
+      (c) =>
+        c.certificateNumber.toLowerCase().includes(q) ||
+        c.phone.includes(q) ||
+        `${c.lastName} ${c.firstName}`.toLowerCase().includes(q)
     );
   }, [certificates, search]);
 
@@ -795,8 +798,8 @@ function CertificatesPanel({
       <div className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 mb-4">
         <h2 className="text-[1.05rem] font-extrabold mb-1">Excel-ээс сертификат импортлох</h2>
         <p className="text-ink-3 font-semibold text-[.85rem] mb-3">
-          Баганын нэрс: Сертификатын дугаар, Овог, Нэр, Сургалтын ангилал, Курс, Сургалтанд хамрагдсан огноо. Давхцсан
-          дугаартай мөрийг шинэчилнэ.
+          Баганын нэрс: Сертификатын дугаар, Овог, Нэр, Утасны дугаар, Сургалтын ангилал, Курс, Сургалтанд хамрагдсан
+          огноо. Утасны дугаараар нь хэрэглэгчийн профайлтай холбогдоно. Давхцсан дугаартай мөрийг шинэчилнэ.
         </p>
         <input
           ref={fileInputRef}
@@ -850,11 +853,12 @@ function CertificatesPanel({
         </p>
       ) : (
         <div className="bg-surface border border-line rounded-md shadow-xs overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[760px]">
+          <table className="w-full text-left border-collapse min-w-[860px]">
             <thead>
               <tr className="text-ink-3 text-[.76rem] font-extrabold tracking-[.05em] uppercase">
                 <th className="px-4 py-3">Дугаар</th>
                 <th className="px-4 py-3">Овог, нэр</th>
+                <th className="px-4 py-3">Утас</th>
                 <th className="px-4 py-3">Ангилал</th>
                 <th className="px-4 py-3">Курс</th>
                 <th className="px-4 py-3">Огноо</th>
@@ -868,6 +872,7 @@ function CertificatesPanel({
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">
                     {c.lastName} {c.firstName}
                   </td>
+                  <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{c.phone}</td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{c.category}</td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{c.course}</td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">

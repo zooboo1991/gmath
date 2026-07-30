@@ -5,12 +5,15 @@ import type { CertificateImportRow } from "./db";
 
 type Field = keyof CertificateImportRow;
 
+const PHONE_RE = /^[0-9]{8}$/;
+
 // Matched case-insensitively against the sheet's header row, so small
 // wording variations in the admin's spreadsheet still work.
 const HEADER_ALIASES: Record<Field, string[]> = {
   certificateNumber: ["сертификатын дугаар", "сертификат дугаар", "дугаар"],
   lastName: ["овог"],
   firstName: ["нэр"],
+  phone: ["утасны дугаар", "утас"],
   category: ["сургалтын ангилал", "ангилал"],
   course: ["курс", "сургалт"],
   issuedDate: ["сургалтанд хамрагдсан огноо", "хамрагдсан огноо", "огноо"],
@@ -20,10 +23,17 @@ const FIELD_LABEL: Record<Field, string> = {
   certificateNumber: "Сертификатын дугаар",
   lastName: "Овог",
   firstName: "Нэр",
+  phone: "Утасны дугаар",
   category: "Сургалтын ангилал",
   course: "Курс",
   issuedDate: "Сургалтанд хамрагдсан огноо",
 };
+
+/** Strips formatting (spaces, dashes, a +976 country code) down to the bare 8-digit number. */
+function normalizePhone(value: unknown): string {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits.length > 8 ? digits.slice(-8) : digits;
+}
 
 export type ParsedCertificates = {
   rows: CertificateImportRow[];
@@ -80,6 +90,7 @@ export function parseCertificateWorkbook(buffer: ArrayBuffer): ParsedCertificate
   const numberHeader = headerOf("certificateNumber");
   const lastNameHeader = headerOf("lastName");
   const firstNameHeader = headerOf("firstName");
+  const phoneHeader = headerOf("phone");
   const categoryHeader = headerOf("category");
   const courseHeader = headerOf("course");
   const dateHeader = headerOf("issuedDate");
@@ -92,6 +103,7 @@ export function parseCertificateWorkbook(buffer: ArrayBuffer): ParsedCertificate
     const certificateNumber = String(record[numberHeader] ?? "").trim();
     const lastName = String(record[lastNameHeader] ?? "").trim();
     const firstName = String(record[firstNameHeader] ?? "").trim();
+    const phone = normalizePhone(record[phoneHeader]);
     const category = String(record[categoryHeader] ?? "").trim();
     const course = String(record[courseHeader] ?? "").trim();
     const issuedDate = excelDateToIso(record[dateHeader]);
@@ -112,6 +124,10 @@ export function parseCertificateWorkbook(buffer: ArrayBuffer): ParsedCertificate
     }
     if (isTooLong(lastName, MAX_LEN.name) || isTooLong(firstName, MAX_LEN.name)) {
       rowErrors.push({ row: rowNumber, reason: "Овог/нэр хэт урт байна" });
+      return;
+    }
+    if (!PHONE_RE.test(phone)) {
+      rowErrors.push({ row: rowNumber, reason: "Утасны дугаар 8 оронтой байх ёстой" });
       return;
     }
     if (!category) {
@@ -135,7 +151,7 @@ export function parseCertificateWorkbook(buffer: ArrayBuffer): ParsedCertificate
       return;
     }
 
-    rows.push({ certificateNumber, lastName, firstName, category, course, issuedDate });
+    rows.push({ certificateNumber, lastName, firstName, phone, category, course, issuedDate });
   });
 
   return { rows, headerErrors: [], rowErrors };

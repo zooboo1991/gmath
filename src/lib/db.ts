@@ -105,12 +105,17 @@ export type Registration = {
   createdAt: string;
 };
 
-/** A teacher's training certificate — looked up publicly by its number. */
+/**
+ * A teacher's training certificate — looked up publicly by its number, and
+ * matched to a student/teacher account by phone so it can show up on their
+ * own profile.
+ */
 export type Certificate = {
   id: string;
   certificateNumber: string;
   lastName: string;
   firstName: string;
+  phone: string;
   category: string;
   course: string;
   /** ISO "YYYY-MM-DD"; display with formatCourseDate. */
@@ -180,6 +185,7 @@ type CertificateRow = {
   certificate_number: string;
   last_name: string;
   first_name: string;
+  phone: string;
   category: string;
   course: string;
   issued_date: string;
@@ -257,6 +263,7 @@ function certificateFromRow(row: CertificateRow): Certificate {
     certificateNumber: row.certificate_number,
     lastName: row.last_name,
     firstName: row.first_name,
+    phone: row.phone,
     category: row.category,
     course: row.course,
     issuedDate: row.issued_date,
@@ -565,6 +572,17 @@ export async function listCertificates(): Promise<Certificate[]> {
   return (data as CertificateRow[]).map(certificateFromRow);
 }
 
+/** For the profile page's own "Сертификат" section — matched by the signed-in user's phone. */
+export async function listCertificatesByPhone(phone: string): Promise<Certificate[]> {
+  const { data, error } = await getSupabase()
+    .from("certificates")
+    .select("*")
+    .eq("phone", phone.trim())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as CertificateRow[]).map(certificateFromRow);
+}
+
 export type CertificateImportRow = Omit<Certificate, "id" | "createdAt">;
 
 /**
@@ -580,6 +598,7 @@ export async function upsertCertificates(rows: CertificateImportRow[]): Promise<
         certificate_number: r.certificateNumber,
         last_name: r.lastName,
         first_name: r.firstName,
+        phone: r.phone,
         category: r.category,
         course: r.course,
         issued_date: r.issuedDate,

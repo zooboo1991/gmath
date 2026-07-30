@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import FormField from "@/components/FormField";
-import type { PublicUser, RegistrationWithGroup } from "@/lib/db";
+import type { Certificate, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import {
   IconCheckCircle,
   IconClock,
@@ -13,19 +13,23 @@ import {
   IconClose,
   IconVideoCamera,
   IconPlay,
+  IconDocument,
 } from "@/components/icons";
+import { formatCourseDate } from "@/lib/courseDate";
 import { getLessonStates, type LessonWithState } from "@/lib/lessonSchedule";
 
-type Tab = "active" | "pending";
+type Tab = "active" | "pending" | "certificates";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ProfileClient({
   user: initialUser,
   registrations,
+  certificates,
 }: {
   user: PublicUser;
   registrations: RegistrationWithGroup[];
+  certificates: Certificate[];
 }) {
   const [user, setUser] = useState(initialUser);
   const [tab, setTab] = useState<Tab>("active");
@@ -80,6 +84,9 @@ export default function ProfileClient({
           <TabButton active={tab === "pending"} onClick={() => setTab("pending")}>
             Өмнөх сургалт{pending.length > 0 && ` (${pending.length})`}
           </TabButton>
+          <TabButton active={tab === "certificates"} onClick={() => setTab("certificates")}>
+            Сертификат{certificates.length > 0 && ` (${certificates.length})`}
+          </TabButton>
         </div>
       </div>
 
@@ -87,7 +94,36 @@ export default function ProfileClient({
           first course; the list should start right under them. */}
       <section className="pt-7 pb-[clamp(48px,7vw,96px)]">
         <div className="wrap max-w-[760px] mx-auto">
-          {list.length === 0 ? (
+          {tab === "certificates" ? (
+            certificates.length === 0 ? (
+              <p className="text-ink-2 font-medium bg-bg-soft border border-line rounded-md px-6 py-8 text-center">
+                Танд одоогоор сертификат олдсонгүй. Хэрэв та сургалт төгссөн бол бүртгэлтэй утасны
+                дугаараа шалгаад багштайгаа холбогдоно уу.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {certificates.map((c) => (
+                  <div
+                    key={c.id}
+                    className="bg-surface border border-line rounded-md shadow-xs px-6 py-5 flex items-center justify-between gap-4 flex-wrap"
+                  >
+                    <div>
+                      <b className="font-extrabold text-[1.05rem] block">{c.course}</b>
+                      <span className="text-ink-3 font-semibold text-[.85rem]">
+                        {c.category} · №{c.certificateNumber} · {formatCourseDate(c.issuedDate)}
+                      </span>
+                    </div>
+                    <a
+                      href={`/api/certificates/${c.id}/download`}
+                      className="shrink-0 inline-flex items-center gap-2 font-extrabold text-[.88rem] text-white bg-blue rounded-full px-5 py-2.5 shadow-blue transition-transform hover:-translate-y-0.5"
+                    >
+                      <IconDocument className="w-4 h-4" /> Татаж авах
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : list.length === 0 ? (
             <p className="text-ink-2 font-medium bg-bg-soft border border-line rounded-md px-6 py-8 text-center">
               {tab === "active" ? "Идэвхтэй сургалт алга байна." : "Өмнөх сургалт алга байна."}{" "}
               <Link href="/courses" className="text-blue-strong font-bold">

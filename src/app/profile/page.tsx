@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import ProfileClient from "@/components/profile/ProfileClient";
-import { listRegistrationsByUser, toPublicUser } from "@/lib/db";
+import { listCertificatesByPhone, listRegistrationsByUser, toPublicUser } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -45,13 +45,18 @@ export default async function ProfilePage() {
     );
   }
 
-  const registrations = await listRegistrationsByUser(user.id);
+  const [registrations, certificates] = await Promise.all([
+    listRegistrationsByUser(user.id),
+    // certificates is a newer table — a site that hasn't run the latest
+    // schema.sql yet shouldn't have its whole profile page go down over it.
+    listCertificatesByPhone(user.phone).catch(() => []),
+  ]);
 
   return (
     <>
       <Navbar />
       <main>
-        <ProfileClient user={toPublicUser(user)} registrations={registrations} />
+        <ProfileClient user={toPublicUser(user)} registrations={registrations} certificates={certificates} />
       </main>
       <Footer />
     </>
