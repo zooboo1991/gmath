@@ -105,6 +105,19 @@ export type Registration = {
   createdAt: string;
 };
 
+/** A teacher's training certificate — looked up publicly by its number. */
+export type Certificate = {
+  id: string;
+  certificateNumber: string;
+  lastName: string;
+  firstName: string;
+  category: string;
+  course: string;
+  /** ISO "YYYY-MM-DD"; display with formatCourseDate. */
+  issuedDate: string;
+  createdAt: string;
+};
+
 type UserRow = {
   id: string;
   role: Role;
@@ -159,6 +172,17 @@ type RegistrationRow = {
   price: string;
   pay_method: PayMethod;
   status: RegistrationStatus;
+  created_at: string;
+};
+
+type CertificateRow = {
+  id: string;
+  certificate_number: string;
+  last_name: string;
+  first_name: string;
+  category: string;
+  course: string;
+  issued_date: string;
   created_at: string;
 };
 
@@ -223,6 +247,19 @@ function registrationFromRow(row: RegistrationRow): Registration {
     price: row.price,
     payMethod: row.pay_method,
     status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
+function certificateFromRow(row: CertificateRow): Certificate {
+  return {
+    id: row.id,
+    certificateNumber: row.certificate_number,
+    lastName: row.last_name,
+    firstName: row.first_name,
+    category: row.category,
+    course: row.course,
+    issuedDate: row.issued_date,
     createdAt: row.created_at,
   };
 }
@@ -500,6 +537,61 @@ export async function updateArticle(
 
 export async function deleteArticle(id: string): Promise<boolean> {
   const { error, count } = await getSupabase().from("articles").delete({ count: "exact" }).eq("id", id);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Certificates
+// ---------------------------------------------------------------------------
+
+/** Public lookup — the certificate holder's own number is all that's needed. */
+export async function findCertificateByNumber(number: string): Promise<Certificate | undefined> {
+  const { data, error } = await getSupabase()
+    .from("certificates")
+    .select("*")
+    .eq("certificate_number", number.trim())
+    .maybeSingle();
+  if (error) throw error;
+  return data ? certificateFromRow(data as CertificateRow) : undefined;
+}
+
+export async function listCertificates(): Promise<Certificate[]> {
+  const { data, error } = await getSupabase()
+    .from("certificates")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as CertificateRow[]).map(certificateFromRow);
+}
+
+export type CertificateImportRow = Omit<Certificate, "id" | "createdAt">;
+
+/**
+ * Upserts by certificate_number, so re-uploading a spreadsheet with a
+ * corrected row fixes it in place instead of creating a duplicate.
+ */
+export async function upsertCertificates(rows: CertificateImportRow[]): Promise<number> {
+  if (rows.length === 0) return 0;
+  const { error, count } = await getSupabase()
+    .from("certificates")
+    .upsert(
+      rows.map((r) => ({
+        certificate_number: r.certificateNumber,
+        last_name: r.lastName,
+        first_name: r.firstName,
+        category: r.category,
+        course: r.course,
+        issued_date: r.issuedDate,
+      })),
+      { onConflict: "certificate_number", count: "exact" }
+    );
+  if (error) throw error;
+  return count ?? rows.length;
+}
+
+export async function deleteCertificate(id: string): Promise<boolean> {
+  const { error, count } = await getSupabase().from("certificates").delete({ count: "exact" }).eq("id", id);
   if (error) throw error;
   return (count ?? 0) > 0;
 }

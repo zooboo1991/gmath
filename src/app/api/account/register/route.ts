@@ -9,7 +9,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
 
 export async function POST(request: Request) {
-  const rate = await checkRateLimit(`register:${getClientIp(request)}`, 15, 10 * 60);
+  const rate = await checkRateLimit(`register:${getClientIp(request.headers)}`, 15, 10 * 60);
   if (!rate.allowed) {
     return NextResponse.json(
       { ok: false, error: "Хэт олон удаа оролдлоо. Хэдэн минутын дараа дахин оролдоно уу." },

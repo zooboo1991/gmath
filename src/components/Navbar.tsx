@@ -12,6 +12,7 @@ const links = [
   { href: "/#about", label: "Нүүр" },
   { href: "/courses", label: "Сургалтууд", match: "/courses" },
   { href: "/articles", label: "Нийтлэл", match: "/articles" },
+  { href: "/certificate", label: "Сертификат", match: "/certificate" },
 ];
 
 export default function Navbar() {

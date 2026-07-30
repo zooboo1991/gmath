@@ -2,20 +2,21 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
-import type { AnalyticsStats, Article, Course, DashboardStats, PublicUser, Registration } from "@/lib/db";
+import { useMemo, useRef, useState } from "react";
+import type { AnalyticsStats, Article, Certificate, Course, DashboardStats, PublicUser, Registration } from "@/lib/db";
 import { IconCheckCircle, IconClock } from "@/components/icons";
 import { formatCourseDate } from "@/lib/courseDate";
 import { formatMnt } from "@/lib/price";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
-type Tab = "dashboard" | "registrations" | "courses" | "articles" | "users" | "analytics";
+type Tab = "dashboard" | "registrations" | "courses" | "articles" | "users" | "analytics" | "certificates";
 
 export default function AdminDashboard({
   initialRegistrations,
   initialCourses,
   initialArticles,
   initialUsers,
+  initialCertificates,
   stats,
   analytics,
 }: {
@@ -23,6 +24,7 @@ export default function AdminDashboard({
   initialCourses: Course[];
   initialArticles: Article[];
   initialUsers: PublicUser[];
+  initialCertificates: Certificate[];
   stats: DashboardStats;
   analytics: AnalyticsStats;
 }) {
@@ -34,6 +36,7 @@ export default function AdminDashboard({
   const [courses, setCourses] = useState(initialCourses);
   const [articles] = useState(initialArticles);
   const [users] = useState(initialUsers);
+  const [certificates, setCertificates] = useState(initialCertificates);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const logout = async () => {
@@ -156,6 +159,15 @@ export default function AdminDashboard({
           >
             Хандалт
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("certificates")}
+            className={`font-extrabold text-[.95rem] px-5 py-2.5 rounded-full transition-colors shrink-0 ${
+              tab === "certificates" ? "bg-blue text-white" : "bg-surface text-ink-2"
+            }`}
+          >
+            Сертификат
+          </button>
         </div>
 
         {tab === "dashboard" && <DashboardPanel stats={stats} onOpenPending={() => setTab("registrations")} />}
@@ -265,6 +277,10 @@ export default function AdminDashboard({
         {tab === "users" && <UsersPanel users={users} registrations={registrations} />}
 
         {tab === "analytics" && <AnalyticsPanel data={analytics} />}
+
+        {tab === "certificates" && (
+          <CertificatesPanel certificates={certificates} setCertificates={setCertificates} />
+        )}
       </div>
     </div>
   );
@@ -710,6 +726,169 @@ function AnalyticsPanel({ data }: { data: AnalyticsStats }) {
         Өдөр тутмын жагсаалт, хамгийн их үзсэн хуудас, эх сурвалж — эдгээр бүгд сүүлийн 30 хоногийн мэдээлэл дээр
         суурилсан. &quot;Нийт (бүх цаг)&quot; ганцаараа бүх түүхэн дүн.
       </p>
+    </div>
+  );
+}
+
+function CertificatesPanel({
+  certificates,
+  setCertificates,
+}: {
+  certificates: Certificate[];
+  setCertificates: React.Dispatch<React.SetStateAction<Certificate[]>>;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [result, setResult] = useState<{ imported: number; skipped: { row: number; reason: string }[] } | null>(
+    null
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/admin/certificates", { method: "POST", body });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Импорт хийхэд алдаа гарлаа");
+        return;
+      }
+      setResult({ imported: json.imported, skipped: json.skipped });
+      const listRes = await fetch("/api/admin/certificates");
+      const listJson = await listRes.json();
+      if (listRes.ok) setCertificates(listJson.certificates);
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const removeCertificate = async (id: string) => {
+    if (!confirm("Энэ сертификатыг устгах уу?")) return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/admin/certificates/${id}`, { method: "DELETE" });
+      if (res.ok) setCertificates((cs) => cs.filter((c) => c.id !== id));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return certificates;
+    return certificates.filter(
+      (c) => c.certificateNumber.toLowerCase().includes(q) || `${c.lastName} ${c.firstName}`.toLowerCase().includes(q)
+    );
+  }, [certificates, search]);
+
+  return (
+    <div>
+      <div className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 mb-4">
+        <h2 className="text-[1.05rem] font-extrabold mb-1">Excel-ээс сертификат импортлох</h2>
+        <p className="text-ink-3 font-semibold text-[.85rem] mb-3">
+          Баганын нэрс: Сертификатын дугаар, Овог, Нэр, Сургалтын ангилал, Курс, Сургалтанд хамрагдсан огноо. Давхцсан
+          дугаартай мөрийг шинэчилнэ.
+        </p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xls"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFile(file);
+          }}
+          disabled={uploading}
+          className="text-[.85rem] font-semibold"
+        />
+        {uploading && <p className="text-ink-3 font-semibold text-[.85rem] mt-2">Импортлож байна…</p>}
+        {error && <p className="text-red-soft font-semibold text-[.85rem] mt-2">{error}</p>}
+        {result && (
+          <div className="mt-3">
+            <p className="text-green font-extrabold text-[.88rem]">{result.imported} мөр импортлогдлоо.</p>
+            {result.skipped.length > 0 && (
+              <div className="mt-1.5">
+                <p className="text-gold-strong font-extrabold text-[.85rem]">{result.skipped.length} мөр алгассан:</p>
+                <ul className="text-ink-3 font-semibold text-[.82rem] list-disc pl-5">
+                  {result.skipped.slice(0, 10).map((s, i) => (
+                    <li key={i}>
+                      {s.row}-р мөр: {s.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+        <h2 className="text-[1.15rem] font-extrabold">
+          Сертификатууд ({filtered.length}
+          {filtered.length !== certificates.length && ` / ${certificates.length}`})
+        </h2>
+        <input
+          type="text"
+          placeholder="Дугаар эсвэл нэрээр хайх"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className={`${FILTER_INPUT_CLASS} max-w-[260px]`}
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-ink-3 font-semibold text-[.9rem] text-center py-10">
+          {certificates.length === 0 ? "Одоогоор сертификат алга." : "Тохирох сертификат алга байна."}
+        </p>
+      ) : (
+        <div className="bg-surface border border-line rounded-md shadow-xs overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[760px]">
+            <thead>
+              <tr className="text-ink-3 text-[.76rem] font-extrabold tracking-[.05em] uppercase">
+                <th className="px-4 py-3">Дугаар</th>
+                <th className="px-4 py-3">Овог, нэр</th>
+                <th className="px-4 py-3">Ангилал</th>
+                <th className="px-4 py-3">Курс</th>
+                <th className="px-4 py-3">Огноо</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c) => (
+                <tr key={c.id} className="border-t border-line">
+                  <td className="px-4 py-3 font-extrabold text-[.9rem]">{c.certificateNumber}</td>
+                  <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">
+                    {c.lastName} {c.firstName}
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{c.category}</td>
+                  <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{c.course}</td>
+                  <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">
+                    {formatCourseDate(c.issuedDate)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      disabled={busyId === c.id}
+                      onClick={() => removeCertificate(c.id)}
+                      className="text-[.8rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-3 py-1.5 rounded-full disabled:opacity-50"
+                    >
+                      {busyId === c.id ? "…" : "Устгах"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   getDashboardStats,
   listAllRegistrations,
   listArticles,
+  listCertificates,
   listCourses,
   listUsers,
   type AnalyticsStats,
@@ -47,10 +48,13 @@ export default async function AdminPage() {
     getDashboardStats(),
   ]);
 
-  // page_views is a newer table — on a site that hasn't run the latest
-  // schema.sql yet this throws, and the whole admin page must not go down
-  // over an analytics tab.
-  const analytics = await getAnalyticsStats().catch(() => EMPTY_ANALYTICS);
+  // page_views and certificates are newer tables — on a site that hasn't run
+  // the latest schema.sql yet these throw, and the whole admin page must not
+  // go down over one tab's data.
+  const [analytics, certificates] = await Promise.all([
+    getAnalyticsStats().catch(() => EMPTY_ANALYTICS),
+    listCertificates().catch(() => []),
+  ]);
 
   return (
     <Suspense fallback={null}>
@@ -59,6 +63,7 @@ export default async function AdminPage() {
         initialCourses={courses}
         initialArticles={articles}
         initialUsers={users}
+        initialCertificates={certificates}
         stats={stats}
         analytics={analytics}
       />

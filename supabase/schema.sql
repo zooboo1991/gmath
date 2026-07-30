@@ -109,6 +109,21 @@ create table if not exists page_views (
 
 create index if not exists page_views_created_at_idx on page_views(created_at);
 
+-- Teacher training certificates, bulk-imported by the admin from an Excel
+-- file and looked up publicly by number on the Сертификат page. The number
+-- is unique so re-importing a corrected spreadsheet updates existing rows
+-- (upsert) instead of duplicating them.
+create table if not exists certificates (
+  id uuid primary key default gen_random_uuid(),
+  certificate_number text not null unique,
+  last_name text not null,
+  first_name text not null,
+  category text not null,
+  course text not null,
+  issued_date text not null,
+  created_at timestamptz not null default now()
+);
+
 -- Seed the same starter courses the site ships with today, so /courses
 -- isn't empty right after setup. Safe to edit/delete afterwards from /admin.
 insert into courses (kind, tag, title, topics, price, period, start_date, mode)

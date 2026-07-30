@@ -23,6 +23,9 @@ export const MAX_LEN = {
   articleAuthor: 100,
   analyticsPath: 300,
   analyticsReferrer: 500,
+  certificateNumber: 60,
+  certificateCategory: 150,
+  certificateCourse: 200,
 } as const;
 
 export function isTooLong(value: unknown, max: number): boolean {

@@ -8,7 +8,7 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 const VISITOR_COOKIE = "vid";
 
 export async function POST(request: Request) {
-  const { allowed } = await checkRateLimit(`track:${getClientIp(request)}`, 120, 60);
+  const { allowed } = await checkRateLimit(`track:${getClientIp(request.headers)}`, 120, 60);
   if (!allowed) return NextResponse.json({ ok: false }, { status: 429 });
 
   const data = await request.json().catch(() => null);
