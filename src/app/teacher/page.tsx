@@ -34,8 +34,7 @@ export default function TeacherPage() {
       />
       <Navbar />
       <main>
-        <section className="hero-navy relative text-white overflow-hidden">
-          <div className="hero-dotgrid pointer-events-none absolute inset-0 opacity-50" />
+        <section className="panel-blue relative text-white overflow-hidden">
           <div className="wrap relative z-[2] grid grid-cols-1 nav:grid-cols-[1.05fr_.95fr] gap-[30px] nav:gap-[48px] items-center py-[clamp(40px,7vw,92px)]">
             <div>
               <span className="inline-flex items-center gap-2 text-[.76rem] font-extrabold tracking-[.14em] uppercase text-gold bg-white/9 px-[14px] py-2 rounded-full before:content-[''] before:w-[22px] before:h-[2px] before:rounded-sm before:bg-gold-strong">
@@ -89,20 +88,20 @@ export default function TeacherPage() {
           </div>
         </section>
 
-        <section className="section-pad !pb-0">
+        <section className="pt-10 md:pt-12 pb-0">
           <div className="wrap">
-            <Reveal className="card-flat flex items-start gap-5 px-[26px] py-[26px] max-w-[840px] mx-auto">
+            <Reveal className="relative rounded-lg bg-[linear-gradient(150deg,var(--color-blue),var(--color-navy))] text-white flex items-start gap-5 px-[26px] py-[26px] max-w-[840px] mx-auto shadow-blue overflow-hidden">
               <span className="w-[54px] h-[54px] rounded-[15px] bg-gold-soft text-gold-strong grid place-items-center shrink-0">
                 <IconCrown className="w-6 h-6" />
               </span>
               <div>
-                <small className="text-[.78rem] text-ink-3 font-extrabold uppercase tracking-[.08em]">
+                <small className="text-[.78rem] text-navy-ink-2 font-extrabold uppercase tracking-[.08em]">
                   Онцлох амжилт · 2023
                 </small>
                 <h3 className="text-[1.15rem] font-extrabold leading-[1.3] mt-1.5">
                   Олон улсын Математик, Физик, Компьютерийн ухааны багш, дасгалжуулагчдын 5-р олимпиад — Алтан медаль
                 </h3>
-                <p className="text-[.95rem] text-ink-2 font-medium mt-2">
+                <p className="text-[.95rem] text-navy-ink-2 font-medium mt-2">
                   International Mathematics, Physics and Computer Science Teachers and Trainers Olympiad —
                   дасгалжуулагчдын төрөлд (League of Trainers) Монгол улсын анхны Алтан медаль.
                 </p>
