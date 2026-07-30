@@ -10,6 +10,8 @@ create table if not exists users (
   first_name text not null,
   phone text not null unique,
   email text not null,
+  province text not null default '',
+  district text not null default '',
   school text not null,
   grade text,
   facebook text,
@@ -18,6 +20,11 @@ create table if not exists users (
   password_salt text not null,
   created_at timestamptz not null default now()
 );
+
+-- Run this if `users` already existed before `province`/`district` were
+-- added, so existing installs pick up the new address columns.
+alter table users add column if not exists province text not null default '';
+alter table users add column if not exists district text not null default '';
 
 create table if not exists courses (
   id uuid primary key default gen_random_uuid(),

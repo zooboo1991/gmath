@@ -78,6 +78,8 @@ export default function UserObjectPage({
           <div className="flex flex-col">
             <InfoRow label="Утас" value={user.phone} />
             <InfoRow label="Имэйл" value={user.email} />
+            <InfoRow label="Аймаг/Хот" value={user.province} />
+            <InfoRow label="Сум/Дүүрэг" value={user.district} />
             <InfoRow label="Сургууль" value={user.school} />
             <InfoRow label="Анги" value={user.grade} />
             <InfoRow label="Facebook" value={user.facebook} />

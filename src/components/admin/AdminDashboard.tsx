@@ -599,13 +599,14 @@ function UsersPanel({
         <p className="text-ink-3 font-semibold text-[.9rem] text-center py-10">Тохирох хэрэглэгч алга байна.</p>
       ) : (
         <div className="bg-surface border border-line rounded-md shadow-xs overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[720px]">
+          <table className="w-full text-left border-collapse min-w-[860px]">
             <thead>
               <tr className="text-ink-3 text-[.76rem] font-extrabold tracking-[.05em] uppercase">
                 <th className="px-4 py-3">Нэр</th>
                 <th className="px-4 py-3">Төрөл</th>
                 <th className="px-4 py-3">Утас</th>
                 <th className="px-4 py-3">Имэйл</th>
+                <th className="px-4 py-3">Байршил</th>
                 <th className="px-4 py-3">Сургууль</th>
                 <th className="px-4 py-3">Анги</th>
                 <th className="px-4 py-3">Бүртгэл</th>
@@ -632,6 +633,9 @@ function UsersPanel({
                   </td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.phone}</td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.email}</td>
+                  <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">
+                    {u.province || u.district ? [u.province, u.district].filter(Boolean).join(", ") : "—"}
+                  </td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.school || "—"}</td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.grade || "—"}</td>
                   <td className="px-4 py-3 font-extrabold text-[.88rem]">{regCountByUser.get(u.id) ?? 0}</td>

@@ -1,6 +1,8 @@
 export const MAX_LEN = {
   name: 50,
   school: 150,
+  province: 60,
+  district: 60,
   email: 254,
   social: 100,
   password: 200,

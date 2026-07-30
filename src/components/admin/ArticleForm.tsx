@@ -53,8 +53,13 @@ export default function ArticleForm({ initialArticle }: { initialArticle?: Artic
   };
 
   const save = async () => {
-    if (!form.title.trim() || !form.excerpt.trim() || !form.coverImage.trim() || !form.author.trim()) {
-      setError("Гарчиг, товч танилцуулга, тэргүүн зураг, зохиогчийг бөглөнө үү");
+    const missing: string[] = [];
+    if (!form.title.trim()) missing.push("Гарчиг");
+    if (!form.excerpt.trim()) missing.push("Товч танилцуулга");
+    if (!form.coverImage.trim()) missing.push("Тэргүүн зураг");
+    if (!form.author.trim()) missing.push("Зохиогч");
+    if (missing.length > 0) {
+      setError(`Дараах талбарыг бөглөнө үү: ${missing.join(", ")}`);
       return;
     }
     setSaving(true);
@@ -112,11 +117,12 @@ export default function ArticleForm({ initialArticle }: { initialArticle?: Artic
           </p>
         )}
 
+        <label className="block text-[.8rem] font-extrabold text-ink-3 mb-1.5">Гарчиг</label>
         <input
           value={form.title}
           onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-          placeholder="Гарчиг"
-          className="w-full text-[1.9rem] font-extrabold tracking-[-.01em] placeholder:text-ink-3 bg-transparent focus:outline-none mb-5"
+          placeholder="Гарчигаа энд бичнэ үү"
+          className="w-full text-[1.9rem] font-extrabold tracking-[-.01em] placeholder:text-ink-3 placeholder:font-medium bg-transparent focus:outline-none mb-5"
         />
 
         <div className="mb-6">

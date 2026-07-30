@@ -37,6 +37,8 @@ export type User = {
   firstName: string;
   phone: string;
   email: string;
+  province: string;
+  district: string;
   school: string;
   grade?: string;
   facebook?: string;
@@ -130,6 +132,8 @@ type UserRow = {
   first_name: string;
   phone: string;
   email: string;
+  province: string | null;
+  district: string | null;
   school: string;
   grade: string | null;
   facebook: string | null;
@@ -200,6 +204,8 @@ function userFromRow(row: UserRow): User {
     firstName: row.first_name,
     phone: row.phone,
     email: row.email,
+    province: row.province ?? "",
+    district: row.district ?? "",
     school: row.school,
     grade: row.grade ?? undefined,
     facebook: row.facebook ?? undefined,
@@ -302,6 +308,8 @@ export async function createUser(
       first_name: input.firstName,
       phone: input.phone,
       email: input.email,
+      province: input.province,
+      district: input.district,
       school: input.school,
       grade: input.grade ?? null,
       facebook: input.facebook ?? null,

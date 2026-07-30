@@ -31,6 +31,8 @@ export type SessionUser = {
 type FieldData = {
   lastName: string;
   firstName: string;
+  province: string;
+  district: string;
   school: string;
   grade: string;
   phone: string;
@@ -44,6 +46,8 @@ type FieldData = {
 const emptyFields: FieldData = {
   lastName: "",
   firstName: "",
+  province: "",
+  district: "",
   school: "",
   grade: "",
   phone: "",
@@ -228,6 +232,8 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     const next: Errors = {};
     if (!fields.lastName.trim()) next.lastName = true;
     if (!fields.firstName.trim()) next.firstName = true;
+    if (!fields.province.trim()) next.province = true;
+    if (!fields.district.trim()) next.district = true;
     if (!fields.school.trim()) next.school = true;
     if (role === "student" && !fields.grade.trim()) next.grade = true;
     if (!PHONE_RE.test(fields.phone.trim())) next.phone = true;
@@ -631,6 +637,14 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   </FormField>
                   <FormField label="Нэр" required error={errors.firstName ? "e" : undefined}>
                     <input value={fields.firstName} onChange={(e) => setField("firstName", e.target.value)} placeholder="Нэр" />
+                  </FormField>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
+                  <FormField label="Аймаг/Хот" required error={errors.province ? "e" : undefined}>
+                    <input value={fields.province} onChange={(e) => setField("province", e.target.value)} placeholder="Жишээ: Улаанбаатар" />
+                  </FormField>
+                  <FormField label="Сум/Дүүрэг" required error={errors.district ? "e" : undefined}>
+                    <input value={fields.district} onChange={(e) => setField("district", e.target.value)} placeholder="Жишээ: Баянзүрх" />
                   </FormField>
                 </div>
                 <FormField

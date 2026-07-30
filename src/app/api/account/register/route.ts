@@ -25,6 +25,10 @@ export async function POST(request: Request) {
   else if (isTooLong(data.lastName, MAX_LEN.name)) errors.lastName = "Овог хэт урт байна";
   if (!data.firstName?.trim()) errors.firstName = "Нэр заавал бөглөнө үү";
   else if (isTooLong(data.firstName, MAX_LEN.name)) errors.firstName = "Нэр хэт урт байна";
+  if (!data.province?.trim()) errors.province = "Аймаг/Хотоо бөглөнө үү";
+  else if (isTooLong(data.province, MAX_LEN.province)) errors.province = "Аймаг/Хот хэт урт байна";
+  if (!data.district?.trim()) errors.district = "Сум/Дүүргээ бөглөнө үү";
+  else if (isTooLong(data.district, MAX_LEN.district)) errors.district = "Сум/Дүүрэг хэт урт байна";
   if (!data.school?.trim()) errors.school = "Сургуулийн нэрийг бөглөнө үү";
   else if (isTooLong(data.school, MAX_LEN.school)) errors.school = "Сургуулийн нэр хэт урт байна";
   if (data.role === "student" && !data.grade?.trim()) errors.grade = "Ангийг бөглөнө үү";
@@ -49,6 +53,8 @@ export async function POST(request: Request) {
         role: data.role,
         lastName: data.lastName.trim(),
         firstName: data.firstName.trim(),
+        province: data.province.trim(),
+        district: data.district.trim(),
         school: data.school.trim(),
         grade: data.grade?.trim() || undefined,
         phone: data.phone.trim(),
