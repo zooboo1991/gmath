@@ -1,7 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
 import Reveal from "./Reveal";
-import VideoCard from "./VideoCard";
+import TeacherIntroCard from "./TeacherIntroCard";
 import { IconTrophy, IconMedal, IconClock, IconPeopleAbout } from "./icons";
 
 const achievements = [
@@ -62,14 +61,7 @@ export default function About() {
               ))}
             </div>
 
-            <VideoCard />
-
-            <Link
-              href="/teacher"
-              className="inline-flex items-center gap-2 font-extrabold text-[.95rem] text-blue-strong mt-5"
-            >
-              Багшийн тухай дэлгэрэнгүй танилцуулга <span>→</span>
-            </Link>
+            <TeacherIntroCard />
           </div>
         </Reveal>
       </div>
