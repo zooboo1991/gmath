@@ -39,6 +39,17 @@ function drawCentered(
   page.drawText(text, { x: centerX - width / 2, y: baselineY, size, font, color: INK });
 }
 
+// The template's own 5-line paragraph, minus the category/course line, which
+// is rebuilt per certificate. Kept verbatim (including the curly quotes) so
+// the redraw reads identically to the original artwork.
+const PARAGRAPH_LINE_1 = "Та Монгол улсын математикийн олимпиадын";
+const PARAGRAPH_LINE_2 = "Дархан аварга Б.Ганбат багшийн зохион байгуулсан";
+const PARAGRAPH_LINE_4 = "“Математикийн олимпиадын сургалт”-д амжилттай";
+const PARAGRAPH_LINE_5 = "хамрагдсан тул энэхүү батламжаар баталгаажуулав.";
+const PARAGRAPH_CENTER_X = 596;
+const PARAGRAPH_MAX_WIDTH = 370;
+const PARAGRAPH_BODY_SIZE = 12;
+
 /**
  * Overlays a certificate's data onto the admin-supplied template (measured
  * directly off src/assets/certificates/template.pdf, an 842x595pt landscape
@@ -55,11 +66,12 @@ export async function renderCertificatePdf(certificate: Certificate): Promise<Ui
 
   const page = pdfDoc.getPages()[0];
 
-  // Certificate number: small cover over the printed underscores, then redraw.
+  // Certificate number: same weight and size as the surrounding sentence, not
+  // bold — it reads as part of "<number> дугаартай энэхүү батламжийг ...".
   page.drawRectangle({ x: 396, y: fromTop(191), width: 66, height: 17, color: WHITE });
   {
-    const size = shrinkToFit(boldFont, certificate.certificateNumber, 55, 12);
-    drawCentered(page, certificate.certificateNumber, 429, fromTop(187), boldFont, size);
+    const size = shrinkToFit(regularFont, certificate.certificateNumber, 55, PARAGRAPH_BODY_SIZE);
+    drawCentered(page, certificate.certificateNumber, 429, fromTop(187), regularFont, size);
   }
 
   // Full name, on the blank line under "... СУРАЛЦАГЧ".
@@ -69,21 +81,28 @@ export async function renderCertificatePdf(certificate: Certificate): Promise<Ui
     drawCentered(page, fullName, 592.5, fromTop(283), boldFont, size);
   }
 
-  // Category + course line: the template's own gaps are too narrow for real
-  // values (some are one or two characters wide), so the whole line is
-  // covered and redrawn centered instead of squeezed into the original gaps.
-  page.drawRectangle({ x: 410, y: fromTop(397), width: 372, height: 22, color: WHITE });
+  // The whole 5-line paragraph is covered and redrawn at one shared size,
+  // rather than leaving the template's own ~14pt lines next to a shrunk-to-fit
+  // category/course line — a visible size mismatch otherwise. The size is
+  // capped at 12pt and only drops below that if the (usually longest)
+  // category/course line can't fit, so every line still matches.
+  page.drawRectangle({ x: 410, y: fromTop(434), width: 372, height: 102, color: WHITE });
   {
-    const line = `${certificate.category} ангиллын ${certificate.course} курсын агуулга бүхий`;
-    const size = shrinkToFit(regularFont, line, 370, 11, 7);
-    drawCentered(page, line, 596, fromTop(391), regularFont, size);
+    const dynamicLine = `${certificate.category} ангиллын ${certificate.course} курсын агуулга бүхий`;
+    const lines = [PARAGRAPH_LINE_1, PARAGRAPH_LINE_2, dynamicLine, PARAGRAPH_LINE_4, PARAGRAPH_LINE_5];
+    const size = Math.min(
+      ...lines.map((line) => shrinkToFit(regularFont, line, PARAGRAPH_MAX_WIDTH, PARAGRAPH_BODY_SIZE, 7))
+    );
+    const lineY = [340.4, 359.4, 378.4, 397.4, 416.4].map((top) => fromTop(top + 10));
+    lines.forEach((line, i) => drawCentered(page, line, PARAGRAPH_CENTER_X, lineY[i], regularFont, size));
   }
 
-  // Date, on the blank line above "ОГНОО".
+  // Date, on the blank line above "ОГНОО" — lifted to sit level with the
+  // signature image next to it rather than hugging the line underneath it.
   {
     const dateText = formatCourseDate(certificate.issuedDate);
-    const size = shrinkToFit(regularFont, dateText, 95, 11);
-    drawCentered(page, dateText, 504.75, fromTop(519), regularFont, size);
+    const size = shrinkToFit(regularFont, dateText, 95, PARAGRAPH_BODY_SIZE);
+    drawCentered(page, dateText, 504.75, fromTop(505), regularFont, size);
   }
 
   return pdfDoc.save();
