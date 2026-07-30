@@ -5,7 +5,8 @@ import type { CertificateImportRow } from "./db";
 
 type Field = keyof CertificateImportRow;
 
-const PHONE_RE = /^[0-9]{8}$/;
+export const CERT_PHONE_RE = /^[0-9]{8}$/;
+const PHONE_RE = CERT_PHONE_RE;
 
 // Matched case-insensitively against the sheet's header row, so small
 // wording variations in the admin's spreadsheet still work.
@@ -30,10 +31,11 @@ const FIELD_LABEL: Record<Field, string> = {
 };
 
 /** Strips formatting (spaces, dashes, a +976 country code) down to the bare 8-digit number. */
-function normalizePhone(value: unknown): string {
+export function normalizeCertPhone(value: unknown): string {
   const digits = String(value ?? "").replace(/\D/g, "");
   return digits.length > 8 ? digits.slice(-8) : digits;
 }
+const normalizePhone = normalizeCertPhone;
 
 export type ParsedCertificates = {
   rows: CertificateImportRow[];
@@ -62,6 +64,65 @@ function excelDateToIso(value: unknown): string | null {
     if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
   }
   return null;
+}
+
+/**
+ * Validates a single certificate submitted by hand from the admin form (as
+ * opposed to a spreadsheet row). With `partial: true`, only the fields
+ * actually present in `data` are checked — used for edits, where an admin
+ * may only be changing one field.
+ */
+export function validateCertificateManualInput(
+  data: Record<string, unknown>,
+  opts: { partial?: boolean } = {}
+): { error: string } | { value: Partial<CertificateImportRow> } {
+  const partial = opts.partial ?? false;
+  const value: Partial<CertificateImportRow> = {};
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const hasField = (key: keyof CertificateImportRow) => Object.prototype.hasOwnProperty.call(data, key);
+
+  if (!partial || hasField("certificateNumber")) {
+    const v = str(data.certificateNumber);
+    if (!v) return { error: "Сертификатын дугаар хоосон байна" };
+    if (isTooLong(v, MAX_LEN.certificateNumber)) return { error: "Сертификатын дугаар хэт урт байна" };
+    value.certificateNumber = v;
+  }
+  if (!partial || hasField("lastName")) {
+    const v = str(data.lastName);
+    if (!v) return { error: "Овог хоосон байна" };
+    if (isTooLong(v, MAX_LEN.name)) return { error: "Овог хэт урт байна" };
+    value.lastName = v;
+  }
+  if (!partial || hasField("firstName")) {
+    const v = str(data.firstName);
+    if (!v) return { error: "Нэр хоосон байна" };
+    if (isTooLong(v, MAX_LEN.name)) return { error: "Нэр хэт урт байна" };
+    value.firstName = v;
+  }
+  if (!partial || hasField("phone")) {
+    const v = normalizeCertPhone(data.phone);
+    if (!CERT_PHONE_RE.test(v)) return { error: "Утасны дугаар 8 оронтой байх ёстой" };
+    value.phone = v;
+  }
+  if (!partial || hasField("category")) {
+    const v = str(data.category);
+    if (!v) return { error: "Сургалтын ангилал хоосон байна" };
+    if (isTooLong(v, MAX_LEN.certificateCategory)) return { error: "Ангилал хэт урт байна" };
+    value.category = v;
+  }
+  if (!partial || hasField("course")) {
+    const v = str(data.course);
+    if (!v) return { error: "Курс хоосон байна" };
+    if (isTooLong(v, MAX_LEN.certificateCourse)) return { error: "Курс хэт урт байна" };
+    value.course = v;
+  }
+  if (!partial || hasField("issuedDate")) {
+    const v = str(data.issuedDate);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return { error: "Огноог зөв оруулна уу" };
+    value.issuedDate = v;
+  }
+
+  return { value };
 }
 
 export function parseCertificateWorkbook(buffer: ArrayBuffer): ParsedCertificates {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { listCertificates, upsertCertificates } from "@/lib/db";
+import { createCertificate, listCertificates, upsertCertificates, type CertificateImportRow } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
-import { parseCertificateWorkbook } from "@/lib/certificateImport";
+import { parseCertificateWorkbook, validateCertificateManualInput } from "@/lib/certificateImport";
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
@@ -16,6 +16,28 @@ export async function GET() {
 export async function POST(request: Request) {
   if (!(await isAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  }
+
+  // The admin form submits JSON for a single, hand-entered certificate;
+  // the Excel importer submits multipart form data with a file.
+  if (!(request.headers.get("content-type") ?? "").includes("multipart/form-data")) {
+    const data = await request.json();
+    const result = validateCertificateManualInput(data);
+    if ("error" in result) {
+      return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
+    }
+    try {
+      const certificate = await createCertificate(result.value as CertificateImportRow);
+      return NextResponse.json({ ok: true, certificate });
+    } catch (err) {
+      if ((err as { code?: string } | null)?.code === "23505") {
+        return NextResponse.json(
+          { ok: false, error: "Энэ дугаартай сертификат аль хэдийн бүртгэгдсэн байна" },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
   }
 
   const formData = await request.formData();

@@ -609,6 +609,47 @@ export async function upsertCertificates(rows: CertificateImportRow[]): Promise<
   return count ?? rows.length;
 }
 
+export async function createCertificate(input: CertificateImportRow): Promise<Certificate> {
+  const { data, error } = await getSupabase()
+    .from("certificates")
+    .insert({
+      certificate_number: input.certificateNumber,
+      last_name: input.lastName,
+      first_name: input.firstName,
+      phone: input.phone,
+      category: input.category,
+      course: input.course,
+      issued_date: input.issuedDate,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return certificateFromRow(data as CertificateRow);
+}
+
+export async function updateCertificate(
+  id: string,
+  input: Partial<CertificateImportRow>
+): Promise<Certificate | undefined> {
+  const patch: Record<string, unknown> = {};
+  if (input.certificateNumber !== undefined) patch.certificate_number = input.certificateNumber;
+  if (input.lastName !== undefined) patch.last_name = input.lastName;
+  if (input.firstName !== undefined) patch.first_name = input.firstName;
+  if (input.phone !== undefined) patch.phone = input.phone;
+  if (input.category !== undefined) patch.category = input.category;
+  if (input.course !== undefined) patch.course = input.course;
+  if (input.issuedDate !== undefined) patch.issued_date = input.issuedDate;
+
+  const { data, error } = await getSupabase()
+    .from("certificates")
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data ? certificateFromRow(data as CertificateRow) : undefined;
+}
+
 export async function deleteCertificate(id: string): Promise<boolean> {
   const { error, count } = await getSupabase().from("certificates").delete({ count: "exact" }).eq("id", id);
   if (error) throw error;
