@@ -278,3 +278,21 @@ export function IconVideoCamera(props: IconProps) {
     </svg>
   );
 }
+
+export function IconCrown(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} {...props}>
+      <path d="M3 8l4 3 5-7 5 7 4-3-2 11H5L3 8z" strokeLinejoin="round" />
+      <circle cx={12} cy={20} r={1.2} fill="currentColor" />
+    </svg>
+  );
+}
+
+export function IconBriefcase(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>
+      <rect x={3} y={7} width={18} height={13} rx={2} />
+      <path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2" strokeLinecap="round" />
+    </svg>
+  );
+}
