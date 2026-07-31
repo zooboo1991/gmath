@@ -1,0 +1,455 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import MathText from "@/components/assessment/MathText";
+import FormField from "@/components/FormField";
+import { useProgramRegister } from "@/components/program/ProgramRegister";
+import type { Assessment, PublicProblem } from "@/lib/assessment/types";
+
+type Step = "loading" | "payment" | "questionnaire" | "problems" | "submitted";
+
+const CARD = "bg-surface border border-line rounded-lg shadow-sm px-[26px] py-[26px]";
+
+export default function AssessmentFlow() {
+  const router = useRouter();
+  const { sessionUser, sessionLoaded, openLogin } = useProgramRegister();
+
+  const [step, setStep] = useState<Step>("loading");
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
+  const [fee, setFee] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Problem-picking state
+  const [problem, setProblem] = useState<PublicProblem | null>(null);
+  const [chosen, setChosen] = useState(0);
+  const [needed, setNeeded] = useState(5);
+
+  const stepForStatus = (a: Assessment | null): Step => {
+    if (!a || a.status === "awaiting_payment") return "payment";
+    if (a.status === "paid") return "questionnaire";
+    if (a.status === "questionnaire_done") return "problems";
+    return "submitted";
+  };
+
+  const loadNextProblem = useCallback(
+    async (id: string) => {
+      const res = await fetch(`/api/assessment/${id}/next-problem`);
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Бодлого ачаалахад алдаа гарлаа");
+        return;
+      }
+      setChosen(json.chosen);
+      setNeeded(json.needed);
+      if (json.finished) {
+        router.push(`/assessment/${id}/solve`);
+        return;
+      }
+      setProblem(json.problem);
+    },
+    [router]
+  );
+
+  // Load any assessment already in progress, so a refresh resumes rather
+  // than silently starting (and charging for) a second one. Fetching the
+  // first problem here — rather than from a second effect watching `step` —
+  // keeps every setState inside an async callback instead of an effect body.
+  useEffect(() => {
+    if (!sessionLoaded || !sessionUser) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/assessment");
+        const json = await res.json();
+        if (cancelled || !res.ok) return;
+        setAssessment(json.assessment);
+        setFee(json.fee);
+        const next = stepForStatus(json.assessment);
+        setStep(next);
+        if (next === "problems" && json.assessment) {
+          await loadNextProblem(json.assessment.id);
+        }
+      } catch {
+        if (!cancelled) setError("Сүлжээний алдаа гарлаа. Хуудсаа шинэчилнэ үү.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionLoaded, sessionUser, loadNextProblem]);
+
+  const pay = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      // Create-or-resume first, so a double click can't open two assessments.
+      const createRes = await fetch("/api/assessment", { method: "POST" });
+      const created = await createRes.json();
+      if (!createRes.ok) {
+        setError(created.error ?? "Алдаа гарлаа");
+        return;
+      }
+      const id = created.assessment.id as string;
+
+      const payRes = await fetch(`/api/assessment/${id}/pay`, { method: "POST" });
+      const paid = await payRes.json();
+      if (!payRes.ok) {
+        setError(paid.error ?? "Төлбөр төлөхөд алдаа гарлаа");
+        return;
+      }
+      setAssessment(paid.assessment);
+      setStep("questionnaire");
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const answer = async (action: "too_easy" | "dont_know" | "solving") => {
+    if (!assessment || !problem) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/assessment/${assessment.id}/problem-action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ problemId: problem.id, action }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Алдаа гарлаа");
+        return;
+      }
+      setChosen(json.chosen);
+      if (json.finished) {
+        router.push(`/assessment/${assessment.id}/solve`);
+        return;
+      }
+      setProblem(json.problem);
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!sessionLoaded) {
+    return <div className={`${CARD} text-center text-ink-3 font-semibold`}>Ачаалж байна…</div>;
+  }
+
+  if (!sessionUser) {
+    return (
+      <div className={`${CARD} text-center`}>
+        <h2 className="text-[1.25rem] font-extrabold">Эхлээд нэвтэрнэ үү</h2>
+        <p className="text-ink-2 font-medium mt-2.5">
+          Түвшин тогтоох үнэлгээний хариу таны профайлд хадгалагдана. Тиймээс нэвтэрсэн байх
+          шаардлагатай.
+        </p>
+        <button
+          type="button"
+          onClick={openLogin}
+          className="inline-flex items-center justify-center font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 mt-6 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+        >
+          Нэвтрэх
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {error && (
+        <p className="bg-[oklch(0.97_0.03_25)] text-red-soft font-semibold text-[.9rem] rounded-md px-4 py-3 mb-4">
+          {error}
+        </p>
+      )}
+
+      {step === "loading" && (
+        <div className={`${CARD} text-center text-ink-3 font-semibold`}>Ачаалж байна…</div>
+      )}
+
+      {step === "payment" && <PaymentStep fee={fee} busy={busy} onPay={pay} />}
+
+      {step === "questionnaire" && assessment && (
+        <QuestionnaireStep
+          assessmentId={assessment.id}
+          onDone={async (a) => {
+            setAssessment(a);
+            setStep("problems");
+            await loadNextProblem(a.id);
+          }}
+        />
+      )}
+
+      {step === "problems" && (
+        <ProblemStep problem={problem} chosen={chosen} needed={needed} busy={busy} onAnswer={answer} />
+      )}
+
+      {step === "submitted" && <SubmittedStep />}
+    </>
+  );
+}
+
+function PaymentStep({ fee, busy, onPay }: { fee: string; busy: boolean; onPay: () => void }) {
+  return (
+    <div className={CARD}>
+      <h2 className="text-[1.3rem] font-extrabold">Түвшин тогтоох үнэлгээ</h2>
+      <p className="text-ink-2 font-medium mt-2.5 leading-[1.7]">
+        Хэдэн асуултад хариулаад, өөрт тохирох хүндрэлийн бодлогуудаас сонгож бодно. Ганбат багш
+        бодолтыг шалгаж, танд 1-10 хүртэлх түвшин болон хувийн зөвлөмж өгнө.
+      </p>
+
+      <ol className="flex flex-col gap-2.5 mt-5">
+        {[
+          "Товч анкет бөглөнө",
+          "Танд тохирох бодлогууд гарч ирнэ — амархан бол алгасаж, хүнд бол хөнгөрүүлнэ",
+          "Сонгосон бодлогоо цаасан дээр бодоод зургаа оруулна",
+          "Багшийн үнэлгээ профайлд тань ирнэ",
+        ].map((text, i) => (
+          <li key={text} className="flex items-start gap-3">
+            <span className="w-6 h-6 rounded-full bg-blue-soft text-blue-strong font-extrabold text-[.8rem] grid place-items-center shrink-0 mt-0.5">
+              {i + 1}
+            </span>
+            <span className="text-[.95rem] text-ink-2 font-medium">{text}</span>
+          </li>
+        ))}
+      </ol>
+
+      <div className="flex items-center justify-between gap-4 flex-wrap mt-6 pt-5 border-t border-line">
+        <div>
+          <small className="text-[.82rem] font-extrabold text-ink-3 block">Үнэлгээний төлбөр</small>
+          <b className="text-[1.5rem] font-extrabold text-navy">{fee || "—"}</b>
+        </div>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onPay}
+          className="inline-flex items-center justify-center gap-2 font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[30px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50"
+        >
+          {busy ? "Түр хүлээнэ үү…" : "Төлбөр төлөх →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function QuestionnaireStep({
+  assessmentId,
+  onDone,
+}: {
+  assessmentId: string;
+  onDone: (a: Assessment) => void | Promise<void>;
+}) {
+  const [grade, setGrade] = useState("");
+  const [age, setAge] = useState("");
+  const [hasPrepared, setHasPrepared] = useState(false);
+  const [hasCompeted, setHasCompeted] = useState(false);
+  const [achievements, setAchievements] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!grade) {
+      setError("Ангиа сонгоно уу");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/assessment/${assessmentId}/questionnaire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grade, age, hasPrepared, hasCompeted, achievements }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Алдаа гарлаа");
+        return;
+      }
+      await onDone({ id: assessmentId, status: "questionnaire_done" } as Assessment);
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={CARD}>
+      <h2 className="text-[1.25rem] font-extrabold">Товч анкет</h2>
+      <p className="text-ink-2 font-medium mt-1.5 mb-5 text-[.95rem]">
+        Эхлэх түвшинг тань тааруулахад ашиглана.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
+        <FormField label="Анги" required>
+          <select value={grade} onChange={(e) => setGrade(e.target.value)}>
+            <option value="">Ангиа сонгоно уу</option>
+            {Array.from({ length: 9 }, (_, i) => i + 4).map((g) => (
+              <option key={g} value={`${g}-р анги`}>
+                {g}-р анги
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Нас">
+          <input
+            type="number"
+            min={5}
+            max={25}
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+            placeholder="Жишээ: 13"
+          />
+        </FormField>
+      </div>
+
+      <div className="flex flex-col gap-3 mt-2 mb-4">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={hasPrepared}
+            onChange={(e) => setHasPrepared(e.target.checked)}
+            className="w-[18px] h-[18px] mt-0.5 shrink-0"
+          />
+          <span className="font-semibold text-[.95rem] text-ink">
+            Олимпиадад тусгайлан бэлтгэж байсан
+          </span>
+        </label>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={hasCompeted}
+            onChange={(e) => setHasCompeted(e.target.checked)}
+            className="w-[18px] h-[18px] mt-0.5 shrink-0"
+          />
+          <span className="font-semibold text-[.95rem] text-ink">Олимпиадад оролцож байсан</span>
+        </label>
+      </div>
+
+      <FormField label="Ямар нэг амжилт байвал бичнэ үү" hint="Жишээ: Аймгийн олимпиад 2-р байр">
+        <textarea
+          value={achievements}
+          onChange={(e) => setAchievements(e.target.value)}
+          rows={3}
+          placeholder="Байхгүй бол хоосон орхино уу"
+        />
+      </FormField>
+
+      {error && <p className="text-red-soft font-semibold text-[.85rem] mb-3">{error}</p>}
+
+      <button
+        type="button"
+        disabled={busy}
+        onClick={submit}
+        className="w-full font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 mt-1.5 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+      >
+        {busy ? "Хадгалж байна…" : "Бодлого руу шилжих →"}
+      </button>
+    </div>
+  );
+}
+
+function ProblemStep({
+  problem,
+  chosen,
+  needed,
+  busy,
+  onAnswer,
+}: {
+  problem: PublicProblem | null;
+  chosen: number;
+  needed: number;
+  busy: boolean;
+  onAnswer: (a: "too_easy" | "dont_know" | "solving") => void;
+}) {
+  if (!problem) {
+    return <div className={`${CARD} text-center text-ink-3 font-semibold`}>Бодлого ачаалж байна…</div>;
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <span className="text-[.85rem] font-extrabold text-ink-3">
+          Сонгосон: {chosen} / {needed}
+        </span>
+        <div className="flex gap-1.5">
+          {Array.from({ length: needed }, (_, i) => (
+            <span
+              key={i}
+              className={`w-7 h-1.5 rounded-full ${i < chosen ? "bg-blue" : "bg-line-2"}`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className={CARD}>
+        {problem.topic && (
+          <span className="inline-block text-[.72rem] font-extrabold text-blue-strong bg-blue-soft px-2.5 py-1 rounded-full mb-3">
+            {problem.topic}
+          </span>
+        )}
+
+        {problem.bodyLatex && <MathText source={problem.bodyLatex} className="text-[1.05rem] overflow-x-auto" />}
+        {problem.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={problem.imageUrl} alt="" className="mt-3 max-w-full rounded-sm border border-line" />
+        )}
+      </div>
+
+      <p className="text-center text-ink-3 font-semibold text-[.88rem] mt-5 mb-3">
+        Энэ бодлого танд ямар байна?
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onAnswer("too_easy")}
+          className="btn-ring font-extrabold rounded-full bg-surface text-ink px-5 py-4 transition-colors disabled:opacity-50"
+        >
+          Амархан
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onAnswer("dont_know")}
+          className="btn-ring font-extrabold rounded-full bg-surface text-ink px-5 py-4 transition-colors disabled:opacity-50"
+        >
+          Мэдэхгүй
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onAnswer("solving")}
+          className="font-extrabold rounded-full bg-blue text-white shadow-blue px-5 py-4 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+        >
+          Бодъё
+        </button>
+      </div>
+      <p className="text-center text-ink-3 font-medium text-[.82rem] mt-3">
+        &ldquo;Амархан&rdquo; сонгоход илүү хүнд, &ldquo;Мэдэхгүй&rdquo; сонгоход хөнгөн бодлого гарна.
+      </p>
+    </div>
+  );
+}
+
+function SubmittedStep() {
+  return (
+    <div className={`${CARD} text-center`}>
+      <h2 className="text-[1.25rem] font-extrabold">Бодолт хүлээн авлаа</h2>
+      <p className="text-ink-2 font-medium mt-2.5">
+        Багш таны ажлыг шалгаж байна. Дүгнэлт гарсны дараа профайл дээр тань харагдана.
+      </p>
+      <Link
+        href="/profile/assessment"
+        className="inline-flex items-center justify-center font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 mt-6 transition-transform hover:-translate-y-0.5"
+      >
+        Үр дүн харах
+      </Link>
+    </div>
+  );
+}

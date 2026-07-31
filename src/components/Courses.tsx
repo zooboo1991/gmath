@@ -71,14 +71,14 @@ export default function Courses() {
               Аль ангилал танай хүүхдэд тохирох вэ?
             </b>
             <span className="text-[.98rem] text-[oklch(0.88_0.02_250)]">
-              3 асуултад хариулаад тохирох ангиллын зөвлөмж аваарай
+              Товч анкет бөглөж, бодлого бодоод багшийн хувийн үнэлгээ аваарай
             </span>
           </div>
           <Link
-            href="/courses"
+            href="/assessment"
             className="md:ml-auto relative z-[2] inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-surface text-blue-strong shadow-sm px-[26px] py-[16px] transition-transform hover:-translate-y-0.5"
           >
-            Тест эхлүүлэх <span>→</span>
+            Түвшин тогтоох <span>→</span>
           </Link>
         </Reveal>
       </div>
