@@ -169,3 +169,115 @@ update courses set lessons = '[
   {"topic": "Мини олимпиад ба дүгнэлт", "schedule": "2026.09.04 Баасан гараг · 18:00–20:00"}
 ]'::jsonb
 where tag = 'A АНГИЛАЛ СУРАГЧ' and title = '1 сарын сургалт';
+
+-- ---------------------------------------------------------------------------
+-- Түвшин тогтоох үнэлгээ (level assessment)
+-- ---------------------------------------------------------------------------
+
+-- Generic key/value store so the admin can change things like the assessment
+-- fee without a redeploy. Values are plain text; callers parse as needed.
+create table if not exists app_settings (
+  key text primary key,
+  value text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+insert into app_settings (key, value) values ('assessment_fee', '20,000₮')
+on conflict (key) do nothing;
+
+-- The 10 levels a student can be placed into. Content is admin-editable.
+create table if not exists levels (
+  id smallint primary key check (id between 1 and 10),
+  name text not null,
+  description text not null default '',
+  scope text not null default '',
+  how_to_advance text not null default '',
+  -- Real FK, unlike registrations.program_id: deleting a course must not
+  -- leave a level pointing at a row that no longer exists.
+  recommended_course_id uuid references courses(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+
+insert into levels (id, name) values
+  (1, '1-р түвшин'), (2, '2-р түвшин'), (3, '3-р түвшин'), (4, '4-р түвшин'),
+  (5, '5-р түвшин'), (6, '6-р түвшин'), (7, '7-р түвшин'), (8, '8-р түвшин'),
+  (9, '9-р түвшин'), (10, '10-р түвшин')
+on conflict (id) do nothing;
+
+-- Problem bank. Images live in the public "problems" bucket; answer_key is
+-- never sent to a student.
+create table if not exists problems (
+  id uuid primary key default gen_random_uuid(),
+  level smallint not null check (level between 1 and 10),
+  difficulty numeric(3,1) not null check (difficulty between 1 and 10),
+  topic text not null default '',
+  image_url text not null,
+  answer_key text,
+  -- Soft delete: a hard delete would break the history of every assessment
+  -- that already showed this problem.
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create index if not exists problems_active_difficulty_idx
+  on problems (difficulty) where active;
+
+create table if not exists assessments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  status text not null default 'awaiting_payment' check (status in
+    ('awaiting_payment','paid','questionnaire_done','problems_submitted','grading','completed')),
+  estimated_level smallint,
+  final_level smallint references levels(id),
+  teacher_comment text,
+  graded_sheet_path text,
+  -- Payment is a stub until QPay is wired up; provider/ref let a real
+  -- transaction be recorded later without a schema change.
+  payment_provider text not null default 'stub',
+  payment_ref text,
+  amount text,
+  paid_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists assessments_user_idx on assessments (user_id, created_at desc);
+create index if not exists assessments_status_idx on assessments (status);
+
+create table if not exists questionnaire_answers (
+  id uuid primary key default gen_random_uuid(),
+  assessment_id uuid not null unique references assessments(id) on delete cascade,
+  age smallint,
+  grade text not null default '',
+  has_competed boolean not null default false,
+  has_prepared boolean not null default false,
+  achievements text not null default '',
+  created_at timestamptz not null default now()
+);
+
+-- Every problem shown during the picking phase, with what the student chose.
+create table if not exists assessment_problems (
+  id uuid primary key default gen_random_uuid(),
+  assessment_id uuid not null references assessments(id) on delete cascade,
+  problem_id uuid not null references problems(id) on delete restrict,
+  action text not null check (action in ('too_easy','dont_know','solving')),
+  shown_order smallint not null,
+  created_at timestamptz not null default now(),
+  -- Stops the picker from ever showing the same problem twice.
+  unique (assessment_id, problem_id)
+);
+create index if not exists assessment_problems_assessment_idx
+  on assessment_problems (assessment_id, shown_order);
+
+-- Uploaded solutions. Paths (not URLs) because the "solutions" bucket is
+-- private — the app mints a short-lived signed URL when it needs to show one.
+create table if not exists solutions (
+  id uuid primary key default gen_random_uuid(),
+  assessment_id uuid not null references assessments(id) on delete cascade,
+  problem_id uuid not null references problems(id) on delete restrict,
+  image_paths text[] not null default '{}',
+  grader_score numeric(4,1),
+  grader_comment text,
+  graded_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (assessment_id, problem_id)
+);
+create index if not exists solutions_assessment_idx on solutions (assessment_id);

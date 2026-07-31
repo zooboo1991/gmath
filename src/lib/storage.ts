@@ -2,6 +2,12 @@ import { getSupabase } from "./supabase";
 
 const BUCKET = "articles";
 
+/** Public: problem images are not sensitive and are shown to every student. */
+export const PROBLEMS_BUCKET = "problems";
+/** Private: a student's handwritten work, and the teacher's graded scan. */
+export const SOLUTIONS_BUCKET = "solutions";
+export const GRADED_SHEETS_BUCKET = "graded-sheets";
+
 type ImageSignature = {
   mime: string;
   ext: string;
@@ -47,6 +53,61 @@ const SIGNATURES: ImageSignature[] = [
 function detectImageType(buffer: Buffer): { mime: string; ext: string } | null {
   const sig = SIGNATURES.find((s) => s.check(buffer));
   return sig ? { mime: sig.mime, ext: sig.ext } : null;
+}
+
+/**
+ * Uploads to an arbitrary bucket and returns the storage *path* rather than a
+ * public URL — for private buckets (student solutions, graded sheets) there
+ * is no public URL, and the caller mints a signed one per view instead.
+ * Shares the byte-signature check above, so the same formats are allowed and
+ * SVG stays rejected.
+ */
+export async function uploadPrivateImage(
+  file: File,
+  bucket: string,
+  prefix: string
+): Promise<string> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const detected = detectImageType(buffer);
+  if (!detected) {
+    throw new Error("unsupported_image_type");
+  }
+
+  const path = `${prefix}/${crypto.randomUUID()}.${detected.ext}`;
+  const { error } = await getSupabase()
+    .storage.from(bucket)
+    .upload(path, buffer, { contentType: detected.mime, upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+/** Short-lived URL for one private object. Returns null if it can't be signed. */
+export async function createSignedUrl(
+  bucket: string,
+  path: string,
+  expiresInSeconds: number
+): Promise<string | null> {
+  const { data, error } = await getSupabase().storage.from(bucket).createSignedUrl(path, expiresInSeconds);
+  if (error) return null;
+  return data?.signedUrl ?? null;
+}
+
+/** Public-bucket upload for problem images, which are not sensitive. */
+export async function uploadProblemImage(file: File): Promise<string> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const detected = detectImageType(buffer);
+  if (!detected) {
+    throw new Error("unsupported_image_type");
+  }
+
+  const path = `problems/${crypto.randomUUID()}.${detected.ext}`;
+  const { error } = await getSupabase()
+    .storage.from(PROBLEMS_BUCKET)
+    .upload(path, buffer, { contentType: detected.mime, upsert: false });
+  if (error) throw error;
+
+  const { data } = getSupabase().storage.from(PROBLEMS_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export async function uploadCoverImage(file: File): Promise<string> {
