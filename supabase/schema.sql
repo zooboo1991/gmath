@@ -141,8 +141,13 @@ create index if not exists certificates_phone_idx on certificates(phone);
 
 -- Seed the same starter courses the site ships with today, so /courses
 -- isn't empty right after setup. Safe to edit/delete afterwards from /admin.
+--
+-- `on conflict do nothing` did NOT make this re-runnable: courses has no
+-- unique constraint for it to conflict on, so every re-run of this file
+-- inserted another copy of all seven. The `where not exists` guard below is
+-- what actually keeps it idempotent.
 insert into courses (kind, tag, title, topics, price, period, start_date, mode)
-values
+select * from (values
   ('upcoming', 'A АНГИЛАЛ СУРАГЧ', '1 сарын сургалт', '4 долоо хоногийн хугацаанд 12 удаагийн хичээлийн оролттой онлайн сургалт.', '350,000₮', '/ сар', '2026.08.10', 'Онлайн'),
   ('upcoming', 'B,E АНГИЛАЛ сурагч', '1 сарын сургалт', '4 долоо хоногийн хугацаанд 12 удаагийн хичээлийн оролттой онлайн сургалт.', '350,000₮', '/ сар', '2026.08.17', 'Онлайн'),
   ('upcoming', 'БАГА БОЛОН ДУНД АНГИЙН БАГШ', '1 сарын сургалт', 'Бага болон дунд ангийн багш нарт зориулсан онлайн болон танхимын сургалт.', '350,000₮', '/ сар', '2026.08.03', 'Онлайн болон танхим'),
@@ -150,7 +155,10 @@ values
   ('vod', 'A,B АНГИЛАЛ · ӨМНӨХ УЛИРАЛ', 'Үндэс суурь курс', 'Өмнөх улиралд явсан 12 хичээлийн бүрэн бичлэг, дасгалын хамт хэзээ ч эхлэх боломжтой.', '250,000₮', '/ багц', null, null),
   ('vod', 'C,D АНГИЛАЛ · ӨМНӨХ УЛИРАЛ', 'Гүнзгийрүүлсэн курс', 'Өмнөх жилийн бүрэн хичээлийн бичлэг, комбинаторик болон геометрийн модуль.', '480,000₮', '/ багц', null, null),
   ('vod', 'E АНГИЛАЛ · ӨМНӨХ УЛИРАЛ', 'Ахисан түвшний клуб', 'Улсын түвшний олимпиадад зориулсан бичлэг хэлбэрийн гүнзгийрүүлсэн бэлтгэл.', '350,000₮', '/ багц', null, null)
-on conflict do nothing;
+) as seed(kind, tag, title, topics, price, period, start_date, mode)
+where not exists (
+  select 1 from courses c where c.tag = seed.tag and c.title = seed.title
+);
 
 -- Sample lesson schedule for the demo "A АНГИЛАЛ СУРАГЧ" course, matching the
 -- course detail page template. Safe to edit/replace from /admin afterwards.
