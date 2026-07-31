@@ -16,10 +16,27 @@ import {
   IconPlay,
   IconDocument,
 } from "@/components/icons";
-import { formatCourseDate } from "@/lib/courseDate";
+import { compareByStartDate, formatCourseDate } from "@/lib/courseDate";
+import {
+  COURSE_CATEGORIES,
+  extractCourseCategories,
+  getCourseAudience,
+  type CourseAudience,
+  type CourseCategory,
+} from "@/lib/courseTag";
 import { getLessonStates, type LessonWithState } from "@/lib/lessonSchedule";
 
 type Tab = "active" | "pending" | "certificates";
+type AudienceFilter = "all" | CourseAudience;
+type CategoryFilter = "all" | CourseCategory;
+
+/** Filters only earn their vertical space once there's a list worth narrowing. */
+const MIN_ROWS_TO_FILTER = 2;
+
+/** The tag the filters read; see RegistrationWithGroup.tag for why it can be missing. */
+function tagOf(r: RegistrationWithGroup): string {
+  return r.tag ?? r.programLabel;
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -35,10 +52,43 @@ export default function ProfileClient({
   const [user, setUser] = useState(initialUser);
   const [tab, setTab] = useState<Tab>("active");
   const [showEdit, setShowEdit] = useState(false);
+  const [audience, setAudience] = useState<AudienceFilter>("all");
+  const [category, setCategory] = useState<CategoryFilter>("all");
 
-  const active = registrations.filter((r) => r.status === "active");
-  const pending = registrations.filter((r) => r.status !== "active");
+  function clearFilters() {
+    setAudience("all");
+    setCategory("all");
+  }
+
+  // Switching tabs clears the filters — one set while reading the active
+  // courses would otherwise carry over and silently empty the next tab.
+  function selectTab(next: Tab) {
+    setTab(next);
+    clearFilters();
+  }
+
+  // Soonest first, so the course starting next is the one at the top. Lists
+  // here are a handful of rows, so this recomputes per render rather than
+  // carrying the weight of memoisation.
+  const sorted = [...registrations].sort(compareByStartDate);
+  const active = sorted.filter((r) => r.status === "active");
+  const pending = sorted.filter((r) => r.status !== "active");
   const list = tab === "active" ? active : pending;
+
+  // Only offer categories the visible list actually carries, so picking one can
+  // never lead to a guaranteed-empty result.
+  const present = new Set(list.flatMap((r) => extractCourseCategories(tagOf(r))));
+  const availableCategories = COURSE_CATEGORIES.filter((c) => present.has(c));
+
+  const shown = list.filter((r) => {
+    const tag = tagOf(r);
+    if (audience !== "all" && getCourseAudience(tag) !== audience) return false;
+    if (category !== "all" && !extractCourseCategories(tag).includes(category)) return false;
+    return true;
+  });
+
+  const filtered = audience !== "all" || category !== "all";
+  const showFilters = tab !== "certificates" && list.length >= MIN_ROWS_TO_FILTER;
 
   return (
     <>
@@ -87,13 +137,13 @@ export default function ProfileClient({
 
       <div className="wrap border-b border-line">
         <div className="flex gap-7">
-          <TabButton active={tab === "active"} onClick={() => setTab("active")}>
+          <TabButton active={tab === "active"} onClick={() => selectTab("active")}>
             Идэвхтэй сургалт{active.length > 0 && ` (${active.length})`}
           </TabButton>
-          <TabButton active={tab === "pending"} onClick={() => setTab("pending")}>
+          <TabButton active={tab === "pending"} onClick={() => selectTab("pending")}>
             Өмнөх сургалт{pending.length > 0 && ` (${pending.length})`}
           </TabButton>
-          <TabButton active={tab === "certificates"} onClick={() => setTab("certificates")}>
+          <TabButton active={tab === "certificates"} onClick={() => selectTab("certificates")}>
             Сертификат{certificates.length > 0 && ` (${certificates.length})`}
           </TabButton>
         </div>
@@ -103,6 +153,50 @@ export default function ProfileClient({
           first course; the list should start right under them. */}
       <section className="pt-7 pb-[clamp(48px,7vw,96px)]">
         <div className="wrap max-w-[760px] mx-auto">
+          {showFilters && (
+            <div className="flex flex-col gap-3 mb-6">
+              <FilterRow label="Төрөл">
+                <FilterPill active={audience === "all"} onClick={() => setAudience("all")}>
+                  Бүгд
+                </FilterPill>
+                <FilterPill active={audience === "student"} onClick={() => setAudience("student")}>
+                  Сурагч
+                </FilterPill>
+                <FilterPill active={audience === "teacher"} onClick={() => setAudience("teacher")}>
+                  Багш
+                </FilterPill>
+              </FilterRow>
+
+              {availableCategories.length > 0 && (
+                <FilterRow label="Ангилал">
+                  <FilterPill active={category === "all"} onClick={() => setCategory("all")}>
+                    Бүгд
+                  </FilterPill>
+                  {availableCategories.map((c) => (
+                    <FilterPill key={c} active={category === c} onClick={() => setCategory(c)}>
+                      {c}
+                    </FilterPill>
+                  ))}
+                </FilterRow>
+              )}
+
+              {filtered && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-[.88rem] font-bold text-ink-3">
+                    {shown.length} сургалт олдлоо
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="text-[.85rem] font-extrabold text-blue-strong"
+                  >
+                    Шүүлтүүр цэвэрлэх
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {tab === "certificates" ? (
             certificates.length === 0 ? (
               <p className="text-ink-2 font-medium bg-bg-soft border border-line rounded-md px-6 py-8 text-center">
@@ -139,14 +233,33 @@ export default function ProfileClient({
                 Сургалтууд үзэх →
               </Link>
             </p>
+          ) : shown.length === 0 ? (
+            <div className="bg-bg-soft border border-line rounded-md px-6 py-8 text-center">
+              <p className="text-ink-2 font-medium max-w-[46ch] mx-auto">
+                Энэ шүүлтүүрт тохирох сургалт алга байна.
+              </p>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-[.9rem] font-extrabold text-blue-strong mt-2.5"
+              >
+                Шүүлтүүр цэвэрлэх
+              </button>
+            </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {list.map((r) => (
+              {shown.map((r) => (
                 <div key={r.id} className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div>
                       <b className="font-extrabold text-[1.05rem] block">{r.programLabel}</b>
-                      <span className="text-ink-3 font-semibold text-[.85rem]">{r.price}</span>
+                      {/* The start date is what the list is ordered by, so it
+                          has to be readable on the card for the order to make
+                          sense. */}
+                      <span className="text-ink-3 font-semibold text-[.85rem]">
+                        {r.price}
+                        {r.startDate && ` · Эхлэх: ${formatCourseDate(r.startDate)}`}
+                      </span>
                     </div>
                     {r.status === "active" ? (
                       <span className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-green bg-green-soft px-3 py-1.5 rounded-full">
@@ -362,6 +475,43 @@ function Pill({ children }: { children: React.ReactNode }) {
     <span className="inline-flex items-center text-[.82rem] font-bold text-ink-2 bg-bg-soft border border-line rounded-full px-3.5 py-1.5">
       {children}
     </span>
+  );
+}
+
+/* The filter row and pills mirror the ones on /courses (CourseBrowser) so the
+   two lists of courses are operated the same way. */
+function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-[.8rem] font-extrabold text-ink-3 uppercase tracking-[.06em] w-[62px] shrink-0">
+        {label}
+      </span>
+      <div className="flex gap-2 overflow-x-auto py-0.5">{children}</div>
+    </div>
+  );
+}
+
+function FilterPill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`font-extrabold text-[.88rem] px-[16px] py-[9px] rounded-full border transition-colors shrink-0 ${
+        active
+          ? "bg-navy text-white border-navy"
+          : "bg-surface text-ink-2 border-line hover:border-line-2"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

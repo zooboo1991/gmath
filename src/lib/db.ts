@@ -701,6 +701,15 @@ export async function addRegistration(input: Omit<Registration, "id" | "createdA
  * to: the Facebook group, the Zoom room, and the lesson schedule.
  */
 export type RegistrationWithGroup = Registration & {
+  /**
+   * The course's `tag` ("B АНГИЛАЛ СУРАГЧ"), which the profile list filters on
+   * by audience and category. Falls back to `programLabel` — /api/enroll writes
+   * it as "<title> (<tag>)" — so static yearly programs and courses whose row
+   * has since been deleted stay filterable instead of dropping out of results.
+   */
+  tag?: string;
+  /** The course's start date, so the profile list can sort soonest-first. */
+  startDate?: string;
   facebookGroup?: string;
   zoomLink?: string;
   zoomMeetingId?: string;
@@ -710,8 +719,10 @@ export type RegistrationWithGroup = Registration & {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type CoursePerksRow = {
+type CourseDetailsRow = {
   id: string;
+  tag: string;
+  start_date: string | null;
   facebook_group: string | null;
   zoom_link: string | null;
   zoom_meeting_id: string | null;
@@ -724,31 +735,41 @@ export async function listRegistrationsByUser(userId: string): Promise<Registrat
   if (error) throw error;
   const registrations = (data as RegistrationRow[]).map(registrationFromRow);
 
-  // The group and Zoom links are perks of a confirmed registration, so they
-  // are attached server-side only for active ones — a pending registration
-  // never carries them in its payload at all, which is what stops an unpaid
-  // student from reading the class link out of the network response. Static
-  // yearly programs have no course row, and so no perks.
+  // Static yearly programs have no course row, so their ids aren't UUIDs and
+  // there is nothing to look up for them.
   const courseIds = [
-    ...new Set(
-      registrations.filter((r) => r.status === "active" && UUID_RE.test(r.programId)).map((r) => r.programId)
-    ),
+    ...new Set(registrations.filter((r) => UUID_RE.test(r.programId)).map((r) => r.programId)),
   ];
-  if (courseIds.length === 0) return registrations;
 
-  const { data: courseRows, error: courseError } = await getSupabase()
-    .from("courses")
-    .select("id, facebook_group, zoom_link, zoom_meeting_id, zoom_passcode, lessons")
-    .in("id", courseIds);
-  if (courseError) throw courseError;
+  let byId = new Map<string, CourseDetailsRow>();
+  if (courseIds.length > 0) {
+    const { data: courseRows, error: courseError } = await getSupabase()
+      .from("courses")
+      .select("id, tag, start_date, facebook_group, zoom_link, zoom_meeting_id, zoom_passcode, lessons")
+      .in("id", courseIds);
+    if (courseError) throw courseError;
+    byId = new Map((courseRows as CourseDetailsRow[]).map((c) => [c.id, c]));
+  }
 
-  const byId = new Map((courseRows as CoursePerksRow[]).map((c) => [c.id, c]));
   return registrations.map((r) => {
-    if (r.status !== "active") return r;
     const course = byId.get(r.programId);
-    if (!course) return r;
-    return {
+    // Tag and start date are already public on /courses, so they ride along
+    // whatever the status — the profile list needs them to sort and filter
+    // pending registrations too.
+    const withCourse: RegistrationWithGroup = {
       ...r,
+      tag: course?.tag ?? r.programLabel,
+      startDate: course?.start_date ?? undefined,
+    };
+
+    // The group and Zoom links, by contrast, are perks of a confirmed
+    // registration, so they are attached server-side only for active ones — a
+    // pending registration never carries them in its payload at all, which is
+    // what stops an unpaid student from reading the class link out of the
+    // network response.
+    if (r.status !== "active" || !course) return withCourse;
+    return {
+      ...withCourse,
       facebookGroup: course.facebook_group ?? undefined,
       zoomLink: course.zoom_link ?? undefined,
       zoomMeetingId: course.zoom_meeting_id ?? undefined,
