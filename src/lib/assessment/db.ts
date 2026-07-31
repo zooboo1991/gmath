@@ -42,7 +42,8 @@ type ProblemRow = {
   level: number;
   difficulty: number | string;
   topic: string;
-  image_url: string;
+  body_latex: string | null;
+  image_url: string | null;
   answer_key: string | null;
   active: boolean;
   created_at: string;
@@ -113,7 +114,8 @@ function problemFromRow(row: ProblemRow): Problem {
     // Postgres numeric comes back as a string through PostgREST.
     difficulty: Number(row.difficulty),
     topic: row.topic,
-    imageUrl: row.image_url,
+    bodyLatex: row.body_latex ?? undefined,
+    imageUrl: row.image_url ?? undefined,
     answerKey: row.answer_key ?? undefined,
     active: row.active,
     createdAt: row.created_at,
@@ -260,7 +262,8 @@ export async function createProblem(input: ProblemInput): Promise<Problem> {
       level: input.level,
       difficulty: input.difficulty,
       topic: input.topic,
-      image_url: input.imageUrl,
+      body_latex: input.bodyLatex || null,
+      image_url: input.imageUrl || null,
       answer_key: input.answerKey ?? null,
       active: input.active,
     })
@@ -278,7 +281,8 @@ export async function updateProblem(
   if (input.level !== undefined) patch.level = input.level;
   if (input.difficulty !== undefined) patch.difficulty = input.difficulty;
   if (input.topic !== undefined) patch.topic = input.topic;
-  if (input.imageUrl !== undefined) patch.image_url = input.imageUrl;
+  if (input.bodyLatex !== undefined) patch.body_latex = input.bodyLatex || null;
+  if (input.imageUrl !== undefined) patch.image_url = input.imageUrl || null;
   if (input.answerKey !== undefined) patch.answer_key = input.answerKey || null;
   if (input.active !== undefined) patch.active = input.active;
 

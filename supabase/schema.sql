@@ -204,19 +204,25 @@ insert into levels (id, name) values
   (9, '9-р түвшин'), (10, '10-р түвшин')
 on conflict (id) do nothing;
 
--- Problem bank. Images live in the public "problems" bucket; answer_key is
--- never sent to a student.
+-- Problem bank. A problem is written as LaTeX (body_latex, rendered with
+-- KaTeX), or supplied as a scanned image, or both — geometry problems
+-- usually need a figure alongside the text. Images live in the public
+-- "problems" bucket; answer_key is never sent to a student.
 create table if not exists problems (
   id uuid primary key default gen_random_uuid(),
   level smallint not null check (level between 1 and 10),
   difficulty numeric(3,1) not null check (difficulty between 1 and 10),
   topic text not null default '',
-  image_url text not null,
+  body_latex text,
+  image_url text,
   answer_key text,
   -- Soft delete: a hard delete would break the history of every assessment
   -- that already showed this problem.
   active boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- An empty problem would be shown to a student as a blank card.
+  constraint problems_has_content
+    check (coalesce(body_latex, '') <> '' or coalesce(image_url, '') <> '')
 );
 create index if not exists problems_active_difficulty_idx
   on problems (difficulty) where active;

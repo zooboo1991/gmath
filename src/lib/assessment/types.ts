@@ -23,12 +23,19 @@ export type Level = {
   recommendedCourseId?: string;
 };
 
+/**
+ * A problem is written as LaTeX, or scanned as an image, or both (a geometry
+ * statement plus its figure). At least one of the two is always present —
+ * enforced by the problems_has_content constraint.
+ */
 export type Problem = {
   id: string;
   level: number;
   difficulty: number;
   topic: string;
-  imageUrl: string;
+  /** Mongolian prose with `$...$` / `$$...$$` math, rendered via KaTeX. */
+  bodyLatex?: string;
+  imageUrl?: string;
   /** Admin-only. Never include this in a response sent to a student. */
   answerKey?: string;
   active: boolean;
@@ -44,6 +51,7 @@ export function toPublicProblem(problem: Problem): PublicProblem {
     level: problem.level,
     difficulty: problem.difficulty,
     topic: problem.topic,
+    bodyLatex: problem.bodyLatex,
     imageUrl: problem.imageUrl,
   };
 }
