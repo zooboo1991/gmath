@@ -10,6 +10,7 @@ import {
   IconFacebook,
   IconPerson,
   IconPencil,
+  IconTarget,
   IconClose,
   IconVideoCamera,
   IconPlay,
@@ -64,13 +65,21 @@ export default function ProfileClient({
                   <Pill>{user.phone}</Pill>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowEdit(true)}
-                className="btn-ring inline-flex items-center gap-2 font-extrabold text-[.9rem] rounded-full bg-surface px-5 py-3 transition-colors hover:text-blue-strong shrink-0"
-              >
-                <IconPencil className="w-4 h-4" /> Профайл засах
-              </button>
+              <div className="flex gap-2.5 flex-wrap shrink-0">
+                <Link
+                  href="/profile/assessment"
+                  className="inline-flex items-center gap-2 font-extrabold text-[.9rem] rounded-full bg-blue-soft text-blue-strong px-5 py-3 transition-transform hover:-translate-y-0.5"
+                >
+                  <IconTarget className="w-4 h-4" /> Миний түвшин
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowEdit(true)}
+                  className="btn-ring inline-flex items-center gap-2 font-extrabold text-[.9rem] rounded-full bg-surface px-5 py-3 transition-colors hover:text-blue-strong"
+                >
+                  <IconPencil className="w-4 h-4" /> Профайл засах
+                </button>
+              </div>
             </div>
           </div>
         </div>
