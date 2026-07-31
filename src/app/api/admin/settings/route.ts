@@ -1,0 +1,37 @@
+import { NextResponse } from "next/server";
+import { getAssessmentFee, setSetting } from "@/lib/assessment/db";
+import { isAdmin } from "@/lib/session";
+import { isTooLong, MAX_LEN } from "@/lib/validate";
+
+/** Only keys listed here can be written, so the endpoint can't set anything. */
+const EDITABLE_KEYS = new Set(["assessment_fee"]);
+
+export async function GET() {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  }
+  return NextResponse.json({ ok: true, settings: { assessment_fee: await getAssessmentFee() } });
+}
+
+export async function PUT(request: Request) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  }
+
+  const data = await request.json();
+  const key = typeof data.key === "string" ? data.key : "";
+  const value = typeof data.value === "string" ? data.value.trim() : "";
+
+  if (!EDITABLE_KEYS.has(key)) {
+    return NextResponse.json({ ok: false, error: "Тохиргоо олдсонгүй" }, { status: 400 });
+  }
+  if (!value) {
+    return NextResponse.json({ ok: false, error: "Утгыг хоослож болохгүй" }, { status: 400 });
+  }
+  if (isTooLong(value, MAX_LEN.settingValue)) {
+    return NextResponse.json({ ok: false, error: "Утга хэт урт байна" }, { status: 400 });
+  }
+
+  await setSetting(key, value);
+  return NextResponse.json({ ok: true, key, value });
+}

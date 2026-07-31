@@ -28,6 +28,12 @@ export const MAX_LEN = {
   certificateNumber: 60,
   certificateCategory: 150,
   certificateCourse: 200,
+  problemTopic: 120,
+  problemBody: 4000,
+  problemAnswerKey: 2000,
+  levelName: 80,
+  levelText: 2000,
+  settingValue: 200,
 } as const;
 
 export function isTooLong(value: unknown, max: number): boolean {

@@ -12,6 +12,8 @@ import {
   listUsers,
   type AnalyticsStats,
 } from "@/lib/db";
+import { getAssessmentFee } from "@/lib/assessment/db";
+import { DEFAULT_ASSESSMENT_FEE } from "@/lib/assessment/config";
 import { isAdmin } from "@/lib/session";
 
 const EMPTY_ANALYTICS: AnalyticsStats = {
@@ -48,12 +50,13 @@ export default async function AdminPage() {
     getDashboardStats(),
   ]);
 
-  // page_views and certificates are newer tables — on a site that hasn't run
-  // the latest schema.sql yet these throw, and the whole admin page must not
-  // go down over one tab's data.
-  const [analytics, certificates] = await Promise.all([
+  // page_views, certificates and app_settings are newer tables — on a site
+  // that hasn't run the latest schema.sql yet these throw, and the whole
+  // admin page must not go down over one tab's data.
+  const [analytics, certificates, assessmentFee] = await Promise.all([
     getAnalyticsStats().catch(() => EMPTY_ANALYTICS),
     listCertificates().catch(() => []),
+    getAssessmentFee().catch(() => DEFAULT_ASSESSMENT_FEE),
   ]);
 
   return (
@@ -64,6 +67,7 @@ export default async function AdminPage() {
         initialArticles={articles}
         initialUsers={users}
         initialCertificates={certificates}
+        assessmentFee={assessmentFee}
         stats={stats}
         analytics={analytics}
       />
