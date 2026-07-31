@@ -5,7 +5,10 @@
 // don't fit that shape (teacher-specialty courses, multi-category combos
 // like the pre-existing "B,E АНГИЛАЛ сурагч").
 
-export const COURSE_CATEGORIES = ["B", "C", "D", "E", "F"] as const;
+// "A" is here because the live data uses it ("A АНГИЛАЛ СУРАГЧ"); leaving it
+// out made those courses impossible to pick in the admin form and invisible
+// to the category filter on /courses.
+export const COURSE_CATEGORIES = ["A", "B", "C", "D", "E", "F"] as const;
 export type CourseCategory = (typeof COURSE_CATEGORIES)[number];
 export type CourseAudience = "student" | "teacher";
 
@@ -40,4 +43,41 @@ export function parseCourseTag(tag: string): {
   }
   const audience: CourseAudience = /багш/i.test(tag) ? "teacher" : "student";
   return { category: "", audience, customLabel: tag };
+}
+
+// ---------------------------------------------------------------------------
+// Filtering helpers for the public /courses page
+// ---------------------------------------------------------------------------
+
+/**
+ * The word that marks the category letters in a tag. Matching the stem
+ * "АНГИЛ" rather than the full "АНГИЛАЛ" also covers "ангиллын"; it
+ * deliberately does NOT match "АНГИЙН" (as in "БАГА БОЛОН ДУНД АНГИЙН БАГШ"),
+ * which is about school years, not categories.
+ */
+const CATEGORY_MARKER = "АНГИЛ";
+
+/**
+ * Every category letter a tag mentions. Real tags are messier than
+ * buildCourseTag's output — "B,E АНГИЛАЛ сурагч" and
+ * "A,B АНГИЛАЛ · ӨМНӨХ УЛИРАЛ" both name two categories — so a course can
+ * legitimately belong to several. Returns [] when the tag names none
+ * ("ДАСГАЛЖУУЛАГЧ БАГШ", "4-р анги").
+ *
+ * Only the text *before* the marker is scanned, so the Cyrillic А of
+ * "АНГИЛАЛ" is never mistaken for the Latin category letter A.
+ */
+export function extractCourseCategories(tag: string): CourseCategory[] {
+  const upper = tag.toUpperCase();
+  const idx = upper.indexOf(CATEGORY_MARKER);
+  if (idx < 0) return [];
+  // Latin A-F only: the letters in the live data are Latin even though the
+  // surrounding words are Cyrillic.
+  const found = upper.slice(0, idx).match(/[A-F]/g) ?? [];
+  return [...new Set(found)] as CourseCategory[];
+}
+
+/** Teacher courses always say "багш" somewhere in the tag; everything else is for students. */
+export function getCourseAudience(tag: string): CourseAudience {
+  return /багш/i.test(tag) ? "teacher" : "student";
 }

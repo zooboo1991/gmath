@@ -33,3 +33,23 @@ export function getWeekdayNameMn(isoDate: string): string {
   if (Number.isNaN(date.getTime())) return "";
   return WEEKDAY_NAMES_MN[date.getDay()];
 }
+
+/**
+ * Sort comparator putting the soonest course first. Dates arrive in two
+ * formats (legacy "2026.08.10" and ISO from the date picker), so both are
+ * normalised before comparing — string-sorting the raw values would
+ * interleave them wrongly.
+ *
+ * Courses with no start date sort last: "date unknown" is not "starts first".
+ */
+export function compareByStartDate(
+  a: { startDate?: string },
+  b: { startDate?: string }
+): number {
+  const left = toIsoDate(a.startDate);
+  const right = toIsoDate(b.startDate);
+  if (!left && !right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
+  return left.localeCompare(right);
+}
