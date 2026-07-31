@@ -381,6 +381,8 @@ function TabButton({
 type EditFields = {
   lastName: string;
   firstName: string;
+  province: string;
+  district: string;
   school: string;
   grade: string;
   email: string;
@@ -400,6 +402,8 @@ function EditProfileModal({
   const [fields, setFields] = useState<EditFields>({
     lastName: user.lastName,
     firstName: user.firstName,
+    province: user.province ?? "",
+    district: user.district ?? "",
     school: user.school,
     grade: user.grade ?? "",
     email: user.email,
@@ -419,6 +423,8 @@ function EditProfileModal({
     const next: Partial<Record<keyof EditFields, boolean>> = {};
     if (!fields.lastName.trim()) next.lastName = true;
     if (!fields.firstName.trim()) next.firstName = true;
+    if (!fields.province.trim()) next.province = true;
+    if (!fields.district.trim()) next.district = true;
     if (!fields.school.trim()) next.school = true;
     if (user.role === "student" && !fields.grade.trim()) next.grade = true;
     if (!EMAIL_RE.test(fields.email.trim())) next.email = true;
@@ -476,6 +482,14 @@ function EditProfileModal({
           </FormField>
           <FormField label="Нэр" required error={errors.firstName ? "e" : undefined}>
             <input value={fields.firstName} onChange={(e) => setField("firstName", e.target.value)} />
+          </FormField>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
+          <FormField label="Аймаг/Хот" required error={errors.province ? "e" : undefined}>
+            <input value={fields.province} onChange={(e) => setField("province", e.target.value)} placeholder="Жишээ: Улаанбаатар" />
+          </FormField>
+          <FormField label="Сум/Дүүрэг" required error={errors.district ? "e" : undefined}>
+            <input value={fields.district} onChange={(e) => setField("district", e.target.value)} placeholder="Жишээ: Баянзүрх" />
           </FormField>
         </div>
         <FormField

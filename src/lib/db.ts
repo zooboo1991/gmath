@@ -343,11 +343,15 @@ export async function updateUserPassword(userId: string, newPassword: string): P
 
 export async function updateUserProfile(
   userId: string,
-  input: Partial<Pick<User, "lastName" | "firstName" | "school" | "grade" | "email" | "facebook" | "zoom">>
+  input: Partial<
+    Pick<User, "lastName" | "firstName" | "province" | "district" | "school" | "grade" | "email" | "facebook" | "zoom">
+  >
 ): Promise<User | undefined> {
   const patch: Record<string, unknown> = {};
   if (input.lastName !== undefined) patch.last_name = input.lastName;
   if (input.firstName !== undefined) patch.first_name = input.firstName;
+  if (input.province !== undefined) patch.province = input.province;
+  if (input.district !== undefined) patch.district = input.district;
   if (input.school !== undefined) patch.school = input.school;
   if (input.grade !== undefined) patch.grade = input.grade || null;
   if (input.email !== undefined) patch.email = input.email;
