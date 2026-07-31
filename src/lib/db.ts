@@ -57,6 +57,17 @@ export function toPublicUser(user: User): PublicUser {
   return rest;
 }
 
+/**
+ * Maps the `users` row that comes back from a `select("*, users(*)")` join.
+ * Exported so other modules (lib/assessment/db.ts) reuse this one mapping
+ * instead of writing their own — a duplicated mapper is how a newly added
+ * column silently fails to appear in half the app.
+ */
+export function publicUserFromJoin(row: unknown): PublicUser | undefined {
+  if (!row) return undefined;
+  return toPublicUser(userFromRow(row as UserRow));
+}
+
 export type Lesson = {
   topic: string;
   schedule?: string;

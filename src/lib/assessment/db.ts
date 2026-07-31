@@ -1,4 +1,5 @@
 import { getSupabase } from "../supabase";
+import { publicUserFromJoin, type PublicUser } from "../db";
 import { DEFAULT_ASSESSMENT_FEE, MAX_PROBLEMS_SHOWN, PROBLEMS_TO_SOLVE } from "./config";
 import { estimateLevel } from "./levelEstimator";
 import { nextTargetDifficulty, pickNextProblem } from "./problemPicker";
@@ -19,6 +20,9 @@ import type {
  * lib/db.ts: row types, `xFromRow` mappers, throw on error, and access is
  * gated by the calling API route (service_role bypasses RLS).
  */
+
+/** An assessment plus the student it belongs to, for the admin queue. */
+export type AssessmentWithUser = Assessment & { user?: PublicUser };
 
 function isInvalidUuidError(err: unknown): boolean {
   return (err as { code?: string } | null)?.code === "22P02";
@@ -361,15 +365,38 @@ export async function updateAssessment(
   return data ? assessmentFromRow(data as AssessmentRow) : undefined;
 }
 
-/** Grading queue: everything submitted but not yet finished. */
-export async function listAssessmentsForGrading(): Promise<Assessment[]> {
+/**
+ * Grading queue: everything submitted but not yet finished, oldest first so
+ * the student who has waited longest is graded next. Joined to users because
+ * a queue of bare UUIDs is unusable.
+ */
+export async function listAssessmentsForGrading(): Promise<AssessmentWithUser[]> {
   const { data, error } = await getSupabase()
     .from("assessments")
-    .select("*")
+    .select("*, users(*)")
     .in("status", ["problems_submitted", "grading"])
     .order("created_at");
   if (error) throw error;
-  return (data as AssessmentRow[]).map(assessmentFromRow);
+
+  return (data as (AssessmentRow & { users: unknown })[]).map((row) => {
+    const { users, ...rest } = row;
+    return { ...assessmentFromRow(rest), user: publicUserFromJoin(users) };
+  });
+}
+
+/** Finished assessments, newest first — the admin's record of past results. */
+export async function listCompletedAssessments(): Promise<AssessmentWithUser[]> {
+  const { data, error } = await getSupabase()
+    .from("assessments")
+    .select("*, users(*)")
+    .eq("status", "completed")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+
+  return (data as (AssessmentRow & { users: unknown })[]).map((row) => {
+    const { users, ...rest } = row;
+    return { ...assessmentFromRow(rest), user: publicUserFromJoin(users) };
+  });
 }
 
 // ---------------------------------------------------------------------------
