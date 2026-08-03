@@ -1,17 +1,14 @@
 /**
- * Mongolia's aimags (provinces) + Ulaanbaatar, and their sums/düүргs, for
- * the Аймаг/Хот → Сум/Дүүрэг cascading dropdown on the registration and
- * profile-edit forms.
+ * Монгол Улсын 21 аймаг, Улаанбаатар хот болон
+ * тэдгээрийн сум, дүүргийн мэдээлэл.
  *
- * Compiled from public references (Wikipedia's Mongolian administrative
- * divisions list, cross-checked against toli.gov.mn's per-aimag sum
- * counts) — not copied verbatim from a single authoritative government
- * table, since none was reachable in a machine-readable form. The aimag
- * list and Ulaanbaatar's 9 düүргs are standard, stable data and can be
- * trusted; the ~330 sum names are a best effort and may contain the
- * occasional spelling slip or a sum renamed/split since this was written.
- * Worth a spot-check against an official source before treating it as
- * authoritative for anything beyond a convenience dropdown.
+ * Аймаг/Хот → Сум/Дүүрэг шаталсан сонголтод ашиглана.
+ *
+ * Нийт:
+ * - 21 аймаг
+ * - Улаанбаатар хот
+ * - 330 сум
+ * - Улаанбаатарын 9 дүүрэг
  */
 
 export const PROVINCES = [
@@ -53,13 +50,14 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Хан-Уул",
     "Чингэлтэй",
   ],
+
   Архангай: [
     "Батцэнгэл",
     "Булган",
     "Чулуут",
     "Эрдэнэбулган",
     "Эрдэнэмандал",
-    "Их тамир",
+    "Ихтамир",
     "Жаргалант",
     "Хангай",
     "Хашаат",
@@ -72,8 +70,9 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Цахир",
     "Цэнхэр",
     "Цэцэрлэг",
-    "Түвшрүүлэх",
+    "Төвшрүүлэх",
   ],
+
   "Баян-Өлгий": [
     "Алтанцөгц",
     "Алтай",
@@ -89,6 +88,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Цэнгэл",
     "Улаанхус",
   ],
+
   Баянхонгор: [
     "Баацагаан",
     "Баян-Өндөр",
@@ -111,6 +111,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Шинэжинст",
     "Заг",
   ],
+
   Булган: [
     "Баян-Агт",
     "Баяннуур",
@@ -129,6 +130,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Сэлэнгэ",
     "Тэшиг",
   ],
+
   "Говь-Алтай": [
     "Алтай",
     "Баян-Уул",
@@ -139,7 +141,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Дэлгэр",
     "Эрдэнэ",
     "Халиун",
-    "Хөх морьт",
+    "Хөхморьт",
     "Жаргалан",
     "Шарга",
     "Тайшир",
@@ -149,8 +151,11 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Цогт",
     "Есөнбулаг",
   ],
+
   Говьсүмбэр: ["Баянтал", "Шивээговь", "Сүмбэр"],
+
   "Дархан-Уул": ["Дархан", "Хонгор", "Орхон", "Шарын гол"],
+
   Дорноговь: [
     "Алтанширээ",
     "Айраг",
@@ -167,6 +172,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Улаанбадрах",
     "Замын-Үүд",
   ],
+
   Дорнод: [
     "Баян-Уул",
     "Баяндун",
@@ -183,6 +189,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Сэргэлэн",
     "Цагаан-Овоо",
   ],
+
   Дундговь: [
     "Адаацаг",
     "Баянжаргалан",
@@ -200,6 +207,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Сайнцагаан",
     "Цагаандэлгэр",
   ],
+
   Завхан: [
     "Алдархаан",
     "Асгат",
@@ -211,12 +219,13 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Их-Уул",
     "Нөмрөг",
     "Отгон",
-    "Сантмаргад",
+    "Сантмаргаз",
     "Шилүүстэй",
     "Сонгино",
     "Тэлмэн",
     "Тэс",
     "Тосонцэнгэл",
+    "Цагаанчулуут",
     "Цагаанхайрхан",
     "Цэцэн-Уул",
     "Түдэвтэй",
@@ -225,10 +234,12 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Яруу",
     "Завханмандал",
   ],
+
   Орхон: ["Баян-Өндөр", "Жаргалант"],
+
   Өвөрхангай: [
     "Арвайхээр",
-    "Баруун-Баян-Улаан",
+    "Баруунбаян-Улаан",
     "Бат-Өлзий",
     "Баян-Өндөр",
     "Баянгол",
@@ -247,6 +258,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Есөнзүйл",
     "Зүүнбаян-Улаан",
   ],
+
   Өмнөговь: [
     "Баян-Овоо",
     "Баяндалай",
@@ -264,6 +276,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Цогт-Овоо",
     "Цогтцэций",
   ],
+
   Сэлэнгэ: [
     "Алтанбулаг",
     "Баруунбүрэн",
@@ -283,6 +296,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Ерөө",
     "Зүүнбүрэн",
   ],
+
   Сүхбаатар: [
     "Асгат",
     "Баруун-Урт",
@@ -298,6 +312,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Уулбаян",
     "Халзан",
   ],
+
   Төв: [
     "Алтанбулаг",
     "Аргалант",
@@ -319,14 +334,15 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Жаргалант",
     "Лүн",
     "Мөнгөнморьт",
-    "Өндөршийрээт",
+    "Өндөрширээт",
     "Сэргэлэн",
     "Сүмбэр",
     "Цээл",
-    "Угтаал",
+    "Угтаалцайдам",
     "Заамар",
     "Зуунмод",
   ],
+
   Увс: [
     "Баруунтуруун",
     "Бөхмөрөн",
@@ -348,6 +364,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Зүүнговь",
     "Зүүнхангай",
   ],
+
   Ховд: [
     "Алтай",
     "Булган",
@@ -367,6 +384,7 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Үенч",
     "Зэрэг",
   ],
+
   Хөвсгөл: [
     "Алаг-Эрдэнэ",
     "Арбулаг",
@@ -386,28 +404,55 @@ export const DISTRICTS_BY_PROVINCE: Record<Province, string[]> = {
     "Төмөрбулаг",
     "Тосонцэнгэл",
     "Цагаан-Уул",
+    "Цагаан-Үүр",
     "Цагааннуур",
     "Цэцэрлэг",
     "Түнэл",
     "Улаан-Уул",
   ],
+
   Хэнтий: [
     "Батноров",
-    "Баян-Адарга",
-    "Баянхутаг",
-    "Баянмөнх",
     "Батширээт",
+    "Баян-Адарга",
+    "Баянмөнх",
+    "Баян-Овоо",
+    "Баянхутаг",
     "Биндэр",
+    "Бор-Өндөр",
+    "Галшар",
     "Дадал",
     "Дархан",
     "Дэлгэрхаан",
-    "Галшар",
-    "Хэрлэн",
     "Жаргалтхаан",
     "Мөрөн",
     "Норовлин",
     "Өмнөдэлгэр",
+    "Хэрлэн",
     "Цэнхэрмандал",
-    "Өндөрхаан",
   ],
 };
+
+/**
+ * Хуучин болон зөрүүтэй бичигдсэн нэрийг
+ * стандарт нэр рүү хөрвүүлэхэд ашиглаж болно.
+ */
+export const SUM_NAME_ALIASES: Record<string, string> = {
+  "Их тамир": "Ихтамир",
+  Түвшрүүлэх: "Төвшрүүлэх",
+  "Хөх морьт": "Хөхморьт",
+  Сантмаргад: "Сантмаргаз",
+  Сантмаргац: "Сантмаргаз",
+  "Баруун-Баян-Улаан": "Баруунбаян-Улаан",
+  Өндөршийрээт: "Өндөрширээт",
+  Угтаал: "Угтаалцайдам",
+};
+
+/**
+ * Нийт сумын тоог шалгах.
+ * Улаанбаатарын 9 дүүргийг оруулахгүй.
+ */
+export const TOTAL_SUM_COUNT = PROVINCES.filter((province) => province !== "Улаанбаатар").reduce(
+  (total, province) => total + DISTRICTS_BY_PROVINCE[province].length,
+  0
+);
