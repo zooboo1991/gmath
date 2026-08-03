@@ -130,6 +130,30 @@ export default function CourseObjectPage({
     setForm((f) => ({ ...f, lessons: f.lessons.filter((_, i) => i !== index) }));
   };
 
+  // Keyed by lesson index rather than lesson id, matching how lesson_meetings
+  // itself is keyed — see the schema comment for the tradeoff.
+  const [zoomMeetingState, setZoomMeetingState] = useState<
+    Record<number, { status: "loading" | "done" | "error"; joinUrl?: string; error?: string }>
+  >({});
+
+  const createZoomMeeting = async (index: number) => {
+    if (!course) return;
+    setZoomMeetingState((s) => ({ ...s, [index]: { status: "loading" } }));
+    try {
+      const res = await fetch(`/api/admin/courses/${course.id}/lessons/${index}/zoom-meeting`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setZoomMeetingState((s) => ({ ...s, [index]: { status: "error", error: json.error } }));
+        return;
+      }
+      setZoomMeetingState((s) => ({ ...s, [index]: { status: "done", joinUrl: json.meeting.joinUrl } }));
+    } catch {
+      setZoomMeetingState((s) => ({ ...s, [index]: { status: "error", error: "Сүлжээний алдаа гарлаа" } }));
+    }
+  };
+
   const save = async () => {
     if (!tag.trim() || !form.title.trim() || !form.price.trim() || !form.period.trim()) {
       setError("Заавал бөглөх талбаруудыг бөглөнө үү");
@@ -524,6 +548,30 @@ export default function CourseObjectPage({
                             className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
                           />
                         </div>
+                        {isEditing && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              disabled={zoomMeetingState[i]?.status === "loading"}
+                              onClick={() => createZoomMeeting(i)}
+                              className="text-[.78rem] font-extrabold text-blue-strong bg-blue-soft px-3 py-1.5 rounded-full disabled:opacity-50"
+                            >
+                              {zoomMeetingState[i]?.status === "loading"
+                                ? "Үүсгэж байна…"
+                                : "Ирц бүртгэх Zoom meeting үүсгэх"}
+                            </button>
+                            {zoomMeetingState[i]?.status === "done" && (
+                              <span className="text-[.78rem] font-bold text-green">
+                                ✓ Үүслээ — сурагч бүрд хувийн холбоос өгнө
+                              </span>
+                            )}
+                            {zoomMeetingState[i]?.status === "error" && (
+                              <span className="text-[.78rem] font-bold text-red-soft">
+                                {zoomMeetingState[i]?.error ?? "Алдаа гарлаа"}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <button
                         type="button"

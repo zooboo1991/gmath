@@ -329,3 +329,51 @@ create table if not exists solutions (
   unique (assessment_id, problem_id)
 );
 create index if not exists solutions_assessment_idx on solutions (assessment_id);
+
+-- Zoom attendance tracking (see src/lib/zoom/). Lessons themselves stay in
+-- courses.lessons jsonb — these tables key off (course_id, lesson_index)
+-- rather than a per-lesson id, since lessons don't have a stable one. A
+-- lesson reordered in the admin editor after its meeting was created would
+-- point at the wrong lesson; acceptable for now, not worth a schema change
+-- to the lessons array just to prevent an edge case admins can just avoid.
+create table if not exists lesson_meetings (
+  id uuid primary key default gen_random_uuid(),
+  course_id uuid not null references courses(id) on delete cascade,
+  lesson_index int not null,
+  zoom_meeting_id text not null unique,
+  join_url text not null,
+  start_url text,
+  created_at timestamptz not null default now(),
+  unique (course_id, lesson_index)
+);
+
+-- One row per student ever registered for a lesson's meeting — created
+-- lazily the first time that student clicks "Хичээлд орох". join_url is
+-- personal to them; Zoom's webhook events carry the registrant_id back,
+-- which is what lets lesson_attendance attribute a join to a specific user.
+create table if not exists lesson_registrants (
+  id uuid primary key default gen_random_uuid(),
+  lesson_meeting_id uuid not null references lesson_meetings(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  zoom_registrant_id text not null,
+  join_url text not null,
+  created_at timestamptz not null default now(),
+  unique (lesson_meeting_id, user_id)
+);
+create index if not exists lesson_registrants_registrant_idx on lesson_registrants (zoom_registrant_id);
+
+-- One row per join; a dropped connection and rejoin during the same lesson
+-- produces a second row rather than overwriting the first. zoom_participant_uuid
+-- is Zoom's per-join session id, used to match the corresponding "left" event
+-- to the right open row instead of guessing by user_id alone.
+create table if not exists lesson_attendance (
+  id uuid primary key default gen_random_uuid(),
+  lesson_meeting_id uuid not null references lesson_meetings(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  zoom_participant_uuid text,
+  joined_at timestamptz not null,
+  left_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists lesson_attendance_lookup_idx on lesson_attendance (lesson_meeting_id, user_id);
+create index if not exists lesson_attendance_participant_idx on lesson_attendance (zoom_participant_uuid);

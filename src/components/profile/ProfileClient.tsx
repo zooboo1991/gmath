@@ -415,7 +415,7 @@ function LessonSchedule({ registration }: { registration: RegistrationWithGroup 
                     {info?.dateLabel && info?.timeLabel && " · "}
                     {info?.timeLabel}
                   </span>
-                  <LessonAction info={info} />
+                  <LessonAction info={info} courseId={registration.programId} lessonIndex={i} />
                 </div>
               </div>
             </div>
@@ -434,7 +434,18 @@ function LessonSchedule({ registration }: { registration: RegistrationWithGroup 
  * The one date check that remains: a *past* lesson without a recording says
  * so instead of offering a join button to a room that has already closed.
  */
-function LessonAction({ info }: { info: LessonWithState | undefined }) {
+function LessonAction({
+  info,
+  courseId,
+  lessonIndex,
+}: {
+  info: LessonWithState | undefined;
+  courseId: string;
+  lessonIndex: number;
+}) {
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState(false);
+
   if (!info) return null;
 
   if (info.lesson.recordingLink) {
@@ -454,21 +465,50 @@ function LessonAction({ info }: { info: LessonWithState | undefined }) {
     return <span className="shrink-0 font-bold text-[.78rem] text-ink-3">Бичлэг удахгүй</span>;
   }
 
-  const href = info.lesson.zoomLink;
-  if (!href) return null;
+  if (!info.lesson.zoomLink) return null;
+
+  // The actual join link is resolved on click rather than rendered as a
+  // plain href — a lesson with a tracked Zoom meeting needs a personal,
+  // per-student registrant link (not the shared one), which only the
+  // server can hand out and only once, on demand.
+  const join = async () => {
+    setJoining(true);
+    setJoinError(false);
+    try {
+      const res = await fetch("/api/lessons/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId, lessonIndex }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.joinUrl) {
+        setJoinError(true);
+        return;
+      }
+      window.open(json.joinUrl, "_blank", "noreferrer");
+    } catch {
+      setJoinError(true);
+    } finally {
+      setJoining(false);
+    }
+  };
 
   const isLive = info.state === "live";
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className={`shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-white rounded-full px-5 py-2.5 transition-transform hover:-translate-y-0.5 ${
-        isLive ? "bg-green shadow-sm" : "bg-blue shadow-blue"
-      }`}
-    >
-      <IconVideoCamera className="w-4 h-4" /> Хичээлд орох{isLive ? " →" : ""}
-    </a>
+    <span className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        disabled={joining}
+        onClick={join}
+        className={`shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-white rounded-full px-5 py-2.5 transition-transform hover:-translate-y-0.5 disabled:opacity-60 ${
+          isLive ? "bg-green shadow-sm" : "bg-blue shadow-blue"
+        }`}
+      >
+        <IconVideoCamera className="w-4 h-4" /> {joining ? "Түр хүлээнэ үү…" : "Хичээлд орох"}
+        {!joining && isLive ? " →" : ""}
+      </button>
+      {joinError && <span className="text-[.75rem] font-bold text-red-soft">Алдаа гарлаа, дахин дарна уу</span>}
+    </span>
   );
 }
 
