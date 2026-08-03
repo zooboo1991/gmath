@@ -29,7 +29,6 @@ export async function PUT(request: Request) {
   if (!EMAIL_RE.test(data.email?.trim() ?? "") || isTooLong(data.email, MAX_LEN.email))
     errors.email = "И-мэйл хаяг буруу байна";
   if (isTooLong(data.facebook, MAX_LEN.social)) errors.facebook = "Facebook нэр хэт урт байна";
-  if (isTooLong(data.zoom, MAX_LEN.social)) errors.zoom = "Zoom нэр хэт урт байна";
 
   if (Object.keys(errors).length > 0) {
     return NextResponse.json({ ok: false, errors }, { status: 400 });
@@ -44,7 +43,6 @@ export async function PUT(request: Request) {
     grade: data.grade?.trim() || undefined,
     email: data.email.trim(),
     facebook: data.facebook?.trim() || undefined,
-    zoom: data.zoom?.trim() || undefined,
   });
 
   if (!user) {

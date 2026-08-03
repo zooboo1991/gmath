@@ -43,7 +43,6 @@ export type User = {
   school: string;
   grade?: string;
   facebook?: string;
-  zoom?: string;
   passwordHash: string;
   passwordSalt: string;
   createdAt: string;
@@ -154,7 +153,6 @@ type UserRow = {
   school: string;
   grade: string | null;
   facebook: string | null;
-  zoom: string | null;
   password_hash: string;
   password_salt: string;
   created_at: string;
@@ -230,7 +228,6 @@ function userFromRow(row: UserRow): User {
     school: row.school,
     grade: row.grade ?? undefined,
     facebook: row.facebook ?? undefined,
-    zoom: row.zoom ?? undefined,
     passwordHash: row.password_hash,
     passwordSalt: row.password_salt,
     createdAt: row.created_at,
@@ -362,7 +359,6 @@ export async function createUser(
       school: input.school,
       grade: input.grade ?? null,
       facebook: input.facebook ?? null,
-      zoom: input.zoom ?? null,
       password_hash: hash,
       password_salt: salt,
     })
@@ -393,7 +389,7 @@ export async function updateUserPassword(userId: string, newPassword: string): P
 export async function updateUserProfile(
   userId: string,
   input: Partial<
-    Pick<User, "lastName" | "firstName" | "province" | "district" | "school" | "grade" | "email" | "facebook" | "zoom">
+    Pick<User, "lastName" | "firstName" | "province" | "district" | "school" | "grade" | "email" | "facebook">
   >
 ): Promise<User | undefined> {
   const patch: Record<string, unknown> = {};
@@ -405,7 +401,6 @@ export async function updateUserProfile(
   if (input.grade !== undefined) patch.grade = input.grade || null;
   if (input.email !== undefined) patch.email = input.email;
   if (input.facebook !== undefined) patch.facebook = input.facebook || null;
-  if (input.zoom !== undefined) patch.zoom = input.zoom || null;
 
   const { data, error } = await getSupabase().from("users").update(patch).eq("id", userId).select("*").maybeSingle();
   if (error) throw error;

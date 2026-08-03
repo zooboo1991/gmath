@@ -83,7 +83,6 @@ export default function UserObjectPage({
             <InfoRow label="Сургууль" value={user.school} />
             <InfoRow label="Анги" value={user.grade} />
             <InfoRow label="Facebook" value={user.facebook} />
-            <InfoRow label="Zoom" value={user.zoom} />
             <InfoRow label="Бүртгүүлсэн огноо" value={new Date(user.createdAt).toLocaleDateString("mn-MN")} />
           </div>
         </Card>

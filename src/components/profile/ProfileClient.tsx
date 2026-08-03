@@ -607,7 +607,6 @@ type EditFields = {
   grade: string;
   email: string;
   facebook: string;
-  zoom: string;
 };
 
 function EditProfileModal({
@@ -628,7 +627,6 @@ function EditProfileModal({
     grade: user.grade ?? "",
     email: user.email,
     facebook: user.facebook ?? "",
-    zoom: user.zoom ?? "",
   });
   const [errors, setErrors] = useState<Partial<Record<keyof EditFields, boolean>>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -755,14 +753,9 @@ function EditProfileModal({
         <FormField label="Имэйл хаяг" required error={errors.email ? "e" : undefined}>
           <input value={fields.email} onChange={(e) => setField("email", e.target.value)} />
         </FormField>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
-          <FormField label="Facebook аккаунт нэр">
-            <input value={fields.facebook} onChange={(e) => setField("facebook", e.target.value)} />
-          </FormField>
-          <FormField label="Zoom аккаунт нэр">
-            <input value={fields.zoom} onChange={(e) => setField("zoom", e.target.value)} />
-          </FormField>
-        </div>
+        <FormField label="Facebook аккаунт нэр">
+          <input value={fields.facebook} onChange={(e) => setField("facebook", e.target.value)} />
+        </FormField>
 
         {submitError && <p className="text-[.85rem] font-semibold text-red-soft mb-3">{submitError}</p>}
 

@@ -40,7 +40,6 @@ type FieldData = {
   phone: string;
   email: string;
   facebook: string;
-  zoom: string;
   password: string;
   passwordConfirm: string;
 };
@@ -55,7 +54,6 @@ const emptyFields: FieldData = {
   phone: "",
   email: "",
   facebook: "",
-  zoom: "",
   password: "",
   passwordConfirm: "",
 };
@@ -988,14 +986,9 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     <input value={fields.email} onChange={(e) => setField("email", e.target.value)} placeholder="name@mail.com" />
                   </FormField>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
-                  <FormField label="Facebook аккаунт нэр">
-                    <input value={fields.facebook} onChange={(e) => setField("facebook", e.target.value)} placeholder="Facebook нэр" />
-                  </FormField>
-                  <FormField label="Zoom аккаунт нэр">
-                    <input value={fields.zoom} onChange={(e) => setField("zoom", e.target.value)} placeholder="Zoom нэр" />
-                  </FormField>
-                </div>
+                <FormField label="Facebook аккаунт нэр">
+                  <input value={fields.facebook} onChange={(e) => setField("facebook", e.target.value)} placeholder="Facebook нэр" />
+                </FormField>
 
                 <div className="flex gap-3.5 mt-1.5">
                   <button

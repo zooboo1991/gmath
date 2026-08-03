@@ -38,7 +38,6 @@ export async function POST(request: Request) {
   if (!EMAIL_RE.test(data.email?.trim() ?? "") || isTooLong(data.email, MAX_LEN.email))
     errors.email = "И-мэйл хаяг буруу байна";
   if (isTooLong(data.facebook, MAX_LEN.social)) errors.facebook = "Facebook нэр хэт урт байна";
-  if (isTooLong(data.zoom, MAX_LEN.social)) errors.zoom = "Zoom нэр хэт урт байна";
   if (!PASSWORD_RE.test(data.password ?? "") || isTooLong(data.password, MAX_LEN.password))
     errors.password = "Нууц үг том, жижиг үсэг, тоо орсон, дор хаяж 6 тэмдэгт байна";
   if (data.passwordConfirm !== data.password) errors.passwordConfirm = "Нууц үг таарахгүй байна";
@@ -72,7 +71,6 @@ export async function POST(request: Request) {
         phone: data.phone.trim(),
         email: data.email.trim(),
         facebook: data.facebook?.trim() || undefined,
-        zoom: data.zoom?.trim() || undefined,
       },
       data.password
     );
