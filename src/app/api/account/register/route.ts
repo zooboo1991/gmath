@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createUser, toPublicUser } from "@/lib/db";
+import { consumeVerifiedOtp } from "@/lib/otp";
 import { setSessionUser } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
@@ -44,6 +45,17 @@ export async function POST(request: Request) {
 
   if (Object.keys(errors).length > 0) {
     return NextResponse.json({ ok: false, errors }, { status: 400 });
+  }
+
+  // The actual enforcement point for phone OTP — the client is expected to
+  // have already run the student through /api/account/otp/send + verify,
+  // but that's only ever a UX gate; this is what stops a request crafted to
+  // skip straight to here.
+  if (!(await consumeVerifiedOtp(data.phone.trim(), "register"))) {
+    return NextResponse.json(
+      { ok: false, errors: { phone: "Утасны дугаараа эхлээд баталгаажуулна уу" } },
+      { status: 400 }
+    );
   }
 
   let user;

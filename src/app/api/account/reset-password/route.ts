@@ -1,16 +1,9 @@
 import { NextResponse } from "next/server";
 import { findUserByPhone, toPublicUser, updateUserPassword } from "@/lib/db";
+import { consumeVerifiedOtp } from "@/lib/otp";
 import { setSessionUser } from "@/lib/session";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
-
-/**
- * Interim hardening: no SMS/email provider is wired up yet, so this can't
- * send a real one-time code. Requiring the registered email to match (on
- * top of the phone number) at least raises the bar above "know one public
- * fact" and closes the account-existence oracle (see the generic error
- * message below). This is not a substitute for real OTP verification.
- */
 
 const PHONE_RE = /^[0-9]{8}$/;
 const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
@@ -44,6 +37,16 @@ export async function POST(request: Request) {
   if (!existing || existing.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
     // Same message either way — don't reveal whether the phone number itself is registered.
     return NextResponse.json({ ok: false, error: GENERIC_MISMATCH_ERROR }, { status: 404 });
+  }
+
+  // The actual enforcement point for phone OTP — see the matching comment
+  // in /api/account/register. Closes the account-takeover gap this route
+  // used to have with only phone+email checked.
+  if (!(await consumeVerifiedOtp(phone.trim(), "reset"))) {
+    return NextResponse.json(
+      { ok: false, error: "Утасны дугаараа эхлээд баталгаажуулна уу" },
+      { status: 400 }
+    );
   }
 
   const user = await updateUserPassword(existing.id, newPassword);

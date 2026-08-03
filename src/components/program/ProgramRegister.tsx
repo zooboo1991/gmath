@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import FormField from "@/components/FormField";
 import {
   IconPerson,
@@ -138,7 +138,8 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const [program, setProgram] = useState<Program | null>(null);
   const [screen, setScreen] = useState<Screen>("login");
 
-  const [registerStep, setRegisterStep] = useState<1 | 2 | 3>(1);
+  // 1 role, 2 info, 3 phone OTP, 4 password.
+  const [registerStep, setRegisterStep] = useState<1 | 2 | 3 | 4>(1);
   const [role, setRole] = useState<Role | null>(null);
   const [fields, setFields] = useState<FieldData>(emptyFields);
   const [errors, setErrors] = useState<Errors>({});
@@ -147,11 +148,20 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
 
+  // 1 phone+email, 2 phone OTP, 3 new password.
+  const [resetStep, setResetStep] = useState<1 | 2 | 3>(1);
   const [resetPhone, setResetPhone] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [resetPassword, setResetPassword] = useState("");
   const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
+
+  // Shared between the register and reset flows — they're never open at
+  // the same time, so one code/cooldown/error is enough for both.
+  const [otpCode, setOtpCode] = useState("");
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const otpTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [payMethod, setPayMethod] = useState<PayMethod | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -199,16 +209,35 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     setLoginPhone("");
     setLoginPassword("");
     setLoginError(null);
+    setResetStep(1);
     setResetPhone("");
     setResetEmail("");
     setResetPassword("");
     setResetPasswordConfirm("");
     setResetError(null);
+    setOtpCode("");
+    setOtpError(null);
+    setOtpCooldown(0);
+    if (otpTimerRef.current) clearInterval(otpTimerRef.current);
     setPayMethod(null);
     setSubmitError(null);
     setRegistrationStatus(null);
     setFacebookGroup(null);
     setQpayQr(null);
+  };
+
+  const startOtpCooldown = () => {
+    if (otpTimerRef.current) clearInterval(otpTimerRef.current);
+    setOtpCooldown(60);
+    otpTimerRef.current = setInterval(() => {
+      setOtpCooldown((s) => {
+        if (s <= 1) {
+          if (otpTimerRef.current) clearInterval(otpTimerRef.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
   };
 
   const open = (p: Program) => {
@@ -264,8 +293,68 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     return Object.keys(next).length === 0;
   };
 
-  const handleContinueToPassword = () => {
-    if (validateInfoFields()) setRegisterStep(3);
+  const sendOtp = async (phone: string, purpose: "register" | "reset", email?: string) => {
+    setOtpError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/account/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, purpose, email }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setOtpError(json.error ?? "Код илгээхэд алдаа гарлаа");
+        return false;
+      }
+      startOtpCooldown();
+      return true;
+    } catch {
+      setOtpError("Сүлжээний алдаа гарлаа.");
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const verifyOtpCode = async (phone: string, purpose: "register" | "reset") => {
+    if (!/^[0-9]{4}$/.test(otpCode)) {
+      setOtpError("4 оронтой кодоо оруулна уу");
+      return false;
+    }
+    setOtpError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/account/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, purpose, code: otpCode }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setOtpError(json.error ?? "Код буруу байна");
+        return false;
+      }
+      return true;
+    } catch {
+      setOtpError("Сүлжээний алдаа гарлаа.");
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleContinueToOtp = async () => {
+    if (!validateInfoFields()) return;
+    setRegisterStep(3);
+    await sendOtp(fields.phone, "register");
+  };
+
+  const handleVerifyRegisterOtp = async () => {
+    if (await verifyOtpCode(fields.phone, "register")) {
+      setOtpCode("");
+      setRegisterStep(4);
+    }
   };
 
   const afterAuthed = (user: SessionUser) => {
@@ -303,7 +392,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     }
   };
 
-  const handleReset = async () => {
+  const handleContinueToResetOtp = async () => {
     setResetError(null);
     if (!PHONE_RE.test(resetPhone.trim())) {
       setResetError("8 оронтой утасны дугаар оруулна уу");
@@ -313,6 +402,20 @@ export default function ProgramRegisterProvider({ children }: { children: React.
       setResetError("Бүртгүүлсэн и-мэйл хаягаа зөв оруулна уу");
       return;
     }
+    if (await sendOtp(resetPhone.trim(), "reset", resetEmail.trim())) {
+      setResetStep(2);
+    }
+  };
+
+  const handleVerifyResetOtp = async () => {
+    if (await verifyOtpCode(resetPhone.trim(), "reset")) {
+      setOtpCode("");
+      setResetStep(3);
+    }
+  };
+
+  const handleReset = async () => {
+    setResetError(null);
     if (!PASSWORD_RE.test(resetPassword)) {
       setResetError("Нууц үг том, жижиг үсэг, тоо орсон, дор хаяж 6 тэмдэгт байна");
       return;
@@ -498,11 +601,16 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     e.preventDefault();
     if (submitting) return;
     if (screen === "login") return void handleLogin();
-    if (screen === "reset") return void handleReset();
+    if (screen === "reset") {
+      if (resetStep === 1) return void handleContinueToResetOtp();
+      if (resetStep === 2) return void handleVerifyResetOtp();
+      return void handleReset();
+    }
     if (screen === "register") {
       if (registerStep === 1 && role) setRegisterStep(2);
-      else if (registerStep === 2) handleContinueToPassword();
-      else if (registerStep === 3) void handleRegisterSubmit();
+      else if (registerStep === 2) void handleContinueToOtp();
+      else if (registerStep === 3) void handleVerifyRegisterOtp();
+      else if (registerStep === 4) void handleRegisterSubmit();
     }
   };
 
@@ -572,7 +680,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
 
             {screen === "register" && (
               <div className="flex gap-1.5 my-[18px]">
-                {[1, 2, 3].map((n) => (
+                {[1, 2, 3, 4].map((n) => (
                   <i key={n} className={`flex-1 h-1 rounded-sm ${n <= stepIndex ? "bg-blue" : "bg-line-2"}`} />
                 ))}
               </div>
@@ -609,6 +717,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   type="button"
                   onClick={() => {
                     setResetPhone(loginPhone);
+                    setResetStep(1);
                     setScreen("reset");
                   }}
                   className="inline-block py-3 -mx-1 px-1 text-[.85rem] font-bold text-blue-strong -mt-1 mb-2"
@@ -633,7 +742,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
               </div>
             )}
 
-            {screen === "reset" && (
+            {screen === "reset" && resetStep === 1 && (
               <div className="mt-[18px]">
                 <FormField label="Утасны дугаар" required error={resetError ? "e" : undefined}>
                   <input
@@ -650,6 +759,75 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     placeholder="name@mail.com"
                   />
                 </FormField>
+                {resetError && <p className="text-[.85rem] font-semibold text-red-soft mb-3">{resetError}</p>}
+                <div className="flex gap-3.5">
+                  <button
+                    type="button"
+                    onClick={() => setScreen("login")}
+                    className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink"
+                  >
+                    ← Буцах
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={handleContinueToResetOtp}
+                    className="flex-1 font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+                  >
+                    {submitting ? "Илгээж байна…" : "Код авах"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {screen === "reset" && resetStep === 2 && (
+              <div className="mt-[18px]">
+                <p className="font-semibold text-ink-2 mb-4">
+                  {resetPhone} дугаарт илгээсэн 4 оронтой кодыг оруулна уу.
+                </p>
+                <FormField label="Баталгаажуулах код" required error={otpError ? "e" : undefined}>
+                  <input
+                    value={otpCode}
+                    onChange={(e) => {
+                      setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 4));
+                      setOtpError(null);
+                    }}
+                    placeholder="0000"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                  />
+                </FormField>
+                {otpError && <p className="text-[.85rem] font-semibold text-red-soft mb-3">{otpError}</p>}
+                <button
+                  type="button"
+                  disabled={otpCooldown > 0 || submitting}
+                  onClick={() => sendOtp(resetPhone.trim(), "reset", resetEmail.trim())}
+                  className="inline-block py-3 -mx-1 px-1 text-[.85rem] font-bold text-blue-strong -mt-1 mb-2 disabled:opacity-50"
+                >
+                  {otpCooldown > 0 ? `Дахин илгээх (${otpCooldown}с)` : "Код дахин илгээх"}
+                </button>
+                <div className="flex gap-3.5">
+                  <button
+                    type="button"
+                    onClick={() => setResetStep(1)}
+                    className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink"
+                  >
+                    ← Буцах
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={handleVerifyResetOtp}
+                    className="flex-1 font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+                  >
+                    {submitting ? "Шалгаж байна…" : "Баталгаажуулах →"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {screen === "reset" && resetStep === 3 && (
+              <div className="mt-[18px]">
                 <FormField
                   label="Шинэ нууц үг"
                   required
@@ -677,7 +855,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 <div className="flex gap-3.5">
                   <button
                     type="button"
-                    onClick={() => setScreen("login")}
+                    onClick={() => setResetStep(2)}
                     className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink"
                   >
                     ← Буцах
@@ -803,16 +981,64 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   </button>
                   <button
                     type="button"
-                    onClick={handleContinueToPassword}
-                    className="flex-1 font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5"
+                    disabled={submitting}
+                    onClick={handleContinueToOtp}
+                    className="flex-1 font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
                   >
-                    Үргэлжлүүлэх →
+                    {submitting ? "Илгээж байна…" : "Үргэлжлүүлэх →"}
                   </button>
                 </div>
               </div>
             )}
 
             {screen === "register" && registerStep === 3 && (
+              <div>
+                <p className="font-semibold text-ink-2 mb-4">
+                  {fields.phone} дугаарт илгээсэн 4 оронтой кодыг оруулна уу.
+                </p>
+                <FormField label="Баталгаажуулах код" required error={otpError ? "e" : undefined}>
+                  <input
+                    value={otpCode}
+                    onChange={(e) => {
+                      setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 4));
+                      setOtpError(null);
+                    }}
+                    placeholder="0000"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                  />
+                </FormField>
+                {otpError && <p className="text-[.85rem] font-semibold text-red-soft mb-3">{otpError}</p>}
+                <button
+                  type="button"
+                  disabled={otpCooldown > 0 || submitting}
+                  onClick={() => sendOtp(fields.phone, "register")}
+                  className="inline-block py-3 -mx-1 px-1 text-[.85rem] font-bold text-blue-strong -mt-1 mb-2 disabled:opacity-50"
+                >
+                  {otpCooldown > 0 ? `Дахин илгээх (${otpCooldown}с)` : "Код дахин илгээх"}
+                </button>
+
+                <div className="flex gap-3.5 mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setRegisterStep(2)}
+                    className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink"
+                  >
+                    ← Буцах
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={handleVerifyRegisterOtp}
+                    className="flex-1 font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-4 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+                  >
+                    {submitting ? "Шалгаж байна…" : "Баталгаажуулах →"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {screen === "register" && registerStep === 4 && (
               <div>
                 <FormField
                   label="Нууц үг"
@@ -843,7 +1069,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 <div className="flex gap-3.5 mt-1.5">
                   <button
                     type="button"
-                    onClick={() => setRegisterStep(2)}
+                    onClick={() => setRegisterStep(3)}
                     className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink"
                   >
                     ← Буцах

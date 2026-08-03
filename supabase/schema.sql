@@ -111,6 +111,25 @@ create table if not exists rate_limits (
   window_start timestamptz not null default now()
 );
 
+-- SMS OTP codes for phone verification during registration and password
+-- reset (see src/lib/otp.ts). code_hash/code_salt mirror users'
+-- password_hash/password_salt — the code is never stored in the clear.
+-- verified_at marks a code as having been correctly entered; the register/
+-- reset-password routes then consume it (setting consumed_at) so it can't
+-- be replayed. Resend/attempt throttling lives in `rate_limits`, not here.
+create table if not exists otp_codes (
+  id uuid primary key default gen_random_uuid(),
+  phone text not null,
+  purpose text not null check (purpose in ('register', 'reset')),
+  code_hash text not null,
+  code_salt text not null,
+  expires_at timestamptz not null,
+  verified_at timestamptz,
+  consumed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists otp_codes_phone_purpose_idx on otp_codes (phone, purpose, created_at desc);
+
 -- Pageviews for the admin analytics tab (see src/components/Analytics.tsx).
 -- visitor_id is a random id in a first-party cookie, not tied to any
 -- account — it exists only to tell "1 visitor, 3 pages" from "3 visitors,
