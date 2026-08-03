@@ -76,8 +76,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true, assessment, paid: false, qrImage: start.qrImage, shortUrl: start.shortUrl });
   } catch (err) {
     console.error("assessment payment failed", id, err);
+    // TEMP DEBUG — remove before merging: surface the raw error to diagnose
+    // the live QPay credential rollout.
     return NextResponse.json(
-      { ok: false, error: "Төлбөрийн систем рүү холбогдоход алдаа гарлаа. Дахин оролдоно уу." },
+      {
+        ok: false,
+        error: "Төлбөрийн систем рүү холбогдоход алдаа гарлаа. Дахин оролдоно уу.",
+        debug: err instanceof Error ? err.message : String(err),
+      },
       { status: 502 }
     );
   }
