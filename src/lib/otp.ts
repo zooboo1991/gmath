@@ -52,7 +52,9 @@ export async function requestOtp(phone: string, purpose: OtpPurpose): Promise<Ot
     });
   if (error) throw error;
 
-  await sendSms(phone, `GMATH.MN: Баталгаажуулах код: ${code}. 5 минутын дараа хүчингүй болно.`);
+  // Latin transliteration, not Cyrillic — confirmed live that Skytel's
+  // Web2SMS gateway garbles Cyrillic text into unreadable characters.
+  await sendSms(phone, `Ganbat bagshiin surgaltiin 1 udaagiin nuuts ug: ${code}`);
   return { ok: true };
 }
 
