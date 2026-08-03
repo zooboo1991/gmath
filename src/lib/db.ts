@@ -302,6 +302,30 @@ function certificateFromRow(row: CertificateRow): Certificate {
   };
 }
 
+/**
+ * Distinct school names previously entered by other users, starting with
+ * `query` — powers the school-name autocomplete on registration/profile
+ * forms so a parent typing "1" sees "1-р сургууль", "11-р сургууль", etc.
+ * from what's already been typed rather than everyone spelling the same
+ * school a slightly different way.
+ */
+export async function listSchoolSuggestions(query: string): Promise<string[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  // Escape LIKE wildcards a user might type literally, so e.g. "50%" doesn't
+  // become a wildcard match against every school.
+  const escaped = trimmed.replace(/[%_]/g, (c) => `\\${c}`);
+  const { data, error } = await getSupabase()
+    .from("users")
+    .select("school")
+    .ilike("school", `${escaped}%`)
+    .not("school", "eq", "")
+    .limit(50);
+  if (error) throw error;
+  const distinct = [...new Set((data as { school: string }[]).map((r) => r.school.trim()))];
+  return distinct.sort((a, b) => a.localeCompare(b, "mn")).slice(0, 8);
+}
+
 export async function findUserByPhone(phone: string): Promise<User | undefined> {
   const { data, error } = await getSupabase().from("users").select("*").eq("phone", phone).maybeSingle();
   if (error) throw error;

@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import FormField from "@/components/FormField";
+import SchoolAutocomplete from "@/components/SchoolAutocomplete";
 import type { Certificate, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import {
   IconCheckCircle,
@@ -17,6 +18,7 @@ import {
   IconDocument,
 } from "@/components/icons";
 import { compareByStartDate, formatCourseDate } from "@/lib/courseDate";
+import { DISTRICTS_BY_PROVINCE, PROVINCES, type Province } from "@/lib/mongoliaRegions";
 import {
   COURSE_CATEGORIES,
   extractCourseCategories,
@@ -645,10 +647,34 @@ function EditProfileModal({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
           <FormField label="Аймаг/Хот" required error={errors.province ? "e" : undefined}>
-            <input value={fields.province} onChange={(e) => setField("province", e.target.value)} placeholder="Жишээ: Улаанбаатар" />
+            <select
+              value={fields.province}
+              onChange={(e) => {
+                setField("province", e.target.value);
+                setField("district", "");
+              }}
+            >
+              <option value="">Сонгоно уу</option>
+              {PROVINCES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
           </FormField>
           <FormField label="Сум/Дүүрэг" required error={errors.district ? "e" : undefined}>
-            <input value={fields.district} onChange={(e) => setField("district", e.target.value)} placeholder="Жишээ: Баянзүрх" />
+            <select
+              value={fields.district}
+              onChange={(e) => setField("district", e.target.value)}
+              disabled={!fields.province}
+            >
+              <option value="">{fields.province ? "Сонгоно уу" : "Эхлээд аймаг/хотоо сонгоно уу"}</option>
+              {(DISTRICTS_BY_PROVINCE[fields.province as Province] ?? []).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
           </FormField>
         </div>
         <FormField
@@ -656,7 +682,7 @@ function EditProfileModal({
           required
           error={errors.school ? "e" : undefined}
         >
-          <input value={fields.school} onChange={(e) => setField("school", e.target.value)} />
+          <SchoolAutocomplete value={fields.school} onChange={(v) => setField("school", v)} />
         </FormField>
         {user.role === "student" && (
           <FormField label="Анги" required error={errors.grade ? "e" : undefined}>
