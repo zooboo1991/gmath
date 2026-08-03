@@ -15,7 +15,7 @@ import {
 
 type Role = "teacher" | "student";
 type PayMethod = "qpay" | "bank";
-type Screen = "login" | "register" | "reset" | "payment" | "success";
+type Screen = "login" | "register" | "reset" | "payment" | "qpay-wait" | "success";
 
 type Program = { id: string; label: string; price: string };
 
@@ -158,6 +158,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [registrationStatus, setRegistrationStatus] = useState<"active" | "pending" | null>(null);
   const [facebookGroup, setFacebookGroup] = useState<string | null>(null);
+  const [qpayQr, setQpayQr] = useState<{ registrationId: string; qrImage: string; shortUrl: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/account/me")
@@ -195,6 +196,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     setSubmitError(null);
     setRegistrationStatus(null);
     setFacebookGroup(null);
+    setQpayQr(null);
   };
 
   const open = (p: Program) => {
@@ -369,17 +371,82 @@ export default function ProgramRegisterProvider({ children }: { children: React.
         setSubmitError(json.error ?? "Илгээхэд алдаа гарлаа. Дахин оролдоно уу.");
         return;
       }
-      setRegistrationStatus(json.registration.status);
-      setFacebookGroup(json.facebookGroup ?? null);
-      // So the course page they came from now offers to open it.
-      setEnrolledProgramIds((ids) => new Set(ids).add(program.id));
-      setScreen("success");
+      if (json.paid) {
+        setRegistrationStatus(json.registration.status);
+        setFacebookGroup(json.facebookGroup ?? null);
+        // So the course page they came from now offers to open it.
+        setEnrolledProgramIds((ids) => new Set(ids).add(program.id));
+        setScreen("success");
+        return;
+      }
+      // QPay invoice created but not yet paid — show the real QR and start
+      // checking for it.
+      setQpayQr({ registrationId: json.registration.id, qrImage: json.qrImage, shortUrl: json.shortUrl });
+      setScreen("qpay-wait");
     } catch {
       setSubmitError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
       setSubmitting(false);
     }
   };
+
+  const checkQpayPayment = async () => {
+    if (!qpayQr || !program) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch(`/api/enroll/${qpayQr.registrationId}/check`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        setSubmitError(json.error ?? "Шалгахад алдаа гарлаа");
+        return;
+      }
+      if (json.paid) {
+        setRegistrationStatus(json.registration.status);
+        setFacebookGroup(null);
+        setEnrolledProgramIds((ids) => new Set(ids).add(program.id));
+        setScreen("success");
+      } else {
+        setSubmitError("Төлбөр хараахан хийгдээгүй байна. Төлөөд дахин шалгана уу.");
+      }
+    } catch {
+      setSubmitError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Light client-side polling while the QR is on screen, so most students
+  // never have to press "Шалгах" themselves. Not the server-side cron QPay's
+  // docs warn against — bounded, only runs while this exact screen is open.
+  useEffect(() => {
+    if (screen !== "qpay-wait" || !qpayQr || !program) return;
+    let cancelled = false;
+    let attempts = 0;
+    const timer = setInterval(async () => {
+      attempts += 1;
+      if (attempts > 45) {
+        clearInterval(timer);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/enroll/${qpayQr.registrationId}/check`, { method: "POST" });
+        const json = await res.json();
+        if (cancelled || !res.ok || !json.paid) return;
+        clearInterval(timer);
+        setRegistrationStatus(json.registration.status);
+        setFacebookGroup(null);
+        setEnrolledProgramIds((ids) => new Set(ids).add(program.id));
+        setScreen("success");
+      } catch {
+        // Retried on the next tick.
+      }
+    }, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [screen, qpayQr, program]);
 
   const stepIndex = registerStep;
 
@@ -442,7 +509,9 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     ? "Нэвтрэх"
                     : screen === "reset"
                       ? "Нууц үг сэргээх"
-                      : "Бүртгүүлэх"}
+                      : screen === "qpay-wait"
+                        ? "Төлбөр хүлээгдэж байна"
+                        : "Бүртгүүлэх"}
               </h3>
               <button
                 type="button"
@@ -454,7 +523,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
               </button>
             </div>
 
-            {program && screen !== "success" && screen !== "payment" && (
+            {program && screen !== "success" && screen !== "payment" && screen !== "qpay-wait" && (
               <p className="text-[.85rem] font-semibold text-ink-3 mb-2">
                 {program.label} · {program.price}
               </p>
@@ -795,10 +864,9 @@ export default function ProgramRegisterProvider({ children }: { children: React.
 
                 {payMethod === "qpay" && (
                   <div className="mt-[18px] text-center bg-bg-soft rounded-md px-6 py-6">
-                    <div className="w-[160px] h-[160px] bg-surface border-[1.5px] border-dashed border-line-2 rounded-sm grid place-items-center mx-auto mb-3.5 text-ink-3 text-[.8rem] font-bold">
-                      QR код
-                    </div>
-                    <p className="font-bold text-ink-2">{program?.price} дүнг банкны апп-аараа уншуулж төлнө үү.</p>
+                    <p className="font-bold text-ink-2">
+                      Үргэлжлүүлэхэд {program?.price} дүнтэй QPay QR код гарч ирнэ.
+                    </p>
                   </div>
                 )}
                 {payMethod === "bank" && (
@@ -827,7 +895,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                       onClick={() => confirmPayment("qpay")}
                       className="w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50"
                     >
-                      {submitting ? "Шалгаж байна…" : "Төлбөр шалгах →"}
+                      {submitting ? "Түр хүлээнэ үү…" : "Үргэлжлүүлэх →"}
                     </button>
                   ) : (
                     <button
@@ -839,6 +907,48 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                       Төлбөр төлсөн →
                     </button>
                   )}
+                </div>
+              </div>
+            )}
+
+            {screen === "qpay-wait" && qpayQr && (
+              <div className="text-center">
+                <p className="text-ink-2 font-medium mb-4">
+                  {program?.price} дүнгээ доорх QR-ийг банкны апп-аараа уншуулж төлнө үү.
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`data:image/png;base64,${qpayQr.qrImage}`}
+                  alt="QPay QR код"
+                  className="w-[220px] h-[220px] mx-auto rounded-sm border border-line"
+                />
+                {qpayQr.shortUrl && (
+                  <a
+                    href={qpayQr.shortUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block mt-3 text-[.9rem] font-bold text-blue-strong"
+                  >
+                    Эсвэл богино холбоосоор нээх →
+                  </a>
+                )}
+                {submitError && <p className="text-[.85rem] font-semibold text-red-soft mt-3">{submitError}</p>}
+                <div className="flex gap-3.5 mt-5">
+                  <button
+                    type="button"
+                    onClick={() => setScreen("payment")}
+                    className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink"
+                  >
+                    ← Буцах
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={checkQpayPayment}
+                    className="flex-1 font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+                  >
+                    {submitting ? "Шалгаж байна…" : "Төлбөр шалгах →"}
+                  </button>
                 </div>
               </div>
             )}

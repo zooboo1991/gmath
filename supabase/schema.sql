@@ -83,6 +83,15 @@ create index if not exists registrations_user_id_idx on registrations(user_id);
 -- program (double-click, retried request, two tabs racing, etc).
 create unique index if not exists registrations_user_program_unique on registrations(user_id, program_id);
 
+-- QPay invoice bookkeeping for a still-pending registration: the invoice has
+-- to be re-checkable (from the callback or a client poll) and resumable
+-- (the QR/short link shown again on a refresh) before it settles. Null for
+-- bank transfers and for the dev-only stub provider.
+alter table registrations add column if not exists qpay_invoice_id text;
+alter table registrations add column if not exists qpay_payment_id text;
+alter table registrations add column if not exists qpay_qr_image text;
+alter table registrations add column if not exists qpay_short_url text;
+
 create table if not exists articles (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -255,6 +264,12 @@ create table if not exists assessments (
 );
 create index if not exists assessments_user_idx on assessments (user_id, created_at desc);
 create index if not exists assessments_status_idx on assessments (status);
+
+-- Mirrors the registrations columns above, for the same reason: a QPay
+-- invoice has to be resumable and re-checkable before it settles.
+alter table assessments add column if not exists payment_invoice_id text;
+alter table assessments add column if not exists payment_qr_image text;
+alter table assessments add column if not exists payment_short_url text;
 
 create table if not exists questionnaire_answers (
   id uuid primary key default gen_random_uuid(),

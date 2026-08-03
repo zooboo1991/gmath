@@ -8,7 +8,7 @@ import FormField from "@/components/FormField";
 import { useProgramRegister } from "@/components/program/ProgramRegister";
 import type { Assessment, PublicProblem } from "@/lib/assessment/types";
 
-type Step = "loading" | "payment" | "questionnaire" | "problems" | "submitted";
+type Step = "loading" | "payment" | "qpay-wait" | "questionnaire" | "problems" | "submitted";
 
 const CARD = "bg-surface border border-line rounded-lg shadow-sm px-[26px] py-[26px]";
 
@@ -21,6 +21,7 @@ export default function AssessmentFlow() {
   const [fee, setFee] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [qpayQr, setQpayQr] = useState<{ qrImage: string; shortUrl: string } | null>(null);
 
   // Problem-picking state
   const [problem, setProblem] = useState<PublicProblem | null>(null);
@@ -101,13 +102,76 @@ export default function AssessmentFlow() {
         return;
       }
       setAssessment(paid.assessment);
-      setStep("questionnaire");
+      if (paid.paid) {
+        setStep("questionnaire");
+      } else {
+        setQpayQr({ qrImage: paid.qrImage, shortUrl: paid.shortUrl });
+        setStep("qpay-wait");
+      }
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
       setBusy(false);
     }
   };
+
+  const checkAssessmentPayment = useCallback(async () => {
+    if (!assessment) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/assessment/${assessment.id}/pay/check`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Алдаа гарлаа");
+        return false;
+      }
+      setAssessment(json.assessment);
+      if (json.paid) {
+        setStep("questionnaire");
+        return true;
+      }
+      return false;
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [assessment]);
+
+  // Light client-side polling while the QR is on screen, so most students
+  // never have to press "Шалгах" themselves. This is not the server-side
+  // cron QPay's docs warn against — it's bounded, only runs while this exact
+  // screen is open, and stops the moment it is not.
+  useEffect(() => {
+    if (step !== "qpay-wait" || !assessment) return;
+    let cancelled = false;
+    let attempts = 0;
+    const timer = setInterval(async () => {
+      attempts += 1;
+      if (attempts > 45) {
+        clearInterval(timer);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/assessment/${assessment.id}/pay/check`, { method: "POST" });
+        const json = await res.json();
+        if (cancelled || !res.ok) return;
+        if (json.paid) {
+          clearInterval(timer);
+          setAssessment(json.assessment);
+          setStep("questionnaire");
+        }
+      } catch {
+        // Retried on the next tick.
+      }
+    }, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [step, assessment]);
 
   const answer = async (action: "too_easy" | "dont_know" | "solving") => {
     if (!assessment || !problem) return;
@@ -174,6 +238,16 @@ export default function AssessmentFlow() {
 
       {step === "payment" && <PaymentStep fee={fee} busy={busy} onPay={pay} />}
 
+      {step === "qpay-wait" && qpayQr && (
+        <QpayWaitStep
+          fee={fee}
+          qrImage={qpayQr.qrImage}
+          shortUrl={qpayQr.shortUrl}
+          busy={busy}
+          onCheck={checkAssessmentPayment}
+        />
+      )}
+
       {step === "questionnaire" && assessment && (
         <QuestionnaireStep
           assessmentId={assessment.id}
@@ -233,6 +307,56 @@ function PaymentStep({ fee, busy, onPay }: { fee: string; busy: boolean; onPay: 
           {busy ? "Түр хүлээнэ үү…" : "Төлбөр төлөх →"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function QpayWaitStep({
+  fee,
+  qrImage,
+  shortUrl,
+  busy,
+  onCheck,
+}: {
+  fee: string;
+  qrImage: string;
+  shortUrl: string;
+  busy: boolean;
+  onCheck: () => void;
+}) {
+  return (
+    <div className={`${CARD} text-center`}>
+      <h2 className="text-[1.3rem] font-extrabold">QPay-ээр төлөх</h2>
+      <p className="text-ink-2 font-medium mt-2.5">
+        {fee} дүнгээ доорх QR-ийг банкны апп-аараа уншуулж төлнө үү.
+      </p>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`data:image/png;base64,${qrImage}`}
+        alt="QPay QR код"
+        className="w-[220px] h-[220px] mx-auto rounded-sm border border-line mt-5"
+      />
+      {shortUrl && (
+        <a
+          href={shortUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-block mt-3 text-[.9rem] font-bold text-blue-strong"
+        >
+          Эсвэл богино холбоосоор нээх →
+        </a>
+      )}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onCheck}
+        className="w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 mt-6 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50"
+      >
+        {busy ? "Шалгаж байна…" : "Төлбөр шалгах →"}
+      </button>
+      <p className="text-ink-3 font-medium text-[.82rem] mt-3">
+        Төлбөр төлөгдмөгц энэ хуудас автоматаар үргэлжилнэ.
+      </p>
     </div>
   );
 }

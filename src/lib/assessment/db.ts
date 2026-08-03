@@ -1,3 +1,4 @@
+import { getPaymentProvider } from "../payment";
 import { getSupabase } from "../supabase";
 import { publicUserFromJoin, type PublicUser } from "../db";
 import { DEFAULT_ASSESSMENT_FEE, MAX_PROBLEMS_SHOWN, PROBLEMS_TO_SOLVE } from "./config";
@@ -63,6 +64,9 @@ type AssessmentRow = {
   graded_sheet_path: string | null;
   payment_provider: string;
   payment_ref: string | null;
+  payment_invoice_id: string | null;
+  payment_qr_image: string | null;
+  payment_short_url: string | null;
   amount: string | null;
   paid_at: string | null;
   created_at: string;
@@ -137,6 +141,9 @@ function assessmentFromRow(row: AssessmentRow): Assessment {
     gradedSheetPath: row.graded_sheet_path ?? undefined,
     paymentProvider: row.payment_provider,
     paymentRef: row.payment_ref ?? undefined,
+    paymentInvoiceId: row.payment_invoice_id ?? undefined,
+    paymentQrImage: row.payment_qr_image ?? undefined,
+    paymentShortUrl: row.payment_short_url ?? undefined,
     amount: row.amount ?? undefined,
     paidAt: row.paid_at ?? undefined,
     createdAt: row.created_at,
@@ -363,6 +370,26 @@ export async function updateAssessment(
     .maybeSingle();
   if (error) throw error;
   return data ? assessmentFromRow(data as AssessmentRow) : undefined;
+}
+
+/**
+ * Re-checks a still-awaiting-payment assessment's QPay invoice and marks it
+ * paid if QPay confirms it settled. Safe to call repeatedly — from the
+ * callback, a client poll, or a manual "Шалгах" click — since a payment that
+ * isn't actually paid yet is just a no-op that returns the assessment as-is.
+ */
+export async function settleAssessmentPayment(id: string): Promise<Assessment | undefined> {
+  const assessment = await findAssessment(id);
+  if (!assessment || assessment.status !== "awaiting_payment" || !assessment.paymentInvoiceId) {
+    return assessment;
+  }
+  const result = await getPaymentProvider().checkPayment(assessment.paymentInvoiceId);
+  if (!result.paid) return assessment;
+  return updateAssessment(id, {
+    status: "paid",
+    payment_ref: result.reference,
+    paid_at: result.paidAt,
+  });
 }
 
 /**

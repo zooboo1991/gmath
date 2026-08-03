@@ -1,3 +1,4 @@
+import { getPaymentProvider } from "./payment";
 import { getSupabase } from "./supabase";
 import { hashPassword, verifyPassword as verifyPasswordHash } from "./password";
 import { parsePriceToNumber } from "./price";
@@ -116,6 +117,11 @@ export type Registration = {
   payMethod: PayMethod;
   status: RegistrationStatus;
   createdAt: string;
+  /** Set once a QPay invoice exists for this registration; undefined for bank transfers and the stub provider. */
+  qpayInvoiceId?: string;
+  qpayPaymentId?: string;
+  qpayQrImage?: string;
+  qpayShortUrl?: string;
 };
 
 /**
@@ -193,6 +199,10 @@ type RegistrationRow = {
   pay_method: PayMethod;
   status: RegistrationStatus;
   created_at: string;
+  qpay_invoice_id: string | null;
+  qpay_payment_id: string | null;
+  qpay_qr_image: string | null;
+  qpay_short_url: string | null;
 };
 
 type CertificateRow = {
@@ -271,6 +281,10 @@ function registrationFromRow(row: RegistrationRow): Registration {
     payMethod: row.pay_method,
     status: row.status,
     createdAt: row.created_at,
+    qpayInvoiceId: row.qpay_invoice_id ?? undefined,
+    qpayPaymentId: row.qpay_payment_id ?? undefined,
+    qpayQrImage: row.qpay_qr_image ?? undefined,
+    qpayShortUrl: row.qpay_short_url ?? undefined,
   };
 }
 
@@ -694,6 +708,64 @@ export async function addRegistration(input: Omit<Registration, "id" | "createdA
     .single();
   if (error) throw error;
   return registrationFromRow(data as RegistrationRow);
+}
+
+export async function findRegistrationById(id: string): Promise<Registration | undefined> {
+  const { data, error } = await getSupabase().from("registrations").select("*").eq("id", id).maybeSingle();
+  if (error) {
+    if (isInvalidUuidError(error)) return undefined;
+    throw error;
+  }
+  return data ? registrationFromRow(data as RegistrationRow) : undefined;
+}
+
+/** Used to resume a QPay checkout the student closed before paying, instead of bouncing off the (user_id, program_id) unique index. */
+export async function findRegistrationByUserAndProgram(
+  userId: string,
+  programId: string
+): Promise<Registration | undefined> {
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("program_id", programId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? registrationFromRow(data as RegistrationRow) : undefined;
+}
+
+export async function updateRegistration(
+  id: string,
+  patch: Record<string, unknown>
+): Promise<Registration | undefined> {
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data ? registrationFromRow(data as RegistrationRow) : undefined;
+}
+
+/**
+ * Re-checks a still-pending QPay registration and marks it active if QPay
+ * confirms it settled. Safe to call repeatedly — from the callback, a
+ * client poll, or a manual "Шалгах" click.
+ */
+export async function settleRegistrationPayment(id: string): Promise<Registration | undefined> {
+  const registration = await findRegistrationById(id);
+  if (
+    !registration ||
+    registration.status !== "pending" ||
+    registration.payMethod !== "qpay" ||
+    !registration.qpayInvoiceId
+  ) {
+    return registration;
+  }
+  const result = await getPaymentProvider().checkPayment(registration.qpayInvoiceId);
+  if (!result.paid) return registration;
+  return updateRegistration(id, { status: "active", qpay_payment_id: result.reference });
 }
 
 /**

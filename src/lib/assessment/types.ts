@@ -66,6 +66,10 @@ export type Assessment = {
   gradedSheetPath?: string;
   paymentProvider: string;
   paymentRef?: string;
+  /** Set once a QPay invoice exists for this assessment; undefined for the stub provider. */
+  paymentInvoiceId?: string;
+  paymentQrImage?: string;
+  paymentShortUrl?: string;
   amount?: string;
   paidAt?: string;
   createdAt: string;
