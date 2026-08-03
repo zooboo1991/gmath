@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import type { AnalyticsStats, Article, Certificate, Course, DashboardStats, PublicUser, Registration } from "@/lib/db";
-import { IconCheckCircle, IconClock } from "@/components/icons";
+import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
 import { formatCourseDate } from "@/lib/courseDate";
 import { formatMnt } from "@/lib/price";
 
@@ -64,6 +64,30 @@ export default function AdminDashboard({
         setRegistrations((rs) => rs.map((r) => (r.id === id ? { ...r, status: "active" } : r)));
       }
       void json;
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // For a QPay checkout the student abandoned, or one that simply never got
+  // paid — clears it out of the queue instead of leaving it stuck forever,
+  // and voids the QPay invoice so a stale QR can't move money later against
+  // a registration that no longer exists on our side.
+  const cancelRegistration = async (id: string) => {
+    if (!confirm("Энэ бүртгэлийг цуцлах уу? QPay-ийн нэхэмжлэл хүчингүй болж, бүртгэл устана.")) return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/admin/registrations/${id}/cancel`, { method: "POST" });
+      const json = await res.json();
+      if (res.ok) {
+        setRegistrations((rs) => rs.filter((r) => r.id !== id));
+      } else if (json.paid) {
+        // Lost the race with the student's own payment — reflect reality
+        // instead of leaving a stale "pending" row in view.
+        setRegistrations((rs) => rs.map((r) => (r.id === id ? { ...r, status: "active" } : r)));
+      } else {
+        alert(json.error ?? "Цуцлахад алдаа гарлаа");
+      }
     } finally {
       setBusyId(null);
     }
@@ -212,14 +236,24 @@ export default function AdminDashboard({
                     <IconCheckCircle className="w-3.5 h-3.5" /> Идэвхтэй
                   </span>
                 ) : (
-                  <button
-                    type="button"
-                    disabled={busyId === r.id}
-                    onClick={() => approve(r.id)}
-                    className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-white bg-gold-strong px-4 py-2 rounded-full disabled:opacity-50"
-                  >
-                    <IconClock className="w-3.5 h-3.5" /> {busyId === r.id ? "…" : "Баталгаажуулах"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => cancelRegistration(r.id)}
+                      className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-ink-2 bg-bg-soft px-4 py-2 rounded-full disabled:opacity-50"
+                    >
+                      <IconClose className="w-3.5 h-3.5" /> Цуцлах
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => approve(r.id)}
+                      className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-white bg-gold-strong px-4 py-2 rounded-full disabled:opacity-50"
+                    >
+                      <IconClock className="w-3.5 h-3.5" /> {busyId === r.id ? "…" : "Баталгаажуулах"}
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
