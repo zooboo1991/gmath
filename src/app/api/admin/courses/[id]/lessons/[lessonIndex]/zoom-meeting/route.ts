@@ -1,8 +1,28 @@
 import { NextResponse } from "next/server";
 import { findCourseById } from "@/lib/db";
+import { parseScheduleString } from "@/lib/lessonSchedule";
 import { isAdmin } from "@/lib/session";
 import { createMeeting } from "@/lib/zoom/client";
 import { createLessonMeeting, findLessonMeeting } from "@/lib/zoom/db";
+
+const DEFAULT_DURATION_MINUTES = 60;
+
+/** Zoom's start_time, paired with a separate timezone field, wants a plain local datetime with no offset/Z. */
+function zoomSchedule(scheduleString: string | undefined): { startTime: string; durationMinutes: number } | undefined {
+  if (!scheduleString) return undefined;
+  const { date, startTime, endTime } = parseScheduleString(scheduleString);
+  if (!date || !startTime) return undefined;
+
+  let durationMinutes = DEFAULT_DURATION_MINUTES;
+  if (endTime) {
+    const [sh, sm] = startTime.split(":").map(Number);
+    const [eh, em] = endTime.split(":").map(Number);
+    const diff = eh * 60 + em - (sh * 60 + sm);
+    if (diff > 0) durationMinutes = diff;
+  }
+
+  return { startTime: `${date}T${startTime}:00`, durationMinutes };
+}
 
 export async function POST(
   _req: Request,
@@ -29,7 +49,7 @@ export async function POST(
   }
 
   try {
-    const zoomMeeting = await createMeeting(`${course.title} — ${lesson.topic}`);
+    const zoomMeeting = await createMeeting(`${course.title} — ${lesson.topic}`, zoomSchedule(lesson.schedule));
     const meeting = await createLessonMeeting({
       courseId,
       lessonIndex,

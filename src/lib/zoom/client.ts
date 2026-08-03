@@ -82,13 +82,25 @@ export type ZoomMeeting = {
  * with a friend would otherwise let both sit in the meeting at once under
  * the same registrant — with it off, the second device joining kicks the
  * first, so at most one connection per registrant at any moment.
+ *
+ * schedule is optional (not every lesson has a parseable date/time yet) —
+ * omitting it just leaves Zoom's own default (effectively "now") on the
+ * meeting's calendar-facing start_time. join_before_host still lets
+ * students in whenever regardless, so a missing schedule never blocks
+ * joining — it only means Zoom's own dashboard shows the wrong date.
  */
-export async function createMeeting(topic: string): Promise<ZoomMeeting> {
+export async function createMeeting(
+  topic: string,
+  schedule?: { startTime: string; durationMinutes: number }
+): Promise<ZoomMeeting> {
   const res = await zoomFetch("/users/me/meetings", {
     method: "POST",
     body: JSON.stringify({
       topic,
       type: 2,
+      ...(schedule
+        ? { start_time: schedule.startTime, duration: schedule.durationMinutes, timezone: "Asia/Ulaanbaatar" }
+        : {}),
       settings: {
         approval_type: 0,
         registration_type: 1,
