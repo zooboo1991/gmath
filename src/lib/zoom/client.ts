@@ -78,6 +78,10 @@ export type ZoomMeeting = {
  * A scheduled meeting with registration turned on and auto-approval, so a
  * student registering gets a working personal join_url back immediately —
  * no one has to click "approve" in the Zoom dashboard for class to start.
+ * allow_multiple_devices is explicitly off: sharing a personal join_url
+ * with a friend would otherwise let both sit in the meeting at once under
+ * the same registrant — with it off, the second device joining kicks the
+ * first, so at most one connection per registrant at any moment.
  */
 export async function createMeeting(topic: string): Promise<ZoomMeeting> {
   const res = await zoomFetch("/users/me/meetings", {
@@ -91,6 +95,7 @@ export async function createMeeting(topic: string): Promise<ZoomMeeting> {
         join_before_host: true,
         waiting_room: false,
         registrants_email_notification: false,
+        allow_multiple_devices: false,
       },
     }),
   });
