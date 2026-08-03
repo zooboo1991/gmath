@@ -6,6 +6,7 @@ import {
   settleRegistrationPayment,
   updateRegistration,
 } from "@/lib/db";
+import { extractCourseCategories, getCourseAudience } from "@/lib/courseTag";
 import { getPaymentProvider, stubPaymentsEnabled } from "@/lib/payment";
 import { parsePriceToNumber } from "@/lib/price";
 import { getSessionUser } from "@/lib/session";
@@ -35,11 +36,16 @@ export async function POST(request: Request) {
   let programLabel: string;
   let price: string;
   let facebookGroup: string | undefined;
+  // Category/audience for the QPay description below — real courses carry a
+  // proper tag; the static yearly programs' label already reads "(C
+  // ангилал)" etc., which extractCourseCategories can parse just as well.
+  let courseTag: string;
 
   const staticProgram = staticProgramById[programId];
   if (staticProgram) {
     programLabel = staticProgram.label;
     price = staticProgram.price;
+    courseTag = staticProgram.label;
   } else if (UUID_RE.test(programId)) {
     const course = await findCourseById(programId);
     if (!course) {
@@ -48,6 +54,7 @@ export async function POST(request: Request) {
     programLabel = `${course.title} (${course.tag})`;
     price = course.price;
     facebookGroup = course.facebookGroup;
+    courseTag = course.tag;
   } else {
     return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
   }
@@ -135,9 +142,17 @@ export async function POST(request: Request) {
       });
     }
 
+    // Phone first so a payment can be matched back to a student later just
+    // by reading the description on the QPay/bank side — name alone isn't
+    // reliably unique.
+    const categories = extractCourseCategories(courseTag);
+    const categoryLabel = categories.length > 0 ? categories.join(",") : "-";
+    const audienceLabel = getCourseAudience(courseTag) === "teacher" ? "Багш" : "Сурагч";
+    const description = `${user.phone} ${categoryLabel} ${audienceLabel}`;
+
     const start = await provider.createPayment({
       amountMnt: parsePriceToNumber(price),
-      description: programLabel,
+      description,
       // QPay caps sender_invoice_no at 45 chars — see the matching comment in
       // assessment/[id]/pay/route.ts.
       senderInvoiceNo: `gm-c-${registration.id.replace(/-/g, "")}`,

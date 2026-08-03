@@ -104,6 +104,23 @@ export async function createInvoice(input: {
   return { invoiceId: json.invoice_id, qrImage: json.qr_image, shortUrl: json.qPay_shortUrl };
 }
 
+/**
+ * Voids an invoice a student abandoned so its QR/short link can no longer be
+ * paid — otherwise a stale QR scanned later would move real money against a
+ * registration/assessment our side has already deleted. A 404 (already
+ * gone) and QPay's own INVOICE_ALREADY_CANCELED are both treated as
+ * success; anything else — most importantly INVOICE_PAID — is left for the
+ * caller to handle, since that means the student paid after all and the
+ * invoice must not be torn down.
+ */
+export async function cancelInvoice(invoiceId: string): Promise<void> {
+  const res = await authedFetch(`/v2/invoice/${invoiceId}`, { method: "DELETE" });
+  if (res.ok || res.status === 404) return;
+  const detail = await errorDetail(res);
+  if (detail.includes("INVOICE_ALREADY_CANCELED")) return;
+  throw new Error(`QPay нэхэмжлэл цуцлахад алдаа гарлаа: ${res.status} ${detail}`);
+}
+
 export type QPayPaymentRow = {
   paymentId: string;
   status: string;

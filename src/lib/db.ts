@@ -768,6 +768,12 @@ export async function settleRegistrationPayment(id: string): Promise<Registratio
   return updateRegistration(id, { status: "active", qpay_payment_id: result.reference });
 }
 
+export async function deleteRegistration(id: string): Promise<boolean> {
+  const { error, count } = await getSupabase().from("registrations").delete({ count: "exact" }).eq("id", id);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
 /**
  * A registration plus the parts of its course a paid-up student is entitled
  * to: the Facebook group, the Zoom room, and the lesson schedule.

@@ -50,9 +50,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       });
     }
 
+    // Phone first so a payment can be matched back to a student later just
+    // by reading the description on the QPay/bank side — name alone isn't
+    // reliably unique.
+    const audienceLabel = guard.user.role === "teacher" ? "Багш" : "Сурагч";
+    const description = `${guard.user.phone} Түвшин тогтоох ${audienceLabel}`;
+
     const start = await provider.createPayment({
       amountMnt: parsePriceToNumber(guard.assessment.amount),
-      description: `Түвшин тогтоох үнэлгээ — ${guard.user.lastName} ${guard.user.firstName}`,
+      description,
       // QPay caps sender_invoice_no at 45 chars — "gmath-assessment-<uuid>" (with
       // dashes) doesn't fit, so the id's dashes are stripped instead.
       senderInvoiceNo: `gm-a-${id.replace(/-/g, "")}`,

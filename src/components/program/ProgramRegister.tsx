@@ -169,11 +169,23 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   }, []);
 
   // Signed-out visitors get a 401 here, which is fine: the empty set just
-  // means every course keeps its "бүртгүүлэх" call to action.
+  // means every course keeps its "бүртгүүлэх" call to action. Only *active*
+  // registrations count as "already enrolled" — a still-pending QPay
+  // attempt used to land here too, which turned "Бүртгүүлэх" into "Сургалт
+  // харах" for a course the student hadn't actually paid for yet, with no
+  // way back into the payment flow to finish or cancel it.
   const refreshEnrolments = () => {
     fetch("/api/account/registrations")
       .then((res) => (res.ok ? res.json() : { registrations: [] }))
-      .then((json) => setEnrolledProgramIds(new Set<string>((json.registrations ?? []).map((r: { programId: string }) => r.programId))))
+      .then((json) =>
+        setEnrolledProgramIds(
+          new Set<string>(
+            (json.registrations ?? [])
+              .filter((r: { status: string }) => r.status === "active")
+              .map((r: { programId: string }) => r.programId)
+          )
+        )
+      )
       .catch(() => setEnrolledProgramIds(new Set()));
   };
 
@@ -409,6 +421,35 @@ export default function ProgramRegisterProvider({ children }: { children: React.
       } else {
         setSubmitError("Төлбөр хараахан хийгдээгүй байна. Төлөөд дахин шалгана уу.");
       }
+    } catch {
+      setSubmitError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const cancelQpayRegistration = async () => {
+    if (!qpayQr || !program) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch(`/api/enroll/${qpayQr.registrationId}/cancel`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        if (json.paid) {
+          // Lost the race with their own payment — treat it as a success.
+          setRegistrationStatus("active");
+          setFacebookGroup(null);
+          setEnrolledProgramIds((ids) => new Set(ids).add(program.id));
+          setScreen("success");
+          return;
+        }
+        setSubmitError(json.error ?? "Цуцлахад алдаа гарлаа");
+        return;
+      }
+      setQpayQr(null);
+      setPayMethod(null);
+      setScreen("payment");
     } catch {
       setSubmitError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
@@ -836,14 +877,15 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 <div className="flex flex-col gap-3 mt-1.5">
                   <button
                     type="button"
-                    onClick={() => setPayMethod("qpay")}
-                    className={`flex items-center gap-3.5 border-[1.5px] rounded-md px-[18px] py-4 text-left transition-colors ${
-                      payMethod === "qpay" ? "border-blue bg-blue-soft" : "border-line-2"
-                    }`}
+                    disabled={submitting}
+                    onClick={() => confirmPayment("qpay")}
+                    className="flex items-center gap-3.5 border-[1.5px] border-line-2 rounded-md px-[18px] py-4 text-left transition-colors hover:border-blue disabled:opacity-50"
                   >
                     <IconQrCode className="w-[26px] h-[26px] text-blue-strong shrink-0" />
                     <div>
-                      <b className="text-[1rem] block">QPay-ээр төлөх</b>
+                      <b className="text-[1rem] block">
+                        {submitting ? "Түр хүлээнэ үү…" : "QPay-ээр төлөх"}
+                      </b>
                       <small className="block text-ink-3 font-semibold text-[.85rem]">Банкны апп-аар уншуулж шууд төлнө</small>
                     </div>
                   </button>
@@ -862,13 +904,6 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   </button>
                 </div>
 
-                {payMethod === "qpay" && (
-                  <div className="mt-[18px] text-center bg-bg-soft rounded-md px-6 py-6">
-                    <p className="font-bold text-ink-2">
-                      Үргэлжлүүлэхэд {program?.price} дүнтэй QPay QR код гарч ирнэ.
-                    </p>
-                  </div>
-                )}
                 {payMethod === "bank" && (
                   <div className="mt-[18px] bg-bg-soft rounded-md px-[22px] py-5">
                     {[
@@ -887,27 +922,18 @@ export default function ProgramRegisterProvider({ children }: { children: React.
 
                 {submitError && <p className="text-[.85rem] font-semibold text-red-soft mt-3">{submitError}</p>}
 
-                <div className="mt-[22px]">
-                  {payMethod === "qpay" ? (
+                {payMethod === "bank" && (
+                  <div className="mt-[22px]">
                     <button
                       type="button"
                       disabled={submitting}
-                      onClick={() => confirmPayment("qpay")}
-                      className="w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50"
-                    >
-                      {submitting ? "Түр хүлээнэ үү…" : "Үргэлжлүүлэх →"}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={!payMethod || submitting}
                       onClick={() => confirmPayment("bank")}
                       className="w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50 disabled:pointer-events-none"
                     >
                       Төлбөр төлсөн →
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -936,10 +962,11 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 <div className="flex gap-3.5 mt-5">
                   <button
                     type="button"
-                    onClick={() => setScreen("payment")}
-                    className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink"
+                    disabled={submitting}
+                    onClick={cancelQpayRegistration}
+                    className="btn-ring font-extrabold rounded-full bg-surface-2 text-ink-2 px-[26px] py-4 transition-colors hover:text-ink disabled:opacity-50"
                   >
-                    ← Буцах
+                    Цуцлах
                   </button>
                   <button
                     type="button"

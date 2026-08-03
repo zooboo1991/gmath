@@ -1,4 +1,4 @@
-import { checkInvoicePayment, createInvoice, qpayConfigured } from "./qpay/client";
+import { cancelInvoice, checkInvoicePayment, createInvoice, qpayConfigured } from "./qpay/client";
 
 /**
  * Shared payment abstraction for both the assessment fee and course
@@ -24,6 +24,8 @@ export interface PaymentProvider {
     callbackUrl: string;
   }): Promise<PaymentStart>;
   checkPayment(invoiceId: string): Promise<PaymentCheckResult>;
+  /** Voids a pending invoice a student abandoned. Must not be called on one that's already paid. */
+  cancelPayment(invoiceId: string): Promise<void>;
 }
 
 /**
@@ -50,6 +52,9 @@ export class StubPaymentProvider implements PaymentProvider {
   async checkPayment(): Promise<PaymentCheckResult> {
     return { paid: true, reference: `stub-${crypto.randomUUID()}`, paidAt: new Date().toISOString() };
   }
+
+  // Nothing to void — the stub never created a real invoice.
+  async cancelPayment(): Promise<void> {}
 }
 
 const SETTLED_STATUSES = new Set(["PAID"]);
@@ -86,6 +91,10 @@ export class QPayPaymentProvider implements PaymentProvider {
     // this records when *we* learned about it, which is what paidAt means
     // everywhere else it's used (audit trail, not a bank ledger).
     return { paid: true, reference: settled.paymentId, paidAt: new Date().toISOString() };
+  }
+
+  async cancelPayment(invoiceId: string): Promise<void> {
+    await cancelInvoice(invoiceId);
   }
 }
 
