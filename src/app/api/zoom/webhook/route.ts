@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { findLessonMeetingByZoomId, findRegistrantByZoomId, recordJoin, recordLeave } from "@/lib/zoom/db";
+
+type ZoomParticipant = {
+  id?: string;
+  participant_user_id?: string;
+  user_id?: string;
+  registrant_id?: string;
+  join_time?: string;
+  leave_time?: string;
+};
 
 function requiredSecretToken(): string {
   const token = process.env.ZOOM_WEBHOOK_SECRET_TOKEN;
@@ -48,9 +58,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  // TODO(attendance): meeting.participant_joined / meeting.participant_left
-  // handling lands with the lesson_attendance schema — see the assessment
-  // rollout's phased-commit pattern for how this file grows next.
-  console.log("[zoom webhook] verified event:", body.event);
+  if (body.event === "meeting.participant_joined" || body.event === "meeting.participant_left") {
+    await handleParticipantEvent(body.event, body.payload);
+  }
+
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Attributing a join/leave to a specific student only works when Zoom hands
+ * back the registrant_id — which it does exactly when the participant used
+ * their personal registration join_url (see /api/lessons/join). A host
+ * joining from the start_url, or anyone joining the meeting's shared link
+ * directly, arrives with no registrant_id and is silently skipped: there is
+ * no user_id to attribute it to, and lesson_attendance.user_id is required.
+ */
+async function handleParticipantEvent(event: string, payload: Record<string, unknown> | undefined): Promise<void> {
+  const object = payload?.object as { id?: string | number; participant?: ZoomParticipant } | undefined;
+  const meetingIdRaw = object?.id;
+  const participant = object?.participant;
+  const registrantId = participant?.registrant_id;
+
+  if (!meetingIdRaw || !registrantId) {
+    console.log("[zoom webhook] participant event without registrant_id, skipping", event);
+    return;
+  }
+
+  const meeting = await findLessonMeetingByZoomId(String(meetingIdRaw));
+  const registrant = await findRegistrantByZoomId(registrantId);
+  if (!meeting || !registrant) {
+    console.warn("[zoom webhook] no matching lesson_meeting/registrant for", { meetingIdRaw, registrantId });
+    return;
+  }
+
+  const participantUuid = participant?.id ?? participant?.participant_user_id ?? participant?.user_id;
+
+  if (event === "meeting.participant_joined") {
+    const joinedAt = participant?.join_time ? new Date(participant.join_time).toISOString() : new Date().toISOString();
+    await recordJoin({ lessonMeetingId: meeting.id, userId: registrant.userId, zoomParticipantUuid: participantUuid, joinedAt });
+  } else {
+    const leftAt = participant?.leave_time ? new Date(participant.leave_time).toISOString() : new Date().toISOString();
+    const closed = await recordLeave({ lessonMeetingId: meeting.id, userId: registrant.userId, zoomParticipantUuid: participantUuid, leftAt });
+    if (!closed) {
+      console.warn("[zoom webhook] leave event with no matching open attendance row", { meetingIdRaw, registrantId });
+    }
+  }
 }
