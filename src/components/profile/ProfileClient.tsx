@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import FormField from "@/components/FormField";
 import SchoolAutocomplete from "@/components/SchoolAutocomplete";
@@ -348,9 +348,23 @@ function useNow(): Date | null {
  * all for lessons that have not come round yet. Joining lives here rather than
  * in a separate card above, so there is one place to look.
  */
+type AttendanceSpan = { joinedAt: string; leftAt?: string };
+
 function LessonSchedule({ registration }: { registration: RegistrationWithGroup }) {
   const now = useNow();
   const lessons = registration.lessons ?? [];
+  const [attendance, setAttendance] = useState<Record<number, AttendanceSpan[]>>({});
+
+  useEffect(() => {
+    if (lessons.length === 0) return;
+    fetch(`/api/lessons/attendance?courseId=${encodeURIComponent(registration.programId)}`)
+      .then((res) => (res.ok ? res.json() : { byLessonIndex: {} }))
+      .then((json) => setAttendance(json.byLessonIndex ?? {}))
+      .catch(() => setAttendance({}));
+    // Only the course changes across a student's lifetime here, not the
+    // lesson count, so this doesn't need to depend on `lessons`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registration.programId]);
 
   if (lessons.length === 0) {
     // No schedule entered yet. If the course still has a room, keep a way in —
@@ -417,6 +431,11 @@ function LessonSchedule({ registration }: { registration: RegistrationWithGroup 
                   </span>
                   <LessonAction info={info} courseId={registration.programId} lessonIndex={i} />
                 </div>
+                {attendance[i] && attendance[i].length > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[.75rem] font-bold text-green mt-1">
+                    <IconCheckCircle className="w-3 h-3" /> Ирц бүртгэгдсэн
+                  </span>
+                )}
               </div>
             </div>
           );

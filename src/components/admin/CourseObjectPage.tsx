@@ -154,6 +154,41 @@ export default function CourseObjectPage({
     }
   };
 
+  type AttendanceRow = { lastName: string; firstName: string; phone: string; joinedAt: string; leftAt?: string };
+  const [attendanceState, setAttendanceState] = useState<
+    Record<number, { status: "loading" | "done" | "error"; rows?: AttendanceRow[] }>
+  >({});
+
+  const toggleAttendance = async (index: number) => {
+    if (attendanceState[index]) {
+      setAttendanceState((s) => {
+        const next = { ...s };
+        delete next[index];
+        return next;
+      });
+      return;
+    }
+    if (!course) return;
+    setAttendanceState((s) => ({ ...s, [index]: { status: "loading" } }));
+    try {
+      const res = await fetch(`/api/admin/courses/${course.id}/lessons/${index}/attendance`);
+      const json = await res.json();
+      if (!res.ok) {
+        setAttendanceState((s) => ({ ...s, [index]: { status: "error" } }));
+        return;
+      }
+      setAttendanceState((s) => ({ ...s, [index]: { status: "done", rows: json.attendance } }));
+    } catch {
+      setAttendanceState((s) => ({ ...s, [index]: { status: "error" } }));
+    }
+  };
+
+  const formatMinutes = (joinedAt: string, leftAt?: string) => {
+    if (!leftAt) return "одоо ч холбогдсон";
+    const mins = Math.round((new Date(leftAt).getTime() - new Date(joinedAt).getTime()) / 60000);
+    return `${mins} мин`;
+  };
+
   const save = async () => {
     if (!tag.trim() || !form.title.trim() || !form.price.trim() || !form.period.trim()) {
       setError("Заавал бөглөх талбаруудыг бөглөнө үү");
@@ -549,26 +584,67 @@ export default function CourseObjectPage({
                           />
                         </div>
                         {isEditing && (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <button
-                              type="button"
-                              disabled={zoomMeetingState[i]?.status === "loading"}
-                              onClick={() => createZoomMeeting(i)}
-                              className="text-[.78rem] font-extrabold text-blue-strong bg-blue-soft px-3 py-1.5 rounded-full disabled:opacity-50"
-                            >
-                              {zoomMeetingState[i]?.status === "loading"
-                                ? "Үүсгэж байна…"
-                                : "Ирц бүртгэх Zoom meeting үүсгэх"}
-                            </button>
-                            {zoomMeetingState[i]?.status === "done" && (
-                              <span className="text-[.78rem] font-bold text-green">
-                                ✓ Үүслээ — сурагч бүрд хувийн холбоос өгнө
-                              </span>
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                disabled={zoomMeetingState[i]?.status === "loading"}
+                                onClick={() => createZoomMeeting(i)}
+                                className="text-[.78rem] font-extrabold text-blue-strong bg-blue-soft px-3 py-1.5 rounded-full disabled:opacity-50"
+                              >
+                                {zoomMeetingState[i]?.status === "loading"
+                                  ? "Үүсгэж байна…"
+                                  : "Ирц бүртгэх Zoom meeting үүсгэх"}
+                              </button>
+                              {zoomMeetingState[i]?.status === "done" && (
+                                <span className="text-[.78rem] font-bold text-green">
+                                  ✓ Үүслээ — сурагч бүрд хувийн холбоос өгнө
+                                </span>
+                              )}
+                              {zoomMeetingState[i]?.status === "error" && (
+                                <span className="text-[.78rem] font-bold text-red-soft">
+                                  {zoomMeetingState[i]?.error ?? "Алдаа гарлаа"}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => toggleAttendance(i)}
+                                className="text-[.78rem] font-extrabold text-ink-2 bg-bg-soft px-3 py-1.5 rounded-full"
+                              >
+                                {attendanceState[i] ? "Ирц нуух" : "Ирц харах"}
+                              </button>
+                            </div>
+                            {attendanceState[i]?.status === "loading" && (
+                              <span className="text-[.78rem] font-semibold text-ink-3">Ачааллаж байна…</span>
                             )}
-                            {zoomMeetingState[i]?.status === "error" && (
-                              <span className="text-[.78rem] font-bold text-red-soft">
-                                {zoomMeetingState[i]?.error ?? "Алдаа гарлаа"}
-                              </span>
+                            {attendanceState[i]?.status === "error" && (
+                              <span className="text-[.78rem] font-bold text-red-soft">Алдаа гарлаа</span>
+                            )}
+                            {attendanceState[i]?.status === "done" && (
+                              <div className="bg-surface border border-line-2 rounded-xs px-3 py-2">
+                                {attendanceState[i]?.rows?.length === 0 ? (
+                                  <span className="text-[.78rem] font-semibold text-ink-3">
+                                    Ирц бүртгэгдээгүй байна.
+                                  </span>
+                                ) : (
+                                  <ul className="flex flex-col gap-1">
+                                    {attendanceState[i]?.rows?.map((r, ri) => (
+                                      <li key={ri} className="text-[.8rem] font-semibold flex justify-between gap-3">
+                                        <span>
+                                          {r.lastName} {r.firstName} · {r.phone}
+                                        </span>
+                                        <span className="text-ink-3 shrink-0">
+                                          {new Date(r.joinedAt).toLocaleTimeString("mn-MN", {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          })}{" "}
+                                          · {formatMinutes(r.joinedAt, r.leftAt)}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
                             )}
                           </div>
                         )}

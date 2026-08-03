@@ -71,6 +71,12 @@ export async function findLessonMeeting(courseId: string, lessonIndex: number): 
   return data ? lessonMeetingFromRow(data as LessonMeetingRow) : undefined;
 }
 
+export async function listLessonMeetingsForCourse(courseId: string): Promise<LessonMeeting[]> {
+  const { data, error } = await getSupabase().from("lesson_meetings").select("*").eq("course_id", courseId);
+  if (error) throw error;
+  return (data as LessonMeetingRow[]).map(lessonMeetingFromRow);
+}
+
 export async function findLessonMeetingByZoomId(zoomMeetingId: string): Promise<LessonMeeting | undefined> {
   const { data, error } = await getSupabase()
     .from("lesson_meetings")
@@ -268,6 +274,26 @@ export async function listAttendanceForLesson(lessonMeetingId: string): Promise<
     .order("joined_at", { ascending: true });
   if (error) throw error;
   return (data as LessonAttendanceRow[]).map(lessonAttendanceFromRow);
+}
+
+export type LessonAttendanceWithName = LessonAttendance & { lastName: string; firstName: string; phone: string };
+
+/** Admin's per-lesson attendance list — names included, since "some user_id joined" isn't useful on its own. */
+export async function listAttendanceForLessonWithNames(lessonMeetingId: string): Promise<LessonAttendanceWithName[]> {
+  const { data, error } = await getSupabase()
+    .from("lesson_attendance")
+    .select("*, users(last_name, first_name, phone)")
+    .eq("lesson_meeting_id", lessonMeetingId)
+    .order("joined_at", { ascending: true });
+  if (error) throw error;
+  return (data as (LessonAttendanceRow & { users: { last_name: string; first_name: string; phone: string } | null })[]).map(
+    (row) => ({
+      ...lessonAttendanceFromRow(row),
+      lastName: row.users?.last_name ?? "",
+      firstName: row.users?.first_name ?? "",
+      phone: row.users?.phone ?? "",
+    })
+  );
 }
 
 export async function listAttendanceForUser(
