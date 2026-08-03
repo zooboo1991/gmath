@@ -53,7 +53,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const start = await provider.createPayment({
       amountMnt: parsePriceToNumber(guard.assessment.amount),
       description: `Түвшин тогтоох үнэлгээ — ${guard.user.lastName} ${guard.user.firstName}`,
-      senderInvoiceNo: `gmath-assessment-${id}`,
+      // QPay caps sender_invoice_no at 45 chars — "gmath-assessment-<uuid>" (with
+      // dashes) doesn't fit, so the id's dashes are stripped instead.
+      senderInvoiceNo: `gm-a-${id.replace(/-/g, "")}`,
       callbackUrl: `${SITE_URL}/api/qpay/callback?type=assessment&ref=${id}`,
     });
 
@@ -76,14 +78,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true, assessment, paid: false, qrImage: start.qrImage, shortUrl: start.shortUrl });
   } catch (err) {
     console.error("assessment payment failed", id, err);
-    // TEMP DEBUG — remove before merging: surface the raw error to diagnose
-    // the live QPay credential rollout.
     return NextResponse.json(
-      {
-        ok: false,
-        error: "Төлбөрийн систем рүү холбогдоход алдаа гарлаа. Дахин оролдоно уу.",
-        debug: err instanceof Error ? err.message : String(err),
-      },
+      { ok: false, error: "Төлбөрийн систем рүү холбогдоход алдаа гарлаа. Дахин оролдоно уу." },
       { status: 502 }
     );
   }

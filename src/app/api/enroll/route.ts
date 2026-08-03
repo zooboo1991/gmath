@@ -138,7 +138,9 @@ export async function POST(request: Request) {
     const start = await provider.createPayment({
       amountMnt: parsePriceToNumber(price),
       description: programLabel,
-      senderInvoiceNo: `gmath-course-${registration.id}`,
+      // QPay caps sender_invoice_no at 45 chars — see the matching comment in
+      // assessment/[id]/pay/route.ts.
+      senderInvoiceNo: `gm-c-${registration.id.replace(/-/g, "")}`,
       callbackUrl: `${SITE_URL}/api/qpay/callback?type=registration&ref=${registration.id}`,
     });
 
