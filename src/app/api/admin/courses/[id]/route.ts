@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { deleteCourse, updateCourse } from "@/lib/db";
+import { updateCourse } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
 import { normalizeLessons, validateLessons } from "@/lib/lessonInput";
@@ -79,14 +79,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   return NextResponse.json({ ok: true, course });
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
-  }
-  const { id } = await params;
-  const removed = await deleteCourse(id);
-  if (!removed) {
-    return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
-  }
-  return NextResponse.json({ ok: true });
-}
+// No DELETE handler here on purpose. deleteCourse() (lib/db.ts) hard-deletes
+// a course and cascades its registrations with no undo — exactly what wiped
+// real registrations twice now, once through the admin "Устгах" button
+// before it was rewired to archive, and again through this endpoint staying
+// reachable afterward (a stale client could still call it directly even
+// with the button gone). The app must never expose a path to it; a true
+// delete is a manual script run against the database, nothing else.
