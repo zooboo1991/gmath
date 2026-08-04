@@ -411,3 +411,37 @@ create table if not exists login_logs (
   created_at timestamptz not null default now()
 );
 create index if not exists login_logs_user_id_idx on login_logs (user_id, created_at desc);
+
+-- Admin broadcast notifications. The recipient set is resolved and
+-- materialized into notification_recipients at send time (not recomputed
+-- live from role/registrations on every read) — this keeps a "Бүх сурагчид"
+-- blast meaning exactly the students who existed at send time, gives a
+-- stable list to drive SMS dispatch from, and makes the unread-count query
+-- a plain join instead of per-type logic on every page load.
+create table if not exists notifications (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  body text not null,
+  image_url text,
+  target_type text not null check (target_type in ('all', 'students', 'teachers', 'course', 'users')),
+  target_course_id text,
+  target_course_label text,
+  channel text not null default 'site' check (channel in ('site', 'sms', 'both')),
+  recipient_count int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists notification_recipients (
+  id uuid primary key default gen_random_uuid(),
+  notification_id uuid not null references notifications(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  unique (notification_id, user_id)
+);
+create index if not exists notification_recipients_user_idx on notification_recipients (user_id, notification_id);
+
+create table if not exists notification_reads (
+  notification_id uuid not null references notifications(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  read_at timestamptz not null default now(),
+  primary key (notification_id, user_id)
+);

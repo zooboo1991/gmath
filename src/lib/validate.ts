@@ -34,6 +34,8 @@ export const MAX_LEN = {
   levelName: 80,
   levelText: 2000,
   settingValue: 200,
+  notificationTitle: 150,
+  notificationBody: 2000,
 } as const;
 
 export function isTooLong(value: unknown, max: number): boolean {

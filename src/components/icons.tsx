@@ -271,6 +271,15 @@ export function IconCopy(props: IconProps) {
   );
 }
 
+export function IconBell(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>
+      <path d="M6 9a6 6 0 1112 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6z" strokeLinejoin="round" />
+      <path d="M10 19a2 2 0 004 0" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function IconClose(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} {...props}>

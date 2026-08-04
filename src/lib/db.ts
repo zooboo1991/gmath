@@ -2,6 +2,8 @@ import { getPaymentProvider } from "./payment";
 import { getSupabase } from "./supabase";
 import { hashPassword, verifyPassword as verifyPasswordHash } from "./password";
 import { parsePriceToNumber } from "./price";
+import { transliterate } from "./mnTransliterate";
+import { sendSms } from "./sms/skytel";
 
 /**
  * Persistence layer backed by Supabase Postgres (see supabase/schema.sql
@@ -1238,4 +1240,207 @@ export async function getAnalyticsStats(): Promise<AnalyticsStats> {
     topReferrers,
     daily,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Notifications — admin broadcasts to users. See supabase/schema.sql for why
+// the recipient set is materialized at send time rather than recomputed live.
+// ---------------------------------------------------------------------------
+
+export type NotificationTargetType = "all" | "students" | "teachers" | "course" | "users";
+export type NotificationChannel = "site" | "sms" | "both";
+
+export type Notification = {
+  id: string;
+  title: string;
+  body: string;
+  imageUrl?: string;
+  targetType: NotificationTargetType;
+  targetCourseId?: string;
+  targetCourseLabel?: string;
+  channel: NotificationChannel;
+  recipientCount: number;
+  createdAt: string;
+};
+
+type NotificationRow = {
+  id: string;
+  title: string;
+  body: string;
+  image_url: string | null;
+  target_type: NotificationTargetType;
+  target_course_id: string | null;
+  target_course_label: string | null;
+  channel: NotificationChannel;
+  recipient_count: number;
+  created_at: string;
+};
+
+function notificationFromRow(row: NotificationRow): Notification {
+  return {
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    imageUrl: row.image_url ?? undefined,
+    targetType: row.target_type,
+    targetCourseId: row.target_course_id ?? undefined,
+    targetCourseLabel: row.target_course_label ?? undefined,
+    channel: row.channel,
+    recipientCount: row.recipient_count,
+    createdAt: row.created_at,
+  };
+}
+
+type NotificationTarget = {
+  targetType: NotificationTargetType;
+  targetCourseId?: string;
+  userIds?: string[];
+};
+
+async function resolveNotificationRecipients(target: NotificationTarget): Promise<{ id: string; phone: string }[]> {
+  const supabase = getSupabase();
+
+  if (target.targetType === "all") {
+    const { data, error } = await supabase.from("users").select("id, phone");
+    if (error) throw error;
+    return data as { id: string; phone: string }[];
+  }
+
+  if (target.targetType === "students" || target.targetType === "teachers") {
+    const role = target.targetType === "students" ? "student" : "teacher";
+    const { data, error } = await supabase.from("users").select("id, phone").eq("role", role);
+    if (error) throw error;
+    return data as { id: string; phone: string }[];
+  }
+
+  if (target.targetType === "course") {
+    if (!target.targetCourseId) return [];
+    const { data, error } = await supabase
+      .from("registrations")
+      .select("user_id, users(id, phone)")
+      .eq("program_id", target.targetCourseId)
+      .eq("status", "active");
+    if (error) throw error;
+    type Row = { user_id: string; users: { id: string; phone: string } | { id: string; phone: string }[] | null };
+    const seen = new Map<string, string>();
+    for (const row of data as unknown as Row[]) {
+      const u = Array.isArray(row.users) ? row.users[0] : row.users;
+      if (u) seen.set(u.id, u.phone);
+    }
+    return [...seen.entries()].map(([id, phone]) => ({ id, phone }));
+  }
+
+  // "users" — explicit selection
+  if (!target.userIds || target.userIds.length === 0) return [];
+  const { data, error } = await supabase.from("users").select("id, phone").in("id", target.userIds);
+  if (error) throw error;
+  return data as { id: string; phone: string }[];
+}
+
+export async function createNotification(input: {
+  title: string;
+  body: string;
+  imageUrl?: string;
+  targetType: NotificationTargetType;
+  targetCourseId?: string;
+  targetCourseLabel?: string;
+  userIds?: string[];
+  channel: NotificationChannel;
+}): Promise<{ notification: Notification; smsFailures: number }> {
+  const supabase = getSupabase();
+  const recipients = await resolveNotificationRecipients({
+    targetType: input.targetType,
+    targetCourseId: input.targetCourseId,
+    userIds: input.userIds,
+  });
+
+  const { data, error } = await supabase
+    .from("notifications")
+    .insert({
+      title: input.title,
+      body: input.body,
+      image_url: input.imageUrl ?? null,
+      target_type: input.targetType,
+      target_course_id: input.targetCourseId ?? null,
+      target_course_label: input.targetCourseLabel ?? null,
+      channel: input.channel,
+      recipient_count: recipients.length,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  const notification = notificationFromRow(data as NotificationRow);
+
+  if (recipients.length > 0) {
+    const { error: recError } = await supabase
+      .from("notification_recipients")
+      .insert(recipients.map((r) => ({ notification_id: notification.id, user_id: r.id })));
+    if (recError) throw recError;
+  }
+
+  let smsFailures = 0;
+  if ((input.channel === "sms" || input.channel === "both") && recipients.length > 0) {
+    const message = transliterate(`${input.title}: ${input.body}`).slice(0, 300);
+    const results = await Promise.allSettled(recipients.map((r) => sendSms(r.phone, message)));
+    smsFailures = results.filter((r) => r.status === "rejected").length;
+    for (const r of results) {
+      if (r.status === "rejected") console.error("[notifications] sms send failed:", r.reason);
+    }
+  }
+
+  return { notification, smsFailures };
+}
+
+export async function listNotificationsForAdmin(limit = 50): Promise<Notification[]> {
+  const { data, error } = await getSupabase()
+    .from("notifications")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data as NotificationRow[]).map(notificationFromRow);
+}
+
+export type NotificationForUser = Notification & { readAt?: string };
+
+export async function listNotificationsForUser(userId: string, limit = 30): Promise<NotificationForUser[]> {
+  const supabase = getSupabase();
+  const { data: recipientRows, error } = await supabase
+    .from("notification_recipients")
+    .select("notifications(*)")
+    .eq("user_id", userId)
+    .limit(limit);
+  if (error) throw error;
+
+  type Row = { notifications: NotificationRow | NotificationRow[] | null };
+  const notifications = (recipientRows as unknown as Row[])
+    .map((r) => (Array.isArray(r.notifications) ? r.notifications[0] : r.notifications))
+    .filter((n): n is NotificationRow => Boolean(n))
+    .map(notificationFromRow)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  if (notifications.length === 0) return [];
+
+  const { data: readRows, error: readError } = await supabase
+    .from("notification_reads")
+    .select("notification_id, read_at")
+    .eq("user_id", userId)
+    .in(
+      "notification_id",
+      notifications.map((n) => n.id)
+    );
+  if (readError) throw readError;
+  const readMap = new Map(
+    (readRows as { notification_id: string; read_at: string }[]).map((r) => [r.notification_id, r.read_at])
+  );
+
+  return notifications.map((n) => ({ ...n, readAt: readMap.get(n.id) }));
+}
+
+export async function markNotificationsRead(notificationIds: string[], userId: string): Promise<void> {
+  if (notificationIds.length === 0) return;
+  const { error } = await getSupabase()
+    .from("notification_reads")
+    .upsert(notificationIds.map((id) => ({ notification_id: id, user_id: userId })));
+  if (error) throw error;
 }

@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import useScrolled from "@/hooks/useScrolled";
 import { useProgramRegister } from "@/components/program/ProgramRegister";
 import { IconPerson } from "@/components/icons";
+import NotificationBell from "@/components/NotificationBell";
 
 const links = [
   { href: "/#about", label: "Нүүр" },
@@ -118,38 +119,41 @@ export default function Navbar() {
             // visitors they were signed out.
             <div aria-hidden className="w-[180px] h-[46px] rounded-full bg-surface-2 animate-pulse" />
           ) : sessionUser ? (
-            <div ref={profileMenuRef} className="relative">
-              <button
-                type="button"
-                aria-expanded={profileMenuOpen}
-                onClick={() => setProfileMenuOpen((o) => !o)}
-                className="flex items-center gap-[10px] font-extrabold text-ink px-[8px] py-[6px] rounded-full hover:bg-blue-soft transition-colors"
-              >
-                <span className="w-9 h-9 rounded-full bg-blue-soft text-blue-strong grid place-items-center shrink-0">
-                  <IconPerson className="w-[18px] h-[18px]" />
-                </span>
-                {sessionUser.firstName}
-              </button>
+            <div className="flex items-center gap-1">
+              <NotificationBell />
+              <div ref={profileMenuRef} className="relative">
+                <button
+                  type="button"
+                  aria-expanded={profileMenuOpen}
+                  onClick={() => setProfileMenuOpen((o) => !o)}
+                  className="flex items-center gap-[10px] font-extrabold text-ink px-[8px] py-[6px] rounded-full hover:bg-blue-soft transition-colors"
+                >
+                  <span className="w-9 h-9 rounded-full bg-blue-soft text-blue-strong grid place-items-center shrink-0">
+                    <IconPerson className="w-[18px] h-[18px]" />
+                  </span>
+                  {sessionUser.firstName}
+                </button>
 
-              {profileMenuOpen && (
-                <div className="absolute right-0 top-[calc(100%+8px)] w-[200px] bg-surface border border-line rounded-md shadow-md py-2 z-[70]">
-                  <Link
-                    href="/profile"
-                    onClick={() => setProfileMenuOpen(false)}
-                    className="block font-bold text-[.92rem] text-ink px-4 py-2.5 hover:bg-blue-soft"
-                  >
-                    Профайл
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    disabled={loggingOut}
-                    className="block w-full text-left font-bold text-[.92rem] text-red-soft px-4 py-2.5 hover:bg-blue-soft disabled:opacity-50"
-                  >
-                    {loggingOut ? "…" : "Гарах"}
-                  </button>
-                </div>
-              )}
+                {profileMenuOpen && (
+                  <div className="absolute right-0 top-[calc(100%+8px)] w-[200px] bg-surface border border-line rounded-md shadow-md py-2 z-[70]">
+                    <Link
+                      href="/profile"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="block font-bold text-[.92rem] text-ink px-4 py-2.5 hover:bg-blue-soft"
+                    >
+                      Профайл
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      disabled={loggingOut}
+                      className="block w-full text-left font-bold text-[.92rem] text-red-soft px-4 py-2.5 hover:bg-blue-soft disabled:opacity-50"
+                    >
+                      {loggingOut ? "…" : "Гарах"}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <>
@@ -167,12 +171,16 @@ export default function Navbar() {
           )}
         </div>
 
+        <div className="nav:hidden ml-auto">
+          <NotificationBell />
+        </div>
+
         <button
           type="button"
           aria-label="Цэс"
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="nav:hidden ml-auto w-12 h-12 shrink-0 rounded-[12px] border border-line-2 bg-surface relative z-[61] grid place-items-center"
+          className="nav:hidden w-12 h-12 shrink-0 rounded-[12px] border border-line-2 bg-surface relative z-[61] grid place-items-center"
         >
           <span className="sr-only">Цэс</span>
           <div className="flex flex-col gap-[3px] items-center">
