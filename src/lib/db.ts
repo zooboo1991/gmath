@@ -29,7 +29,7 @@ export type Role = "teacher" | "student";
 export type PayMethod = "qpay" | "bank";
 export type RegistrationStatus = "pending" | "active";
 export type CourseKind = "upcoming" | "vod";
-export type CourseStatus = "draft" | "published";
+export type CourseStatus = "draft" | "published" | "archived";
 
 export type User = {
   id: string;
@@ -969,12 +969,13 @@ async function countRows(table: string, filters: Record<string, string> = {}): P
  * should become a Postgres view.
  */
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const [students, teachers, courses, coursesPublished, coursesUpcoming, coursesVod, articles] =
+  const [students, teachers, courses, coursesPublished, coursesArchived, coursesUpcoming, coursesVod, articles] =
     await Promise.all([
       countRows("users", { role: "student" }),
       countRows("users", { role: "teacher" }),
       countRows("courses"),
       countRows("courses", { status: "published" }),
+      countRows("courses", { status: "archived" }),
       countRows("courses", { kind: "upcoming" }),
       countRows("courses", { kind: "vod" }),
       countRows("articles"),
@@ -1042,7 +1043,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     teachersInClass: activeTeacherIds.size,
     courses,
     coursesPublished,
-    coursesDraft: courses - coursesPublished,
+    coursesDraft: courses - coursesPublished - coursesArchived,
     coursesUpcoming,
     coursesVod,
     articles,

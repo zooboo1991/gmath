@@ -377,3 +377,12 @@ create table if not exists lesson_attendance (
 );
 create index if not exists lesson_attendance_lookup_idx on lesson_attendance (lesson_meeting_id, user_id);
 create index if not exists lesson_attendance_participant_idx on lesson_attendance (zoom_participant_uuid);
+
+-- "Устгах" no longer hard-deletes a course — deleteCourse() took its
+-- registrations with it (no confirmation beyond a dialog, no way back),
+-- which is exactly how a course with real paid registrations got wiped by
+-- one admin click. The admin UI now only ever archives (sets this status);
+-- a real delete is something to run by hand against the database, never
+-- from the app.
+alter table courses drop constraint if exists courses_status_check;
+alter table courses add constraint courses_status_check check (status in ('draft', 'published', 'archived'));

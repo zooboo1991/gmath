@@ -47,6 +47,13 @@ function StatusBadge({ status }: { status: CourseStatus }) {
       </span>
     );
   }
+  if (status === "archived") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[.76rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-3 py-1 rounded-full">
+        <IconClose className="w-3 h-3" /> Архивласан
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-1.5 text-[.76rem] font-extrabold text-ink-3 bg-bg-soft px-3 py-1 rounded-full">
       <IconClock className="w-3 h-3" /> Ноорог
@@ -94,7 +101,7 @@ export default function CourseObjectPage({
   const [coverUploading, setCoverUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
@@ -251,21 +258,43 @@ export default function CourseObjectPage({
     }
   };
 
-  const remove = async () => {
+  const archive = async () => {
     if (!isEditing) return;
-    // The course's registrations are deleted with it, so name the cost.
-    const attached = registrations.length;
-    const warning = attached > 0 ? ` Энэ сургалтын ${attached} бүртгэл хамт устана.` : "";
-    if (!confirm(`Энэ сургалтыг устгах уу?${warning} Энэ үйлдлийг буцаах боломжгүй.`)) return;
-    setDeleting(true);
+    if (!confirm("Энэ сургалтыг архивлах уу? Нийтэд харагдахгүй болно, бүртгэлүүд хадгалагдаж үлдэнэ.")) return;
+    setArchiving(true);
     try {
-      const res = await fetch(`/api/admin/courses/${course.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/courses/${course.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "archived" }),
+      });
       if (res.ok) {
         router.push("/admin?tab=courses");
         router.refresh();
       }
     } finally {
-      setDeleting(false);
+      setArchiving(false);
+    }
+  };
+
+  const restore = async () => {
+    if (!isEditing) return;
+    setArchiving(true);
+    try {
+      const res = await fetch(`/api/admin/courses/${course.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "draft" }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setStatus("draft");
+        router.refresh();
+      } else {
+        setError(json.error ?? "Сэргээхэд алдаа гарлаа");
+      }
+    } finally {
+      setArchiving(false);
     }
   };
 
@@ -312,17 +341,27 @@ export default function CourseObjectPage({
 
           <div className="flex items-center gap-2 shrink-0">
             {savedMessage && <span className="text-[.82rem] font-bold text-green">{savedMessage}</span>}
-            {isEditing && (
+            {isEditing && status === "archived" && (
               <button
                 type="button"
-                disabled={deleting}
-                onClick={remove}
-                className="text-[.85rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-4 py-2.5 rounded-full disabled:opacity-50"
+                disabled={archiving}
+                onClick={restore}
+                className="text-[.85rem] font-extrabold text-ink-2 bg-surface-2 px-4 py-2.5 rounded-full disabled:opacity-50"
               >
-                {deleting ? "…" : "Устгах"}
+                {archiving ? "…" : "Сэргээх"}
               </button>
             )}
-            {isEditing && (
+            {isEditing && status !== "archived" && (
+              <button
+                type="button"
+                disabled={archiving}
+                onClick={archive}
+                className="text-[.85rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-4 py-2.5 rounded-full disabled:opacity-50"
+              >
+                {archiving ? "…" : "Архивлах"}
+              </button>
+            )}
+            {isEditing && status !== "archived" && (
               <button
                 type="button"
                 disabled={publishing}

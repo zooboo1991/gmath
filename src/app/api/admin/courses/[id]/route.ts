@@ -40,7 +40,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   ) {
     return NextResponse.json({ ok: false, error: "Заавал бөглөх талбаруудыг хоослож болохгүй" }, { status: 400 });
   }
-  if (data.status !== undefined && data.status !== "draft" && data.status !== "published") {
+  if (
+    data.status !== undefined &&
+    data.status !== "draft" &&
+    data.status !== "published" &&
+    data.status !== "archived"
+  ) {
     return NextResponse.json({ ok: false, error: "Статус буруу байна" }, { status: 400 });
   }
   const lengthError = validateCourseFields(data);

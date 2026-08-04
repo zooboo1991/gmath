@@ -93,18 +93,35 @@ export default function AdminDashboard({
     }
   };
 
-  const removeCourse = async (id: string) => {
-    // Deleting a course also deletes its registrations, so say how many are
-    // about to go — otherwise it is silent data loss.
-    const attached = registrations.filter((r) => r.programId === id).length;
-    const warning = attached > 0 ? `\n\nЭнэ сургалтын ${attached} бүртгэл хамт устана.` : "";
-    if (!confirm(`Энэ сургалтыг устгах уу?${warning}`)) return;
+  // Archives rather than deletes — the course (and its registrations) stay
+  // in the database, just hidden from the public site and the active lists.
+  const archiveCourse = async (id: string) => {
+    if (!confirm("Энэ сургалтыг архивлах уу? Нийтэд харагдахгүй болно, бүртгэлүүд хадгалагдаж үлдэнэ.")) return;
     setBusyId(id);
     try {
-      const res = await fetch(`/api/admin/courses/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/courses/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "archived" }),
+      });
       if (res.ok) {
-        setCourses((cs) => cs.filter((c) => c.id !== id));
-        setRegistrations((rs) => rs.filter((r) => r.programId !== id));
+        setCourses((cs) => cs.map((c) => (c.id === id ? { ...c, status: "archived" } : c)));
+      }
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const restoreCourse = async (id: string) => {
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/admin/courses/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "draft" }),
+      });
+      if (res.ok) {
+        setCourses((cs) => cs.map((c) => (c.id === id ? { ...c, status: "draft" } : c)));
       }
     } finally {
       setBusyId(null);
@@ -122,8 +139,9 @@ export default function AdminDashboard({
     }
   };
 
-  const upcoming = courses.filter((c) => c.kind === "upcoming");
-  const vod = courses.filter((c) => c.kind === "vod");
+  const upcoming = courses.filter((c) => c.kind === "upcoming" && c.status !== "archived");
+  const vod = courses.filter((c) => c.kind === "vod" && c.status !== "archived");
+  const archived = courses.filter((c) => c.status === "archived");
   const pendingCount = registrations.filter((r) => r.status === "pending").length;
 
   return (
@@ -267,7 +285,7 @@ export default function AdminDashboard({
               courses={upcoming}
               busyId={busyId}
               addHref="/admin/courses/new?kind=upcoming"
-              onDelete={removeCourse}
+              onArchive={archiveCourse}
             />
             <div className="mt-10">
               <CourseGroup
@@ -275,9 +293,14 @@ export default function AdminDashboard({
                 courses={vod}
                 busyId={busyId}
                 addHref="/admin/courses/new?kind=vod"
-                onDelete={removeCourse}
+                onArchive={archiveCourse}
               />
             </div>
+            {archived.length > 0 && (
+              <div className="mt-10">
+                <CourseGroup title="Архивласан сургалтууд" courses={archived} busyId={busyId} onRestore={restoreCourse} />
+              </div>
+            )}
           </div>
         )}
 
@@ -495,24 +518,28 @@ function CourseGroup({
   courses,
   busyId,
   addHref,
-  onDelete,
+  onArchive,
+  onRestore,
 }: {
   title: string;
   courses: Course[];
   busyId: string | null;
-  addHref: string;
-  onDelete: (id: string) => void;
+  addHref?: string;
+  onArchive?: (id: string) => void;
+  onRestore?: (id: string) => void;
 }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-[1.15rem] font-extrabold">{title}</h2>
-        <Link
-          href={addHref}
-          className="text-[.85rem] font-extrabold text-blue-strong bg-blue-soft px-4 py-2 rounded-full"
-        >
-          + Сургалт нэмэх
-        </Link>
+        {addHref && (
+          <Link
+            href={addHref}
+            className="text-[.85rem] font-extrabold text-blue-strong bg-blue-soft px-4 py-2 rounded-full"
+          >
+            + Сургалт нэмэх
+          </Link>
+        )}
       </div>
       <div className="flex flex-col gap-2.5">
         {courses.length === 0 && <p className="text-ink-3 font-semibold text-[.9rem]">Одоогоор алга.</p>}
@@ -523,6 +550,8 @@ function CourseGroup({
                 <span className="text-[.72rem] font-extrabold tracking-[.08em] uppercase text-blue-strong">{c.tag}</span>
                 {c.status === "draft" ? (
                   <span className="text-[.7rem] font-extrabold text-ink-3 bg-bg-soft px-2 py-0.5 rounded-full">Ноорог</span>
+                ) : c.status === "archived" ? (
+                  <span className="text-[.7rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-2 py-0.5 rounded-full">Архивласан</span>
                 ) : (
                   <span className="text-[.7rem] font-extrabold text-green bg-green-soft px-2 py-0.5 rounded-full">Нийтлэгдсэн</span>
                 )}
@@ -541,14 +570,26 @@ function CourseGroup({
               >
                 Засах
               </Link>
-              <button
-                type="button"
-                disabled={busyId === c.id}
-                onClick={() => onDelete(c.id)}
-                className="text-[.82rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-3.5 py-2 rounded-full disabled:opacity-50"
-              >
-                Устгах
-              </button>
+              {onRestore && (
+                <button
+                  type="button"
+                  disabled={busyId === c.id}
+                  onClick={() => onRestore(c.id)}
+                  className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full disabled:opacity-50"
+                >
+                  Сэргээх
+                </button>
+              )}
+              {onArchive && (
+                <button
+                  type="button"
+                  disabled={busyId === c.id}
+                  onClick={() => onArchive(c.id)}
+                  className="text-[.82rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-3.5 py-2 rounded-full disabled:opacity-50"
+                >
+                  Архивлах
+                </button>
+              )}
             </div>
           </div>
         ))}
