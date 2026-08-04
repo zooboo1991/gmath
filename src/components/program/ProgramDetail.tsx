@@ -75,7 +75,9 @@ export default function ProgramDetail({
 }) {
   const programId = `program-${category.toLowerCase()}`;
   const { label, price } = staticProgramById[programId];
-  const program = { id: programId, label, price };
+  // tag mirrors what /api/enroll uses server-side for this program (its own
+  // label) — see the comment on the Program type in ProgramRegister.tsx.
+  const program = { id: programId, label, price, tag: label };
 
   return (
     <>

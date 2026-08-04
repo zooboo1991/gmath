@@ -12,14 +12,21 @@ import {
   IconClose,
   IconCheck,
   IconFacebook,
+  IconCopy,
 } from "@/components/icons";
+import { extractCourseCategories, getCourseAudience } from "@/lib/courseTag";
 import { DISTRICTS_BY_PROVINCE, PROVINCES, type Province } from "@/lib/mongoliaRegions";
+import { staticProgramById } from "@/lib/staticPrograms";
 
 type Role = "teacher" | "student";
 type PayMethod = "qpay" | "bank";
 type Screen = "login" | "register" | "reset" | "payment" | "qpay-wait" | "success";
 
-type Program = { id: string; label: string; price: string };
+// `tag` mirrors what the server uses to build the QPay/bank transfer
+// description (course.tag for real courses, the static program's own label
+// for yearly programs — see /api/enroll) so the client can compute the same
+// "Гүйлгээний утга" text without a round trip.
+type Program = { id: string; label: string; price: string; tag: string };
 
 export type SessionUser = {
   id: string;
@@ -169,6 +176,14 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const [registrationStatus, setRegistrationStatus] = useState<"active" | "pending" | null>(null);
   const [facebookGroup, setFacebookGroup] = useState<string | null>(null);
   const [qpayQr, setQpayQr] = useState<{ registrationId: string; qrImage: string; shortUrl: string } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const copyToClipboard = (key: string, value: string) => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopiedField(key);
+      setTimeout(() => setCopiedField((k) => (k === key ? null : k)), 1500);
+    });
+  };
 
   useEffect(() => {
     fetch("/api/account/me")
@@ -629,6 +644,18 @@ export default function ProgramRegisterProvider({ children }: { children: React.
       document.body.style.overflow = previousOverflow;
     };
   }, [isOpen]);
+
+  // QPay's commission bites hardest on the yearly programs' large lump-sum
+  // price, so they only ever offer bank transfer.
+  const isStaticYearlyProgram = Boolean(program && staticProgramById[program.id]);
+
+  // Mirrors the QPay invoice description built server-side in /api/enroll,
+  // so the bank-transfer "Гүйлгээний утга" reads the same way and a payment
+  // can be matched back to a student from either channel the same way.
+  const bankCategories = program ? extractCourseCategories(program.tag) : [];
+  const bankCategoryLabel = bankCategories.length > 0 ? bankCategories.join(",") : "-";
+  const bankAudienceLabel = program && getCourseAudience(program.tag) === "teacher" ? "Багш" : "Сурагч";
+  const bankDescription = `${sessionUser?.phone ?? ""} ${bankCategoryLabel} ${bankAudienceLabel}`.trim();
 
   return (
     <ModalCtx.Provider
@@ -1120,20 +1147,22 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 )}
                 <p className="font-bold text-ink-2 mb-1">Төлбөрийн хэлбэр сонгоно уу</p>
                 <div className="flex flex-col gap-3 mt-1.5">
-                  <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={() => confirmPayment("qpay")}
-                    className="flex items-center gap-3.5 border-[1.5px] border-line-2 rounded-md px-[18px] py-4 text-left transition-colors hover:border-blue disabled:opacity-50"
-                  >
-                    <IconQrCode className="w-[26px] h-[26px] text-blue-strong shrink-0" />
-                    <div>
-                      <b className="text-[1rem] block">
-                        {submitting ? "Түр хүлээнэ үү…" : "QPay-ээр төлөх"}
-                      </b>
-                      <small className="block text-ink-3 font-semibold text-[.85rem]">Банкны апп-аар уншуулж шууд төлнө</small>
-                    </div>
-                  </button>
+                  {!isStaticYearlyProgram && (
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => confirmPayment("qpay")}
+                      className="flex items-center gap-3.5 border-[1.5px] border-line-2 rounded-md px-[18px] py-4 text-left transition-colors hover:border-blue disabled:opacity-50"
+                    >
+                      <IconQrCode className="w-[26px] h-[26px] text-blue-strong shrink-0" />
+                      <div>
+                        <b className="text-[1rem] block">
+                          {submitting ? "Түр хүлээнэ үү…" : "QPay-ээр төлөх"}
+                        </b>
+                        <small className="block text-ink-3 font-semibold text-[.85rem]">Банкны апп-аар уншуулж шууд төлнө</small>
+                      </div>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setPayMethod("bank")}
@@ -1152,14 +1181,28 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 {payMethod === "bank" && (
                   <div className="mt-[18px] bg-bg-soft rounded-md px-[22px] py-5">
                     {[
-                      ["Банк", "Хаан Банк"],
-                      ["Дансны дугаар", "5003006508049758"],
-                      ["Хүлээн авагч", "Б.Ганбат"],
-                      ["Гүйлгээний утга", `${sessionUser?.lastName ?? "Сурагчийн нэр"} — ${program?.label ?? ""}`],
-                    ].map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-4 py-1.5 text-[.95rem] font-bold">
-                        <span className="text-ink-3 font-semibold">{k}</span>
-                        <b className="text-right">{v}</b>
+                      ["bank", "Банк", "Хаан Банк"],
+                      ["account", "Дансны дугаар", "MN19000500 5034904750"],
+                      ["recipient", "Хүлээн авагч", "Ганбат"],
+                      ["description", "Гүйлгээний утга", bankDescription],
+                    ].map(([key, k, v]) => (
+                      <div key={key} className="flex items-center justify-between gap-4 py-1.5 text-[.95rem] font-bold">
+                        <span className="text-ink-3 font-semibold shrink-0">{k}</span>
+                        <span className="flex items-center gap-2 min-w-0">
+                          <b className="text-right truncate">{v}</b>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(key, v)}
+                            aria-label={`${k} хуулах`}
+                            className="shrink-0 text-ink-3 hover:text-blue-strong transition-colors"
+                          >
+                            {copiedField === key ? (
+                              <IconCheck className="w-4 h-4 text-green" strokeWidth={2.8} />
+                            ) : (
+                              <IconCopy className="w-4 h-4" />
+                            )}
+                          </button>
+                        </span>
                       </div>
                     ))}
                   </div>
