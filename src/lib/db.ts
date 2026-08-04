@@ -1433,6 +1433,11 @@ export async function listNotificationsForUser(userId: string, limit = 30): Prom
     .map((r) => (Array.isArray(r.notifications) ? r.notifications[0] : r.notifications))
     .filter((n): n is NotificationRow => Boolean(n))
     .map(notificationFromRow)
+    // "sms" channel means the admin picked SMS only — the site/bell list is
+    // only for "site" and "both". Recipients are still materialized for
+    // sms-only sends (that's how the phone list gets resolved), they just
+    // don't surface here.
+    .filter((n) => n.channel !== "sms")
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   if (notifications.length === 0) return [];
