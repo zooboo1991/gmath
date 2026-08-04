@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findCourseById } from "@/lib/db";
+import { findCourseById, updateCourse } from "@/lib/db";
 import { parseScheduleString } from "@/lib/lessonSchedule";
 import { isAdmin } from "@/lib/session";
 import { createMeeting } from "@/lib/zoom/client";
@@ -43,26 +43,34 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Хичээл олдсонгүй" }, { status: 404 });
   }
 
-  const existing = await findLessonMeeting(courseId, lessonIndex);
-  if (existing) {
-    return NextResponse.json({ ok: true, meeting: existing });
+  let meeting = await findLessonMeeting(courseId, lessonIndex);
+  if (!meeting) {
+    try {
+      const zoomMeeting = await createMeeting(`${course.title} — ${lesson.topic}`, zoomSchedule(lesson.schedule));
+      meeting = await createLessonMeeting({
+        courseId,
+        lessonIndex,
+        zoomMeetingId: zoomMeeting.id,
+        joinUrl: zoomMeeting.joinUrl,
+        startUrl: zoomMeeting.startUrl,
+      });
+    } catch (err) {
+      console.error("zoom meeting creation failed", courseId, lessonIndex, err);
+      return NextResponse.json(
+        { ok: false, error: "Zoom meeting үүсгэхэд алдаа гарлаа. Дахин оролдоно уу." },
+        { status: 502 }
+      );
+    }
   }
 
-  try {
-    const zoomMeeting = await createMeeting(`${course.title} — ${lesson.topic}`, zoomSchedule(lesson.schedule));
-    const meeting = await createLessonMeeting({
-      courseId,
-      lessonIndex,
-      zoomMeetingId: zoomMeeting.id,
-      joinUrl: zoomMeeting.joinUrl,
-      startUrl: zoomMeeting.startUrl,
-    });
-    return NextResponse.json({ ok: true, meeting });
-  } catch (err) {
-    console.error("zoom meeting creation failed", courseId, lessonIndex, err);
-    return NextResponse.json(
-      { ok: false, error: "Zoom meeting үүсгэхэд алдаа гарлаа. Дахин оролдоно уу." },
-      { status: 502 }
-    );
+  // The student-facing join button is gated on lessons[i].zoomLink (see
+  // ProfileClient's LessonAction) — persist it onto the course row itself so
+  // the button appears right away, instead of depending on the admin also
+  // clicking "Хадгалах" afterward to save the client-side form state.
+  if (course.lessons[lessonIndex].zoomLink !== meeting.joinUrl) {
+    const lessons = course.lessons.map((l, i) => (i === lessonIndex ? { ...l, zoomLink: meeting!.joinUrl } : l));
+    await updateCourse(courseId, { lessons });
   }
+
+  return NextResponse.json({ ok: true, meeting });
 }
