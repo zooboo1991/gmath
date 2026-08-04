@@ -386,3 +386,15 @@ create index if not exists lesson_attendance_participant_idx on lesson_attendanc
 -- from the app.
 alter table courses drop constraint if exists courses_status_check;
 alter table courses add constraint courses_status_check check (status in ('draft', 'published', 'archived'));
+
+-- One active session per user. Logging in deletes any existing row for that
+-- user_id before inserting the new one, so an older device's cookie (still
+-- pointing at the deleted session id) stops resolving to a user and reads as
+-- logged out the next time it's checked — that's the "kick the old device"
+-- mechanism, no separate revocation step needed.
+create table if not exists sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists sessions_user_id_idx on sessions (user_id);

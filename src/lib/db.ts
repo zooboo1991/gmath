@@ -374,6 +374,33 @@ export async function verifyUserPassword(phone: string, password: string): Promi
   return verifyPasswordHash(password, user.passwordHash, user.passwordSalt) ? user : null;
 }
 
+// Enforces one active session per user: any existing session row for this
+// user is deleted before the new one is created, so an older device's
+// session id no longer resolves (see findSessionUserId) the next time it's
+// checked.
+export async function createSession(userId: string): Promise<string> {
+  const supabase = getSupabase();
+  const { error: deleteError } = await supabase.from("sessions").delete().eq("user_id", userId);
+  if (deleteError) throw deleteError;
+  const { data, error } = await supabase.from("sessions").insert({ user_id: userId }).select("id").single();
+  if (error) throw error;
+  return (data as { id: string }).id;
+}
+
+export async function findSessionUserId(sessionId: string): Promise<string | undefined> {
+  const { data, error } = await getSupabase().from("sessions").select("user_id").eq("id", sessionId).maybeSingle();
+  if (error) {
+    if (isInvalidUuidError(error)) return undefined;
+    throw error;
+  }
+  return (data as { user_id: string } | null)?.user_id ?? undefined;
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  const { error } = await getSupabase().from("sessions").delete().eq("id", sessionId);
+  if (error && !isInvalidUuidError(error)) throw error;
+}
+
 export async function updateUserPassword(userId: string, newPassword: string): Promise<User | undefined> {
   const { hash, salt } = hashPassword(newPassword);
   const { data, error } = await getSupabase()

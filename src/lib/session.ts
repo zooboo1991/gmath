@@ -1,13 +1,19 @@
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
-import { findUserById, type User } from "./db";
+import { createSession, deleteSession, findSessionUserId, findUserById, type User } from "./db";
 
 /**
  * Placeholder auth: a signed cookie stands in for a real session store
  * (NextAuth, Supabase Auth, etc). The signature stops a raw cookie value
  * from being forged/replayed, but there's still no server-side revocation
- * (changing a password doesn't invalidate existing sessions) — replace
- * with real auth before this needs to withstand serious attack.
+ * of password changes — replace with real auth before this needs to
+ * withstand serious attack.
+ *
+ * The cookie holds a session id (see the `sessions` table), not the user id
+ * directly. Logging in deletes any other session row for that user first,
+ * so only the newest login's cookie still resolves to a user — an older
+ * device's cookie starts reading as logged out the next time it's checked.
+ * That's the whole "one active session per user" mechanism.
  *
  * If SESSION_SECRET isn't set, sessions fall back to unsigned (the old
  * behavior) rather than crashing every page load — a missing env var on a
@@ -60,14 +66,17 @@ export async function getSessionUser(): Promise<User | null> {
   const store = await cookies();
   const raw = store.get(SESSION_COOKIE)?.value;
   if (!raw) return null;
-  const id = unsign(raw);
-  if (!id) return null;
-  return (await findUserById(id)) ?? null;
+  const sessionId = unsign(raw);
+  if (!sessionId) return null;
+  const userId = await findSessionUserId(sessionId);
+  if (!userId) return null;
+  return (await findUserById(userId)) ?? null;
 }
 
 export async function setSessionUser(userId: string) {
+  const sessionId = await createSession(userId);
   const store = await cookies();
-  store.set(SESSION_COOKIE, sign(userId), {
+  store.set(SESSION_COOKIE, sign(sessionId), {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
@@ -77,6 +86,9 @@ export async function setSessionUser(userId: string) {
 
 export async function clearSessionUser() {
   const store = await cookies();
+  const raw = store.get(SESSION_COOKIE)?.value;
+  const sessionId = raw ? unsign(raw) : null;
+  if (sessionId) await deleteSession(sessionId);
   store.delete(SESSION_COOKIE);
 }
 
