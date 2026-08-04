@@ -398,3 +398,16 @@ create table if not exists sessions (
   created_at timestamptz not null default now()
 );
 create index if not exists sessions_user_id_idx on sessions (user_id);
+
+-- Append-only history of logins, separate from `sessions` (which only ever
+-- holds the one currently-active session and gets overwritten on every new
+-- login). This is what the admin's Хэрэглэгч → Төхөөрөмж tab reads to show
+-- which devices a user has accessed from over time.
+create table if not exists login_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  user_agent text,
+  ip text,
+  created_at timestamptz not null default now()
+);
+create index if not exists login_logs_user_id_idx on login_logs (user_id, created_at desc);

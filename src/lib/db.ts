@@ -401,6 +401,46 @@ export async function deleteSession(sessionId: string): Promise<void> {
   if (error && !isInvalidUuidError(error)) throw error;
 }
 
+export type LoginLog = {
+  id: string;
+  userAgent: string | null;
+  ip: string | null;
+  createdAt: string;
+};
+
+type LoginLogRow = {
+  id: string;
+  user_agent: string | null;
+  ip: string | null;
+  created_at: string;
+};
+
+function loginLogFromRow(row: LoginLogRow): LoginLog {
+  return { id: row.id, userAgent: row.user_agent, ip: row.ip, createdAt: row.created_at };
+}
+
+// Fails silently — a device-log write must never be able to break a login.
+export async function logLogin(userId: string, info: { userAgent: string | null; ip: string }): Promise<void> {
+  const { error } = await getSupabase()
+    .from("login_logs")
+    .insert({ user_id: userId, user_agent: info.userAgent, ip: info.ip });
+  if (error) console.error("[logLogin] failed to record login:", error);
+}
+
+export async function listLoginLogs(userId: string, limit = 50): Promise<LoginLog[]> {
+  const { data, error } = await getSupabase()
+    .from("login_logs")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    if (isInvalidUuidError(error)) return [];
+    throw error;
+  }
+  return (data as LoginLogRow[]).map(loginLogFromRow);
+}
+
 export async function updateUserPassword(userId: string, newPassword: string): Promise<User | undefined> {
   const { hash, salt } = hashPassword(newPassword);
   const { data, error } = await getSupabase()

@@ -1,6 +1,7 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
-import { createSession, deleteSession, findSessionUserId, findUserById, type User } from "./db";
+import { createSession, deleteSession, findSessionUserId, findUserById, logLogin, type User } from "./db";
+import { getClientIp } from "./rateLimit";
 
 /**
  * Placeholder auth: a signed cookie stands in for a real session store
@@ -82,6 +83,9 @@ export async function setSessionUser(userId: string) {
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });
+
+  const hdrs = await headers();
+  await logLogin(userId, { userAgent: hdrs.get("user-agent"), ip: getClientIp(hdrs) });
 }
 
 export async function clearSessionUser() {

@@ -1,6 +1,12 @@
+"use client";
+
 import Link from "next/link";
-import type { PublicUser, RegistrationWithGroup } from "@/lib/db";
+import { useState } from "react";
+import type { LoginLog, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import { IconCheckCircle, IconClock } from "@/components/icons";
+import { describeUserAgent } from "@/lib/userAgent";
+
+type ObjectTab = "info" | "devices";
 
 function StatusBadge({ status }: { status: RegistrationWithGroup["status"] }) {
   if (status === "active") {
@@ -36,13 +42,40 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
   );
 }
 
+function AnchorTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`shrink-0 font-extrabold text-[.86rem] px-4 py-3 border-b-[2.5px] transition-colors ${
+        active ? "border-blue text-blue-strong" : "border-transparent text-ink-3 hover:text-ink-2"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function formatLogDate(iso: string) {
+  return new Date(iso).toLocaleString("mn-MN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function UserObjectPage({
   user,
   registrations,
+  loginLogs,
 }: {
   user: PublicUser;
   registrations: RegistrationWithGroup[];
+  loginLogs: LoginLog[];
 }) {
+  const [tab, setTab] = useState<ObjectTab>("info");
   const active = registrations.filter((r) => r.status === "active");
   const pending = registrations.filter((r) => r.status === "pending");
 
@@ -71,47 +104,84 @@ export default function UserObjectPage({
             </b>
           </div>
         </div>
+
+        <div className="wrap flex gap-1 overflow-x-auto">
+          <AnchorTab label="Ерөнхий мэдээлэл" active={tab === "info"} onClick={() => setTab("info")} />
+          <AnchorTab
+            label={`Төхөөрөмж${loginLogs.length ? ` (${loginLogs.length})` : ""}`}
+            active={tab === "devices"}
+            onClick={() => setTab("devices")}
+          />
+        </div>
       </header>
 
       <div className="wrap max-w-[720px] py-8 flex flex-col gap-5">
-        <Card title="Хувийн мэдээлэл">
-          <div className="flex flex-col">
-            <InfoRow label="Утас" value={user.phone} />
-            <InfoRow label="Имэйл" value={user.email} />
-            <InfoRow label="Аймаг/Хот" value={user.province} />
-            <InfoRow label="Сум/Дүүрэг" value={user.district} />
-            <InfoRow label="Сургууль" value={user.school} />
-            <InfoRow label="Анги" value={user.grade} />
-            <InfoRow label="Facebook" value={user.facebook} />
-            <InfoRow label="Бүртгүүлсэн огноо" value={new Date(user.createdAt).toLocaleDateString("mn-MN")} />
-          </div>
-        </Card>
+        {tab === "info" && (
+          <>
+            <Card title="Хувийн мэдээлэл">
+              <div className="flex flex-col">
+                <InfoRow label="Утас" value={user.phone} />
+                <InfoRow label="Имэйл" value={user.email} />
+                <InfoRow label="Аймаг/Хот" value={user.province} />
+                <InfoRow label="Сум/Дүүрэг" value={user.district} />
+                <InfoRow label="Сургууль" value={user.school} />
+                <InfoRow label="Анги" value={user.grade} />
+                <InfoRow label="Facebook" value={user.facebook} />
+                <InfoRow label="Бүртгүүлсэн огноо" value={new Date(user.createdAt).toLocaleDateString("mn-MN")} />
+              </div>
+            </Card>
 
-        <Card title={`Сургалт, төлбөрийн түүх (${registrations.length})`}>
-          {registrations.length === 0 ? (
-            <p className="text-ink-3 font-semibold text-[.9rem]">Бүртгэл алга байна.</p>
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {[...active, ...pending]
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                .map((r) => (
+            <Card title={`Сургалт, төлбөрийн түүх (${registrations.length})`}>
+              {registrations.length === 0 ? (
+                <p className="text-ink-3 font-semibold text-[.9rem]">Бүртгэл алга байна.</p>
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  {[...active, ...pending]
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .map((r) => (
+                      <div
+                        key={r.id}
+                        className="bg-bg-soft rounded-md px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap"
+                      >
+                        <div>
+                          <b className="font-extrabold block text-[.92rem]">{r.programLabel}</b>
+                          <span className="text-ink-3 font-semibold text-[.82rem]">
+                            {r.price} · {r.payMethod === "qpay" ? "QPay" : "Дансаар"} ·{" "}
+                            {new Date(r.createdAt).toLocaleDateString("mn-MN")}
+                          </span>
+                        </div>
+                        <StatusBadge status={r.status} />
+                      </div>
+                    ))}
+                </div>
+              )}
+            </Card>
+          </>
+        )}
+
+        {tab === "devices" && (
+          <Card title={`Нэвтэрсэн төхөөрөмжийн лог (${loginLogs.length})`}>
+            {loginLogs.length === 0 ? (
+              <p className="text-ink-3 font-semibold text-[.9rem]">Нэвтэрсэн түүх алга байна.</p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {loginLogs.map((log) => (
                   <div
-                    key={r.id}
+                    key={log.id}
                     className="bg-bg-soft rounded-md px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap"
                   >
                     <div>
-                      <b className="font-extrabold block text-[.92rem]">{r.programLabel}</b>
+                      <b className="font-extrabold block text-[.92rem]">{describeUserAgent(log.userAgent)}</b>
                       <span className="text-ink-3 font-semibold text-[.82rem]">
-                        {r.price} · {r.payMethod === "qpay" ? "QPay" : "Дансаар"} ·{" "}
-                        {new Date(r.createdAt).toLocaleDateString("mn-MN")}
+                        {log.ip ?? "IP тодорхойгүй"} · {formatLogDate(log.createdAt)}
                       </span>
                     </div>
-                    <StatusBadge status={r.status} />
                   </div>
                 ))}
-            </div>
-          )}
-        </Card>
+              </div>
+            )}
+          </Card>
+        )}
       </div>
     </div>
   );
