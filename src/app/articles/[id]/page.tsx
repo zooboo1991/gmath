@@ -75,18 +75,23 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
       />
       <Navbar />
       <main>
-        <div className="relative h-[260px] sm:h-[400px] overflow-hidden">
-          {/* LCP element for this page — reserve its box and load it eagerly. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={article.coverImage}
-            alt=""
-            width={1600}
-            height={800}
-            fetchPriority="high"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(5,15,35,.55)_0%,rgba(5,15,35,.05)_60%)]" />
+        <div className="wrap max-w-[720px] mx-auto pt-8">
+          {/* Matches the text column below rather than running full-bleed —
+              at 720px wide, floor-to-ceiling edge-to-edge made the cover
+              look stretched/cropped compared to the article body. */}
+          <div className="relative h-[220px] sm:h-[360px] overflow-hidden rounded-lg">
+            {/* LCP element for this page — reserve its box and load it eagerly. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={article.coverImage}
+              alt=""
+              width={1600}
+              height={800}
+              fetchPriority="high"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(5,15,35,.55)_0%,rgba(5,15,35,.05)_60%)]" />
+          </div>
         </div>
 
         <section className="section-pad !pt-10">
