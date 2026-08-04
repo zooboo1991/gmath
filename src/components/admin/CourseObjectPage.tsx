@@ -143,12 +143,21 @@ export default function CourseObjectPage({
     Record<number, { status: "loading" | "done" | "error"; joinUrl?: string; error?: string }>
   >({});
 
-  const createZoomMeeting = async (index: number) => {
+  const createZoomMeeting = async (index: number, force = false) => {
     if (!course) return;
+    if (
+      force &&
+      !confirm(
+        "Zoom meeting-ийг дахин үүсгэх үү? Энэ нь тухайн meeting Zoom дээр устсан үед л хэрэгтэй. Өмнө нь холбоосоор орсон сурагчид дараагийн удаа \"Хичээлд орох\" дарахад автоматаар шинэ холбоос авна."
+      )
+    )
+      return;
     setZoomMeetingState((s) => ({ ...s, [index]: { status: "loading" } }));
     try {
       const res = await fetch(`/api/admin/courses/${course.id}/lessons/${index}/zoom-meeting`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -640,6 +649,16 @@ export default function CourseObjectPage({
                                   ? "Үүсгэж байна…"
                                   : "Ирц бүртгэх Zoom meeting үүсгэх"}
                               </button>
+                              {lesson.zoomLink && (
+                                <button
+                                  type="button"
+                                  disabled={zoomMeetingState[i]?.status === "loading"}
+                                  onClick={() => createZoomMeeting(i, true)}
+                                  className="text-[.78rem] font-extrabold text-ink-2 bg-bg-soft px-3 py-1.5 rounded-full disabled:opacity-50"
+                                >
+                                  Дахин үүсгэх
+                                </button>
+                              )}
                               {zoomMeetingState[i]?.status === "done" && (
                                 <span className="text-[.78rem] font-bold text-green">
                                   ✓ Үүслээ — сурагч бүрд хувийн холбоос өгнө

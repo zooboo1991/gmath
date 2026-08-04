@@ -60,6 +60,27 @@ export async function createLessonMeeting(input: {
   return lessonMeetingFromRow(data as LessonMeetingRow);
 }
 
+/**
+ * Repoints an existing lesson_meetings row at a freshly created Zoom
+ * meeting — used when the tracked meeting was deleted directly on Zoom's
+ * side and the admin force-recreates it. Updates the row in place (same id)
+ * rather than delete+insert so lesson_attendance history, which references
+ * this row's id, survives untouched.
+ */
+export async function updateLessonMeeting(
+  id: string,
+  input: { zoomMeetingId: string; joinUrl: string; startUrl?: string }
+): Promise<LessonMeeting> {
+  const { data, error } = await getSupabase()
+    .from("lesson_meetings")
+    .update({ zoom_meeting_id: input.zoomMeetingId, join_url: input.joinUrl, start_url: input.startUrl ?? null })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return lessonMeetingFromRow(data as LessonMeetingRow);
+}
+
 export async function findLessonMeeting(courseId: string, lessonIndex: number): Promise<LessonMeeting | undefined> {
   const { data, error } = await getSupabase()
     .from("lesson_meetings")
@@ -132,6 +153,19 @@ export async function findRegistrant(lessonMeetingId: string, userId: string): P
     .maybeSingle();
   if (error) throw error;
   return data ? lessonRegistrantFromRow(data as LessonRegistrantRow) : undefined;
+}
+
+/**
+ * Clears every student's registrant link for a lesson meeting that just got
+ * repointed at a new Zoom meeting (see updateLessonMeeting) — the old
+ * zoom_registrant_id/join_url belong to a meeting that no longer exists.
+ * Doesn't touch lesson_attendance, so past join/leave history is unaffected;
+ * a student who already joined once just gets silently re-registered (see
+ * /api/lessons/join) the next time they click "Хичээлд орох".
+ */
+export async function deleteRegistrantsForLessonMeeting(lessonMeetingId: string): Promise<void> {
+  const { error } = await getSupabase().from("lesson_registrants").delete().eq("lesson_meeting_id", lessonMeetingId);
+  if (error) throw error;
 }
 
 export async function findRegistrantByZoomId(zoomRegistrantId: string): Promise<LessonRegistrant | undefined> {

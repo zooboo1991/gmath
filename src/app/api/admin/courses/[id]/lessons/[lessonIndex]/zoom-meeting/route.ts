@@ -3,7 +3,12 @@ import { findCourseById, updateCourse } from "@/lib/db";
 import { parseScheduleString } from "@/lib/lessonSchedule";
 import { isAdmin } from "@/lib/session";
 import { createMeeting } from "@/lib/zoom/client";
-import { createLessonMeeting, findLessonMeeting } from "@/lib/zoom/db";
+import {
+  createLessonMeeting,
+  deleteRegistrantsForLessonMeeting,
+  findLessonMeeting,
+  updateLessonMeeting,
+} from "@/lib/zoom/db";
 
 const DEFAULT_DURATION_MINUTES = 60;
 
@@ -25,7 +30,7 @@ function zoomSchedule(scheduleString: string | undefined): { startTime: string; 
 }
 
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string; lessonIndex: string }> }
 ) {
   if (!(await isAdmin())) {
@@ -43,17 +48,38 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Хичээл олдсонгүй" }, { status: 404 });
   }
 
-  let meeting = await findLessonMeeting(courseId, lessonIndex);
+  // force=true is the admin's "meeting-ээ дахин үүсгэх" escape hatch — for
+  // when the tracked meeting was deleted directly on Zoom's side (e.g. via
+  // zoom.us), which this app has no way to detect on its own.
+  const body = await req.json().catch(() => ({}));
+  const force = (body as { force?: boolean })?.force === true;
+
+  const existingRow = await findLessonMeeting(courseId, lessonIndex);
+  let meeting = force ? undefined : existingRow;
   if (!meeting) {
     try {
       const zoomMeeting = await createMeeting(`${course.title} — ${lesson.topic}`, zoomSchedule(lesson.schedule));
-      meeting = await createLessonMeeting({
-        courseId,
-        lessonIndex,
-        zoomMeetingId: zoomMeeting.id,
-        joinUrl: zoomMeeting.joinUrl,
-        startUrl: zoomMeeting.startUrl,
-      });
+      if (force && existingRow) {
+        // Update in place (same row id) rather than delete+insert, so
+        // lesson_attendance history — which references this id — survives.
+        meeting = await updateLessonMeeting(existingRow.id, {
+          zoomMeetingId: zoomMeeting.id,
+          joinUrl: zoomMeeting.joinUrl,
+          startUrl: zoomMeeting.startUrl,
+        });
+        // Old registrant links point at a meeting that no longer exists —
+        // clear them so each student gets silently re-registered on the new
+        // meeting the next time they click "Хичээлд орох".
+        await deleteRegistrantsForLessonMeeting(existingRow.id);
+      } else {
+        meeting = await createLessonMeeting({
+          courseId,
+          lessonIndex,
+          zoomMeetingId: zoomMeeting.id,
+          joinUrl: zoomMeeting.joinUrl,
+          startUrl: zoomMeeting.startUrl,
+        });
+      }
     } catch (err) {
       console.error("zoom meeting creation failed", courseId, lessonIndex, err);
       return NextResponse.json(
