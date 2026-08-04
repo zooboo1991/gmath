@@ -73,6 +73,7 @@ export async function POST(request: Request) {
     zoomMeetingId: data.zoomMeetingId?.trim() || undefined,
     zoomPasscode: data.zoomPasscode?.trim() || undefined,
     lessons,
+    showOnHomepage: data.showOnHomepage === true,
   });
 
   return NextResponse.json({ ok: true, course });

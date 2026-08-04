@@ -9,6 +9,12 @@ import FinalCta from "@/components/FinalCta";
 import Footer from "@/components/Footer";
 import JsonLd, { organizationSchema } from "@/components/JsonLd";
 
+// Courses now reads which courses to show from the database (admin-editable
+// "Нүүр хуудсанд харуулах" checkbox) instead of a hardcoded list, so this
+// page must be read fresh on every request rather than cached as static
+// output at build time — same reasoning as /courses/page.tsx.
+export const dynamic = "force-dynamic";
+
 export default function Home() {
   return (
     <>

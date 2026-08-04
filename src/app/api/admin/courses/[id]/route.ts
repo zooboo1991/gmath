@@ -70,6 +70,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     zoomMeetingId: data.zoomMeetingId !== undefined ? data.zoomMeetingId?.trim() || "" : undefined,
     zoomPasscode: data.zoomPasscode !== undefined ? data.zoomPasscode?.trim() || "" : undefined,
     lessons,
+    showOnHomepage: data.showOnHomepage !== undefined ? data.showOnHomepage === true : undefined,
   });
 
   if (!course) {

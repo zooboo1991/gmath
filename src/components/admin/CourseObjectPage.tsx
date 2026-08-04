@@ -92,6 +92,7 @@ export default function CourseObjectPage({
     zoomMeetingId: course?.zoomMeetingId ?? "",
     zoomPasscode: course?.zoomPasscode ?? "",
     lessons: course?.lessons ?? ([] as Lesson[]),
+    showOnHomepage: course?.showOnHomepage ?? false,
   });
   const parsedTag = parseCourseTag(course?.tag ?? "");
   const [tagCategory, setTagCategory] = useState<CourseCategory | "">(parsedTag.category);
@@ -454,6 +455,14 @@ export default function CourseObjectPage({
                 <AdminField label="Тайлбар">
                   <input value={form.topics} onChange={(e) => setForm((f) => ({ ...f, topics: e.target.value }))} />
                 </AdminField>
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.showOnHomepage}
+                    onChange={(e) => setForm((f) => ({ ...f, showOnHomepage: e.target.checked }))}
+                  />
+                  <span className="text-[.87rem] font-bold text-ink-2">Нүүр хуудсанд харуулах</span>
+                </label>
                 <div className="grid grid-cols-2 gap-3">
                   <AdminField label="Үнэ">
                     <input

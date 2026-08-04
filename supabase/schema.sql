@@ -66,6 +66,11 @@ alter table courses add column if not exists zoom_link text;
 alter table courses add column if not exists zoom_meeting_id text;
 alter table courses add column if not exists zoom_passcode text;
 
+-- Which courses show as cards on the homepage — previously a hardcoded,
+-- disconnected-from-the-database list in src/components/Courses.tsx. Default
+-- false: nothing appears there until the admin explicitly opts a course in.
+alter table courses add column if not exists show_on_homepage boolean not null default false;
+
 create table if not exists registrations (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references users(id) on delete cascade,

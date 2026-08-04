@@ -2,36 +2,12 @@ import Link from "next/link";
 import Reveal from "./Reveal";
 import CourseCard from "./CourseCard";
 import { IconQuestion } from "./icons";
+import { listHomepageCourses } from "@/lib/db";
 
-const courses = [
-  {
-    tag: "B,C,D,E АНГИЛАЛ",
-    title: "1 сарын сургалт",
-    topics: "4 долоо хоногийн хугацаанд 12 удаагийн хичээлийн оролттой онлайн сургалт.",
-    price: "350,000₮",
-    period: "/ сар",
-    featured: false,
-  },
-  {
-    tag: "C,D АНГИЛАЛ",
-    title: "1 жилийн хөтөлбөр",
-    topics:
-      "1 жил буюу 10 сарын хугацаанд +100 хичээлийг үзэж дотоодын болон олон улсын олимпиадад бэлдэнэ.",
-    price: "2,800,000₮",
-    period: "/ жил",
-    featured: true,
-  },
-  {
-    tag: "БАГА БОЛОН ДУНД АНГИЙН БАГШ",
-    title: "1 сарын сургалт",
-    topics: "Бага болон дунд ангийн багш нарт зориулсан онлайн болон танхимын сургалт",
-    price: "350,000₮",
-    period: "/ сар",
-    featured: false,
-  },
-];
+export default async function Courses() {
+  const courses = await listHomepageCourses();
+  if (courses.length === 0) return null;
 
-export default function Courses() {
   return (
     <section className="section-pad bg-bg-soft" id="courses">
       <div className="wrap">
@@ -49,7 +25,7 @@ export default function Courses() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-[18px] mt-[44px] items-stretch">
           {courses.map((c) => (
-            <CourseCard key={c.tag} {...c} ctaHref="/courses" />
+            <CourseCard key={c.id} {...c} ctaHref={`/courses/${c.id}`} />
           ))}
         </div>
 

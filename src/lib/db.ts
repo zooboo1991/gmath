@@ -96,6 +96,7 @@ export type Course = {
   zoomMeetingId?: string;
   zoomPasscode?: string;
   lessons: Lesson[];
+  showOnHomepage: boolean;
 };
 
 export type Article = {
@@ -177,6 +178,7 @@ type CourseRow = {
   zoom_meeting_id: string | null;
   zoom_passcode: string | null;
   lessons: Lesson[] | null;
+  show_on_homepage: boolean;
 };
 
 type ArticleRow = {
@@ -254,6 +256,7 @@ function courseFromRow(row: CourseRow): Course {
     zoomMeetingId: row.zoom_meeting_id ?? undefined,
     zoomPasscode: row.zoom_passcode ?? undefined,
     lessons: row.lessons ?? [],
+    showOnHomepage: row.show_on_homepage,
   };
 }
 
@@ -512,6 +515,17 @@ export async function listPublishedCourseSummaries(limit?: number): Promise<Cour
   return data as CourseSummary[];
 }
 
+/** Homepage's "Сургалтууд" section — admin opts a course in via a checkbox on its edit page. */
+export async function listHomepageCourses(): Promise<CourseSummary[]> {
+  const { data, error } = await getSupabase()
+    .from("courses")
+    .select("id, tag, title, topics, price, period")
+    .eq("status", "published")
+    .eq("show_on_homepage", true);
+  if (error) throw error;
+  return data as CourseSummary[];
+}
+
 export async function findCourseById(id: string): Promise<Course | undefined> {
   const { data, error } = await getSupabase().from("courses").select("*").eq("id", id).maybeSingle();
   if (error) {
@@ -540,6 +554,7 @@ export async function addCourse(input: Omit<Course, "id">): Promise<Course> {
       zoom_meeting_id: input.zoomMeetingId ?? null,
       zoom_passcode: input.zoomPasscode ?? null,
       lessons: input.lessons ?? [],
+      show_on_homepage: input.showOnHomepage ?? false,
     })
     .select("*")
     .single();
@@ -566,6 +581,7 @@ export async function updateCourse(
   if (input.zoomMeetingId !== undefined) patch.zoom_meeting_id = input.zoomMeetingId || null;
   if (input.zoomPasscode !== undefined) patch.zoom_passcode = input.zoomPasscode || null;
   if (input.lessons !== undefined) patch.lessons = input.lessons;
+  if (input.showOnHomepage !== undefined) patch.show_on_homepage = input.showOnHomepage;
 
   const { data, error } = await getSupabase().from("courses").update(patch).eq("id", id).select("*").maybeSingle();
   if (error) throw error;
