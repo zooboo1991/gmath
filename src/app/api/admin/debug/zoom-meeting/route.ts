@@ -13,5 +13,5 @@ export async function GET(request: Request) {
 
   const res = await zoomFetch(`/meetings/${meetingId}`);
   const json = await res.json();
-  return NextResponse.json({ status: res.status, settings: json.settings });
+  return NextResponse.json({ status: res.status, json });
 }
