@@ -649,13 +649,18 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   // price, so they only ever offer bank transfer.
   const isStaticYearlyProgram = Boolean(program && staticProgramById[program.id]);
 
-  // Mirrors the QPay invoice description built server-side in /api/enroll,
-  // so the bank-transfer "Гүйлгээний утга" reads the same way and a payment
-  // can be matched back to a student from either channel the same way.
+  // Mirrors the QPay invoice description built server-side in /api/enroll
+  // (phone + category + audience), plus the student's name — QPay invoices
+  // don't need that (QPay itself shows the payer's bank name), but a bank
+  // transfer is matched back to a student by an admin reading this text by
+  // eye, and a name makes that much faster than phone + tag alone.
   const bankCategories = program ? extractCourseCategories(program.tag) : [];
   const bankCategoryLabel = bankCategories.length > 0 ? bankCategories.join(",") : "-";
   const bankAudienceLabel = program && getCourseAudience(program.tag) === "teacher" ? "Багш" : "Сурагч";
-  const bankDescription = `${sessionUser?.phone ?? ""} ${bankCategoryLabel} ${bankAudienceLabel}`.trim();
+  const bankStudentName = `${sessionUser?.lastName ?? ""} ${sessionUser?.firstName ?? ""}`.trim();
+  const bankDescription = `${sessionUser?.phone ?? ""} ${bankCategoryLabel} ${bankAudienceLabel}${
+    bankStudentName ? ` + ${bankStudentName}` : ""
+  }`.trim();
 
   return (
     <ModalCtx.Provider
