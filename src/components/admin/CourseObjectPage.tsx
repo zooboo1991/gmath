@@ -149,6 +149,11 @@ export default function CourseObjectPage({
         return;
       }
       setZoomMeetingState((s) => ({ ...s, [index]: { status: "done", joinUrl: json.meeting.joinUrl } }));
+      // The tracked meeting is what students actually join through (their
+      // own registrant link) — this just keeps the plain field a visible,
+      // copyable reference for the teacher, and the fallback link for any
+      // lesson index where tracking ever gets removed later.
+      updateLessonRow(index, { zoomLink: json.meeting.joinUrl });
     } catch {
       setZoomMeetingState((s) => ({ ...s, [index]: { status: "error", error: "Сүлжээний алдаа гарлаа" } }));
     }
