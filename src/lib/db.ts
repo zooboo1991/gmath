@@ -28,7 +28,7 @@ function parseHostname(url: string): string | null {
 }
 
 export type Role = "teacher" | "student";
-export type PayMethod = "qpay" | "bank";
+export type PayMethod = "qpay" | "bank" | "manual";
 export type RegistrationStatus = "pending" | "active";
 export type CourseKind = "upcoming" | "vod";
 export type CourseStatus = "draft" | "published" | "archived";
@@ -137,7 +137,10 @@ export type Article = {
 
 export type Registration = {
   id: string;
-  userId: string;
+  /** Undefined for a phone-only row admin added before that phone had an account — see `phone`. */
+  userId?: string;
+  /** Set only while userId is unset — the phone a manually-added registration is waiting to be claimed by. */
+  phone?: string;
   programId: string;
   programLabel: string;
   price: string;
@@ -234,7 +237,8 @@ type ArticleRow = {
 
 type RegistrationRow = {
   id: string;
-  user_id: string;
+  user_id: string | null;
+  phone: string | null;
   program_id: string;
   program_label: string;
   price: string;
@@ -333,7 +337,8 @@ function articleFromRow(row: ArticleRow): Article {
 function registrationFromRow(row: RegistrationRow): Registration {
   return {
     id: row.id,
-    userId: row.user_id,
+    userId: row.user_id ?? undefined,
+    phone: row.phone ?? undefined,
     programId: row.program_id,
     programLabel: row.program_label,
     price: row.price,
@@ -912,6 +917,49 @@ export async function addRegistration(input: Omit<Registration, "id" | "createdA
   return registrationFromRow(data as RegistrationRow);
 }
 
+/**
+ * Admin adding someone by hand (paid in cash, over chat, etc) — created
+ * straight to "active" since the admin's own action is the confirmation,
+ * no payment step to wait on. `userId` unset means `phone` has no account
+ * yet; the row attaches itself the moment one is created for that phone,
+ * see linkPendingRegistrationsToUser().
+ */
+export async function addManualRegistration(input: {
+  programId: string;
+  programLabel: string;
+  price: string;
+  phone: string;
+  userId?: string;
+}): Promise<Registration> {
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .insert({
+      user_id: input.userId ?? null,
+      phone: input.userId ? null : input.phone,
+      program_id: input.programId,
+      program_label: input.programLabel,
+      price: input.price,
+      pay_method: "manual",
+      status: "active",
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  const registration = registrationFromRow(data as RegistrationRow);
+  await notifyRegistrationActive(registration);
+  return registration;
+}
+
+/** Attaches any phone-only registrations (added by admin before this account existed) to the account that just claimed that phone number. */
+export async function linkPendingRegistrationsToUser(phone: string, userId: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("registrations")
+    .update({ user_id: userId, phone: null })
+    .eq("phone", phone)
+    .is("user_id", null);
+  if (error) throw error;
+}
+
 export async function findRegistrationById(id: string): Promise<Registration | undefined> {
   const { data, error } = await getSupabase().from("registrations").select("*").eq("id", id).maybeSingle();
   if (error) {
@@ -951,6 +999,22 @@ export async function updateRegistration(
 }
 
 /**
+ * Fired the moment a registration flips pending → active, whichever path
+ * caused it (bank approval, QPay confirmation, admin manual add). A no-op
+ * for a still-unclaimed phone-only registration — nothing to notify yet.
+ */
+async function notifyRegistrationActive(registration: Registration): Promise<void> {
+  if (!registration.userId) return;
+  await createNotification({
+    title: "Бүртгэл амжилттай боллоо",
+    body: `Таны "${registration.programLabel}" сургалтад хийсэн бүртгэл амжилттай боллоо.`,
+    targetType: "users",
+    userIds: [registration.userId],
+    channel: "site",
+  });
+}
+
+/**
  * Re-checks a still-pending QPay registration and marks it active if QPay
  * confirms it settled. Safe to call repeatedly — from the callback, a
  * client poll, or a manual "Шалгах" click.
@@ -967,7 +1031,9 @@ export async function settleRegistrationPayment(id: string): Promise<Registratio
   }
   const result = await getPaymentProvider().checkPayment(registration.qpayInvoiceId);
   if (!result.paid) return registration;
-  return updateRegistration(id, { status: "active", qpay_payment_id: result.reference });
+  const updated = await updateRegistration(id, { status: "active", qpay_payment_id: result.reference });
+  if (updated) await notifyRegistrationActive(updated);
+  return updated;
 }
 
 export async function deleteRegistration(id: string): Promise<boolean> {
@@ -1108,14 +1174,21 @@ export async function listRegistrationsByProgram(
 }
 
 export async function approveRegistration(id: string): Promise<Registration | undefined> {
+  // Scoped to status="pending" so this is a true pending→active transition
+  // (idempotent against a double-click, and tells us whether to notify) —
+  // not an unconditional overwrite.
   const { data, error } = await getSupabase()
     .from("registrations")
     .update({ status: "active" })
     .eq("id", id)
+    .eq("status", "pending")
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data ? registrationFromRow(data as RegistrationRow) : undefined;
+  if (!data) return findRegistrationById(id);
+  const registration = registrationFromRow(data as RegistrationRow);
+  await notifyRegistrationActive(registration);
+  return registration;
 }
 
 // ---------------------------------------------------------------------------

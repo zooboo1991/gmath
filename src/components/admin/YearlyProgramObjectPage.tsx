@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { Lesson, YearlyProgram } from "@/lib/db";
+import type { Lesson, PublicUser, Registration, YearlyProgram } from "@/lib/db";
 import AdminField from "./AdminField";
 import LessonScheduleEditor from "./LessonScheduleEditor";
+import RegistrationRoster from "./RegistrationRoster";
+
+type RegistrationWithUser = Registration & { user?: PublicUser };
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -16,8 +19,15 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-export default function YearlyProgramObjectPage({ program }: { program: YearlyProgram }) {
+export default function YearlyProgramObjectPage({
+  program,
+  initialRegistrations,
+}: {
+  program: YearlyProgram;
+  initialRegistrations: RegistrationWithUser[];
+}) {
   const router = useRouter();
+  const [registrations, setRegistrations] = useState(initialRegistrations);
 
   const [form, setForm] = useState({
     tag: program.tag,
@@ -187,6 +197,10 @@ export default function YearlyProgramObjectPage({ program }: { program: YearlyPr
             id={program.id}
             courseZoomLink={form.zoomLink}
           />
+
+          <Card title="Бүртгүүлсэн сурагчид">
+            <RegistrationRoster programId={program.id} registrations={registrations} onChange={setRegistrations} />
+          </Card>
         </div>
       </div>
     </div>

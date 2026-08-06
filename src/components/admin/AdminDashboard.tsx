@@ -19,6 +19,7 @@ import type {
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
 import { formatCourseDate } from "@/lib/courseDate";
 import { formatMnt } from "@/lib/price";
+import { payMethodLabel } from "@/lib/registration";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 type Tab =
@@ -273,8 +274,12 @@ export default function AdminDashboard({
                 <div>
                   <b className="font-extrabold block">{r.programLabel}</b>
                   <span className="text-ink-3 font-semibold text-[.85rem]">
-                    {r.user ? `${r.user.lastName} ${r.user.firstName} · ${r.user.phone}` : "Хэрэглэгч устсан"} ·{" "}
-                    {r.payMethod === "qpay" ? "QPay" : "Дансаар"} · {r.price}
+                    {r.user
+                      ? `${r.user.lastName} ${r.user.firstName} · ${r.user.phone}`
+                      : r.phone
+                        ? `Бүртгэл хүлээгдэж буй · ${r.phone}`
+                        : "Хэрэглэгч устсан"}{" "}
+                    · {payMethodLabel(r.payMethod)} · {r.price}
                   </span>
                 </div>
                 {r.status === "active" ? (

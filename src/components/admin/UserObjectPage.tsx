@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { LoginLog, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import { IconCheckCircle, IconClock } from "@/components/icons";
 import { describeUserAgent } from "@/lib/userAgent";
+import { payMethodLabel } from "@/lib/registration";
 
 type ObjectTab = "info" | "devices";
 
@@ -146,7 +147,7 @@ export default function UserObjectPage({
                         <div>
                           <b className="font-extrabold block text-[.92rem]">{r.programLabel}</b>
                           <span className="text-ink-3 font-semibold text-[.82rem]">
-                            {r.price} · {r.payMethod === "qpay" ? "QPay" : "Дансаар"} ·{" "}
+                            {r.price} · {payMethodLabel(r.payMethod)} ·{" "}
                             {new Date(r.createdAt).toLocaleDateString("mn-MN")}
                           </span>
                         </div>

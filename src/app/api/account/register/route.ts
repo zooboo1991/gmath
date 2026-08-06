@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createUser, toPublicUser } from "@/lib/db";
+import { createUser, linkPendingRegistrationsToUser, toPublicUser } from "@/lib/db";
 import { consumeVerifiedOtp } from "@/lib/otp";
 import { setSessionUser } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
@@ -80,6 +80,10 @@ export async function POST(request: Request) {
       { status: 409 }
     );
   }
+
+  // Attaches any registration(s) admin added by hand for this phone number
+  // before an account existed for it — see addManualRegistration().
+  await linkPendingRegistrationsToUser(user.phone, user.id);
 
   await setSessionUser(user.id);
 

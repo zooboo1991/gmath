@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Course, CourseKind, CourseStatus, Lesson, PublicUser, Registration } from "@/lib/db";
-import { IconCheckCircle, IconClock, IconClose, IconBank, IconQrCode } from "@/components/icons";
+import { IconCheckCircle, IconClock, IconClose, IconBank, IconQrCode, IconPerson } from "@/components/icons";
 import {
   buildCourseTag,
   parseCourseTag,
@@ -14,8 +14,10 @@ import {
 } from "@/lib/courseTag";
 import { toIsoDate } from "@/lib/courseDate";
 import { parsePriceToNumber, formatMnt } from "@/lib/price";
+import { payMethodLabel } from "@/lib/registration";
 import AdminField from "./AdminField";
 import LessonScheduleEditor from "./LessonScheduleEditor";
+import RegistrationRoster from "./RegistrationRoster";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 type SectionTab = "info" | "roster" | "confirm" | "report";
@@ -242,6 +244,7 @@ export default function CourseObjectPage({
   const totalRevenue = active.reduce((sum, r) => sum + parsePriceToNumber(r.price), 0);
   const qpayCount = registrations.filter((r) => r.payMethod === "qpay").length;
   const bankCount = registrations.filter((r) => r.payMethod === "bank").length;
+  const manualCount = registrations.filter((r) => r.payMethod === "manual").length;
 
   return (
     <div className="min-h-screen bg-bg-soft">
@@ -505,21 +508,7 @@ export default function CourseObjectPage({
 
         {tab === "roster" && isEditing && (
           <Card title="Бүртгүүлсэн сурагчид">
-            <RegistrationTable
-              rows={registrations}
-              empty="Одоогоор бүртгэл алга байна."
-              renderStatus={(r) =>
-                r.status === "active" ? (
-                  <span className="inline-flex items-center gap-1.5 text-[.78rem] font-extrabold text-green bg-green-soft px-2.5 py-1 rounded-full">
-                    <IconCheckCircle className="w-3 h-3" /> Идэвхтэй
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-[.78rem] font-extrabold text-gold-strong bg-gold-soft px-2.5 py-1 rounded-full">
-                    <IconClock className="w-3 h-3" /> Хүлээгдэж буй
-                  </span>
-                )
-              }
-            />
+            <RegistrationRoster programId={course.id} registrations={registrations} onChange={setRegistrations} />
           </Card>
         )}
 
@@ -539,7 +528,7 @@ export default function CourseObjectPage({
                       </b>
                       <span className="text-ink-3 font-semibold text-[.82rem] inline-flex items-center gap-1.5">
                         {r.payMethod === "qpay" ? <IconQrCode className="w-3.5 h-3.5" /> : <IconBank className="w-3.5 h-3.5" />}
-                        {r.payMethod === "qpay" ? "QPay" : "Дансаар"} · {r.price}
+                        {payMethodLabel(r.payMethod)} · {r.price}
                       </span>
                     </div>
                     <button
@@ -564,7 +553,7 @@ export default function CourseObjectPage({
                       {r.user ? `${r.user.lastName} ${r.user.firstName}` : "Хэрэглэгч устсан"}
                     </span>
                     <span className="text-ink-3 font-semibold text-[.82rem]">
-                      {r.payMethod === "qpay" ? "QPay" : "Дансаар"} · {r.price} · {new Date(r.createdAt).toLocaleDateString("mn-MN")}
+                      {payMethodLabel(r.payMethod)} · {r.price} · {new Date(r.createdAt).toLocaleDateString("mn-MN")}
                     </span>
                   </div>
                 ))}
@@ -589,11 +578,17 @@ export default function CourseObjectPage({
                   </span>
                   <b className="font-extrabold">{qpayCount}</b>
                 </div>
-                <div className="flex items-center justify-between py-2">
+                <div className="flex items-center justify-between py-2 border-b border-line">
                   <span className="font-bold text-[.9rem] text-ink-2 inline-flex items-center gap-1.5">
                     <IconBank className="w-3.5 h-3.5" /> Дансаар
                   </span>
                   <b className="font-extrabold">{bankCount}</b>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="font-bold text-[.9rem] text-ink-2 inline-flex items-center gap-1.5">
+                    <IconPerson className="w-3.5 h-3.5" /> Гараар нэмсэн
+                  </span>
+                  <b className="font-extrabold">{manualCount}</b>
                 </div>
               </div>
             </Card>
@@ -647,44 +642,3 @@ function KpiTile({ label, value, tone }: { label: string; value: string; tone?: 
   );
 }
 
-function RegistrationTable({
-  rows,
-  empty,
-  renderStatus,
-}: {
-  rows: RegistrationWithUser[];
-  empty: string;
-  renderStatus: (r: RegistrationWithUser) => React.ReactNode;
-}) {
-  if (rows.length === 0) {
-    return <p className="text-ink-3 font-semibold text-[.9rem]">{empty}</p>;
-  }
-  return (
-    <div className="overflow-x-auto -mx-2">
-      <table className="w-full text-left border-collapse min-w-[560px]">
-        <thead>
-          <tr className="text-ink-3 text-[.76rem] font-extrabold tracking-[.05em] uppercase">
-            <th className="px-2 py-2">Сурагч</th>
-            <th className="px-2 py-2">Утас</th>
-            <th className="px-2 py-2">Огноо</th>
-            <th className="px-2 py-2">Төлөв</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className="border-t border-line">
-              <td className="px-2 py-3 font-extrabold text-[.9rem]">
-                {r.user ? `${r.user.lastName} ${r.user.firstName}` : "Хэрэглэгч устсан"}
-              </td>
-              <td className="px-2 py-3 font-semibold text-[.88rem] text-ink-2">{r.user?.phone ?? "—"}</td>
-              <td className="px-2 py-3 font-semibold text-[.88rem] text-ink-2">
-                {new Date(r.createdAt).toLocaleDateString("mn-MN")}
-              </td>
-              <td className="px-2 py-3">{renderStatus(r)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}

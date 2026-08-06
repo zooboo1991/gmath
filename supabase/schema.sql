@@ -480,3 +480,21 @@ create table if not exists yearly_programs (
 -- column match, same as registrations.program_id.
 alter table lesson_meetings drop constraint if exists lesson_meetings_course_id_fkey;
 alter table lesson_meetings alter column course_id type text;
+
+-- Admin can now add a registration by phone number before that person has
+-- an account (paid in cash, over chat, etc). user_id becomes optional and
+-- phone carries the row until a matching account shows up — see
+-- linkPendingRegistrationsToUser() in lib/db.ts, called from
+-- /api/account/register right after a new account is created. A stub
+-- `users` row was considered and rejected: phone is unique and
+-- login-capable there, so a placeholder account would need special-casing
+-- everywhere a user is assumed real.
+alter table registrations alter column user_id drop not null;
+alter table registrations add column if not exists phone text;
+alter table registrations drop constraint if exists registrations_pay_method_check;
+alter table registrations add constraint registrations_pay_method_check check (pay_method in ('qpay', 'bank', 'manual'));
+-- (user_id, program_id) above already stops a real account from double-
+-- registering; this is the same guard for a phone that has no account yet
+-- (partial, since NULL user_id would otherwise defeat any plain unique index).
+create unique index if not exists registrations_phone_program_unique
+  on registrations (phone, program_id) where user_id is null;
