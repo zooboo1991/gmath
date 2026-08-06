@@ -14,11 +14,11 @@ import type {
   NotificationTargetType,
   PublicUser,
   Registration,
+  YearlyProgram,
 } from "@/lib/db";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
 import { formatCourseDate } from "@/lib/courseDate";
 import { formatMnt } from "@/lib/price";
-import { staticProgramById } from "@/lib/staticPrograms";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 type Tab =
@@ -35,6 +35,7 @@ type Tab =
 export default function AdminDashboard({
   initialRegistrations,
   initialCourses,
+  yearlyPrograms,
   initialArticles,
   initialUsers,
   initialCertificates,
@@ -44,6 +45,7 @@ export default function AdminDashboard({
 }: {
   initialRegistrations: RegistrationWithUser[];
   initialCourses: Course[];
+  yearlyPrograms: YearlyProgram[];
   initialArticles: Article[];
   initialUsers: PublicUser[];
   initialCertificates: Certificate[];
@@ -257,7 +259,9 @@ export default function AdminDashboard({
 
         {tab === "assessment" && <AssessmentPanel initialFee={assessmentFee} />}
 
-        {tab === "notifications" && <NotificationsPanel users={users} courses={courses} />}
+        {tab === "notifications" && (
+          <NotificationsPanel users={users} courses={courses} yearlyPrograms={yearlyPrograms} />
+        )}
 
         {tab === "registrations" && (
           <div className="flex flex-col gap-3">
@@ -304,13 +308,16 @@ export default function AdminDashboard({
 
         {tab === "courses" && (
           <div>
-            <CourseGroup
-              title="Удахгүй эхлэх сургалтууд"
-              courses={upcoming}
-              busyId={busyId}
-              addHref="/admin/courses/new?kind=upcoming"
-              onArchive={archiveCourse}
-            />
+            <YearlyProgramGroup programs={yearlyPrograms} />
+            <div className="mt-10">
+              <CourseGroup
+                title="Удахгүй эхлэх сургалтууд"
+                courses={upcoming}
+                busyId={busyId}
+                addHref="/admin/courses/new?kind=upcoming"
+                onArchive={archiveCourse}
+              />
+            </div>
             <div className="mt-10">
               <CourseGroup
                 title="Бичлэгээр үзэх сургалтууд"
@@ -615,6 +622,37 @@ function CourseGroup({
                 </button>
               )}
             </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The two yearly programs — fixed, never added/archived, only edited. */
+function YearlyProgramGroup({ programs }: { programs: YearlyProgram[] }) {
+  return (
+    <div>
+      <h2 className="text-[1.15rem] font-extrabold mb-3">1 жилийн хөтөлбөр</h2>
+      <div className="flex flex-col gap-2.5">
+        {programs.map((p) => (
+          <div
+            key={p.id}
+            className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 flex items-center justify-between gap-4 flex-wrap"
+          >
+            <div>
+              <span className="text-[.72rem] font-extrabold tracking-[.08em] uppercase text-blue-strong">{p.tag}</span>
+              <b className="font-extrabold block">{p.title}</b>
+              <span className="text-ink-3 font-semibold text-[.85rem]">
+                {p.price} {p.period} · {p.lessons.length} хичээл
+              </span>
+            </div>
+            <Link
+              href={`/admin/yearly/${p.id}`}
+              className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
+            >
+              Засах
+            </Link>
           </div>
         ))}
       </div>
@@ -1331,9 +1369,17 @@ const CHANNEL_LABELS: Record<NotificationChannel, string> = {
   both: "Сайт + SMS",
 };
 
-function NotificationsPanel({ users, courses }: { users: PublicUser[]; courses: Course[] }) {
+function NotificationsPanel({
+  users,
+  courses,
+  yearlyPrograms,
+}: {
+  users: PublicUser[];
+  courses: Course[];
+  yearlyPrograms: YearlyProgram[];
+}) {
   const courseOptions = [
-    ...Object.entries(staticProgramById).map(([id, p]) => ({ id, label: p.label })),
+    ...yearlyPrograms.map((p) => ({ id: p.id, label: p.label })),
     ...courses.map((c) => ({ id: c.id, label: `${c.title} (${c.tag})` })),
   ];
 

@@ -16,7 +16,6 @@ import {
 } from "@/components/icons";
 import { extractCourseCategories, getCourseAudience } from "@/lib/courseTag";
 import { DISTRICTS_BY_PROVINCE, PROVINCES, type Province } from "@/lib/mongoliaRegions";
-import { staticProgramById } from "@/lib/staticPrograms";
 
 type Role = "teacher" | "student";
 type PayMethod = "qpay" | "bank";
@@ -647,7 +646,9 @@ export default function ProgramRegisterProvider({ children }: { children: React.
 
   // QPay's commission bites hardest on the yearly programs' large lump-sum
   // price, so they only ever offer bank transfer.
-  const isStaticYearlyProgram = Boolean(program && staticProgramById[program.id]);
+  // Yearly programs are the only ones whose ids aren't real course UUIDs —
+  // see the schema comment on yearly_programs.
+  const isStaticYearlyProgram = Boolean(program?.id.startsWith("program-"));
 
   // Mirrors the QPay invoice description built server-side in /api/enroll
   // (phone + category + audience), plus the student's name — QPay invoices

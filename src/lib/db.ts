@@ -103,6 +103,27 @@ export type Course = {
   showOnHomepage: boolean;
 };
 
+/**
+ * The two yearly programs (C/D ангилал) — hand-written marketing pages with
+ * an admin-editable settings row behind them. `id` is "program-c"/"program-d",
+ * matching the ids already used in `registrations.program_id` from before
+ * this row existed (see the schema comment) — never a real course.
+ */
+export type YearlyProgram = {
+  id: string;
+  tag: string;
+  title: string;
+  label: string;
+  topics: string;
+  price: string;
+  period: string;
+  facebookGroup?: string;
+  zoomLink?: string;
+  zoomMeetingId?: string;
+  zoomPasscode?: string;
+  lessons: Lesson[];
+};
+
 export type Article = {
   id: string;
   title: string;
@@ -185,6 +206,21 @@ type CourseRow = {
   show_on_homepage: boolean;
 };
 
+type YearlyProgramRow = {
+  id: string;
+  tag: string;
+  title: string;
+  label: string;
+  topics: string;
+  price: string;
+  period: string;
+  facebook_group: string | null;
+  zoom_link: string | null;
+  zoom_meeting_id: string | null;
+  zoom_passcode: string | null;
+  lessons: Lesson[] | null;
+};
+
 type ArticleRow = {
   id: string;
   title: string;
@@ -261,6 +297,23 @@ function courseFromRow(row: CourseRow): Course {
     zoomPasscode: row.zoom_passcode ?? undefined,
     lessons: row.lessons ?? [],
     showOnHomepage: row.show_on_homepage,
+  };
+}
+
+function yearlyProgramFromRow(row: YearlyProgramRow): YearlyProgram {
+  return {
+    id: row.id,
+    tag: row.tag,
+    title: row.title,
+    label: row.label,
+    topics: row.topics,
+    price: row.price,
+    period: row.period,
+    facebookGroup: row.facebook_group ?? undefined,
+    zoomLink: row.zoom_link ?? undefined,
+    zoomMeetingId: row.zoom_meeting_id ?? undefined,
+    zoomPasscode: row.zoom_passcode ?? undefined,
+    lessons: row.lessons ?? [],
   };
 }
 
@@ -592,6 +645,47 @@ export async function updateCourse(
   return data ? courseFromRow(data as CourseRow) : undefined;
 }
 
+/** Only ever the two pre-seeded rows ("program-c"/"program-d") — no add, no delete, only edit. */
+export async function listYearlyPrograms(): Promise<YearlyProgram[]> {
+  const { data, error } = await getSupabase().from("yearly_programs").select("*");
+  if (error) throw error;
+  return (data as YearlyProgramRow[]).map(yearlyProgramFromRow);
+}
+
+export async function findYearlyProgramById(id: string): Promise<YearlyProgram | undefined> {
+  const { data, error } = await getSupabase().from("yearly_programs").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data ? yearlyProgramFromRow(data as YearlyProgramRow) : undefined;
+}
+
+export async function updateYearlyProgram(
+  id: string,
+  input: Partial<Omit<YearlyProgram, "id">>
+): Promise<YearlyProgram | undefined> {
+  const patch: Record<string, unknown> = {};
+  if (input.tag !== undefined) patch.tag = input.tag;
+  if (input.title !== undefined) patch.title = input.title;
+  if (input.label !== undefined) patch.label = input.label;
+  if (input.topics !== undefined) patch.topics = input.topics;
+  if (input.price !== undefined) patch.price = input.price;
+  if (input.period !== undefined) patch.period = input.period;
+  if (input.facebookGroup !== undefined) patch.facebook_group = input.facebookGroup || null;
+  if (input.zoomLink !== undefined) patch.zoom_link = input.zoomLink || null;
+  if (input.zoomMeetingId !== undefined) patch.zoom_meeting_id = input.zoomMeetingId || null;
+  if (input.zoomPasscode !== undefined) patch.zoom_passcode = input.zoomPasscode || null;
+  if (input.lessons !== undefined) patch.lessons = input.lessons;
+  patch.updated_at = new Date().toISOString();
+
+  const { data, error } = await getSupabase()
+    .from("yearly_programs")
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data ? yearlyProgramFromRow(data as YearlyProgramRow) : undefined;
+}
+
 /**
  * `registrations.program_id` is plain text with no foreign key (it also holds
  * ids of the static yearly programmes, which have no course row). Nothing
@@ -905,7 +999,7 @@ export type RegistrationWithGroup = Registration & {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type CourseDetailsRow = {
+type ProgramDetailsRow = {
   id: string;
   tag: string;
   start_date: string | null;
@@ -921,20 +1015,33 @@ export async function listRegistrationsByUser(userId: string): Promise<Registrat
   if (error) throw error;
   const registrations = (data as RegistrationRow[]).map(registrationFromRow);
 
-  // Static yearly programs have no course row, so their ids aren't UUIDs and
-  // there is nothing to look up for them.
   const courseIds = [
     ...new Set(registrations.filter((r) => UUID_RE.test(r.programId)).map((r) => r.programId)),
   ];
+  // Yearly programs have no `courses` row — their ids ("program-c" etc.) live
+  // in `yearly_programs` instead, keyed the same opaque-text way.
+  const yearlyIds = [
+    ...new Set(registrations.filter((r) => !UUID_RE.test(r.programId)).map((r) => r.programId)),
+  ];
 
-  let byId = new Map<string, CourseDetailsRow>();
+  const byId = new Map<string, ProgramDetailsRow>();
   if (courseIds.length > 0) {
     const { data: courseRows, error: courseError } = await getSupabase()
       .from("courses")
       .select("id, tag, start_date, facebook_group, zoom_link, zoom_meeting_id, zoom_passcode, lessons")
       .in("id", courseIds);
     if (courseError) throw courseError;
-    byId = new Map((courseRows as CourseDetailsRow[]).map((c) => [c.id, c]));
+    for (const c of courseRows as ProgramDetailsRow[]) byId.set(c.id, c);
+  }
+  if (yearlyIds.length > 0) {
+    const { data: yearlyRows, error: yearlyError } = await getSupabase()
+      .from("yearly_programs")
+      .select("id, tag, facebook_group, zoom_link, zoom_meeting_id, zoom_passcode, lessons")
+      .in("id", yearlyIds);
+    if (yearlyError) throw yearlyError;
+    for (const p of yearlyRows as Omit<ProgramDetailsRow, "start_date">[]) {
+      byId.set(p.id, { ...p, start_date: null });
+    }
   }
 
   return registrations.map((r) => {

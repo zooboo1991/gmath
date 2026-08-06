@@ -4,9 +4,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CourseDetail, { type RelatedCourse } from "@/components/program/CourseDetail";
 import JsonLd, { SITE_URL } from "@/components/JsonLd";
-import { findCourseById, listPublishedCourseSummaries } from "@/lib/db";
+import { findCourseById, listPublishedCourseSummaries, listYearlyPrograms } from "@/lib/db";
 import { toIsoDate } from "@/lib/courseDate";
-import { yearlyPrograms } from "@/lib/staticPrograms";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +25,11 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   if (!course || course.status !== "published") notFound();
 
   // Four, so dropping the current course still leaves three to show.
-  const otherDbCourses = (await listPublishedCourseSummaries(4)).filter((c) => c.id !== course.id);
+  const [otherCourses, yearlyPrograms] = await Promise.all([
+    listPublishedCourseSummaries(4),
+    listYearlyPrograms(),
+  ]);
+  const otherDbCourses = otherCourses.filter((c) => c.id !== course.id);
   const related: RelatedCourse[] = [
     ...otherDbCourses.map((c) => ({
       tag: c.tag,
@@ -36,7 +39,14 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
       period: c.period,
       href: `/courses/${c.id}`,
     })),
-    ...yearlyPrograms,
+    ...yearlyPrograms.map((p) => ({
+      tag: p.tag,
+      title: p.title,
+      topics: p.topics,
+      price: p.price,
+      period: p.period,
+      href: `/courses/${p.id.replace("program-", "")}`,
+    })),
   ].slice(0, 3);
 
   return (

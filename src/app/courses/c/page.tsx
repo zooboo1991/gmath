@@ -3,6 +3,10 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProgramDetail from "@/components/program/ProgramDetail";
 
+// Price/label are admin-editable (see /admin/yearly), so this can't be
+// cached as static output at build time.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "1 жилийн хөтөлбөр — C ангилал",
   description:

@@ -40,6 +40,11 @@ function tagOf(r: RegistrationWithGroup): string {
   return r.tag ?? r.programLabel;
 }
 
+/** Yearly programs are the only registrations whose id isn't a real course UUID — see the schema comment on yearly_programs. */
+function isYearly(r: RegistrationWithGroup): boolean {
+  return r.programId.startsWith("program-");
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ProfileClient({
@@ -73,7 +78,13 @@ export default function ProfileClient({
   // here are a handful of rows, so this recomputes per render rather than
   // carrying the weight of memoisation.
   const sorted = [...registrations].sort(compareByStartDate);
-  const active = sorted.filter((r) => r.status === "active");
+  // The yearly program has no start date to sort by, and is pinned above
+  // everything else regardless — a year-long commitment outranks whatever
+  // else the student is enrolled in.
+  const active = [
+    ...sorted.filter((r) => r.status === "active" && isYearly(r)),
+    ...sorted.filter((r) => r.status === "active" && !isYearly(r)),
+  ];
   const pending = sorted.filter((r) => r.status !== "active");
   const list = tab === "active" ? active : pending;
 
@@ -250,56 +261,46 @@ export default function ProfileClient({
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {shown.map((r) => (
-                <div key={r.id} className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div>
-                      <b className="font-extrabold text-[1.05rem] block">{r.programLabel}</b>
-                      {/* The start date is what the list is ordered by, so it
-                          has to be readable on the card for the order to make
-                          sense. */}
-                      <span className="text-ink-3 font-semibold text-[.85rem]">
-                        {r.price}
-                        {r.startDate && ` · Эхлэх: ${formatCourseDate(r.startDate)}`}
-                      </span>
+              {shown.map((r) =>
+                r.status === "active" && isYearly(r) ? (
+                  <YearlyProgramCard key={r.id} registration={r} />
+                ) : (
+                  <div key={r.id} className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div>
+                        <b className="font-extrabold text-[1.05rem] block">{r.programLabel}</b>
+                        {/* The start date is what the list is ordered by, so it
+                            has to be readable on the card for the order to make
+                            sense. */}
+                        <span className="text-ink-3 font-semibold text-[.85rem]">
+                          {r.price}
+                          {r.startDate && ` · Эхлэх: ${formatCourseDate(r.startDate)}`}
+                        </span>
+                      </div>
+                      {r.status === "active" ? (
+                        <span className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-green bg-green-soft px-3 py-1.5 rounded-full">
+                          <IconCheckCircle className="w-3.5 h-3.5" /> Идэвхтэй
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-gold-strong bg-gold-soft px-3 py-1.5 rounded-full">
+                          <IconClock className="w-3.5 h-3.5" /> Хүлээгдэж буй
+                        </span>
+                      )}
                     </div>
+
                     {r.status === "active" ? (
-                      <span className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-green bg-green-soft px-3 py-1.5 rounded-full">
-                        <IconCheckCircle className="w-3.5 h-3.5" /> Идэвхтэй
-                      </span>
+                      <div className="mt-4 pt-4 border-t border-line">
+                        <ActiveCourseDetails registration={r} />
+                      </div>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-gold-strong bg-gold-soft px-3 py-1.5 rounded-full">
-                        <IconClock className="w-3.5 h-3.5" /> Хүлээгдэж буй
-                      </span>
+                      <p className="mt-3 text-[.88rem] text-ink-3 font-semibold">
+                        Админ төлбөрийг баталгаажуулсны дараа энд Facebook групп, хуваарийн холбоос
+                        гарч ирнэ.
+                      </p>
                     )}
                   </div>
-
-                  {r.status === "active" ? (
-                    <div className="mt-4 pt-4 border-t border-line flex flex-col gap-3">
-                      {r.facebookGroup ? (
-                        <a
-                          href={r.facebookGroup}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-2.5 bg-blue-soft text-blue-strong font-bold text-[.9rem] rounded-sm px-4 py-3"
-                        >
-                          <IconFacebook className="w-[18px] h-[18px] shrink-0" /> Facebook группт нэгдэх
-                        </a>
-                      ) : (
-                        <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
-                          <IconFacebook className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Facebook групп тун удахгүй
-                        </div>
-                      )}
-                      <LessonSchedule registration={r} />
-                    </div>
-                  ) : (
-                    <p className="mt-3 text-[.88rem] text-ink-3 font-semibold">
-                      Админ төлбөрийг баталгаажуулсны дараа энд Facebook групп, хуваарийн холбоос
-                      гарч ирнэ.
-                    </p>
-                  )}
-                </div>
-              ))}
+                )
+              )}
             </div>
           )}
         </div>
@@ -316,6 +317,73 @@ export default function ProfileClient({
         />
       )}
     </>
+  );
+}
+
+/** The Facebook-group link + full lesson schedule shown for any active registration — shared by the plain course card and the yearly program's expanded view. */
+function ActiveCourseDetails({ registration }: { registration: RegistrationWithGroup }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {registration.facebookGroup ? (
+        <a
+          href={registration.facebookGroup}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-2.5 bg-blue-soft text-blue-strong font-bold text-[.9rem] rounded-sm px-4 py-3"
+        >
+          <IconFacebook className="w-[18px] h-[18px] shrink-0" /> Facebook группт нэгдэх
+        </a>
+      ) : (
+        <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
+          <IconFacebook className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Facebook групп тун удахгүй
+        </div>
+      )}
+      <LessonSchedule registration={registration} />
+    </div>
+  );
+}
+
+/**
+ * Collapsed by default to just the next lesson's date — the full schedule,
+ * attendance, and Facebook link (identical to what a monthly course shows
+ * inline) only appear once the student asks for them via "Дэлгэрэнгүй
+ * харах". Always pinned first in the active list (see ProfileClient).
+ */
+function YearlyProgramCard({ registration }: { registration: RegistrationWithGroup }) {
+  const [expanded, setExpanded] = useState(false);
+  const now = useNow();
+  const lessons = registration.lessons ?? [];
+  const states = now ? getLessonStates(lessons, now) : null;
+  const next = states?.find((s) => s.state === "upcoming" || s.state === "live");
+
+  return (
+    <div className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <span className="inline-flex items-center text-[.72rem] font-extrabold tracking-[.06em] uppercase text-gold-strong bg-gold-soft px-2.5 py-1 rounded-full mb-1.5">
+            1 жилийн хөтөлбөр
+          </span>
+          <b className="font-extrabold text-[1.05rem] block">{registration.programLabel}</b>
+          <span className="text-ink-3 font-semibold text-[.85rem]">
+            {next
+              ? `Дараагийн хичээл: ${next.dateLabel}${next.timeLabel ? ` · ${next.timeLabel}` : ""}`
+              : "Хуваарь тун удахгүй"}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft rounded-full px-4 py-2.5"
+        >
+          {expanded ? "Хаах" : "Дэлгэрэнгүй харах"}
+        </button>
+      </div>
+      {expanded && (
+        <div className="mt-4 pt-4 border-t border-line">
+          <ActiveCourseDetails registration={registration} />
+        </div>
+      )}
+    </div>
   );
 }
 

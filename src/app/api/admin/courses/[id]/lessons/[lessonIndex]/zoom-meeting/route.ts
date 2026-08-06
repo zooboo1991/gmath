@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findCourseById, updateCourse } from "@/lib/db";
+import { findCourseById, findYearlyProgramById, updateCourse, updateYearlyProgram, type Lesson } from "@/lib/db";
 import { parseScheduleString } from "@/lib/lessonSchedule";
 import { isAdmin } from "@/lib/session";
 import { createMeeting } from "@/lib/zoom/client";
@@ -42,9 +42,15 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Буруу хичээлийн дугаар" }, { status: 400 });
   }
 
-  const course = await findCourseById(courseId);
-  const lesson = course?.lessons?.[lessonIndex];
-  if (!course || !lesson) {
+  // The owner can be a real course or a yearly program (both keep their
+  // lessons/title under this same opaque text id — see the schema comment on
+  // yearly_programs) — try the yearly table first since its ids are the ones
+  // that never look like a UUID.
+  const yearlyProgram = await findYearlyProgramById(courseId);
+  const course = yearlyProgram ? undefined : await findCourseById(courseId);
+  const owner = yearlyProgram ?? course;
+  const lesson = owner?.lessons?.[lessonIndex];
+  if (!owner || !lesson) {
     return NextResponse.json({ ok: false, error: "Хичээл олдсонгүй" }, { status: 404 });
   }
   if (lesson.mode === "inperson") {
@@ -64,7 +70,7 @@ export async function POST(
   let meeting = force ? undefined : existingRow;
   if (!meeting) {
     try {
-      const zoomMeeting = await createMeeting(`${course.title} — ${lesson.topic}`, zoomSchedule(lesson.schedule));
+      const zoomMeeting = await createMeeting(`${owner.title} — ${lesson.topic}`, zoomSchedule(lesson.schedule));
       if (force && existingRow) {
         // Update in place (same row id) rather than delete+insert, so
         // lesson_attendance history — which references this id — survives.
@@ -96,12 +102,18 @@ export async function POST(
   }
 
   // The student-facing join button is gated on lessons[i].zoomLink (see
-  // ProfileClient's LessonAction) — persist it onto the course row itself so
+  // ProfileClient's LessonAction) — persist it onto the owner row itself so
   // the button appears right away, instead of depending on the admin also
   // clicking "Хадгалах" afterward to save the client-side form state.
-  if (course.lessons[lessonIndex].zoomLink !== meeting.joinUrl) {
-    const lessons = course.lessons.map((l, i) => (i === lessonIndex ? { ...l, zoomLink: meeting!.joinUrl } : l));
-    await updateCourse(courseId, { lessons });
+  if (owner.lessons[lessonIndex].zoomLink !== meeting.joinUrl) {
+    const lessons: Lesson[] = owner.lessons.map((l, i) =>
+      i === lessonIndex ? { ...l, zoomLink: meeting!.joinUrl } : l
+    );
+    if (yearlyProgram) {
+      await updateYearlyProgram(courseId, { lessons });
+    } else {
+      await updateCourse(courseId, { lessons });
+    }
   }
 
   return NextResponse.json({ ok: true, meeting });

@@ -1,7 +1,8 @@
 import Image from "next/image";
+import { notFound } from "next/navigation";
 import Reveal from "@/components/Reveal";
 import { RegisterTriggerButton } from "./ProgramRegister";
-import { staticProgramById } from "@/lib/staticPrograms";
+import { findYearlyProgramById } from "@/lib/db";
 import { IconTrophy, IconPerson, IconClock, IconPlayBox, IconCheckCircle, IconPeopleHero, IconGraduationCap, IconGrid, IconDocument } from "@/components/icons";
 
 const whyItems = [
@@ -64,7 +65,7 @@ const stepCards = [
   },
 ];
 
-export default function ProgramDetail({
+export default async function ProgramDetail({
   category,
   categoryWord,
   grade,
@@ -74,7 +75,9 @@ export default function ProgramDetail({
   grade: string;
 }) {
   const programId = `program-${category.toLowerCase()}`;
-  const { label, price } = staticProgramById[programId];
+  const yearlyProgram = await findYearlyProgramById(programId);
+  if (!yearlyProgram) notFound();
+  const { label, price } = yearlyProgram;
   // tag mirrors what /api/enroll uses server-side for this program (its own
   // label) — see the comment on the Program type in ProgramRegister.tsx.
   const program = { id: programId, label, price, tag: label };

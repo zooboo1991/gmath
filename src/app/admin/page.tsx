@@ -10,6 +10,7 @@ import {
   listCertificates,
   listCourses,
   listUsers,
+  listYearlyPrograms,
   type AnalyticsStats,
 } from "@/lib/db";
 import { getAssessmentFee } from "@/lib/assessment/db";
@@ -40,11 +41,12 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
-  const [registrations, courses, articles, users, stats] = await Promise.all([
+  const [registrations, courses, yearlyPrograms, articles, users, stats] = await Promise.all([
     listAllRegistrations(),
     // Drafts are hidden from the public site but must be listed here —
     // otherwise unpublishing a course would make it vanish from the admin.
     listCourses(undefined, { includeDrafts: true }),
+    listYearlyPrograms(),
     listArticles(),
     listUsers(),
     getDashboardStats(),
@@ -64,6 +66,7 @@ export default async function AdminPage() {
       <AdminDashboard
         initialRegistrations={registrations}
         initialCourses={courses}
+        yearlyPrograms={yearlyPrograms}
         initialArticles={articles}
         initialUsers={users}
         initialCertificates={certificates}

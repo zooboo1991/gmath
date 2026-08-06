@@ -3,6 +3,7 @@ import {
   addRegistration,
   findCourseById,
   findRegistrationByUserAndProgram,
+  findYearlyProgramById,
   settleRegistrationPayment,
   updateRegistration,
 } from "@/lib/db";
@@ -11,7 +12,6 @@ import { getPaymentProvider, stubPaymentsEnabled } from "@/lib/payment";
 import { parsePriceToNumber } from "@/lib/price";
 import { getSessionUser } from "@/lib/session";
 import { SITE_URL } from "@/lib/siteUrl";
-import { staticProgramById } from "@/lib/staticPrograms";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -41,11 +41,11 @@ export async function POST(request: Request) {
   // ангилал)" etc., which extractCourseCategories can parse just as well.
   let courseTag: string;
 
-  const staticProgram = staticProgramById[programId];
-  if (staticProgram) {
-    programLabel = staticProgram.label;
-    price = staticProgram.price;
-    courseTag = staticProgram.label;
+  const yearlyProgram = await findYearlyProgramById(programId);
+  if (yearlyProgram) {
+    programLabel = yearlyProgram.label;
+    price = yearlyProgram.price;
+    courseTag = yearlyProgram.tag;
   } else if (UUID_RE.test(programId)) {
     const course = await findCourseById(programId);
     if (!course) {

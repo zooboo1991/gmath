@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findCourseById, findRegistrationByUserAndProgram } from "@/lib/db";
+import { findCourseById, findRegistrationByUserAndProgram, findYearlyProgramById } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { addRegistrant } from "@/lib/zoom/client";
 import { createRegistrant, findLessonMeeting, findRegistrant } from "@/lib/zoom/db";
@@ -32,8 +32,10 @@ export async function POST(request: Request) {
 
   const meeting = await findLessonMeeting(courseId, lessonIndex);
   if (!meeting) {
-    const course = await findCourseById(courseId);
-    const fallbackLink = course?.lessons?.[lessonIndex]?.zoomLink;
+    // programId can be a real course (UUID) or a yearly program ("program-c"
+    // etc.) — same opaque-id split used everywhere else this can happen.
+    const owner = (await findYearlyProgramById(courseId)) ?? (await findCourseById(courseId));
+    const fallbackLink = owner?.lessons?.[lessonIndex]?.zoomLink;
     if (!fallbackLink) {
       return NextResponse.json({ ok: false, error: "Энэ хичээлд Zoom холбоос алга байна" }, { status: 404 });
     }

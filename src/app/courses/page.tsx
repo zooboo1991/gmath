@@ -4,8 +4,7 @@ import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import CourseCard from "@/components/CourseCard";
 import CourseBrowser from "@/components/CourseBrowser";
-import { listCourses } from "@/lib/db";
-import { yearlyPrograms } from "@/lib/staticPrograms";
+import { listCourses, listYearlyPrograms } from "@/lib/db";
 
 export const metadata: Metadata = {
   title: "Сургалтууд",
@@ -18,9 +17,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function CoursesPage() {
-  const [upcomingCourses, vodCourses] = await Promise.all([
+  const [upcomingCourses, vodCourses, yearlyPrograms] = await Promise.all([
     listCourses("upcoming"),
     listCourses("vod"),
+    listYearlyPrograms(),
   ]);
 
   return (
@@ -35,8 +35,18 @@ export default async function CoursesPage() {
         <section className="bg-gold-soft py-[44px]">
           <div className="wrap">
             <div className="grid grid-cols-1 nav:grid-cols-2 gap-5 max-w-[900px] mx-auto">
-              {yearlyPrograms.map(({ href, ...c }) => (
-                <CourseCard key={c.tag} {...c} featured ctaHref={href} ctaLabel="Дэлгэрэнгүй" />
+              {yearlyPrograms.map((p) => (
+                <CourseCard
+                  key={p.id}
+                  tag={p.tag}
+                  title={p.title}
+                  topics={p.topics}
+                  price={p.price}
+                  period={p.period}
+                  featured
+                  ctaHref={`/courses/${p.id.replace("program-", "")}`}
+                  ctaLabel="Дэлгэрэнгүй"
+                />
               ))}
             </div>
           </div>

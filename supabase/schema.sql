@@ -450,3 +450,33 @@ create table if not exists notification_reads (
   read_at timestamptz not null default now(),
   primary key (notification_id, user_id)
 );
+
+-- The yearly programs (C/D ангилал) used to be hand-written pages with no
+-- database row at all — see the removed src/lib/staticPrograms.ts. `id` is
+-- text, not uuid, and deliberately kept as the exact "program-c"/"program-d"
+-- strings already live in registrations.program_id, so existing paid
+-- registrations resolve without any data migration. Rows are pre-seeded by a
+-- one-off script, never created/deleted through the app — only edited.
+create table if not exists yearly_programs (
+  id text primary key,
+  tag text not null,           -- "C АНГИЛАЛ" — the CourseCard badge on /courses
+  title text not null,
+  label text not null,
+  topics text not null,
+  price text not null,
+  period text not null default '/ жил',
+  facebook_group text,
+  zoom_link text,
+  zoom_meeting_id text,
+  zoom_passcode text,
+  lessons jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+-- lesson_meetings.course_id was a uuid FK into `courses`, so tracking a Zoom
+-- meeting for a yearly program's lesson (course_id = "program-c", not a
+-- UUID) failed with a Postgres 22P02 error. It's opaque text everywhere it's
+-- queried already (see the schema comment above it) — this just makes the
+-- column match, same as registrations.program_id.
+alter table lesson_meetings drop constraint if exists lesson_meetings_course_id_fkey;
+alter table lesson_meetings alter column course_id type text;

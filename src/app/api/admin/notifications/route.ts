@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { createNotification, findCourseById, listNotificationsForAdmin } from "@/lib/db";
+import { createNotification, findCourseById, findYearlyProgramById, listNotificationsForAdmin } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
-import { staticProgramById } from "@/lib/staticPrograms";
 
 const TARGET_TYPES = new Set(["all", "students", "teachers", "course", "users"]);
 const CHANNELS = new Set(["site", "sms", "both"]);
@@ -53,9 +52,9 @@ export async function POST(request: Request) {
   // gets renamed or archived later.
   let targetCourseLabel: string | undefined;
   if (targetType === "course" && targetCourseId) {
-    const staticProgram = staticProgramById[targetCourseId];
-    if (staticProgram) {
-      targetCourseLabel = staticProgram.label;
+    const yearlyProgram = await findYearlyProgramById(targetCourseId);
+    if (yearlyProgram) {
+      targetCourseLabel = yearlyProgram.label;
     } else {
       const course = await findCourseById(targetCourseId);
       if (!course) {
