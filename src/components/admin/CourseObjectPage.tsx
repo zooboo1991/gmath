@@ -129,7 +129,7 @@ export default function CourseObjectPage({
   };
 
   const addLessonRow = () => {
-    setForm((f) => ({ ...f, lessons: [...f.lessons, { topic: "", schedule: "" }] }));
+    setForm((f) => ({ ...f, lessons: [...f.lessons, { topic: "", schedule: "", mode: "online" }] }));
   };
   const updateLessonRow = (index: number, patch: Partial<Lesson>) => {
     setForm((f) => ({ ...f, lessons: f.lessons.map((l, i) => (i === index ? { ...l, ...patch } : l)) }));
@@ -597,6 +597,7 @@ export default function CourseObjectPage({
                     const next = { ...parsed, ...patch };
                     updateLessonRow(i, { schedule: buildScheduleString(next.date, next.startTime, next.endTime) });
                   };
+                  const isOnline = lesson.mode !== "inperson";
                   return (
                     <div key={i} className="flex gap-2 items-start bg-bg-soft rounded-xs p-2.5">
                       <span className="w-7 h-7 rounded-md bg-surface border border-line-2 grid place-items-center font-extrabold text-[.8rem] shrink-0 mt-0.5">
@@ -609,6 +610,26 @@ export default function CourseObjectPage({
                           placeholder="Хичээлийн сэдэв"
                           className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.9rem] focus:outline-none focus:border-blue focus:bg-surface"
                         />
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => updateLessonRow(i, { mode: "online" })}
+                            className={`text-[.78rem] font-extrabold px-2.5 py-1.5 rounded-full transition-colors ${
+                              isOnline ? "text-blue-strong bg-blue-soft" : "text-ink-3 bg-bg-soft"
+                            }`}
+                          >
+                            Онлайн
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateLessonRow(i, { mode: "inperson" })}
+                            className={`text-[.78rem] font-extrabold px-2.5 py-1.5 rounded-full transition-colors ${
+                              !isOnline ? "text-blue-strong bg-blue-soft" : "text-ink-3 bg-bg-soft"
+                            }`}
+                          >
+                            Танхим
+                          </button>
+                        </div>
                         <div className="flex gap-1.5 items-center flex-wrap">
                           <input
                             type="date"
@@ -631,13 +652,15 @@ export default function CourseObjectPage({
                             className="px-2.5 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
                           />
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                          <input
-                            value={lesson.zoomLink ?? ""}
-                            onChange={(e) => updateLessonRow(i, { zoomLink: e.target.value })}
-                            placeholder={form.zoomLink ? "Zoom (сургалтын ерөнхийг ашиглана)" : "Zoom холбоос"}
-                            className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
-                          />
+                        <div className={`grid grid-cols-1 gap-1.5 ${isOnline ? "sm:grid-cols-2" : ""}`}>
+                          {isOnline && (
+                            <input
+                              value={lesson.zoomLink ?? ""}
+                              onChange={(e) => updateLessonRow(i, { zoomLink: e.target.value })}
+                              placeholder={form.zoomLink ? "Zoom (сургалтын ерөнхийг ашиглана)" : "Zoom холбоос"}
+                              className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
+                            />
+                          )}
                           <input
                             value={lesson.recordingLink ?? ""}
                             onChange={(e) => updateLessonRow(i, { recordingLink: e.target.value })}
@@ -645,7 +668,7 @@ export default function CourseObjectPage({
                             className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
                           />
                         </div>
-                        {isEditing && (
+                        {isEditing && isOnline && (
                           <div className="flex flex-col gap-1.5">
                             <div className="flex items-center gap-2 flex-wrap">
                               <button

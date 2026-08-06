@@ -70,10 +70,14 @@ export function publicUserFromJoin(row: unknown): PublicUser | undefined {
   return toPublicUser(userFromRow(row as UserRow));
 }
 
+export type LessonMode = "online" | "inperson";
+
 export type Lesson = {
   topic: string;
   schedule?: string;
-  /** Room for this lesson. Falls back to the course's link when unset. */
+  /** Missing on lessons saved before this field existed — treated as "online". */
+  mode?: LessonMode;
+  /** Room for this lesson. Falls back to the course's link when unset. Only meaningful when mode is "online". */
   zoomLink?: string;
   /** Filled in after the lesson, and shown instead of the room once it ends. */
   recordingLink?: string;

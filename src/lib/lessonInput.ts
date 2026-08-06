@@ -10,6 +10,7 @@ import { isTooLong, isValidHttpUrl, MAX_LEN } from "./validate";
 type LessonInput = {
   topic?: string;
   schedule?: string;
+  mode?: string;
   zoomLink?: string;
   recordingLink?: string;
 };
@@ -20,7 +21,10 @@ export function normalizeLessons(input: unknown): Lesson[] | undefined {
     .map((l) => ({
       topic: l.topic?.trim() ?? "",
       schedule: l.schedule?.trim() || undefined,
-      zoomLink: l.zoomLink?.trim() || undefined,
+      mode: l.mode === "inperson" ? ("inperson" as const) : ("online" as const),
+      // In-person lessons have no Zoom room — a mode switch shouldn't leave
+      // a stale link a student could still be shown.
+      zoomLink: l.mode === "inperson" ? undefined : l.zoomLink?.trim() || undefined,
       recordingLink: l.recordingLink?.trim() || undefined,
     }))
     .filter((l) => l.topic);

@@ -47,6 +47,12 @@ export async function POST(
   if (!course || !lesson) {
     return NextResponse.json({ ok: false, error: "Хичээл олдсонгүй" }, { status: 404 });
   }
+  if (lesson.mode === "inperson") {
+    return NextResponse.json(
+      { ok: false, error: "Танхимын хичээлд Zoom meeting үүсгэх боломжгүй" },
+      { status: 400 }
+    );
+  }
 
   // force=true is the admin's "meeting-ээ дахин үүсгэх" escape hatch — for
   // when the tracked meeting was deleted directly on Zoom's side (e.g. via
