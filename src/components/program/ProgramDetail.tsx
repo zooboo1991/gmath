@@ -23,7 +23,7 @@ const whyItems = [
   {
     icon: <IconCheckCircle className="w-6 h-6" />,
     iconBg: "bg-purple-soft text-purple",
-    text: "Онлайн болон танхимаар хичээллэнэ.",
+    text: "Долоо хоногт 2 удаа онлайн, 1 удаа танхимаар хичээллэнэ.",
   },
   {
     icon: <IconPeopleHero className="w-6 h-6" />,
