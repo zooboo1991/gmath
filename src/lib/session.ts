@@ -27,6 +27,10 @@ const SESSION_COOKIE = "session_user_id";
 const ADMIN_COOKIE = "admin_session";
 const ADMIN_MARKER = "admin-ok";
 
+// Not forced in dev, where the site runs over plain http://localhost and a
+// `secure` cookie would just silently fail to be set at all.
+const SECURE_COOKIE = process.env.NODE_ENV === "production";
+
 function getSessionSecret(): string | null {
   const secret = process.env.SESSION_SECRET;
   if (!secret) {
@@ -79,6 +83,7 @@ export async function setSessionUser(userId: string) {
   const store = await cookies();
   store.set(SESSION_COOKIE, sign(sessionId), {
     httpOnly: true,
+    secure: SECURE_COOKIE,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
@@ -107,6 +112,7 @@ export async function setAdminSession() {
   const store = await cookies();
   store.set(ADMIN_COOKIE, sign(ADMIN_MARKER), {
     httpOnly: true,
+    secure: SECURE_COOKIE,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 8,
