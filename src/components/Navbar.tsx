@@ -9,9 +9,20 @@ import { useProgramRegister } from "@/components/program/ProgramRegister";
 import { IconPerson } from "@/components/icons";
 import NotificationBell from "@/components/NotificationBell";
 
-const links = [
+type NavLink = { href: string; label: string; match?: string; children?: { href: string; label: string }[] };
+
+const links: NavLink[] = [
   { href: "/#about", label: "Нүүр" },
   { href: "/courses", label: "Сургалтууд", match: "/courses" },
+  {
+    href: "/team",
+    label: "Манай баг",
+    match: "/team",
+    children: [
+      { href: "/team/ganbat", label: "Б.Ганбат багш" },
+      { href: "/team/batchimeg", label: "Б.Батчимэг багш" },
+    ],
+  },
   { href: "/articles", label: "Нийтлэл", match: "/articles" },
   { href: "/certificate", label: "Сертификат", match: "/certificate" },
 ];
@@ -97,17 +108,36 @@ export default function Navbar() {
 
         <nav className="hidden nav:flex gap-1 ml-auto">
           {links.map((l) => {
-            const active = l.match && pathname === l.match;
+            const active = l.match && pathname.startsWith(l.match);
+            const linkClass = `font-bold text-[.97rem] px-[14px] py-[11px] rounded-full transition-colors ${
+              active ? "text-ink bg-blue-soft" : "text-ink-2 hover:text-ink hover:bg-blue-soft"
+            }`;
+            if (!l.children) {
+              return (
+                <Link key={l.href} href={l.href} className={linkClass}>
+                  {l.label}
+                </Link>
+              );
+            }
             return (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={`font-bold text-[.97rem] px-[14px] py-[11px] rounded-full transition-colors ${
-                  active ? "text-ink bg-blue-soft" : "text-ink-2 hover:text-ink hover:bg-blue-soft"
-                }`}
-              >
-                {l.label}
-              </Link>
+              <div key={l.href} className="relative group">
+                <Link href={l.href} className={`inline-block ${linkClass}`}>
+                  {l.label}
+                </Link>
+                <div className="absolute left-0 top-full pt-1 opacity-0 invisible translate-y-1 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-150 z-[70]">
+                  <div className="w-[220px] bg-surface border border-line rounded-md shadow-md py-2">
+                    {l.children.map((c) => (
+                      <Link
+                        key={c.href}
+                        href={c.href}
+                        className="block font-bold text-[.92rem] text-ink px-4 py-2.5 hover:bg-blue-soft"
+                      >
+                        {c.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
             );
           })}
         </nav>
@@ -210,18 +240,33 @@ export default function Navbar() {
         style={{ maxHeight: open ? 420 : 0 }}
       >
         {links.map((l) => {
-          const active = l.match && pathname === l.match;
+          const active = l.match && pathname.startsWith(l.match);
           return (
-            <Link
-              key={l.href}
-              href={l.href}
-              onClick={closeMenu}
-              className={`font-bold text-[1.02rem] px-[6px] py-[12px] rounded-xs ${
-                active ? "text-ink bg-blue-soft" : "text-ink-2 hover:text-ink hover:bg-blue-soft"
-              }`}
-            >
-              {l.label}
-            </Link>
+            <div key={l.href}>
+              <Link
+                href={l.href}
+                onClick={closeMenu}
+                className={`font-bold text-[1.02rem] px-[6px] py-[12px] rounded-xs ${
+                  active ? "text-ink bg-blue-soft" : "text-ink-2 hover:text-ink hover:bg-blue-soft"
+                }`}
+              >
+                {l.label}
+              </Link>
+              {l.children && (
+                <div className="flex flex-col pl-4">
+                  {l.children.map((c) => (
+                    <Link
+                      key={c.href}
+                      href={c.href}
+                      onClick={closeMenu}
+                      className="font-bold text-[.92rem] text-ink-3 px-[6px] py-[9px] rounded-xs hover:text-ink hover:bg-blue-soft"
+                    >
+                      {c.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           );
         })}
         {!sessionLoaded ? (
