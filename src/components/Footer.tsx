@@ -66,12 +66,12 @@ export default function Footer() {
                 <IconMail className="w-4 h-4 text-navy-ink-3 shrink-0" /> math.ganbat@gmail.com
               </li>
               <li className="flex items-center gap-[9px] text-[.96rem]">
-                <IconPhone className="w-4 h-4 text-navy-ink-3 shrink-0" /> 9077 7400
+                <IconPhone className="w-4 h-4 text-navy-ink-3 shrink-0" /> 9077 7400, 9939 5945
               </li>
               <li className="flex items-start gap-[9px] text-[.96rem]">
                 <IconLocation className="w-4 h-4 text-navy-ink-3 shrink-0 mt-0.5" />
                 Улаанбаатар хот, Сүхбаатар дүүрэг, 1-р хороо, 1-р сургуулийн замын эсрэг талд, Чонон
-                бүрт төв, 406 тоот
+                бүрт төв, 403 тоот
               </li>
               <li className="flex items-center gap-[9px] text-[.96rem] -ml-1">
                 <IconFacebook className="w-4 h-4 text-navy-ink-3 shrink-0 ml-1" />

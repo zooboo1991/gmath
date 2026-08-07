@@ -11,18 +11,10 @@ import NotificationBell from "@/components/NotificationBell";
 
 type NavLink = { href: string; label: string; match?: string; children?: { href: string; label: string }[] };
 
+// "Манай баг" removed for now (page not ready) — re-add once /team is done.
 const links: NavLink[] = [
   { href: "/#about", label: "Нүүр" },
   { href: "/courses", label: "Сургалтууд", match: "/courses" },
-  {
-    href: "/team",
-    label: "Манай баг",
-    match: "/team",
-    children: [
-      { href: "/team/ganbat", label: "Б.Ганбат багш" },
-      { href: "/team/batchimeg", label: "Б.Батчимэг багш" },
-    ],
-  },
   { href: "/articles", label: "Нийтлэл", match: "/articles" },
   { href: "/certificate", label: "Сертификат", match: "/certificate" },
 ];
