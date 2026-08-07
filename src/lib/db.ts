@@ -1023,11 +1023,24 @@ async function notifyRegistrationActive(registration: Registration): Promise<voi
   if (!registration.userId) return;
   await createNotification({
     title: "Бүртгэл амжилттай боллоо",
-    body: `Таны "${registration.programLabel}" сургалтад хийсэн бүртгэл амжилттай боллоо.`,
+    body: `Таны "${registration.programLabel}" сургалтанд бүртгэлээ. Та Профайл цэснээс сургалтын мэдээллээ харна уу.`,
     targetType: "users",
     userIds: [registration.userId],
     channel: "site",
   });
+
+  // A fixed, hardcoded Latin string rather than transliterated Cyrillic —
+  // same convention as the OTP SMS in otp.ts — since the exact wording
+  // asked for here doesn't survive the Cyrillic->Latin map unchanged
+  // ("профайл" would come out "profail", not "profile"). Never let an SMS
+  // hiccup fail the registration that already succeeded.
+  const user = await findUserById(registration.userId);
+  if (user) {
+    await sendSms(
+      user.phone,
+      "Ganbat bagshiin surgaltand amjilttai burtgegdlee. Ta profile tsesnees surgaltiin medeellee harna uu."
+    ).catch((err) => console.error("[notifyRegistrationActive] sms send failed:", err));
+  }
 }
 
 /**
