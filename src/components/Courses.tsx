@@ -1,7 +1,5 @@
 import Link from "next/link";
-import Reveal from "./Reveal";
 import CourseCard from "./CourseCard";
-import { IconQuestion } from "./icons";
 import { listHomepageCourses, listHomepageYearlyPrograms } from "@/lib/db";
 
 export default async function Courses() {
@@ -44,26 +42,6 @@ export default async function Courses() {
             Бүх сургалтыг үзэх <span>→</span>
           </Link>
         </div>
-
-        <Reveal className="panel-blue relative overflow-hidden mt-8 rounded-lg text-white px-[24px] md:px-[44px] py-[30px] flex items-center gap-6 flex-wrap shadow-blue">
-          <span className="w-[58px] h-[58px] rounded-2xl bg-white/14 grid place-items-center shrink-0">
-            <IconQuestion className="w-7 h-7" />
-          </span>
-          <div>
-            <b className="text-[1.3rem] font-extrabold block tracking-[-.01em]">
-              Аль ангилал танай хүүхдэд тохирох вэ?
-            </b>
-            <span className="text-[.98rem] text-[oklch(0.88_0.02_250)]">
-              Товч анкет бөглөж, бодлого бодоод багшийн хувийн үнэлгээ аваарай
-            </span>
-          </div>
-          <Link
-            href="/assessment"
-            className="md:ml-auto relative z-[2] inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-surface text-blue-strong shadow-sm px-[26px] py-[16px] transition-transform hover:-translate-y-0.5"
-          >
-            Түвшин тогтоох <span>→</span>
-          </Link>
-        </Reveal>
       </div>
     </section>
   );
