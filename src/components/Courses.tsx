@@ -2,10 +2,17 @@ import Link from "next/link";
 import Reveal from "./Reveal";
 import CourseCard from "./CourseCard";
 import { IconQuestion } from "./icons";
-import { listHomepageCourses } from "@/lib/db";
+import { listHomepageCourses, listHomepageYearlyPrograms } from "@/lib/db";
 
 export default async function Courses() {
-  const courses = await listHomepageCourses();
+  const [dbCourses, yearlyPrograms] = await Promise.all([listHomepageCourses(), listHomepageYearlyPrograms()]);
+  const courses = [
+    ...dbCourses.map((c) => ({ ...c, href: `/courses/${c.id}` })),
+    // Yearly programs live outside the courses table (see the schema
+    // comment on yearly_programs) — hand-written pages at /courses/c
+    // and /courses/d, so the href doesn't follow the course-id pattern.
+    ...yearlyPrograms.map((p) => ({ ...p, href: `/courses/${p.id.replace("program-", "")}` })),
+  ];
   if (courses.length === 0) return null;
 
   return (
@@ -24,8 +31,8 @@ export default async function Courses() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-[18px] mt-[44px] items-stretch">
-          {courses.map((c) => (
-            <CourseCard key={c.id} {...c} ctaHref={`/courses/${c.id}`} />
+          {courses.map(({ href, ...c }) => (
+            <CourseCard key={c.id} {...c} ctaHref={href} />
           ))}
         </div>
 

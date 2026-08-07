@@ -41,6 +41,7 @@ export default function YearlyProgramObjectPage({
     zoomMeetingId: program.zoomMeetingId ?? "",
     zoomPasscode: program.zoomPasscode ?? "",
     lessons: program.lessons ?? ([] as Lesson[]),
+    showOnHomepage: program.showOnHomepage,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +129,14 @@ export default function YearlyProgramObjectPage({
               <AdminField label="Тайлбар">
                 <input value={form.topics} onChange={(e) => setForm((f) => ({ ...f, topics: e.target.value }))} />
               </AdminField>
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.showOnHomepage}
+                  onChange={(e) => setForm((f) => ({ ...f, showOnHomepage: e.target.checked }))}
+                />
+                <span className="text-[.87rem] font-bold text-ink-2">Нүүр хуудсанд харуулах</span>
+              </label>
               <div className="grid grid-cols-2 gap-3">
                 <AdminField label="Үнэ">
                   <input

@@ -514,3 +514,7 @@ create table if not exists admin_logs (
 );
 create index if not exists admin_logs_created_at_idx on admin_logs (created_at desc);
 create index if not exists admin_logs_action_type_idx on admin_logs (action_type);
+
+-- Mirrors courses.show_on_homepage — same admin-opt-in toggle, now available
+-- for the yearly programs too.
+alter table yearly_programs add column if not exists show_on_homepage boolean not null default false;

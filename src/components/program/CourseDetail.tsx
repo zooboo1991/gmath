@@ -6,6 +6,7 @@ import { formatCourseDate } from "@/lib/courseDate";
 import {
   IconCalendar,
   IconMonitor,
+  IconLocation,
   IconBook,
   IconPlayBox,
   IconPeopleHero,
@@ -149,12 +150,22 @@ export default function CourseDetail({ course, related }: { course: Course; rela
                     </span>
                     <b className="font-extrabold text-[1rem]">{lesson.topic}</b>
                   </div>
-                  {lesson.schedule && (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {lesson.schedule && (
+                      <span className="inline-flex items-center gap-1.5 text-[.85rem] font-bold text-ink-3">
+                        <IconCalendar className="w-[15px] h-[15px] text-gold-strong shrink-0" />
+                        {lesson.schedule}
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1.5 text-[.85rem] font-bold text-ink-3">
-                      <IconCalendar className="w-[15px] h-[15px] text-gold-strong shrink-0" />
-                      {lesson.schedule}
+                      {lesson.mode === "inperson" ? (
+                        <IconLocation className="w-[15px] h-[15px] text-blue-strong shrink-0" />
+                      ) : (
+                        <IconMonitor className="w-[15px] h-[15px] text-blue-strong shrink-0" />
+                      )}
+                      {lesson.mode === "inperson" ? "Танхим" : "Онлайн"}
                     </span>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>

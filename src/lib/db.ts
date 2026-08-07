@@ -122,6 +122,7 @@ export type YearlyProgram = {
   zoomMeetingId?: string;
   zoomPasscode?: string;
   lessons: Lesson[];
+  showOnHomepage: boolean;
 };
 
 export type Article = {
@@ -222,6 +223,7 @@ type YearlyProgramRow = {
   zoom_meeting_id: string | null;
   zoom_passcode: string | null;
   lessons: Lesson[] | null;
+  show_on_homepage: boolean;
 };
 
 type ArticleRow = {
@@ -318,6 +320,7 @@ function yearlyProgramFromRow(row: YearlyProgramRow): YearlyProgram {
     zoomMeetingId: row.zoom_meeting_id ?? undefined,
     zoomPasscode: row.zoom_passcode ?? undefined,
     lessons: row.lessons ?? [],
+    showOnHomepage: row.show_on_homepage,
   };
 }
 
@@ -657,6 +660,18 @@ export async function listYearlyPrograms(): Promise<YearlyProgram[]> {
   return (data as YearlyProgramRow[]).map(yearlyProgramFromRow);
 }
 
+export type YearlyProgramSummary = Pick<YearlyProgram, "id" | "tag" | "title" | "topics" | "price" | "period">;
+
+/** Mirrors listHomepageCourses() — the admin opts a yearly program into the homepage the same way. */
+export async function listHomepageYearlyPrograms(): Promise<YearlyProgramSummary[]> {
+  const { data, error } = await getSupabase()
+    .from("yearly_programs")
+    .select("id, tag, title, topics, price, period")
+    .eq("show_on_homepage", true);
+  if (error) throw error;
+  return data as YearlyProgramSummary[];
+}
+
 export async function findYearlyProgramById(id: string): Promise<YearlyProgram | undefined> {
   const { data, error } = await getSupabase().from("yearly_programs").select("*").eq("id", id).maybeSingle();
   if (error) throw error;
@@ -679,6 +694,7 @@ export async function updateYearlyProgram(
   if (input.zoomMeetingId !== undefined) patch.zoom_meeting_id = input.zoomMeetingId || null;
   if (input.zoomPasscode !== undefined) patch.zoom_passcode = input.zoomPasscode || null;
   if (input.lessons !== undefined) patch.lessons = input.lessons;
+  if (input.showOnHomepage !== undefined) patch.show_on_homepage = input.showOnHomepage;
   patch.updated_at = new Date().toISOString();
 
   const { data, error } = await getSupabase()

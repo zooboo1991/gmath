@@ -63,6 +63,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     zoomMeetingId: data.zoomMeetingId?.trim() || undefined,
     zoomPasscode: data.zoomPasscode?.trim() || undefined,
     lessons,
+    showOnHomepage: data.showOnHomepage === true,
   });
 
   if (!program) {
