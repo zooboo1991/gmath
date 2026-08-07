@@ -16,7 +16,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await logAdminAction(request, {
     actionType: "registration.approve",
     targetId: id,
-    details: { programLabel: registration.programLabel, price: registration.price },
+    details: { programId: registration.programId, programLabel: registration.programLabel, price: registration.price },
   });
 
   return NextResponse.json({ ok: true, registration });

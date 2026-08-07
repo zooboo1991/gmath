@@ -115,9 +115,16 @@ export default function GradingDetail({ detail, levels }: { detail: Detail; leve
           >
             ← Буцах
           </Link>
-          <b className="font-extrabold text-[1rem] truncate">
-            {detail.user ? `${detail.user.lastName} ${detail.user.firstName}` : "Хэрэглэгч устсан"}
-          </b>
+          {detail.user ? (
+            <Link
+              href={`/admin/users/${detail.user.id}`}
+              className="font-extrabold text-[1rem] truncate hover:text-blue-strong hover:underline"
+            >
+              {detail.user.lastName} {detail.user.firstName}
+            </Link>
+          ) : (
+            <b className="font-extrabold text-[1rem] truncate">Хэрэглэгч устсан</b>
+          )}
           {done ? (
             <span className="text-[.75rem] font-extrabold text-green bg-green-soft px-3 py-1.5 rounded-full shrink-0">
               Түвшин {detail.assessment.finalLevel}

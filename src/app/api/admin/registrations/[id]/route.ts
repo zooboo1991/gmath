@@ -25,7 +25,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   await logAdminAction(request, {
     actionType: "registration.delete",
     targetId: id,
-    details: { programLabel: registration?.programLabel, status: registration?.status, price: registration?.price },
+    details: {
+      programId: registration?.programId,
+      programLabel: registration?.programLabel,
+      status: registration?.status,
+      price: registration?.price,
+    },
   });
 
   return NextResponse.json({ ok: true });

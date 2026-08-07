@@ -1747,7 +1747,9 @@ function NotificationsPanel({
       </div>
 
       <div className="bg-surface border border-line rounded-md shadow-xs px-5 py-5">
-        <h2 className="text-[1.05rem] font-extrabold mb-3">Илгээсэн түүх</h2>
+        <h2 className="text-[1.05rem] font-extrabold mb-3">
+          Илгээсэн түүх{history && history.length > 0 ? ` (${history.length})` : ""}
+        </h2>
         {history === null ? (
           <p className="text-ink-3 font-semibold text-[.85rem]">Ачааллаж байна…</p>
         ) : history.length === 0 ? (
@@ -1770,8 +1772,18 @@ function NotificationsPanel({
                 </div>
                 <p className="text-ink-2 font-medium text-[.85rem] mt-1">{n.body}</p>
                 <span className="text-ink-3 font-semibold text-[.78rem] mt-1.5 block">
-                  {n.targetType === "course" ? n.targetCourseLabel : TARGET_LABELS[n.targetType]} ·{" "}
-                  {CHANNEL_LABELS[n.channel]} · {n.recipientCount} хэрэглэгч
+                  {n.targetType === "course" ? (
+                    n.targetCourseId ? (
+                      <Link href={programAdminHref(n.targetCourseId)} className="hover:text-blue-strong hover:underline">
+                        {n.targetCourseLabel}
+                      </Link>
+                    ) : (
+                      n.targetCourseLabel
+                    )
+                  ) : (
+                    TARGET_LABELS[n.targetType]
+                  )}{" "}
+                  · {CHANNEL_LABELS[n.channel]} · {n.recipientCount} хэрэглэгч
                 </span>
               </div>
             ))}
@@ -1794,6 +1806,22 @@ const ACTION_LABELS: Record<string, string> = {
   "notification.send": "Мэдэгдэл илгээсэн",
   "setting.update": "Тохиргоо өөрчилсөн",
 };
+
+/** Where a log entry's course/program lives in the admin, if it still can be derived. */
+function logTargetHref(log: AdminLogEntry): string | undefined {
+  if (log.actionType === "course.create" || log.actionType === "course.update" || log.actionType === "yearly_program.update") {
+    return log.targetId ? programAdminHref(log.targetId) : undefined;
+  }
+  if (log.actionType === "lesson.zoom_meeting_create") {
+    const courseId = log.targetId?.split("#")[0];
+    return courseId ? programAdminHref(courseId) : undefined;
+  }
+  if (log.actionType.startsWith("registration.")) {
+    const programId = log.details?.programId;
+    return typeof programId === "string" ? programAdminHref(programId) : undefined;
+  }
+  return undefined;
+}
 
 /** Loaded lazily — this tab's own data, not part of the page's initial props. */
 function AdminLogsPanel() {
@@ -1819,7 +1847,9 @@ function AdminLogsPanel() {
   return (
     <div className="card-flat px-6 py-6">
       <div className="mb-4">
-        <h3 className="font-extrabold text-[1.05rem]">Админы үйлдлийн түүх</h3>
+        <h3 className="font-extrabold text-[1.05rem]">
+          Админы үйлдлийн түүх{state.status === "done" && state.logs && state.logs.length > 0 ? ` (${state.logs.length})` : ""}
+        </h3>
         <p className="text-ink-3 font-semibold text-[.85rem] mt-1">
           Үнэ өөрчлөх, бүртгэл нэмэх/хасах, Zoom үүсгэх, мэдэгдэл илгээх зэрэг мэдрэмтгий үйлдлүүд
           энд бүртгэгдэнэ. Админ эрх нэг л нууц үгтэй тул &quot;хэн&quot; гэдгийг биш &quot;юу
@@ -1836,10 +1866,18 @@ function AdminLogsPanel() {
       )}
       {state.status === "done" && state.logs && state.logs.length > 0 && (
         <div className="flex flex-col gap-2">
-          {state.logs.map((log) => (
+          {state.logs.map((log) => {
+            const href = logTargetHref(log);
+            return (
             <div key={log.id} className="flex items-start justify-between gap-4 flex-wrap py-2.5 border-b border-line last:border-0">
               <div>
-                <b className="font-extrabold text-[.9rem] block">{ACTION_LABELS[log.actionType] ?? log.actionType}</b>
+                {href ? (
+                  <Link href={href} className="font-extrabold text-[.9rem] block hover:text-blue-strong hover:underline">
+                    {ACTION_LABELS[log.actionType] ?? log.actionType}
+                  </Link>
+                ) : (
+                  <b className="font-extrabold text-[.9rem] block">{ACTION_LABELS[log.actionType] ?? log.actionType}</b>
+                )}
                 {log.details && (
                   <span className="text-ink-3 font-semibold text-[.8rem] block mt-0.5">
                     {Object.entries(log.details)
@@ -1854,7 +1892,8 @@ function AdminLogsPanel() {
                 {log.ip && ` · ${log.ip}`}
               </span>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
