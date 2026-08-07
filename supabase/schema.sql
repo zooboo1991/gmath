@@ -479,3 +479,21 @@ create index if not exists admin_logs_action_type_idx on admin_logs (action_type
 -- Mirrors courses.show_on_homepage — same admin-opt-in toggle, now available
 -- for the yearly programs too.
 alter table yearly_programs add column if not exists show_on_homepage boolean not null default false;
+
+-- Installment payment tracking for yearly-program registrations, where the
+-- agreed total can differ from the sticker price (month-5/6 discounts) and
+-- some students pay in several installments. total_due is a plain integer
+-- (not the "2,800,000₮" formatted-text convention `price` uses) since it
+-- needs real arithmetic against a sum of payments. Nullable/unset means the
+-- feature hasn't been used for that registration yet — scoping to yearly
+-- programs is done in the admin UI, not here.
+alter table registrations add column if not exists total_due bigint;
+
+create table if not exists registration_payments (
+  id uuid primary key default gen_random_uuid(),
+  registration_id uuid not null references registrations(id) on delete cascade,
+  amount bigint not null,
+  paid_at date not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists registration_payments_registration_id_idx on registration_payments (registration_id);

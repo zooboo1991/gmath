@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import YearlyProgramObjectPage from "@/components/admin/YearlyProgramObjectPage";
-import { findYearlyProgramById, listRegistrationsByProgram } from "@/lib/db";
+import { findYearlyProgramById, listPaymentsForRegistrations, listRegistrationsByProgram } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,7 @@ export default async function EditYearlyProgramPage({ params }: { params: Promis
   if (!program) notFound();
 
   const registrations = await listRegistrationsByProgram(id);
+  const payments = await listPaymentsForRegistrations(registrations.map((r) => r.id));
 
-  return <YearlyProgramObjectPage program={program} initialRegistrations={registrations} />;
+  return <YearlyProgramObjectPage program={program} initialRegistrations={registrations} initialPayments={payments} />;
 }

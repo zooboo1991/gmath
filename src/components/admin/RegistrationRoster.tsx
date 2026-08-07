@@ -1,14 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import type { PublicUser, Registration } from "@/lib/db";
+import { Fragment, useState } from "react";
+import type { PublicUser, Registration, RegistrationPayment } from "@/lib/db";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
+import { formatMnt } from "@/lib/price";
 import { payMethodLabel } from "@/lib/registration";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 
 const PHONE_RE = /^[0-9]{8}$/;
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("mn-MN");
+}
 
 /**
  * The roster for one course/yearly program — the read-only table plus admin
@@ -16,15 +25,27 @@ const PHONE_RE = /^[0-9]{8}$/;
  * addManualRegistration()/linkPendingRegistrationsToUser() in lib/db.ts for
  * how a phone-only row later attaches itself) and to remove a registration
  * outright. Shared between CourseObjectPage and YearlyProgramObjectPage.
+ *
+ * trackPayments/payments/onPaymentsChange are only passed by
+ * YearlyProgramObjectPage — installment payment tracking (agreed total vs.
+ * price, since discounts vary by signup month) is a yearly-program-only
+ * feature, so CourseObjectPage's call site leaves these unset and the extra
+ * column simply doesn't render.
  */
 export default function RegistrationRoster({
   programId,
   registrations,
   onChange,
+  trackPayments,
+  payments,
+  onPaymentsChange,
 }: {
   programId: string;
   registrations: RegistrationWithUser[];
   onChange: (registrations: RegistrationWithUser[]) => void;
+  trackPayments?: boolean;
+  payments?: RegistrationPayment[];
+  onPaymentsChange?: (payments: RegistrationPayment[]) => void;
 }) {
   const [phone, setPhone] = useState("");
   const [lookup, setLookup] = useState<{ status: "loading" | "done" | "error"; user?: PublicUser | null } | null>(
@@ -33,6 +54,13 @@ export default function RegistrationRoster({
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [totalDueDraft, setTotalDueDraft] = useState<Record<string, string>>({});
+  const [savingTotalDueId, setSavingTotalDueId] = useState<string | null>(null);
+  const [paymentForm, setPaymentForm] = useState<Record<string, { date: string; amount: string }>>({});
+  const [addingPaymentId, setAddingPaymentId] = useState<string | null>(null);
+  const [removingPaymentId, setRemovingPaymentId] = useState<string | null>(null);
 
   const search = async () => {
     if (!PHONE_RE.test(phone)) return;
@@ -85,6 +113,75 @@ export default function RegistrationRoster({
       }
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const toggleExpand = (r: RegistrationWithUser) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(r.id)) {
+        next.delete(r.id);
+      } else {
+        next.add(r.id);
+        setTotalDueDraft((d) => ({ ...d, [r.id]: d[r.id] ?? String(r.totalDue ?? "") }));
+        setPaymentForm((f) => ({ ...f, [r.id]: f[r.id] ?? { date: todayIso(), amount: "" } }));
+      }
+      return next;
+    });
+  };
+
+  const saveTotalDue = async (id: string) => {
+    const value = Number(totalDueDraft[id]);
+    if (!Number.isFinite(value) || value < 0) return;
+    setSavingTotalDueId(id);
+    try {
+      const res = await fetch(`/api/admin/registrations/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ totalDue: value }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        onChange(registrations.map((r) => (r.id === id ? { ...r, totalDue: value } : r)));
+      }
+      void json;
+    } finally {
+      setSavingTotalDueId(null);
+    }
+  };
+
+  const addPayment = async (id: string) => {
+    const form = paymentForm[id];
+    const amount = Number(form?.amount);
+    if (!form?.date || !Number.isFinite(amount) || amount <= 0) return;
+    setAddingPaymentId(id);
+    try {
+      const res = await fetch(`/api/admin/registrations/${id}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, paidAt: form.date }),
+      });
+      const json = await res.json();
+      if (res.ok && onPaymentsChange && payments) {
+        onPaymentsChange([...payments, json.payment]);
+        setPaymentForm((f) => ({ ...f, [id]: { date: todayIso(), amount: "" } }));
+      }
+    } finally {
+      setAddingPaymentId(null);
+    }
+  };
+
+  const removePayment = async (registrationId: string, paymentId: string) => {
+    setRemovingPaymentId(paymentId);
+    try {
+      const res = await fetch(`/api/admin/registrations/${registrationId}/payments/${paymentId}`, {
+        method: "DELETE",
+      });
+      if (res.ok && onPaymentsChange && payments) {
+        onPaymentsChange(payments.filter((p) => p.id !== paymentId));
+      }
+    } finally {
+      setRemovingPaymentId(null);
     }
   };
 
@@ -152,54 +249,181 @@ export default function RegistrationRoster({
                 <th className="px-2 py-2">Утас</th>
                 <th className="px-2 py-2">Огноо</th>
                 <th className="px-2 py-2">Төлөв</th>
+                {trackPayments && <th className="px-2 py-2">Төлбөр</th>}
                 <th className="px-2 py-2" />
               </tr>
             </thead>
             <tbody>
-              {registrations.map((r) => (
-                <tr key={r.id} className="border-t border-line">
-                  <td className="px-2 py-3 font-extrabold text-[.9rem]">
-                    {r.user ? (
-                      <Link href={`/admin/users/${r.user.id}`} className="hover:text-blue-strong hover:underline">
-                        {r.user.lastName} {r.user.firstName}
-                      </Link>
-                    ) : r.phone ? (
-                      "Бүртгэл хүлээгдэж буй"
-                    ) : (
-                      "Хэрэглэгч устсан"
+              {registrations.map((r) => {
+                const regPayments = trackPayments
+                  ? (payments ?? [])
+                      .filter((p) => p.registrationId === r.id)
+                      .sort((a, b) => a.paidAt.localeCompare(b.paidAt))
+                  : [];
+                const paidSum = regPayments.reduce((sum, p) => sum + p.amount, 0);
+                const balance = (r.totalDue ?? 0) - paidSum;
+                const expanded = expandedIds.has(r.id);
+                return (
+                  <Fragment key={r.id}>
+                    <tr className="border-t border-line">
+                      <td className="px-2 py-3 font-extrabold text-[.9rem]">
+                        {r.user ? (
+                          <Link href={`/admin/users/${r.user.id}`} className="hover:text-blue-strong hover:underline">
+                            {r.user.lastName} {r.user.firstName}
+                          </Link>
+                        ) : r.phone ? (
+                          "Бүртгэл хүлээгдэж буй"
+                        ) : (
+                          "Хэрэглэгч устсан"
+                        )}
+                      </td>
+                      <td className="px-2 py-3 font-semibold text-[.88rem] text-ink-2">
+                        {r.user?.phone ?? r.phone ?? "—"}
+                      </td>
+                      <td className="px-2 py-3 font-semibold text-[.88rem] text-ink-2">
+                        {new Date(r.createdAt).toLocaleDateString("mn-MN")}
+                        <span className="text-ink-3"> · {payMethodLabel(r.payMethod)}</span>
+                      </td>
+                      <td className="px-2 py-3">
+                        {r.status === "active" ? (
+                          <span className="inline-flex items-center gap-1.5 text-[.78rem] font-extrabold text-green bg-green-soft px-2.5 py-1 rounded-full">
+                            <IconCheckCircle className="w-3 h-3" /> Идэвхтэй
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-[.78rem] font-extrabold text-gold-strong bg-gold-soft px-2.5 py-1 rounded-full">
+                            <IconClock className="w-3 h-3" /> Хүлээгдэж буй
+                          </span>
+                        )}
+                      </td>
+                      {trackPayments && (
+                        <td className="px-2 py-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(r)}
+                            className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold"
+                          >
+                            {r.totalDue != null ? (
+                              <span className={balance <= 0 ? "text-green" : "text-gold-strong"}>
+                                Үлдэгдэл {formatMnt(balance)}
+                              </span>
+                            ) : (
+                              <span className="text-ink-3 font-semibold">Дүн тохируулаагүй</span>
+                            )}
+                            <span className="text-ink-3 text-[.7rem]">{expanded ? "▲" : "▼"}</span>
+                          </button>
+                        </td>
+                      )}
+                      <td className="px-2 py-3 text-right">
+                        <button
+                          type="button"
+                          disabled={busyId === r.id}
+                          onClick={() => remove(r.id)}
+                          aria-label="Хасах"
+                          className="w-7 h-7 rounded-full bg-surface border border-line-2 grid place-items-center disabled:opacity-50"
+                        >
+                          <IconClose className="w-3 h-3 text-ink-3" />
+                        </button>
+                      </td>
+                    </tr>
+                    {trackPayments && expanded && (
+                      <tr className="border-t border-line">
+                        <td colSpan={6} className="px-2 py-4 bg-bg-soft">
+                          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2.5 items-end max-w-[420px]">
+                            <label className="flex flex-col gap-1.5">
+                              <span className="text-[.78rem] font-extrabold text-ink-3">Төлөх дүн</span>
+                              <input
+                                type="number"
+                                min={0}
+                                value={totalDueDraft[r.id] ?? ""}
+                                onChange={(e) => setTotalDueDraft((d) => ({ ...d, [r.id]: e.target.value }))}
+                                placeholder="2,240,000"
+                                className="px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface text-ink font-semibold text-[.88rem] focus:outline-none focus:border-blue"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              disabled={savingTotalDueId === r.id}
+                              onClick={() => saveTotalDue(r.id)}
+                              className="text-[.82rem] font-extrabold text-white bg-blue rounded-full px-4 py-2 disabled:opacity-50 h-fit"
+                            >
+                              {savingTotalDueId === r.id ? "…" : "Хадгалах"}
+                            </button>
+                          </div>
+
+                          {regPayments.length > 0 && (
+                            <div className="grid grid-cols-[1fr_1fr_auto] gap-x-4 gap-y-1.5 max-w-[420px] mt-4">
+                              <span className="text-[.76rem] font-extrabold text-ink-3 uppercase tracking-[.05em]">Огноо</span>
+                              <span className="text-[.76rem] font-extrabold text-ink-3 uppercase tracking-[.05em]">Дүн</span>
+                              <span />
+                              {regPayments.map((p) => (
+                                <Fragment key={p.id}>
+                                  <span className="text-[.88rem] font-semibold">{formatDate(p.paidAt)}</span>
+                                  <span className="text-[.88rem] font-extrabold">{formatMnt(p.amount)}</span>
+                                  <button
+                                    type="button"
+                                    disabled={removingPaymentId === p.id}
+                                    onClick={() => removePayment(r.id, p.id)}
+                                    aria-label="Төлбөр хасах"
+                                    className="w-5 h-5 rounded-full bg-surface border border-line-2 grid place-items-center disabled:opacity-50 justify-self-start"
+                                  >
+                                    <IconClose className="w-2.5 h-2.5 text-ink-3" />
+                                  </button>
+                                </Fragment>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-2.5 items-end max-w-[520px] mt-4">
+                            <label className="flex flex-col gap-1.5">
+                              <span className="text-[.78rem] font-extrabold text-ink-3">Төлсөн огноо</span>
+                              <input
+                                type="date"
+                                value={paymentForm[r.id]?.date ?? todayIso()}
+                                onChange={(e) =>
+                                  setPaymentForm((f) => ({ ...f, [r.id]: { date: e.target.value, amount: f[r.id]?.amount ?? "" } }))
+                                }
+                                className="px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface text-ink font-semibold text-[.88rem] focus:outline-none focus:border-blue"
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1.5">
+                              <span className="text-[.78rem] font-extrabold text-ink-3">Төлсөн дүн</span>
+                              <input
+                                type="number"
+                                min={0}
+                                value={paymentForm[r.id]?.amount ?? ""}
+                                onChange={(e) =>
+                                  setPaymentForm((f) => ({ ...f, [r.id]: { date: f[r.id]?.date ?? todayIso(), amount: e.target.value } }))
+                                }
+                                placeholder="500,000"
+                                className="px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface text-ink font-semibold text-[.88rem] focus:outline-none focus:border-blue"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              disabled={addingPaymentId === r.id}
+                              onClick={() => addPayment(r.id)}
+                              className="text-[.82rem] font-extrabold text-white bg-blue rounded-full px-4 py-2 disabled:opacity-50 h-fit"
+                            >
+                              {addingPaymentId === r.id ? "…" : "Төлбөр нэмэх"}
+                            </button>
+                          </div>
+
+                          <p className="text-[.85rem] font-bold text-ink-2 mt-4">
+                            Нийт төлсөн {formatMnt(paidSum)}
+                            {r.totalDue != null && (
+                              <>
+                                {" "}
+                                · Үлдэгдэл{" "}
+                                <span className={balance <= 0 ? "text-green" : "text-gold-strong"}>{formatMnt(balance)}</span>
+                              </>
+                            )}
+                          </p>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                  <td className="px-2 py-3 font-semibold text-[.88rem] text-ink-2">
-                    {r.user?.phone ?? r.phone ?? "—"}
-                  </td>
-                  <td className="px-2 py-3 font-semibold text-[.88rem] text-ink-2">
-                    {new Date(r.createdAt).toLocaleDateString("mn-MN")}
-                    <span className="text-ink-3"> · {payMethodLabel(r.payMethod)}</span>
-                  </td>
-                  <td className="px-2 py-3">
-                    {r.status === "active" ? (
-                      <span className="inline-flex items-center gap-1.5 text-[.78rem] font-extrabold text-green bg-green-soft px-2.5 py-1 rounded-full">
-                        <IconCheckCircle className="w-3 h-3" /> Идэвхтэй
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-[.78rem] font-extrabold text-gold-strong bg-gold-soft px-2.5 py-1 rounded-full">
-                        <IconClock className="w-3 h-3" /> Хүлээгдэж буй
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-2 py-3 text-right">
-                    <button
-                      type="button"
-                      disabled={busyId === r.id}
-                      onClick={() => remove(r.id)}
-                      aria-label="Хасах"
-                      className="w-7 h-7 rounded-full bg-surface border border-line-2 grid place-items-center disabled:opacity-50"
-                    >
-                      <IconClose className="w-3 h-3 text-ink-3" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

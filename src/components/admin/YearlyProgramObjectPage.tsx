@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { Lesson, PublicUser, Registration, YearlyProgram } from "@/lib/db";
+import type { Lesson, PublicUser, Registration, RegistrationPayment, YearlyProgram } from "@/lib/db";
 import { IconBank, IconPerson, IconQrCode } from "@/components/icons";
 import { formatMnt, parsePriceToNumber } from "@/lib/price";
 import { payMethodLabel } from "@/lib/registration";
@@ -18,13 +18,16 @@ type SectionTab = "info" | "roster" | "confirm" | "report";
 export default function YearlyProgramObjectPage({
   program,
   initialRegistrations,
+  initialPayments,
 }: {
   program: YearlyProgram;
   initialRegistrations: RegistrationWithUser[];
+  initialPayments: RegistrationPayment[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<SectionTab>("info");
   const [registrations, setRegistrations] = useState(initialRegistrations);
+  const [payments, setPayments] = useState(initialPayments);
   const [busyRegId, setBusyRegId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
@@ -244,7 +247,14 @@ export default function YearlyProgramObjectPage({
 
         {tab === "roster" && (
           <Card title={`Бүртгүүлсэн сурагчид (${registrations.length})`}>
-            <RegistrationRoster programId={program.id} registrations={registrations} onChange={setRegistrations} />
+            <RegistrationRoster
+              programId={program.id}
+              registrations={registrations}
+              onChange={setRegistrations}
+              trackPayments
+              payments={payments}
+              onPaymentsChange={setPayments}
+            />
           </Card>
         )}
 

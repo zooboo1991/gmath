@@ -153,6 +153,8 @@ export type Registration = {
   qpayPaymentId?: string;
   qpayQrImage?: string;
   qpayShortUrl?: string;
+  /** The actual agreed total for this student (can differ from `price` — discounts, negotiated deals). Set via the admin roster's payment tracking, yearly programs only. */
+  totalDue?: number;
 };
 
 /**
@@ -251,6 +253,7 @@ type RegistrationRow = {
   qpay_payment_id: string | null;
   qpay_qr_image: string | null;
   qpay_short_url: string | null;
+  total_due: number | null;
 };
 
 type CertificateRow = {
@@ -352,6 +355,7 @@ function registrationFromRow(row: RegistrationRow): Registration {
     qpayPaymentId: row.qpay_payment_id ?? undefined,
     qpayQrImage: row.qpay_qr_image ?? undefined,
     qpayShortUrl: row.qpay_short_url ?? undefined,
+    totalDue: row.total_due ?? undefined,
   };
 }
 
@@ -1082,6 +1086,82 @@ export async function settleRegistrationPayment(id: string): Promise<Registratio
 
 export async function deleteRegistration(id: string): Promise<boolean> {
   const { error, count } = await getSupabase().from("registrations").delete({ count: "exact" }).eq("id", id);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
+export async function setRegistrationTotalDue(id: string, totalDue: number): Promise<Registration | undefined> {
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .update({ total_due: totalDue })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data ? registrationFromRow(data as RegistrationRow) : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Installment payments — see the schema comment on registration_payments.
+// ---------------------------------------------------------------------------
+
+export type RegistrationPayment = {
+  id: string;
+  registrationId: string;
+  amount: number;
+  paidAt: string;
+  createdAt: string;
+};
+
+type RegistrationPaymentRow = {
+  id: string;
+  registration_id: string;
+  amount: number;
+  paid_at: string;
+  created_at: string;
+};
+
+function registrationPaymentFromRow(row: RegistrationPaymentRow): RegistrationPayment {
+  return {
+    id: row.id,
+    registrationId: row.registration_id,
+    amount: row.amount,
+    paidAt: row.paid_at,
+    createdAt: row.created_at,
+  };
+}
+
+/** Bulk-fetches every payment for a whole roster at once (~30 rows max) rather than lazily per row. */
+export async function listPaymentsForRegistrations(registrationIds: string[]): Promise<RegistrationPayment[]> {
+  if (registrationIds.length === 0) return [];
+  const { data, error } = await getSupabase()
+    .from("registration_payments")
+    .select("*")
+    .in("registration_id", registrationIds)
+    .order("paid_at", { ascending: true });
+  if (error) throw error;
+  return (data as RegistrationPaymentRow[]).map(registrationPaymentFromRow);
+}
+
+export async function addRegistrationPayment(input: {
+  registrationId: string;
+  amount: number;
+  paidAt: string;
+}): Promise<RegistrationPayment> {
+  const { data, error } = await getSupabase()
+    .from("registration_payments")
+    .insert({ registration_id: input.registrationId, amount: input.amount, paid_at: input.paidAt })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return registrationPaymentFromRow(data as RegistrationPaymentRow);
+}
+
+export async function deleteRegistrationPayment(id: string): Promise<boolean> {
+  const { error, count } = await getSupabase()
+    .from("registration_payments")
+    .delete({ count: "exact" })
+    .eq("id", id);
   if (error) throw error;
   return (count ?? 0) > 0;
 }
