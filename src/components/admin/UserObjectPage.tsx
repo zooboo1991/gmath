@@ -101,7 +101,7 @@ export default function UserObjectPage({
               </span>
             </div>
             <b className="block text-[1.02rem] truncate max-w-[360px]">
-              {user.lastName} {user.firstName}
+              {user.lastName || user.firstName ? `${user.lastName} ${user.firstName}` : "Мэдээлэл дутуу"}
             </b>
           </div>
         </div>

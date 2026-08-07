@@ -65,7 +65,7 @@ export default function AdminDashboard({
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [courses, setCourses] = useState(initialCourses);
   const [articles] = useState(initialArticles);
-  const [users] = useState(initialUsers);
+  const [users, setUsers] = useState(initialUsers);
   const [certificates, setCertificates] = useState(initialCertificates);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -433,7 +433,7 @@ export default function AdminDashboard({
           </div>
         )}
 
-        {tab === "users" && <UsersPanel users={users} registrations={registrations} />}
+        {tab === "users" && <UsersPanel users={users} setUsers={setUsers} registrations={registrations} />}
 
         {tab === "analytics" && <AnalyticsPanel data={analytics} />}
 
@@ -762,9 +762,11 @@ const FILTER_INPUT_CLASS =
 
 function UsersPanel({
   users,
+  setUsers,
   registrations,
 }: {
   users: PublicUser[];
+  setUsers: React.Dispatch<React.SetStateAction<PublicUser[]>>;
   registrations: RegistrationWithUser[];
 }) {
   const router = useRouter();
@@ -773,6 +775,39 @@ function UsersPanel({
   const [email, setEmail] = useState("");
   const [school, setSchool] = useState("");
   const [role, setRole] = useState<"" | "teacher" | "student">("");
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [newPhone, setNewPhone] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState<"student" | "teacher">("student");
+  const [adding, setAdding] = useState(false);
+  const [addErrors, setAddErrors] = useState<Record<string, string>>({});
+
+  const addUser = async () => {
+    setAdding(true);
+    setAddErrors({});
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: newPhone, password: newPassword, role: newRole }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setAddErrors(json.errors ?? { phone: json.error ?? "Нэмэхэд алдаа гарлаа" });
+        return;
+      }
+      setUsers((us) => [json.user, ...us]);
+      setNewPhone("");
+      setNewPassword("");
+      setNewRole("student");
+      setAddOpen(false);
+    } catch {
+      setAddErrors({ phone: "Сүлжээний алдаа гарлаа. Дахин оролдоно уу." });
+    } finally {
+      setAdding(false);
+    }
+  };
 
   const schools = useMemo(
     () => [...new Set(users.map((u) => u.school).filter(Boolean))].sort((a, b) => a.localeCompare(b, "mn")),
@@ -804,10 +839,83 @@ function UsersPanel({
 
   return (
     <div>
-      <h2 className="text-[1.15rem] font-extrabold mb-3">
-        Хэрэглэгчид ({filtered.length}
-        {filtered.length !== users.length && ` / ${users.length}`})
-      </h2>
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+        <h2 className="text-[1.15rem] font-extrabold">
+          Хэрэглэгчид ({filtered.length}
+          {filtered.length !== users.length && ` / ${users.length}`})
+        </h2>
+        {!addOpen && (
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="text-[.85rem] font-extrabold text-blue-strong bg-blue-soft px-4 py-2 rounded-full"
+          >
+            + Хэрэглэгч нэмэх
+          </button>
+        )}
+      </div>
+
+      {addOpen && (
+        <div className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 mb-4">
+          <h3 className="font-extrabold text-[.95rem] mb-1">Хэрэглэгч гараар нэмэх</h3>
+          <p className="text-ink-3 font-semibold text-[.85rem] mb-3">
+            OTP баталгаажуулалтгүйгээр шууд бүртгэнэ. Хэрэглэгч эдгээр дугаар, нууц үгээр нэвтэрч орж,
+            Профайл хэсгээсээ дутуу мэдээллээ (нэр, имэйл, сургууль гэх мэт) засах шаардлагатай.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[.8rem] font-extrabold text-ink-3">Утасны дугаар</span>
+              <input
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                placeholder="99XXXXXX"
+                className={FILTER_INPUT_CLASS}
+              />
+              {addErrors.phone && <span className="text-[.78rem] font-semibold text-red-soft">{addErrors.phone}</span>}
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[.8rem] font-extrabold text-ink-3">Нууц үг</span>
+              <input
+                type="text"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Том, жижиг үсэг, тоо, 6+ тэмдэгт"
+                className={FILTER_INPUT_CLASS}
+              />
+              {addErrors.password && (
+                <span className="text-[.78rem] font-semibold text-red-soft">{addErrors.password}</span>
+              )}
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[.8rem] font-extrabold text-ink-3">Төрөл</span>
+              <select value={newRole} onChange={(e) => setNewRole(e.target.value as "student" | "teacher")} className={FILTER_INPUT_CLASS}>
+                <option value="student">Сурагч</option>
+                <option value="teacher">Багш</option>
+              </select>
+            </label>
+          </div>
+          <div className="flex gap-2.5 mt-3.5">
+            <button
+              type="button"
+              disabled={adding}
+              onClick={addUser}
+              className="text-[.85rem] font-extrabold text-white bg-blue px-5 py-2.5 rounded-full disabled:opacity-50"
+            >
+              {adding ? "Нэмж байна…" : "Нэмэх"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAddOpen(false);
+                setAddErrors({});
+              }}
+              className="text-[.85rem] font-extrabold text-ink-2 bg-surface-2 px-5 py-2.5 rounded-full"
+            >
+              Цуцлах
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 mb-4 grid grid-cols-1 nav:grid-cols-5 gap-3">
         <input
@@ -875,7 +983,9 @@ function UsersPanel({
                   className="border-t border-line cursor-pointer hover:bg-bg-soft transition-colors"
                 >
                   <td className="px-4 py-3 font-extrabold text-[.9rem]">
-                    {u.lastName} {u.firstName}
+                    {u.lastName || u.firstName ? `${u.lastName} ${u.firstName}` : (
+                      <span className="text-ink-3 font-semibold">Мэдээлэл дутуу</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span
@@ -1795,6 +1905,7 @@ function NotificationsPanel({
 }
 
 const ACTION_LABELS: Record<string, string> = {
+  "user.create": "Хэрэглэгч гараар нэмсэн",
   "course.create": "Сургалт үүсгэсэн",
   "course.update": "Сургалт засварласан",
   "yearly_program.update": "Жилийн хөтөлбөр засварласан",
@@ -1809,6 +1920,9 @@ const ACTION_LABELS: Record<string, string> = {
 
 /** Where a log entry's course/program lives in the admin, if it still can be derived. */
 function logTargetHref(log: AdminLogEntry): string | undefined {
+  if (log.actionType === "user.create") {
+    return log.targetId ? `/admin/users/${log.targetId}` : undefined;
+  }
   if (log.actionType === "course.create" || log.actionType === "course.update" || log.actionType === "yearly_program.update") {
     return log.targetId ? programAdminHref(log.targetId) : undefined;
   }
