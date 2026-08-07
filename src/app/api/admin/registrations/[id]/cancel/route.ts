@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deleteRegistration, findRegistrationById, settleRegistrationPayment } from "@/lib/db";
+import { logAdminAction } from "@/lib/adminLog";
 import { getPaymentProvider } from "@/lib/payment";
 import { isAdmin } from "@/lib/session";
 
@@ -9,7 +10,7 @@ import { isAdmin } from "@/lib/session";
  * instead of leaving it stuck in the "Баталгаажуулах" queue forever, with
  * no way to tell it apart from one genuinely awaiting a bank transfer.
  */
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
@@ -43,6 +44,13 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       await getPaymentProvider().cancelPayment(current.qpayInvoiceId);
     }
     await deleteRegistration(id);
+
+    await logAdminAction(request, {
+      actionType: "registration.cancel_pending",
+      targetId: id,
+      details: { programLabel: registration.programLabel, price: registration.price },
+    });
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("admin registration cancel failed", id, err);

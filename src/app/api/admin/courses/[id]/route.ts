@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { updateCourse } from "@/lib/db";
+import { logAdminAction } from "@/lib/adminLog";
 import { isAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
 import { normalizeLessons, validateLessons } from "@/lib/lessonInput";
@@ -76,6 +77,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!course) {
     return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
   }
+
+  await logAdminAction(request, {
+    actionType: "course.update",
+    targetId: id,
+    details: {
+      ...(data.status !== undefined && { status: data.status }),
+      ...(data.price !== undefined && { price: data.price }),
+      ...(data.title !== undefined && { title: data.title }),
+    },
+  });
+
   return NextResponse.json({ ok: true, course });
 }
 

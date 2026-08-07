@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { approveRegistration } from "@/lib/db";
+import { logAdminAction } from "@/lib/adminLog";
 import { isAdmin } from "@/lib/session";
 
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
@@ -11,5 +12,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!registration) {
     return NextResponse.json({ ok: false, error: "Бүртгэл олдсонгүй" }, { status: 404 });
   }
+
+  await logAdminAction(request, {
+    actionType: "registration.approve",
+    targetId: id,
+    details: { programLabel: registration.programLabel, price: registration.price },
+  });
+
   return NextResponse.json({ ok: true, registration });
 }

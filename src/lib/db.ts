@@ -1031,8 +1031,23 @@ export async function settleRegistrationPayment(id: string): Promise<Registratio
   }
   const result = await getPaymentProvider().checkPayment(registration.qpayInvoiceId);
   if (!result.paid) return registration;
-  const updated = await updateRegistration(id, { status: "active", qpay_payment_id: result.reference });
-  if (updated) await notifyRegistrationActive(updated);
+
+  // Scoped to status="pending" so a duplicate/concurrent call (the QPay
+  // webhook and a client poll can genuinely land at nearly the same time)
+  // can't both "win" this transition and both fire notifyRegistrationActive.
+  // updateRegistration() doesn't take a WHERE-status guard, hence the raw
+  // query here instead.
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .update({ status: "active", qpay_payment_id: result.reference })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return findRegistrationById(id);
+  const updated = registrationFromRow(data as RegistrationRow);
+  await notifyRegistrationActive(updated);
   return updated;
 }
 

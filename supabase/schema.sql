@@ -498,3 +498,19 @@ alter table registrations add constraint registrations_pay_method_check check (p
 -- (partial, since NULL user_id would otherwise defeat any plain unique index).
 create unique index if not exists registrations_phone_program_unique
   on registrations (phone, program_id) where user_id is null;
+
+-- Records what happened, not who did it — admin access is one shared
+-- password with a single generic cookie marker (see checkAdminPassword() /
+-- ADMIN_MARKER in lib/session.ts), so there's no per-admin identity to
+-- attach an admin_id to today. `ip` is the closest available forensic
+-- signal (same getClientIp() helper already used for rate limiting).
+create table if not exists admin_logs (
+  id uuid primary key default gen_random_uuid(),
+  action_type text not null,
+  target_id text,
+  details jsonb,
+  ip text,
+  created_at timestamptz not null default now()
+);
+create index if not exists admin_logs_created_at_idx on admin_logs (created_at desc);
+create index if not exists admin_logs_action_type_idx on admin_logs (action_type);

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createNotification, findCourseById, findYearlyProgramById, listNotificationsForAdmin } from "@/lib/db";
+import { logAdminAction } from "@/lib/adminLog";
 import { isAdmin } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 
@@ -73,6 +74,12 @@ export async function POST(request: Request) {
     targetCourseLabel,
     userIds: targetType === "users" ? userIds : undefined,
     channel,
+  });
+
+  await logAdminAction(request, {
+    actionType: "notification.send",
+    targetId: notification.id,
+    details: { title, targetType, channel, recipientCount: notification.recipientCount, smsFailures },
   });
 
   return NextResponse.json({ ok: true, notification, smsFailures });

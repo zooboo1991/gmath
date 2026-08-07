@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { findCourseById, findYearlyProgramById, updateCourse, updateYearlyProgram, type Lesson } from "@/lib/db";
+import { logAdminAction } from "@/lib/adminLog";
 import { parseScheduleString } from "@/lib/lessonSchedule";
 import { isAdmin } from "@/lib/session";
 import { createMeeting } from "@/lib/zoom/client";
@@ -30,7 +31,7 @@ function zoomSchedule(scheduleString: string | undefined): { startTime: string; 
 }
 
 export async function POST(
-  req: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string; lessonIndex: string }> }
 ) {
   if (!(await isAdmin())) {
@@ -63,7 +64,7 @@ export async function POST(
   // force=true is the admin's "meeting-ээ дахин үүсгэх" escape hatch — for
   // when the tracked meeting was deleted directly on Zoom's side (e.g. via
   // zoom.us), which this app has no way to detect on its own.
-  const body = await req.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({}));
   const force = (body as { force?: boolean })?.force === true;
 
   const existingRow = await findLessonMeeting(courseId, lessonIndex);
@@ -115,6 +116,12 @@ export async function POST(
       await updateCourse(courseId, { lessons });
     }
   }
+
+  await logAdminAction(request, {
+    actionType: "lesson.zoom_meeting_create",
+    targetId: `${courseId}#${lessonIndex}`,
+    details: { title: owner.title, topic: lesson.topic, force },
+  });
 
   return NextResponse.json({ ok: true, meeting });
 }

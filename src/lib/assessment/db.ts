@@ -385,11 +385,25 @@ export async function settleAssessmentPayment(id: string): Promise<Assessment | 
   }
   const result = await getPaymentProvider().checkPayment(assessment.paymentInvoiceId);
   if (!result.paid) return assessment;
-  return updateAssessment(id, {
-    status: "paid",
-    payment_ref: result.reference,
-    paid_at: result.paidAt,
-  });
+
+  // Scoped to status="awaiting_payment" so a duplicate/concurrent call (the
+  // QPay webhook and a client poll can genuinely land at nearly the same
+  // time) can't both "win" this transition — mirrors the same guard on
+  // settleRegistrationPayment() in lib/db.ts.
+  const { data, error } = await getSupabase()
+    .from("assessments")
+    .update({
+      status: "paid",
+      payment_ref: result.reference,
+      paid_at: result.paidAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "awaiting_payment")
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data ? assessmentFromRow(data as AssessmentRow) : await findAssessment(id);
 }
 
 /**

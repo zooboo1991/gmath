@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { updateYearlyProgram } from "@/lib/db";
+import { logAdminAction } from "@/lib/adminLog";
 import { isAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
 import { normalizeLessons, validateLessons } from "@/lib/lessonInput";
@@ -67,5 +68,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!program) {
     return NextResponse.json({ ok: false, error: "Хөтөлбөр олдсонгүй" }, { status: 404 });
   }
+
+  await logAdminAction(request, {
+    actionType: "yearly_program.update",
+    targetId: id,
+    details: { title: program.title, price: program.price },
+  });
+
   return NextResponse.json({ ok: true, program });
 }

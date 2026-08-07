@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { addCourse, listCourses } from "@/lib/db";
+import { logAdminAction } from "@/lib/adminLog";
 import { isAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
 import { normalizeLessons, validateLessons } from "@/lib/lessonInput";
@@ -74,6 +75,12 @@ export async function POST(request: Request) {
     zoomPasscode: data.zoomPasscode?.trim() || undefined,
     lessons,
     showOnHomepage: data.showOnHomepage === true,
+  });
+
+  await logAdminAction(request, {
+    actionType: "course.create",
+    targetId: course.id,
+    details: { title: course.title, price: course.price, kind: course.kind, status: course.status },
   });
 
   return NextResponse.json({ ok: true, course });

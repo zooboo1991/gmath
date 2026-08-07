@@ -17,6 +17,7 @@ import type {
   YearlyProgram,
 } from "@/lib/db";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
+import type { AdminLogEntry } from "@/lib/adminLog";
 import { formatCourseDate } from "@/lib/courseDate";
 import { formatMnt } from "@/lib/price";
 import { payMethodLabel } from "@/lib/registration";
@@ -31,7 +32,8 @@ type Tab =
   | "analytics"
   | "certificates"
   | "assessment"
-  | "notifications";
+  | "notifications"
+  | "logs";
 
 export default function AdminDashboard({
   initialRegistrations,
@@ -254,6 +256,15 @@ export default function AdminDashboard({
           >
             Мэдэгдэл
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("logs")}
+            className={`font-extrabold text-[.95rem] px-5 py-2.5 rounded-full transition-colors shrink-0 ${
+              tab === "logs" ? "bg-blue text-white" : "bg-surface text-ink-2"
+            }`}
+          >
+            Түүх
+          </button>
         </div>
 
         {tab === "dashboard" && <DashboardPanel stats={stats} onOpenPending={() => setTab("registrations")} />}
@@ -263,6 +274,8 @@ export default function AdminDashboard({
         {tab === "notifications" && (
           <NotificationsPanel users={users} courses={courses} yearlyPrograms={yearlyPrograms} />
         )}
+
+        {tab === "logs" && <AdminLogsPanel />}
 
         {tab === "registrations" && (
           <div className="flex flex-col gap-3">
@@ -1686,6 +1699,85 @@ function NotificationsPanel({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  "course.create": "Сургалт үүсгэсэн",
+  "course.update": "Сургалт засварласан",
+  "yearly_program.update": "Жилийн хөтөлбөр засварласан",
+  "registration.manual_add": "Бүртгэл гараар нэмсэн",
+  "registration.delete": "Бүртгэл хассан",
+  "registration.approve": "Бүртгэл баталгаажуулсан",
+  "registration.cancel_pending": "Хүлээгдэж буй бүртгэл цуцалсан",
+  "lesson.zoom_meeting_create": "Zoom meeting үүсгэсэн",
+  "notification.send": "Мэдэгдэл илгээсэн",
+  "setting.update": "Тохиргоо өөрчилсөн",
+};
+
+/** Loaded lazily — this tab's own data, not part of the page's initial props. */
+function AdminLogsPanel() {
+  const [state, setState] = useState<{ status: "loading" | "done" | "error"; logs?: AdminLogEntry[] }>({
+    status: "loading",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/logs")
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((json) => {
+        if (!cancelled) setState({ status: "done", logs: json.logs });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: "error" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className="card-flat px-6 py-6">
+      <div className="mb-4">
+        <h3 className="font-extrabold text-[1.05rem]">Админы үйлдлийн түүх</h3>
+        <p className="text-ink-3 font-semibold text-[.85rem] mt-1">
+          Үнэ өөрчлөх, бүртгэл нэмэх/хасах, Zoom үүсгэх, мэдэгдэл илгээх зэрэг мэдрэмтгий үйлдлүүд
+          энд бүртгэгдэнэ. Админ эрх нэг л нууц үгтэй тул &quot;хэн&quot; гэдгийг биш &quot;юу
+          хийсэн бэ&quot;-г л харуулна.
+        </p>
+      </div>
+
+      {state.status === "loading" && <p className="text-ink-3 font-semibold text-[.9rem]">Ачааллаж байна…</p>}
+      {state.status === "error" && (
+        <p className="text-red-soft font-semibold text-[.9rem]">Ачаалахад алдаа гарлаа. Дахин оролдоно уу.</p>
+      )}
+      {state.status === "done" && state.logs && state.logs.length === 0 && (
+        <p className="text-ink-3 font-semibold text-[.9rem]">Одоогоор бүртгэгдсэн үйлдэл алга.</p>
+      )}
+      {state.status === "done" && state.logs && state.logs.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {state.logs.map((log) => (
+            <div key={log.id} className="flex items-start justify-between gap-4 flex-wrap py-2.5 border-b border-line last:border-0">
+              <div>
+                <b className="font-extrabold text-[.9rem] block">{ACTION_LABELS[log.actionType] ?? log.actionType}</b>
+                {log.details && (
+                  <span className="text-ink-3 font-semibold text-[.8rem] block mt-0.5">
+                    {Object.entries(log.details)
+                      .filter(([, v]) => v !== undefined && v !== "")
+                      .map(([k, v]) => `${k}: ${v}`)
+                      .join(" · ")}
+                  </span>
+                )}
+              </div>
+              <span className="text-ink-3 font-semibold text-[.78rem] shrink-0">
+                {new Date(log.createdAt).toLocaleString("mn-MN")}
+                {log.ip && ` · ${log.ip}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

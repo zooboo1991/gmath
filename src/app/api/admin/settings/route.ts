@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAssessmentFee, setSetting } from "@/lib/assessment/db";
+import { logAdminAction } from "@/lib/adminLog";
 import { isAdmin } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 
@@ -33,5 +34,8 @@ export async function PUT(request: Request) {
   }
 
   await setSetting(key, value);
+
+  await logAdminAction(request, { actionType: "setting.update", targetId: key, details: { value } });
+
   return NextResponse.json({ ok: true, key, value });
 }

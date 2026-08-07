@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { addManualRegistration, findRegistrationByUserAndProgram, findUserByPhone, listAllRegistrations } from "@/lib/db";
+import { logAdminAction } from "@/lib/adminLog";
 import { resolveProgram } from "@/lib/resolveProgram";
 import { isAdmin } from "@/lib/session";
 
@@ -50,6 +51,11 @@ export async function POST(request: Request) {
       price: program.price,
       phone,
       userId: user?.id,
+    });
+    await logAdminAction(request, {
+      actionType: "registration.manual_add",
+      targetId: registration.id,
+      details: { programId, phone, programLabel: program.label, price: program.price, linkedExistingAccount: Boolean(user) },
     });
     return NextResponse.json({ ok: true, registration });
   } catch (err) {
