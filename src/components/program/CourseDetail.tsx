@@ -206,8 +206,8 @@ export default function CourseDetail({ course, related }: { course: Course; rela
               {course.price} <span className="text-[1rem] text-ink-3 font-bold">{course.period}</span>
             </b>
             <p className="text-ink-3 font-semibold text-[.92rem] mt-3">
-              {course.startDate && `Эхлэх огноо: ${formatCourseDate(course.startDate)}. `}Суудлын тоо хязгаарлагдмал тул эрт
-              бүртгүүлсэн сурагч урьтал эдэлнэ.
+              {course.startDate && `Эхлэх огноо: ${formatCourseDate(course.startDate)}. `}Суудлын тоо хязгаарлагдмал бөгөөд
+              сурагчдын тоо дүүрэхэд элсэлт хаагдана.
             </p>
             <div className="mt-6">
               <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
