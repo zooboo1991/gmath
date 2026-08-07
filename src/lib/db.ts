@@ -1474,71 +1474,73 @@ export async function getPageViewCountsByPrefix(prefix: string): Promise<Record<
   return counts;
 }
 
-export type AnalyticsStats = {
-  viewsAllTime: number;
-  viewsToday: number;
-  viewsWeek: number;
-  viewsMonth: number;
-  visitorsToday: number;
-  visitorsWeek: number;
-  visitorsMonth: number;
-  topPages: { path: string; views: number }[];
-  topReferrers: { referrer: string; views: number }[];
-  /** One entry per day, oldest first, covering the last 30 days. */
-  daily: { date: string; views: number }[];
-};
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/**
- * Reads the last 30 days of raw rows once and derives every breakdown from
- * that in memory — cheap at this school's traffic, and it avoids needing a
- * separate round trip (or a Postgres view) per stat. viewsAllTime is the one
- * figure that reaches further back, so it's a head-only count instead of a
- * row fetch.
- */
-export async function getAnalyticsStats(): Promise<AnalyticsStats> {
-  const now = Date.now();
-  const since = new Date(now - 30 * DAY_MS).toISOString();
+/** All-time pageview count — a small head-only query, independent of whatever date range the admin has filtered analytics to. */
+export async function getTotalPageViews(): Promise<number> {
+  return countRows("page_views");
+}
 
-  const [viewsAllTime, recent] = await Promise.all([
-    countRows("page_views"),
+export type AnalyticsRangeStats = {
+  views: number;
+  visitors: number;
+  topPages: { path: string; views: number }[];
+  topReferrers: { referrer: string; views: number }[];
+  /** One entry per calendar day in the range, oldest first. */
+  daily: { date: string; views: number }[];
+  newRegistrations: number;
+  newRevenue: number;
+  newUsers: number;
+};
+
+/**
+ * Every analytics figure scoped to one admin-picked date range (calendar
+ * dates, inclusive both ends) — pageviews plus, since the admin is already
+ * looking at "what happened in this period", the business metrics that
+ * answer the same question: how many people signed up or registered, and
+ * how much of that turned into confirmed revenue.
+ */
+export async function getAnalyticsStatsForRange(fromDate: string, toDate: string): Promise<AnalyticsRangeStats> {
+  const fromIso = `${fromDate}T00:00:00.000Z`;
+  const toIso = `${toDate}T23:59:59.999Z`;
+
+  const [viewRows, regRows, newUsers] = await Promise.all([
     getSupabase()
       .from("page_views")
       .select("path, referrer, visitor_id, created_at")
-      .gte("created_at", since)
+      .gte("created_at", fromIso)
+      .lte("created_at", toIso)
       .then(({ data, error }) => {
         if (error) throw error;
         return data as { path: string; referrer: string | null; visitor_id: string; created_at: string }[];
       }),
+    getSupabase()
+      .from("registrations")
+      .select("price, status, created_at")
+      .gte("created_at", fromIso)
+      .lte("created_at", toIso)
+      .then(({ data, error }) => {
+        if (error) throw error;
+        return data as { price: string; status: RegistrationStatus; created_at: string }[];
+      }),
+    getSupabase()
+      .from("users")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", fromIso)
+      .lte("created_at", toIso)
+      .then(({ count, error }) => {
+        if (error) throw error;
+        return count ?? 0;
+      }),
   ]);
 
-  const todayStart = now - DAY_MS;
-  const weekStart = now - 7 * DAY_MS;
-
-  let viewsToday = 0;
-  let viewsWeek = 0;
-  let viewsMonth = 0;
-  const visitorsToday = new Set<string>();
-  const visitorsWeek = new Set<string>();
-  const visitorsMonth = new Set<string>();
+  const visitors = new Set<string>();
   const byPage = new Map<string, number>();
   const byReferrer = new Map<string, number>();
   const byDay = new Map<string, number>();
 
-  for (const row of recent) {
-    const t = new Date(row.created_at).getTime();
-    viewsMonth += 1;
-    visitorsMonth.add(row.visitor_id);
-    if (t >= weekStart) {
-      viewsWeek += 1;
-      visitorsWeek.add(row.visitor_id);
-    }
-    if (t >= todayStart) {
-      viewsToday += 1;
-      visitorsToday.add(row.visitor_id);
-    }
-
+  for (const row of viewRows) {
+    visitors.add(row.visitor_id);
     byPage.set(row.path, (byPage.get(row.path) ?? 0) + 1);
 
     const referrerLabel = row.referrer ? (parseHostname(row.referrer) ?? "Бусад") : "Шууд орсон";
@@ -1549,8 +1551,12 @@ export async function getAnalyticsStats(): Promise<AnalyticsStats> {
   }
 
   const daily: { date: string; views: number }[] = [];
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date(now - i * DAY_MS).toISOString().slice(0, 10);
+  for (
+    let cursor = new Date(fromIso);
+    cursor.toISOString().slice(0, 10) <= toDate;
+    cursor = new Date(cursor.getTime() + DAY_MS)
+  ) {
+    const date = cursor.toISOString().slice(0, 10);
     daily.push({ date, views: byDay.get(date) ?? 0 });
   }
 
@@ -1563,17 +1569,20 @@ export async function getAnalyticsStats(): Promise<AnalyticsStats> {
     .sort((a, b) => b.views - a.views)
     .slice(0, 6);
 
+  let newRevenue = 0;
+  for (const r of regRows) {
+    if (r.status === "active") newRevenue += parsePriceToNumber(r.price);
+  }
+
   return {
-    viewsAllTime,
-    viewsToday,
-    viewsWeek,
-    viewsMonth,
-    visitorsToday: visitorsToday.size,
-    visitorsWeek: visitorsWeek.size,
-    visitorsMonth: visitorsMonth.size,
+    views: viewRows.length,
+    visitors: visitors.size,
     topPages,
     topReferrers,
     daily,
+    newRegistrations: regRows.length,
+    newRevenue,
+    newUsers,
   };
 }
 
