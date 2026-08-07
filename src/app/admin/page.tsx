@@ -5,6 +5,7 @@ import AdminDashboard from "@/components/admin/AdminDashboard";
 import {
   getAnalyticsStats,
   getDashboardStats,
+  getPageViewCountsByPrefix,
   listAllRegistrations,
   listArticles,
   listCertificates,
@@ -55,10 +56,11 @@ export default async function AdminPage() {
   // page_views, certificates and app_settings are newer tables — on a site
   // that hasn't run the latest schema.sql yet these throw, and the whole
   // admin page must not go down over one tab's data.
-  const [analytics, certificates, assessmentFee] = await Promise.all([
+  const [analytics, certificates, assessmentFee, viewCounts] = await Promise.all([
     getAnalyticsStats().catch(() => EMPTY_ANALYTICS),
     listCertificates().catch(() => []),
     getAssessmentFee().catch(() => DEFAULT_ASSESSMENT_FEE),
+    getPageViewCountsByPrefix("/courses/").catch(() => ({})),
   ]);
 
   return (
@@ -73,6 +75,7 @@ export default async function AdminPage() {
         assessmentFee={assessmentFee}
         stats={stats}
         analytics={analytics}
+        viewCounts={viewCounts}
       />
     </Suspense>
   );

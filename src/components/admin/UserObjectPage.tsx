@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { LoginLog, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import { IconCheckCircle, IconClock } from "@/components/icons";
 import { describeUserAgent } from "@/lib/userAgent";
-import { payMethodLabel } from "@/lib/registration";
+import { payMethodLabel, programAdminHref } from "@/lib/registration";
 
 type ObjectTab = "info" | "devices";
 
@@ -145,7 +145,12 @@ export default function UserObjectPage({
                         className="bg-bg-soft rounded-md px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap"
                       >
                         <div>
-                          <b className="font-extrabold block text-[.92rem]">{r.programLabel}</b>
+                          <Link
+                            href={programAdminHref(r.programId)}
+                            className="font-extrabold block text-[.92rem] hover:text-blue-strong hover:underline"
+                          >
+                            {r.programLabel}
+                          </Link>
                           <span className="text-ink-3 font-semibold text-[.82rem]">
                             {r.price} · {payMethodLabel(r.payMethod)} ·{" "}
                             {new Date(r.createdAt).toLocaleDateString("mn-MN")}

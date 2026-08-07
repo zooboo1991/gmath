@@ -1383,6 +1383,17 @@ export async function logPageView(input: { path: string; referrer: string | null
   if (error) throw error;
 }
 
+/** Total pageview count per exact path, for paths starting with `prefix` — e.g. per-course "Харсан" counts on the admin course list. */
+export async function getPageViewCountsByPrefix(prefix: string): Promise<Record<string, number>> {
+  const { data, error } = await getSupabase().from("page_views").select("path").like("path", `${prefix}%`);
+  if (error) throw error;
+  const counts: Record<string, number> = {};
+  for (const row of data as { path: string }[]) {
+    counts[row.path] = (counts[row.path] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export type AnalyticsStats = {
   viewsAllTime: number;
   viewsToday: number;

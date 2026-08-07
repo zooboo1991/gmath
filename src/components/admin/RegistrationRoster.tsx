@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { PublicUser, Registration } from "@/lib/db";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
@@ -158,11 +159,15 @@ export default function RegistrationRoster({
               {registrations.map((r) => (
                 <tr key={r.id} className="border-t border-line">
                   <td className="px-2 py-3 font-extrabold text-[.9rem]">
-                    {r.user
-                      ? `${r.user.lastName} ${r.user.firstName}`
-                      : r.phone
-                        ? "Бүртгэл хүлээгдэж буй"
-                        : "Хэрэглэгч устсан"}
+                    {r.user ? (
+                      <Link href={`/admin/users/${r.user.id}`} className="hover:text-blue-strong hover:underline">
+                        {r.user.lastName} {r.user.firstName}
+                      </Link>
+                    ) : r.phone ? (
+                      "Бүртгэл хүлээгдэж буй"
+                    ) : (
+                      "Хэрэглэгч устсан"
+                    )}
                   </td>
                   <td className="px-2 py-3 font-semibold text-[.88rem] text-ink-2">
                     {r.user?.phone ?? r.phone ?? "—"}

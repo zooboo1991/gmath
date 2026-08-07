@@ -20,7 +20,7 @@ import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
 import type { AdminLogEntry } from "@/lib/adminLog";
 import { formatCourseDate } from "@/lib/courseDate";
 import { formatMnt } from "@/lib/price";
-import { payMethodLabel } from "@/lib/registration";
+import { payMethodLabel, programAdminHref } from "@/lib/registration";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 type Tab =
@@ -45,6 +45,7 @@ export default function AdminDashboard({
   assessmentFee,
   stats,
   analytics,
+  viewCounts,
 }: {
   initialRegistrations: RegistrationWithUser[];
   initialCourses: Course[];
@@ -55,6 +56,7 @@ export default function AdminDashboard({
   assessmentFee: string;
   stats: DashboardStats;
   analytics: AnalyticsStats;
+  viewCounts: Record<string, number>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -161,6 +163,19 @@ export default function AdminDashboard({
   const vod = courses.filter((c) => c.kind === "vod" && c.status !== "archived");
   const archived = courses.filter((c) => c.status === "archived");
   const pendingCount = registrations.filter((r) => r.status === "pending").length;
+  const activeCourseCount = upcoming.length + vod.length + yearlyPrograms.length;
+
+  // Per-course/program active+pending registration counts for the list cards.
+  const programStats = useMemo(() => {
+    const map = new Map<string, { active: number; pending: number }>();
+    for (const r of registrations) {
+      const entry = map.get(r.programId) ?? { active: 0, pending: 0 };
+      if (r.status === "active") entry.active += 1;
+      else entry.pending += 1;
+      map.set(r.programId, entry);
+    }
+    return map;
+  }, [registrations]);
 
   return (
     <div className="min-h-screen bg-bg-soft">
@@ -200,7 +215,7 @@ export default function AdminDashboard({
               tab === "courses" ? "bg-blue text-white" : "bg-surface text-ink-2"
             }`}
           >
-            Сургалтууд
+            Сургалтууд ({activeCourseCount})
           </button>
           <button
             type="button"
@@ -209,7 +224,7 @@ export default function AdminDashboard({
               tab === "articles" ? "bg-blue text-white" : "bg-surface text-ink-2"
             }`}
           >
-            Нийтлэл
+            Нийтлэл ({articles.length})
           </button>
           <button
             type="button"
@@ -285,13 +300,19 @@ export default function AdminDashboard({
             {registrations.map((r) => (
               <div key={r.id} className="bg-surface border border-line rounded-md shadow-xs px-6 py-5 flex items-center justify-between flex-wrap gap-4">
                 <div>
-                  <b className="font-extrabold block">{r.programLabel}</b>
+                  <Link href={programAdminHref(r.programId)} className="font-extrabold block hover:text-blue-strong hover:underline">
+                    {r.programLabel}
+                  </Link>
                   <span className="text-ink-3 font-semibold text-[.85rem]">
-                    {r.user
-                      ? `${r.user.lastName} ${r.user.firstName} · ${r.user.phone}`
-                      : r.phone
-                        ? `Бүртгэл хүлээгдэж буй · ${r.phone}`
-                        : "Хэрэглэгч устсан"}{" "}
+                    {r.user ? (
+                      <Link href={`/admin/users/${r.user.id}`} className="hover:text-blue-strong hover:underline">
+                        {r.user.lastName} {r.user.firstName} · {r.user.phone}
+                      </Link>
+                    ) : r.phone ? (
+                      `Бүртгэл хүлээгдэж буй · ${r.phone}`
+                    ) : (
+                      "Хэрэглэгч устсан"
+                    )}{" "}
                     · {payMethodLabel(r.payMethod)} · {r.price}
                   </span>
                 </div>
@@ -326,7 +347,7 @@ export default function AdminDashboard({
 
         {tab === "courses" && (
           <div>
-            <YearlyProgramGroup programs={yearlyPrograms} />
+            <YearlyProgramGroup programs={yearlyPrograms} viewCounts={viewCounts} programStats={programStats} />
             <div className="mt-10">
               <CourseGroup
                 title="Удахгүй эхлэх сургалтууд"
@@ -334,6 +355,8 @@ export default function AdminDashboard({
                 busyId={busyId}
                 addHref="/admin/courses/new?kind=upcoming"
                 onArchive={archiveCourse}
+                viewCounts={viewCounts}
+                programStats={programStats}
               />
             </div>
             <div className="mt-10">
@@ -343,11 +366,20 @@ export default function AdminDashboard({
                 busyId={busyId}
                 addHref="/admin/courses/new?kind=vod"
                 onArchive={archiveCourse}
+                viewCounts={viewCounts}
+                programStats={programStats}
               />
             </div>
             {archived.length > 0 && (
               <div className="mt-10">
-                <CourseGroup title="Архивласан сургалтууд" courses={archived} busyId={busyId} onRestore={restoreCourse} />
+                <CourseGroup
+                  title="Архивласан сургалтууд"
+                  courses={archived}
+                  busyId={busyId}
+                  onRestore={restoreCourse}
+                  viewCounts={viewCounts}
+                  programStats={programStats}
+                />
               </div>
             )}
           </div>
@@ -562,6 +594,25 @@ function SplitRow({ label, value, total }: { label: string; value: number; total
   );
 }
 
+/** Харсан / Бүртгүүлсэн / Хүлээгдэж буй chips shared by course and yearly-program cards. */
+function CardStats({ viewed, active, pending }: { viewed: number; active: number; pending: number }) {
+  return (
+    <div className="flex items-center gap-3 flex-wrap text-[.8rem] font-bold text-ink-3">
+      <span>
+        Харсан <b className="font-extrabold text-ink-2">{viewed}</b>
+      </span>
+      <span>
+        Бүртгүүлсэн <b className="font-extrabold text-ink-2">{active}</b>
+      </span>
+      {pending > 0 && (
+        <span className="text-gold-strong">
+          Төлбөр хүлээгдэж буй <b className="font-extrabold">{pending}</b>
+        </span>
+      )}
+    </div>
+  );
+}
+
 function CourseGroup({
   title,
   courses,
@@ -569,6 +620,8 @@ function CourseGroup({
   addHref,
   onArchive,
   onRestore,
+  viewCounts,
+  programStats,
 }: {
   title: string;
   courses: Course[];
@@ -576,6 +629,8 @@ function CourseGroup({
   addHref?: string;
   onArchive?: (id: string) => void;
   onRestore?: (id: string) => void;
+  viewCounts: Record<string, number>;
+  programStats: Map<string, { active: number; pending: number }>;
 }) {
   return (
     <div>
@@ -592,87 +647,111 @@ function CourseGroup({
       </div>
       <div className="flex flex-col gap-2.5">
         {courses.length === 0 && <p className="text-ink-3 font-semibold text-[.9rem]">Одоогоор алга.</p>}
-        {courses.map((c) => (
-          <div key={c.id} className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[.72rem] font-extrabold tracking-[.08em] uppercase text-blue-strong">{c.tag}</span>
-                {c.status === "draft" ? (
-                  <span className="text-[.7rem] font-extrabold text-ink-3 bg-bg-soft px-2 py-0.5 rounded-full">Ноорог</span>
-                ) : c.status === "archived" ? (
-                  <span className="text-[.7rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-2 py-0.5 rounded-full">Архивласан</span>
-                ) : (
-                  <span className="text-[.7rem] font-extrabold text-green bg-green-soft px-2 py-0.5 rounded-full">Нийтлэгдсэн</span>
+        {courses.map((c) => {
+          const stats = programStats.get(c.id) ?? { active: 0, pending: 0 };
+          return (
+            <div key={c.id} className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[.72rem] font-extrabold tracking-[.08em] uppercase text-blue-strong">{c.tag}</span>
+                  {c.status === "draft" ? (
+                    <span className="text-[.7rem] font-extrabold text-ink-3 bg-bg-soft px-2 py-0.5 rounded-full">Ноорог</span>
+                  ) : c.status === "archived" ? (
+                    <span className="text-[.7rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-2 py-0.5 rounded-full">Архивласан</span>
+                  ) : (
+                    <span className="text-[.7rem] font-extrabold text-green bg-green-soft px-2 py-0.5 rounded-full">Нийтлэгдсэн</span>
+                  )}
+                </div>
+                <b className="font-extrabold block">{c.title}</b>
+                <span className="text-ink-3 font-semibold text-[.85rem]">
+                  {c.price} {c.period}
+                  {c.startDate && ` · ${formatCourseDate(c.startDate)}`}
+                  {c.mode && ` · ${c.mode}`}
+                </span>
+                <div className="mt-1.5">
+                  <CardStats viewed={viewCounts[`/courses/${c.id}`] ?? 0} active={stats.active} pending={stats.pending} />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Link
+                  href={`/admin/courses/${c.id}`}
+                  className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
+                >
+                  Дэлгэрэнгүй
+                </Link>
+                {onRestore && (
+                  <button
+                    type="button"
+                    disabled={busyId === c.id}
+                    onClick={() => onRestore(c.id)}
+                    className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full disabled:opacity-50"
+                  >
+                    Сэргээх
+                  </button>
+                )}
+                {onArchive && (
+                  <button
+                    type="button"
+                    disabled={busyId === c.id}
+                    onClick={() => onArchive(c.id)}
+                    className="text-[.82rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-3.5 py-2 rounded-full disabled:opacity-50"
+                  >
+                    Архивлах
+                  </button>
                 )}
               </div>
-              <b className="font-extrabold block">{c.title}</b>
-              <span className="text-ink-3 font-semibold text-[.85rem]">
-                {c.price} {c.period}
-                {c.startDate && ` · ${formatCourseDate(c.startDate)}`}
-                {c.mode && ` · ${c.mode}`}
-              </span>
             </div>
-            <div className="flex gap-2">
-              <Link
-                href={`/admin/courses/${c.id}`}
-                className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
-              >
-                Засах
-              </Link>
-              {onRestore && (
-                <button
-                  type="button"
-                  disabled={busyId === c.id}
-                  onClick={() => onRestore(c.id)}
-                  className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full disabled:opacity-50"
-                >
-                  Сэргээх
-                </button>
-              )}
-              {onArchive && (
-                <button
-                  type="button"
-                  disabled={busyId === c.id}
-                  onClick={() => onArchive(c.id)}
-                  className="text-[.82rem] font-extrabold text-red-soft bg-[oklch(0.95_0.03_25)] px-3.5 py-2 rounded-full disabled:opacity-50"
-                >
-                  Архивлах
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
 
 /** The two yearly programs — fixed, never added/archived, only edited. */
-function YearlyProgramGroup({ programs }: { programs: YearlyProgram[] }) {
+function YearlyProgramGroup({
+  programs,
+  viewCounts,
+  programStats,
+}: {
+  programs: YearlyProgram[];
+  viewCounts: Record<string, number>;
+  programStats: Map<string, { active: number; pending: number }>;
+}) {
   return (
     <div>
       <h2 className="text-[1.15rem] font-extrabold mb-3">1 жилийн хөтөлбөр</h2>
       <div className="flex flex-col gap-2.5">
-        {programs.map((p) => (
-          <div
-            key={p.id}
-            className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 flex items-center justify-between gap-4 flex-wrap"
-          >
-            <div>
-              <span className="text-[.72rem] font-extrabold tracking-[.08em] uppercase text-blue-strong">{p.tag}</span>
-              <b className="font-extrabold block">{p.title}</b>
-              <span className="text-ink-3 font-semibold text-[.85rem]">
-                {p.price} {p.period} · {p.lessons.length} хичээл
-              </span>
-            </div>
-            <Link
-              href={`/admin/yearly/${p.id}`}
-              className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
+        {programs.map((p) => {
+          const stats = programStats.get(p.id) ?? { active: 0, pending: 0 };
+          return (
+            <div
+              key={p.id}
+              className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 flex items-center justify-between gap-4 flex-wrap"
             >
-              Засах
-            </Link>
-          </div>
-        ))}
+              <div>
+                <span className="text-[.72rem] font-extrabold tracking-[.08em] uppercase text-blue-strong">{p.tag}</span>
+                <b className="font-extrabold block">{p.title}</b>
+                <span className="text-ink-3 font-semibold text-[.85rem]">
+                  {p.price} {p.period} · {p.lessons.length} хичээл
+                </span>
+                <div className="mt-1.5">
+                  <CardStats
+                    viewed={viewCounts[`/courses/${p.id.replace("program-", "")}`] ?? 0}
+                    active={stats.active}
+                    pending={stats.pending}
+                  />
+                </div>
+              </div>
+              <Link
+                href={`/admin/yearly/${p.id}`}
+                className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
+              >
+                Дэлгэрэнгүй
+              </Link>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
