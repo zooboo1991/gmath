@@ -177,7 +177,7 @@ export default function PushSettings() {
             </button>
           ) : (
             <span className="text-ink-3 font-semibold text-[.82rem] shrink-0">
-              Safari-ийн Share → &quot;Add to Home Screen&quot;
+              Chrome биш <b>Safari</b>-аар нээгээд: Share → &quot;Add to Home Screen&quot;
             </span>
           )}
         </div>
