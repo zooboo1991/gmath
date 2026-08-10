@@ -3,6 +3,7 @@ import { Nunito } from "next/font/google";
 import Analytics from "@/components/Analytics";
 import HashScroll from "@/components/HashScroll";
 import ProgramRegisterProvider from "@/components/program/ProgramRegister";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import { SITE_URL } from "@/lib/siteUrl";
 import "./globals.css";
 
@@ -62,6 +63,7 @@ export default function RootLayout({
         </noscript>
         <HashScroll />
         <Analytics />
+        <ServiceWorkerRegister />
         <ProgramRegisterProvider>{children}</ProgramRegisterProvider>
       </body>
     </html>

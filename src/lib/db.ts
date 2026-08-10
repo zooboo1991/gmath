@@ -3,6 +3,7 @@ import { getSupabase } from "./supabase";
 import { hashPassword, verifyPassword as verifyPasswordHash } from "./password";
 import { parsePriceToNumber } from "./price";
 import { transliterate } from "./mnTransliterate";
+import { sendPushToUsers } from "./push";
 import { sendSms } from "./sms/skytel";
 
 /**
@@ -1732,7 +1733,43 @@ export async function createNotification(input: {
     }
   }
 
+  // Push piggybacks on the site channel rather than being its own selectable
+  // option — a push notification's whole purpose is "come look at the one
+  // that's already in your bell", so there's no case for push without site.
+  if ((input.channel === "site" || input.channel === "both") && recipients.length > 0) {
+    await sendPushToUsers(recipients.map((r) => r.id), {
+      title: input.title,
+      body: input.body,
+      url: "/profile",
+    }).catch((err) => console.error("[notifications] push send failed:", err));
+  }
+
   return { notification, smsFailures };
+}
+
+// ---------------------------------------------------------------------------
+// Push subscriptions — one row per device a user has enabled notifications
+// on (Profile page's "Мэдэгдэл идэвхжүүлэх"). Sending itself lives in
+// lib/push.ts; these are just the CRUD the subscribe/unsubscribe API routes
+// call.
+// ---------------------------------------------------------------------------
+
+export async function savePushSubscription(
+  userId: string,
+  input: { endpoint: string; p256dh: string; auth: string }
+): Promise<void> {
+  const { error } = await getSupabase()
+    .from("push_subscriptions")
+    .upsert(
+      { user_id: userId, endpoint: input.endpoint, p256dh: input.p256dh, auth: input.auth },
+      { onConflict: "endpoint" }
+    );
+  if (error) throw error;
+}
+
+export async function deletePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
+  const { error } = await getSupabase().from("push_subscriptions").delete().eq("endpoint", endpoint);
+  if (error) throw error;
 }
 
 export async function listNotificationsForAdmin(limit = 50): Promise<Notification[]> {

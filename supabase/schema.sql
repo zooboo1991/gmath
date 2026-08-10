@@ -497,3 +497,18 @@ create table if not exists registration_payments (
   created_at timestamptz not null default now()
 );
 create index if not exists registration_payments_registration_id_idx on registration_payments (registration_id);
+
+-- One row per (user, device/browser) that opted into push notifications
+-- (installed the site as an app, tapped "Мэдэгдэл идэвхжүүлэх"). No separate
+-- enabled flag: a row existing here *is* "enabled" for that device — see
+-- lib/push.ts, which deletes a row on the spot if a send comes back 410/404
+-- (the browser revoked it on its own).
+create table if not exists push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists push_subscriptions_user_id_idx on push_subscriptions (user_id);

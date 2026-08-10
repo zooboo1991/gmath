@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import FormField from "@/components/FormField";
 import SchoolAutocomplete from "@/components/SchoolAutocomplete";
+import PushSettings from "@/components/profile/PushSettings";
 import type { Certificate, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import {
   IconCheckCircle,
@@ -147,6 +148,10 @@ export default function ProfileClient({
           </div>
         </div>
       </section>
+
+      <div className="wrap pt-5">
+        <PushSettings />
+      </div>
 
       <div className="wrap border-b border-line">
         <div className="flex gap-7">
