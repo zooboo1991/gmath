@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { updateYearlyProgram } from "@/lib/db";
+import { findYearlyProgramById, notifyNewRecordings, updateYearlyProgram } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { isAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
@@ -51,6 +51,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const lessons = normalizeLessons(data.lessons) ?? [];
 
+  const previous = await findYearlyProgramById(id);
+
   const program = await updateYearlyProgram(id, {
     tag: data.tag.trim(),
     title: data.title.trim(),
@@ -69,6 +71,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!program) {
     return NextResponse.json({ ok: false, error: "Хөтөлбөр олдсонгүй" }, { status: 404 });
   }
+
+  notifyNewRecordings(id, program.label, previous?.lessons ?? [], program.lessons).catch((err) =>
+    console.error("[yearly] recording notification failed:", err)
+  );
 
   await logAdminAction(request, {
     actionType: "yearly_program.update",

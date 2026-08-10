@@ -1691,6 +1691,8 @@ export async function createNotification(input: {
   targetCourseLabel?: string;
   userIds?: string[];
   channel: NotificationChannel;
+  /** Where a push notification's click should land — defaults to the profile page's bell list. The lesson reminder is the one caller that points this at a Zoom link instead. */
+  pushUrl?: string;
 }): Promise<{ notification: Notification; smsFailures: number }> {
   const supabase = getSupabase();
   const recipients = await resolveNotificationRecipients({
@@ -1740,11 +1742,62 @@ export async function createNotification(input: {
     await sendPushToUsers(recipients.map((r) => r.id), {
       title: input.title,
       body: input.body,
-      url: "/profile",
+      url: input.pushUrl ?? "/profile",
     }).catch((err) => console.error("[notifications] push send failed:", err));
   }
 
   return { notification, smsFailures };
+}
+
+/**
+ * Diffs a course/program's lesson list before vs. after an admin save and
+ * notifies that program's active students about any lesson whose
+ * recordingLink just went from empty to set. Called from the courses/[id]
+ * and yearly/[id] PUT routes right after a successful update — fire-and-
+ * forget there, same as every other side-effect notification in this file.
+ */
+export async function notifyNewRecordings(
+  programId: string,
+  programLabel: string,
+  previousLessons: Lesson[],
+  currentLessons: Lesson[]
+): Promise<void> {
+  const newlyRecorded = currentLessons.filter((lesson, i) => lesson.recordingLink && !previousLessons[i]?.recordingLink);
+  if (newlyRecorded.length === 0) return;
+
+  const registrations = await listRegistrationsByProgram(programId);
+  const userIds = [...new Set(registrations.filter((r) => r.status === "active" && r.userId).map((r) => r.userId!))];
+  if (userIds.length === 0) return;
+
+  for (const lesson of newlyRecorded) {
+    await createNotification({
+      title: "Хичээлийн бичлэг орлоо",
+      body: `"${programLabel}" — "${lesson.topic}" хичээлийн бичлэг нэмэгдлээ.`,
+      targetType: "users",
+      userIds,
+      channel: "site",
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Lesson reminders — 30-minutes-before push, sent by the cron route at
+// src/app/api/cron/lesson-reminders. sent-table keyed by (program, lesson
+// index) is the idempotency guard against the same lesson being caught by
+// two consecutive cron ticks.
+// ---------------------------------------------------------------------------
+
+export async function listSentReminderKeys(): Promise<Set<string>> {
+  const { data, error } = await getSupabase().from("lesson_reminders_sent").select("program_id, lesson_index");
+  if (error) throw error;
+  return new Set((data as { program_id: string; lesson_index: number }[]).map((r) => `${r.program_id}#${r.lesson_index}`));
+}
+
+export async function markLessonReminderSent(programId: string, lessonIndex: number): Promise<void> {
+  const { error } = await getSupabase()
+    .from("lesson_reminders_sent")
+    .upsert({ program_id: programId, lesson_index: lessonIndex }, { onConflict: "program_id,lesson_index" });
+  if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------

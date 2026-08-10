@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { updateCourse } from "@/lib/db";
+import { findCourseById, notifyNewRecordings, updateCourse } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { isAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
@@ -56,6 +56,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const lessons = normalizeLessons(data.lessons);
 
+  const previous = await findCourseById(id);
+
   const course = await updateCourse(id, {
     status: data.status,
     tag: data.tag?.trim(),
@@ -77,6 +79,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!course) {
     return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
   }
+
+  notifyNewRecordings(id, `${course.title} (${course.tag})`, previous?.lessons ?? [], course.lessons).catch((err) =>
+    console.error("[courses] recording notification failed:", err)
+  );
 
   await logAdminAction(request, {
     actionType: "course.update",

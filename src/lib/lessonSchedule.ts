@@ -25,6 +25,23 @@ export function parseScheduleString(schedule: string): { date: string; startTime
   return { date: `${year}-${month}-${day}`, startTime: startTime ?? "", endTime: endTime ?? "" };
 }
 
+/**
+ * Converts a "date + time" pair that's implicitly Mongolia local time (no
+ * offset stored — see the comment on toLocalDate() below) into a real UTC
+ * instant, safe to call from server code. toLocalDate() below deliberately
+ * does NOT do this — it runs in the student's own browser, so building a
+ * Date from local parts there already lands in the right timezone; doing
+ * the same server-side would be off by Mongolia's UTC+8 (no DST, so a fixed
+ * offset is always correct). Used by the lesson-reminder cron.
+ */
+export function mongoliaLocalToUtc(isoDate: string, time: string): Date | null {
+  if (!isoDate || !time) return null;
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const [hh, mm] = time.split(":").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d, hh - 8, mm));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 type ScheduledLesson = {
   topic: string;
   schedule?: string;

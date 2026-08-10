@@ -512,3 +512,13 @@ create table if not exists push_subscriptions (
   created_at timestamptz not null default now()
 );
 create index if not exists push_subscriptions_user_id_idx on push_subscriptions (user_id);
+
+-- Idempotency guard for the lesson-reminder cron (src/app/api/cron/lesson-reminders) —
+-- without this, a lesson sitting in the scan window across two consecutive
+-- ticks (or a re-run) would notify students twice.
+create table if not exists lesson_reminders_sent (
+  program_id text not null,
+  lesson_index int not null,
+  sent_at timestamptz not null default now(),
+  primary key (program_id, lesson_index)
+);
