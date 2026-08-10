@@ -22,12 +22,41 @@ export default function NotificationBell() {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // The bell isn't in the root layout (each page renders its own Navbar), so
+  // without this a new notification only ever showed up after a full page
+  // navigation happened to remount the component. Polling + a refetch when
+  // the tab regains focus covers both "just sitting on one page" and
+  // "switched tabs and came back" without needing a websocket for something
+  // this low-frequency.
+  const POLL_MS = 45_000;
+
   useEffect(() => {
     if (!sessionUser?.id) return;
-    fetch("/api/notifications")
-      .then((res) => (res.ok ? res.json() : { notifications: [] }))
-      .then((json) => setItems(json.notifications ?? []))
-      .catch(() => setItems([]));
+
+    let cancelled = false;
+    const load = () => {
+      fetch("/api/notifications")
+        .then((res) => (res.ok ? res.json() : { notifications: [] }))
+        .then((json) => {
+          if (!cancelled) setItems(json.notifications ?? []);
+        })
+        .catch(() => {
+          if (!cancelled) setItems([]);
+        });
+    };
+
+    load();
+    const interval = setInterval(load, POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [sessionUser?.id]);
 
   useEffect(() => {
