@@ -63,12 +63,20 @@ export async function sendPushToUsers(
 
   const staleEndpoints: string[] = [];
   results.forEach((result, i) => {
-    if (result.status === "rejected") {
+    // Endpoint host only (e.g. "web.push.apple.com") — never log the full
+    // endpoint/subscription secret.
+    const host = new URL(subscriptions[i].endpoint).host;
+    if (result.status === "fulfilled") {
+      console.log(`[push] sent ok host=${host} statusCode=${result.value.statusCode} body=${result.value.body.slice(0, 200)}`);
+    } else {
       const reason = result.reason;
       if (reason instanceof WebPushError && (reason.statusCode === 404 || reason.statusCode === 410)) {
         staleEndpoints.push(subscriptions[i].endpoint);
+        console.log(`[push] stale, removing host=${host} statusCode=${reason.statusCode}`);
+      } else if (reason instanceof WebPushError) {
+        console.error(`[push] send failed host=${host} statusCode=${reason.statusCode} body=${reason.body?.slice(0, 300)}`);
       } else {
-        console.error("[push] send failed:", reason);
+        console.error(`[push] send failed host=${host}:`, reason);
       }
     }
   });
