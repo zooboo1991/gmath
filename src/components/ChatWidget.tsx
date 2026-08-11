@@ -178,14 +178,18 @@ export default function ChatWidget() {
           something" rather than an anonymous icon. Open: shrinks back to a
           plain close circle — a full-width pill would sit on top of the panel
           it belongs to. Gold either way, not navy: the launcher floats over the
-          navy hero on most pages, where a navy circle disappears. */}
+          navy hero on most pages, where a navy circle disappears.
+
+          The white ring is what keeps it readable as a separate, floating
+          control: the site's own CTAs are the same gold, so when the launcher
+          scrolls over one they merged into a single shape. */}
       {open ? (
         <button
           type="button"
           onClick={() => setOpen(false)}
           aria-label="Чат хаах"
           aria-expanded
-          className="fixed bottom-5 right-5 w-14 h-14 rounded-full bg-gold text-gold-ink grid place-items-center shadow-gold hover:bg-gold-strong transition-colors z-[90]"
+          className="fixed bottom-5 right-5 w-14 h-14 rounded-full bg-gold text-gold-ink grid place-items-center ring-[3px] ring-white shadow-lg hover:bg-gold-strong transition-colors z-[90]"
         >
           <IconClose className="w-6 h-6" />
         </button>
@@ -195,7 +199,7 @@ export default function ChatWidget() {
           onClick={() => setOpen(true)}
           aria-label="Чат нээх"
           aria-expanded={false}
-          className="fixed bottom-5 right-5 flex items-center gap-2.5 pl-1.5 pr-4 py-1.5 rounded-full bg-gold text-gold-ink shadow-gold hover:bg-gold-strong transition-colors z-[90]"
+          className="fixed bottom-5 right-5 flex items-center gap-2.5 pl-1.5 pr-4 py-1.5 rounded-full bg-gold text-gold-ink ring-[3px] ring-white shadow-lg hover:bg-gold-strong transition-colors z-[90]"
         >
           <span className="w-11 h-11 rounded-full bg-surface grid place-items-center shrink-0 overflow-hidden">
             <Image
