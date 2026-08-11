@@ -63,7 +63,7 @@ export default function LevelsPanel({
       <header className="sticky top-0 z-10 bg-surface border-b border-line">
         <div className="wrap flex items-center justify-between h-[68px]">
           <Link
-            href="/admin?tab=assessment"
+            href="/admin/assessment"
             className="inline-flex items-center gap-2 font-extrabold text-ink-2 hover:text-ink text-[.92rem]"
           >
             ← Буцах

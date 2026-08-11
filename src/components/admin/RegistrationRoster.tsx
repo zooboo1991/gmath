@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatDate } from "@/lib/dateFormat";
 import { Fragment, useState } from "react";
 import type { PublicUser, Registration, RegistrationPayment } from "@/lib/db";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
@@ -15,9 +16,6 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("mn-MN");
-}
 
 /**
  * The roster for one course/yearly program — the read-only table plus admin

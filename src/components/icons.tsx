@@ -322,3 +322,12 @@ export function IconBriefcase(props: IconProps) {
     </svg>
   );
 }
+
+export function IconLogout(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>
+      <path d="M14 4H7a2 2 0 00-2 2v12a2 2 0 002 2h7" strokeLinecap="round" />
+      <path d="M17 8l4 4-4 4M21 12H10" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

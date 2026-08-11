@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatDate } from "@/lib/dateFormat";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Course, CourseKind, CourseStatus, Lesson, PublicUser, Registration } from "@/lib/db";
@@ -199,7 +200,7 @@ export default function CourseObjectPage({
         body: JSON.stringify({ status: "archived" }),
       });
       if (res.ok) {
-        router.push("/admin?tab=courses");
+        router.push("/admin/courses");
         router.refresh();
       }
     } finally {
@@ -254,7 +255,7 @@ export default function CourseObjectPage({
         <div className="wrap py-3.5 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
             <Link
-              href="/admin?tab=courses"
+              href="/admin/courses"
               className="inline-flex items-center gap-1.5 font-extrabold text-ink-2 hover:text-ink text-[.88rem] shrink-0"
             >
               ← Буцах
@@ -565,7 +566,7 @@ export default function CourseObjectPage({
                       <span className="font-bold text-[.88rem] text-ink-2">Хэрэглэгч устсан</span>
                     )}
                     <span className="text-ink-3 font-semibold text-[.82rem]">
-                      {payMethodLabel(r.payMethod)} · {r.price} · {new Date(r.createdAt).toLocaleDateString("mn-MN")}
+                      {payMethodLabel(r.payMethod)} · {r.price} · {formatDate(r.createdAt)}
                     </span>
                   </div>
                 ))}

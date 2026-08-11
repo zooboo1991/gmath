@@ -66,6 +66,6 @@ export async function recordChatIssue(input: {
     targetType: "users",
     userIds,
     channel: "site",
-    pushUrl: "/admin?tab=chat",
+    pushUrl: "/admin/chat",
   });
 }

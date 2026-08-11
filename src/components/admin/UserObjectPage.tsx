@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { formatDate, formatDateTime } from "@/lib/dateFormat";
 import { useState } from "react";
 import type { AdminChatConversation, LoginLog, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import ChatTranscript from "@/components/admin/ChatTranscript";
+import { KpiTile } from "@/components/admin/AdminObjectPageParts";
 import { IconCheckCircle, IconClock } from "@/components/icons";
 import { describeUserAgent } from "@/lib/userAgent";
 import { payMethodLabel, programAdminHref } from "@/lib/registration";
@@ -59,13 +61,8 @@ function AnchorTab({ label, active, onClick }: { label: string; active: boolean;
 }
 
 function formatLogDate(iso: string) {
-  return new Date(iso).toLocaleString("mn-MN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Deterministic (see lib/dateFormat.ts) — the locale version hydration-mismatched.
+  return formatDateTime(iso);
 }
 
 export default function UserObjectPage({
@@ -89,7 +86,7 @@ export default function UserObjectPage({
       <header className="sticky top-0 z-20 bg-surface border-b border-line">
         <div className="wrap py-3.5 flex items-center gap-4 flex-wrap">
           <Link
-            href="/admin?tab=users"
+            href="/admin/users"
             className="inline-flex items-center gap-1.5 font-extrabold text-ink-2 hover:text-ink text-[.88rem] shrink-0"
           >
             ← Буцах
@@ -107,6 +104,29 @@ export default function UserObjectPage({
             <b className="block text-[1.02rem] truncate max-w-[360px]">
               {user.lastName || user.firstName ? `${user.lastName} ${user.firstName}` : "Мэдээлэл дутуу"}
             </b>
+          </div>
+        </div>
+
+        <div className="wrap py-5 flex items-center justify-between gap-5 flex-wrap border-t border-line">
+          <div className="flex items-center gap-4 min-w-0">
+            <span className="w-14 h-14 rounded-full bg-blue-soft text-blue-strong grid place-items-center font-extrabold text-[1.3rem] shrink-0">
+              {(user.lastName?.[0] ?? "") + (user.firstName?.[0] ?? "") || "?"}
+            </span>
+            <div className="min-w-0">
+              <b className="block text-[1.15rem] leading-tight truncate">
+                {user.lastName || user.firstName ? `${user.lastName} ${user.firstName}` : "Мэдээлэл дутуу"}
+              </b>
+              <span className="text-ink-3 font-semibold text-[.85rem]">
+                {user.phone}
+                {" · Бүртгүүлсэн: "}
+                {formatDate(user.createdAt)}
+              </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 shrink-0">
+            <KpiTile label="Сургалт" value={String(registrations.length)} />
+            <KpiTile label="Идэвхтэй" value={String(active.length)} tone="green" />
+            <KpiTile label="Чат" value={String(chatConversations.length)} tone="blue" />
           </div>
         </div>
 
@@ -137,7 +157,7 @@ export default function UserObjectPage({
                 <InfoRow label="Сургууль" value={user.school} />
                 <InfoRow label="Анги" value={user.grade} />
                 <InfoRow label="Facebook" value={user.facebook} />
-                <InfoRow label="Бүртгүүлсэн огноо" value={new Date(user.createdAt).toLocaleDateString("mn-MN")} />
+                <InfoRow label="Бүртгүүлсэн огноо" value={formatDate(user.createdAt)} />
               </div>
             </Card>
 
@@ -162,7 +182,7 @@ export default function UserObjectPage({
                           </Link>
                           <span className="text-ink-3 font-semibold text-[.82rem]">
                             {r.price} · {payMethodLabel(r.payMethod)} ·{" "}
-                            {new Date(r.createdAt).toLocaleDateString("mn-MN")}
+                            {formatDate(r.createdAt)}
                           </span>
                         </div>
                         <StatusBadge status={r.status} />

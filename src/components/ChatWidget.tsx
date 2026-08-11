@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { IconChat, IconClose } from "@/components/icons";
 
@@ -112,6 +113,7 @@ const GREETING =
  * fresh — matching how a visitor thinks about a support chat.
  */
 export default function ChatWidget() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -126,6 +128,10 @@ export default function ChatWidget() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, busy]);
+
+  // The widget is for visitors; on admin pages it just floats over the
+  // sidebar's own chat-oversight UI. After every hook, per the rules of hooks.
+  if (pathname.startsWith("/admin")) return null;
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();

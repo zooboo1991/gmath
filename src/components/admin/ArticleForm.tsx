@@ -77,7 +77,7 @@ export default function ArticleForm({ initialArticle }: { initialArticle?: Artic
         setError(json.error ?? "Хадгалахад алдаа гарлаа");
         return;
       }
-      router.push("/admin?tab=articles");
+      router.push("/admin/articles");
       router.refresh();
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
@@ -91,7 +91,7 @@ export default function ArticleForm({ initialArticle }: { initialArticle?: Artic
       <header className="sticky top-0 z-10 bg-surface border-b border-line">
         <div className="wrap flex items-center justify-between h-[68px]">
           <Link
-            href="/admin?tab=articles"
+            href="/admin/articles"
             className="inline-flex items-center gap-2 font-extrabold text-ink-2 hover:text-ink text-[.92rem]"
           >
             ← Буцах

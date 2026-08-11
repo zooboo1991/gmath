@@ -1,0 +1,127 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import type { AdminLogEntry } from "@/lib/adminLog";
+import { programAdminHref } from "@/lib/registration";
+
+const ACTION_LABELS: Record<string, string> = {
+  "user.create": "Хэрэглэгч гараар нэмсэн",
+  "course.create": "Сургалт үүсгэсэн",
+  "course.update": "Сургалт засварласан",
+  "yearly_program.update": "Жилийн хөтөлбөр засварласан",
+  "registration.manual_add": "Бүртгэл гараар нэмсэн",
+  "registration.delete": "Бүртгэл хассан",
+  "registration.approve": "Бүртгэл баталгаажуулсан",
+  "registration.cancel_pending": "Хүлээгдэж буй бүртгэл цуцалсан",
+  "registration.set_total_due": "Төлөх дүн тохируулсан",
+  "registration.add_payment": "Төлбөр бүртгэсэн",
+  "registration.delete_payment": "Төлбөр хассан",
+  "lesson.zoom_meeting_create": "Zoom meeting үүсгэсэн",
+  "notification.send": "Мэдэгдэл илгээсэн",
+  "setting.update": "Тохиргоо өөрчилсөн",
+};
+
+/** Where a log entry's course/program lives in the admin, if it still can be derived. */
+function logTargetHref(log: AdminLogEntry): string | undefined {
+  if (log.actionType === "user.create") {
+    return log.targetId ? `/admin/users/${log.targetId}` : undefined;
+  }
+  if (log.actionType === "course.create" || log.actionType === "course.update" || log.actionType === "yearly_program.update") {
+    return log.targetId ? programAdminHref(log.targetId) : undefined;
+  }
+  if (log.actionType === "lesson.zoom_meeting_create") {
+    const courseId = log.targetId?.split("#")[0];
+    return courseId ? programAdminHref(courseId) : undefined;
+  }
+  if (log.actionType.startsWith("registration.")) {
+    const programId = log.details?.programId;
+    return typeof programId === "string" ? programAdminHref(programId) : undefined;
+  }
+  return undefined;
+}
+
+/** Loaded lazily — this tab's own data, not part of the page's initial props. */
+
+export default function AdminLogsPanel() {
+  const [state, setState] = useState<{ status: "loading" | "done" | "error"; logs?: AdminLogEntry[] }>({
+    status: "loading",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/logs")
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((json) => {
+        if (!cancelled) setState({ status: "done", logs: json.logs });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: "error" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className="card-flat px-6 py-6">
+      <div className="mb-4">
+        <h3 className="font-extrabold text-[1.05rem]">
+          Админы үйлдлийн түүх{state.status === "done" && state.logs && state.logs.length > 0 ? ` (${state.logs.length})` : ""}
+        </h3>
+        <p className="text-ink-3 font-semibold text-[.85rem] mt-1">
+          Үнэ өөрчлөх, бүртгэл нэмэх/хасах, Zoom үүсгэх, мэдэгдэл илгээх зэрэг мэдрэмтгий үйлдлүүд
+          энд бүртгэгдэнэ. Админ эрх нэг л нууц үгтэй тул &quot;хэн&quot; гэдгийг биш &quot;юу
+          хийсэн бэ&quot;-г л харуулна.
+        </p>
+      </div>
+
+      {state.status === "loading" && <p className="text-ink-3 font-semibold text-[.9rem]">Ачааллаж байна…</p>}
+      {state.status === "error" && (
+        <p className="text-red-soft font-semibold text-[.9rem]">Ачаалахад алдаа гарлаа. Дахин оролдоно уу.</p>
+      )}
+      {state.status === "done" && state.logs && state.logs.length === 0 && (
+        <p className="text-ink-3 font-semibold text-[.9rem]">Одоогоор бүртгэгдсэн үйлдэл алга.</p>
+      )}
+      {state.status === "done" && state.logs && state.logs.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {state.logs.map((log) => {
+            const href = logTargetHref(log);
+            return (
+            <div key={log.id} className="flex items-start justify-between gap-4 flex-wrap py-2.5 border-b border-line last:border-0">
+              <div>
+                {href ? (
+                  <Link href={href} className="font-extrabold text-[.9rem] block hover:text-blue-strong hover:underline">
+                    {ACTION_LABELS[log.actionType] ?? log.actionType}
+                  </Link>
+                ) : (
+                  <b className="font-extrabold text-[.9rem] block">{ACTION_LABELS[log.actionType] ?? log.actionType}</b>
+                )}
+                {log.details && (
+                  <span className="text-ink-3 font-semibold text-[.8rem] block mt-0.5">
+                    {Object.entries(log.details)
+                      .filter(([, v]) => v !== undefined && v !== "")
+                      .map(([k, v]) => `${k}: ${v}`)
+                      .join(" · ")}
+                  </span>
+                )}
+              </div>
+              <span className="text-ink-3 font-semibold text-[.78rem] shrink-0">
+                {new Date(log.createdAt).toLocaleString("mn-MN")}
+                {log.ip && ` · ${log.ip}`}
+              </span>
+            </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Chatbot oversight: the complaint log the bot feeds (see lib/ai/issues.ts)
+ * on top, every conversation underneath. Loaded lazily like AdminLogsPanel —
+ * this tab's own data, not part of the page's initial props. Transcripts are
+ * fetched one at a time on expand via <ChatTranscript>.
+ */

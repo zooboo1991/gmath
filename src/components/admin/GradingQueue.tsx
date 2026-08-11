@@ -1,14 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { formatDate } from "@/lib/dateFormat";
 import { useState } from "react";
 import type { AssessmentWithUser } from "@/lib/assessment/db";
 
 const CARD = "bg-surface border border-line rounded-md shadow-xs px-[18px] py-[16px]";
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("mn-MN", { year: "numeric", month: "2-digit", day: "2-digit" });
-}
 
 /** Days a submission has been sitting in the queue. */
 function waitingDays(iso: string) {
@@ -30,7 +28,7 @@ export default function GradingQueue({
       <header className="sticky top-0 z-10 bg-surface border-b border-line">
         <div className="wrap flex items-center justify-between h-[68px]">
           <Link
-            href="/admin?tab=assessment"
+            href="/admin/assessment"
             className="inline-flex items-center gap-2 font-extrabold text-ink-2 hover:text-ink text-[.92rem]"
           >
             ← Буцах
