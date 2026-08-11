@@ -70,8 +70,17 @@ export default function Footer() {
               </li>
               <li className="flex items-start gap-[9px] text-[.96rem]">
                 <IconLocation className="w-4 h-4 text-navy-ink-3 shrink-0 mt-0.5" />
-                Улаанбаатар хот, Сүхбаатар дүүрэг, 1-р хороо, 1-р сургуулийн замын эсрэг талд, Чонон
-                бүрт төв, 403 тоот
+                {/* The address is the map link — one tap from the footer to
+                    directions, which is what a parent looking it up wants. */}
+                <a
+                  href="https://maps.app.goo.gl/UcgNm7tTaQSbGenF7"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-white underline decoration-white/25 hover:decoration-white underline-offset-[3px] transition-colors"
+                >
+                  Улаанбаатар хот, Сүхбаатар дүүрэг, 1-р хороо, 1-р сургуулийн замын эсрэг талд, Чонон
+                  бүрт төв, 403 тоот
+                </a>
               </li>
               <li className="flex items-center gap-[9px] text-[.96rem] -ml-1">
                 <IconFacebook className="w-4 h-4 text-navy-ink-3 shrink-0 ml-1" />
