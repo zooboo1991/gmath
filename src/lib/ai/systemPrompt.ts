@@ -1,5 +1,6 @@
 import type { ChatChannel } from "../db";
 import { listPublishedCourseSummaries, listRegistrationsByUser, listYearlyPrograms } from "../db";
+import { siteAchievements, siteFaqs, siteFeatures } from "../siteContent";
 import { SITE_URL } from "../siteUrl";
 
 const BASE_PROMPT = `Та бол gmath.mn сайтын туслах чатбот. gmath.mn нь Б.Ганбат багшийн олимпиадын математикийн онлайн сургалтын сайт бөгөөд 4–12-р ангийн сурагчид болон багш нарт зориулсан сургалт, түвшин тогтоох үнэлгээ, сертификатын үйлчилгээ үзүүлдэг.
@@ -20,6 +21,22 @@ const BASE_PROMPT = `Та бол gmath.mn сайтын туслах чатбот
 
 /** A 100-lesson yearly programme would swamp the prompt; the first chunk plus a total is enough to answer "хэзээ эхлэх вэ". */
 const MAX_LESSONS_IN_PROMPT = 20;
+
+/**
+ * The homepage's own copy — selling points, teacher record and FAQ — pulled
+ * from the same module the page renders from (../siteContent). Added because
+ * the bot used to answer "мэдээлэл байхгүй" to things like "сургалтын онцлог
+ * давуу тал юу вэ" when the answer was right there on the site; it only ever
+ * saw the structured course rows. Sharing the source means editing the page
+ * copy changes what the bot says, with nothing to keep in sync.
+ */
+const SITE_COPY = [
+  `Сургалтын онцлог, давуу тал:\n${siteFeatures.map((f) => `- ${f.title}: ${f.text}`).join("\n")}`,
+  `Б.Ганбат багшийн үзүүлэлт:\n${siteAchievements.map((a) => `- ${a.value} — ${a.label}`).join("\n")}`,
+  `Байнга асуудаг асуултууд (сайтын Асуулт хариулт хэсгээс):\n${siteFaqs
+    .map((f) => `- ${f.q}\n  ${f.a}`)
+    .join("\n")}`,
+].join("\n\n");
 
 /**
  * The two channels need different link conventions. The website widget renders
@@ -71,7 +88,7 @@ export async function buildSystemPrompt({
   const [courses, yearly] = await Promise.all([listPublishedCourseSummaries(), listYearlyPrograms()]);
 
   const base = channel === "messenger" ? SITE_URL : "";
-  const sections = [BASE_PROMPT, channelRules(channel), sitePages(channel)];
+  const sections = [BASE_PROMPT, channelRules(channel), sitePages(channel), SITE_COPY];
 
   // `period` already carries its own leading slash ("/ сар"), so it's
   // concatenated rather than joined with another one.

@@ -2,13 +2,18 @@ import Image from "next/image";
 import Reveal from "./Reveal";
 import TeacherIntroCard from "./TeacherIntroCard";
 import { IconTrophy, IconMedal, IconClock, IconPeopleAbout } from "./icons";
+import { siteAchievements } from "@/lib/siteContent";
 
-const achievements = [
-  { icon: <IconTrophy className="w-[21px] h-[21px]" />, value: "2024", label: "Дархан аварга багш" },
-  { icon: <IconMedal className="w-[21px] h-[21px]" />, value: "4× Алтан медаль", label: "Улсын олимпиад" },
-  { icon: <IconClock className="w-[21px] h-[21px]" />, value: "10+ жил", label: "Багшлах туршлага" },
-  { icon: <IconPeopleAbout className="w-[21px] h-[21px]" />, value: "500+ сурагч", label: "Амжилттай төгссөн" },
+// Wording lives in src/lib/siteContent.ts so the chatbot answers from the same
+// copy; only the icons stay here. Order must match siteAchievements.
+const icons = [
+  <IconTrophy key="trophy" className="w-[21px] h-[21px]" />,
+  <IconMedal key="medal" className="w-[21px] h-[21px]" />,
+  <IconClock key="clock" className="w-[21px] h-[21px]" />,
+  <IconPeopleAbout key="people" className="w-[21px] h-[21px]" />,
 ];
+
+const achievements = siteAchievements.map((a, i) => ({ ...a, icon: icons[i] }));
 
 export default function About() {
   return (

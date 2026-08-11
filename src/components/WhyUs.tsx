@@ -1,32 +1,17 @@
 import Reveal from "./Reveal";
 import { IconTrophy, IconBook, IconTarget, IconPlayBox } from "./icons";
+import { siteFeatures } from "@/lib/siteContent";
 
-const features = [
-  {
-    icon: <IconTrophy withBase className="w-[26px] h-[26px]" />,
-    iconBg: "bg-gold-soft text-gold-strong",
-    title: "Батлагдсан үр дүн",
-    text: "600+ сурагч, 200+ багш нар сургалтанд амжилттай хамрагдсан.",
-  },
-  {
-    icon: <IconBook className="w-[26px] h-[26px]" />,
-    iconBg: "bg-blue-soft text-blue-strong",
-    title: "Шавь нарын амжилт",
-    text: "Бэлдсэн шавь нар нь улс болон олон улсын олимпиадаас медаль авсан.",
-  },
-  {
-    icon: <IconTarget className="w-[26px] h-[26px]" />,
-    iconBg: "bg-green-soft text-green",
-    title: "Зорилтот агуулга",
-    text: "Зөвхөн олимпиадад бэлдэх бодлого, арга барилд төвлөрнө.",
-  },
-  {
-    icon: <IconPlayBox className="w-[26px] h-[26px]" />,
-    iconBg: "bg-purple-soft text-purple",
-    title: "Хаанаас ч, хэзээ ч",
-    text: "Бүх хичээл хадгалагдаж, хүссэн үедээ дахин нөхөж үзэх боломжтой.",
-  },
+// Wording lives in src/lib/siteContent.ts so the chatbot answers from the same
+// copy; only the visuals stay here. Order must match siteFeatures.
+const visuals = [
+  { icon: <IconTrophy withBase className="w-[26px] h-[26px]" />, iconBg: "bg-gold-soft text-gold-strong" },
+  { icon: <IconBook className="w-[26px] h-[26px]" />, iconBg: "bg-blue-soft text-blue-strong" },
+  { icon: <IconTarget className="w-[26px] h-[26px]" />, iconBg: "bg-green-soft text-green" },
+  { icon: <IconPlayBox className="w-[26px] h-[26px]" />, iconBg: "bg-purple-soft text-purple" },
 ];
+
+const features = siteFeatures.map((f, i) => ({ ...f, ...visuals[i] }));
 
 export default function WhyUs() {
   return (
