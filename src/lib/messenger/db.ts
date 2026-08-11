@@ -9,9 +9,29 @@ import { getSupabase } from "../supabase";
 
 const LINK_TOKEN_TTL_MS = 15 * 60 * 1000;
 
-/** The signed-in student's half of the flow: mint a token to put in the m.me link. */
+/**
+ * Deliberately short and hand-typable, because the token doubles as a code the
+ * student can send as a plain Messenger message. That path exists because
+ * m.me?ref= only reliably delivers the ref inside the mobile Messenger app —
+ * on desktop m.me redirects through messenger.com and the ref is lost, which
+ * left the first real linking attempt with a minted-but-never-consumed token.
+ *
+ * Alphabet omits I/O/0/1 so nothing is ambiguous when read off a screen.
+ * 32^8 ≈ 10^12 combinations, single-use, 15-minute life.
+ */
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export const LINK_CODE_LENGTH = 8;
+/** Latin-only, so a Mongolian Cyrillic message can never be mistaken for a code. */
+export const LINK_CODE_RE = /^[A-Z2-9]{8}$/;
+
+function generateCode(): string {
+  const bytes = crypto.randomBytes(LINK_CODE_LENGTH);
+  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
+}
+
+/** The signed-in student's half of the flow: mint a code for the m.me link and for typing. */
 export async function createLinkToken(userId: string): Promise<string> {
-  const token = crypto.randomBytes(24).toString("base64url");
+  const token = generateCode();
   const { error } = await getSupabase().from("messenger_link_tokens").insert({
     token,
     user_id: userId,

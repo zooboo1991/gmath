@@ -18,6 +18,7 @@ export default function MessengerLink() {
   const [state, setState] = useState<State>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState<{ code: string; url: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,10 +40,10 @@ export default function MessengerLink() {
       const res = await fetch("/api/messenger/link", { method: "POST" });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? "");
-      // Opened rather than navigated: the student comes back to this page after
-      // saying hello to the bot, and the token is consumed on that first message.
-      window.open(json.url, "_blank", "noopener,noreferrer");
-      setState((s) => (s ? { ...s, linked: true } : s));
+      // Shows the code instead of jumping straight to Messenger: the ref in the
+      // m.me link only survives inside the mobile app, so the student needs to
+      // see the code they can type either way.
+      setCode({ code: json.code, url: json.url });
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : "Холбоход алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
@@ -57,6 +58,7 @@ export default function MessengerLink() {
       const res = await fetch("/api/messenger/link", { method: "DELETE" });
       if (!res.ok) throw new Error();
       setState((s) => (s ? { ...s, linked: false } : s));
+      setCode(null);
     } catch {
       setError("Салгахад алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
@@ -95,7 +97,7 @@ export default function MessengerLink() {
             {busy ? "…" : "Салгах"}
           </button>
         </div>
-      ) : (
+      ) : code ? null : (
         <button
           type="button"
           disabled={busy}
@@ -104,6 +106,37 @@ export default function MessengerLink() {
         >
           {busy ? "…" : "Холбох"}
         </button>
+      )}
+
+      {code && !state.linked && (
+        <div className="w-full bg-bg-soft rounded-md px-4 py-3.5 flex flex-col gap-2.5">
+          <p className="text-ink-2 font-semibold text-[.85rem] leading-[1.55]">
+            Messenger дээр манай хуудсанд доорх кодыг бичиж илгээнэ үү. Код 15 минут хүчинтэй.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <code className="font-extrabold text-[1.35rem] tracking-[.18em] text-navy bg-surface px-4 py-2 rounded-sm border border-line">
+              {code.code}
+            </code>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(code.code)}
+              className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-4 py-2 rounded-full"
+            >
+              Хуулах
+            </button>
+            <a
+              href={code.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[.82rem] font-extrabold text-white bg-blue px-4 py-2 rounded-full"
+            >
+              Messenger нээх
+            </a>
+          </div>
+          <p className="text-ink-3 font-semibold text-[.78rem]">
+            Холбогдсоны дараа бот танд батламж мессеж илгээнэ.
+          </p>
+        </div>
       )}
 
       {error && <p className="w-full text-[.82rem] font-semibold text-red-soft">{error}</p>}

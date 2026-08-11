@@ -37,12 +37,16 @@ export async function POST() {
     );
   }
 
-  const token = await createLinkToken(user.id);
-  // Facebook passes `ref` straight through to the webhook on the first message
-  // from this link — that is what ties the PSID to this account.
+  const code = await createLinkToken(user.id);
+  // Two ways in, because the ref alone isn't dependable: Facebook passes `ref`
+  // through to the webhook when the link is opened inside the mobile Messenger
+  // app, but on desktop m.me redirects via messenger.com and the ref is
+  // dropped. Sending the code as a message works everywhere, so the UI leads
+  // with that and treats the ref as a shortcut when it happens to survive.
   return NextResponse.json({
     ok: true,
-    url: `https://m.me/${encodeURIComponent(pageUsername)}?ref=${encodeURIComponent(token)}`,
+    code,
+    url: `https://m.me/${encodeURIComponent(pageUsername)}?ref=${encodeURIComponent(code)}`,
   });
 }
 

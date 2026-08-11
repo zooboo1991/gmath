@@ -8,7 +8,7 @@ import {
 import { routeChat } from "@/lib/ai/router";
 import { buildSystemPrompt } from "@/lib/ai/systemPrompt";
 import { sendMessage, sendTypingOn, verifySignature } from "@/lib/messenger/client";
-import { consumeLinkToken, findUserIdByPsid, unlinkPsid } from "@/lib/messenger/db";
+import { consumeLinkToken, findUserIdByPsid, LINK_CODE_RE, unlinkPsid } from "@/lib/messenger/db";
 import { checkRateLimit } from "@/lib/rateLimit";
 
 /** Typed just enough for what's handled — Meta's payload has far more fields. */
@@ -106,6 +106,22 @@ async function handleEvent(event: MessagingEvent): Promise<void> {
   // Delivery receipts, read receipts, reactions and attachments all land here
   // with no text — nothing to answer.
   if (!text) return;
+
+  // The linking code typed as a message — the reliable path, since m.me?ref=
+  // only delivers its ref inside the mobile Messenger app. Shape-checked first
+  // so this costs a DB lookup only for something that actually looks like a
+  // code; anything that looks like one but isn't valid falls through to a
+  // normal answer rather than dead-ending.
+  if (LINK_CODE_RE.test(text.toUpperCase())) {
+    const linkedUserId = await consumeLinkToken(text.toUpperCase(), psid);
+    if (linkedUserId) {
+      await sendMessage(
+        psid,
+        "Таны gmath.mn эрх холбогдлоо. Одооноос хичээлийн хуваарь, Facebook групп, Zoom холбоосоо надаас асууж болно."
+      );
+      return;
+    }
+  }
 
   if (UNLINK_COMMANDS.some((cmd) => text.toLowerCase().includes(cmd))) {
     const had = await unlinkPsid(psid);
