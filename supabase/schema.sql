@@ -581,3 +581,24 @@ alter table chat_conversations add column if not exists channel text not null de
 alter table chat_conversations drop constraint if exists chat_conversations_channel_check;
 alter table chat_conversations add constraint chat_conversations_channel_check
   check (channel in ('website', 'messenger'));
+
+-- Complaints the chatbot flags out of live conversations (src/lib/ai/issues.ts).
+-- The model appends a marker line when a message reports a service problem;
+-- the route strips it from the reply and records the row here, so a "төлбөр
+-- төлсөн ч идэвхжээгүй" no longer vanishes into an unread transcript.
+create table if not exists chat_issues (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references chat_conversations(id) on delete cascade,
+  user_id uuid references users(id) on delete set null,
+  channel text not null default 'website',
+  message text not null,
+  status text not null default 'new' check (status in ('new', 'resolved')),
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+create index if not exists chat_issues_status_idx on chat_issues (status);
+
+-- The admin "Чат" tab orders by started_at desc and the user detail page
+-- filters by user_id — neither had an index before that tab existed.
+create index if not exists chat_conversations_started_at_idx on chat_conversations (started_at desc);
+create index if not exists chat_conversations_user_id_idx on chat_conversations (user_id);

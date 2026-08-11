@@ -5,6 +5,7 @@ import {
   insertChatMessage,
   listChatMessages,
 } from "@/lib/db";
+import { extractIssue, recordChatIssue } from "@/lib/ai/issues";
 import { routeChat } from "@/lib/ai/router";
 import { buildSystemPrompt } from "@/lib/ai/systemPrompt";
 import { sendMessage, sendTypingOn, verifySignature } from "@/lib/messenger/client";
@@ -157,9 +158,18 @@ async function handleEvent(event: MessagingEvent): Promise<void> {
   const system = await buildSystemPrompt({ userId, channel: "messenger" });
   const result = await routeChat({ system, messages: [...history, { role: "user", content: text }] });
 
-  await insertChatMessage(conversationId, "assistant", result.text, {
+  // Same marker handling as the website route: strip before storing/sending,
+  // record the issue in the background.
+  const { cleanText, flagged } = extractIssue(result.text);
+  if (flagged) {
+    recordChatIssue({ conversationId, userId, channel: "messenger", userMessage: text }).catch((err) =>
+      console.error("[messenger] issue recording failed:", err)
+    );
+  }
+
+  await insertChatMessage(conversationId, "assistant", cleanText, {
     tokensUsed: result.tokensUsed.input + result.tokensUsed.output,
     modelUsed: result.model,
   });
-  await sendMessage(psid, result.text);
+  await sendMessage(psid, cleanText);
 }

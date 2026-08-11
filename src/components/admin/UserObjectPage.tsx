@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { LoginLog, PublicUser, RegistrationWithGroup } from "@/lib/db";
+import type { AdminChatConversation, LoginLog, PublicUser, RegistrationWithGroup } from "@/lib/db";
+import ChatTranscript from "@/components/admin/ChatTranscript";
 import { IconCheckCircle, IconClock } from "@/components/icons";
 import { describeUserAgent } from "@/lib/userAgent";
 import { payMethodLabel, programAdminHref } from "@/lib/registration";
 
-type ObjectTab = "info" | "devices";
+type ObjectTab = "info" | "devices" | "chat";
 
 function StatusBadge({ status }: { status: RegistrationWithGroup["status"] }) {
   if (status === "active") {
@@ -71,12 +72,15 @@ export default function UserObjectPage({
   user,
   registrations,
   loginLogs,
+  chatConversations,
 }: {
   user: PublicUser;
   registrations: RegistrationWithGroup[];
   loginLogs: LoginLog[];
+  chatConversations: AdminChatConversation[];
 }) {
   const [tab, setTab] = useState<ObjectTab>("info");
+  const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
   const active = registrations.filter((r) => r.status === "active");
   const pending = registrations.filter((r) => r.status === "pending");
 
@@ -112,6 +116,11 @@ export default function UserObjectPage({
             label={`Төхөөрөмж${loginLogs.length ? ` (${loginLogs.length})` : ""}`}
             active={tab === "devices"}
             onClick={() => setTab("devices")}
+          />
+          <AnchorTab
+            label={`Чат${chatConversations.length ? ` (${chatConversations.length})` : ""}`}
+            active={tab === "chat"}
+            onClick={() => setTab("chat")}
           />
         </div>
       </header>
@@ -182,6 +191,51 @@ export default function UserObjectPage({
                         {log.ip ?? "IP тодорхойгүй"} · {formatLogDate(log.createdAt)}
                       </span>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {tab === "chat" && (
+          <Card title={`Чатын түүх (${chatConversations.length})`}>
+            {chatConversations.length === 0 ? (
+              <p className="text-ink-3 font-semibold text-[.9rem]">Чатын түүх алга байна.</p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {chatConversations.map((c) => (
+                  <div key={c.id} className="bg-bg-soft rounded-md px-4 py-3.5">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedChatId(expandedChatId === c.id ? null : c.id)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`inline-flex items-center text-[.72rem] font-extrabold px-2.5 py-0.5 rounded-full ${
+                              c.channel === "messenger"
+                                ? "text-gold-strong bg-gold-soft"
+                                : "text-blue-strong bg-blue-soft"
+                            }`}
+                          >
+                            {c.channel === "messenger" ? "Messenger" : "Вэб"}
+                          </span>
+                          <span className="text-ink-3 font-semibold text-[.82rem]">{c.messageCount} мессеж</span>
+                        </div>
+                        <span className="text-ink-3 font-semibold text-[.78rem] shrink-0">
+                          {formatLogDate(c.lastMessage?.createdAt ?? c.startedAt)}
+                        </span>
+                      </div>
+                      {c.lastMessage && (
+                        <p className="text-ink-3 font-medium text-[.83rem] mt-1 truncate">
+                          {c.lastMessage.role === "user" ? "Хэрэглэгч: " : "Бот: "}
+                          {c.lastMessage.content}
+                        </p>
+                      )}
+                    </button>
+                    {expandedChatId === c.id && <ChatTranscript conversationId={c.id} />}
                   </div>
                 ))}
               </div>

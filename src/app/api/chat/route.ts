@@ -10,6 +10,7 @@ import {
   listChatMessages,
 } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
+import { extractIssue, recordChatIssue } from "@/lib/ai/issues";
 import { routeChat } from "@/lib/ai/router";
 import { buildSystemPrompt } from "@/lib/ai/systemPrompt";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
@@ -73,12 +74,24 @@ export async function POST(request: Request) {
     const system = await buildSystemPrompt({ userId: sessionUser?.id, channel: "website" });
     const result = await routeChat({ system, messages: [...history, { role: "user", content: message }] });
 
-    await insertChatMessage(conversationId, "assistant", result.text, {
+    // The complaint marker never reaches the visitor or the transcript —
+    // extractIssue strips it before anything is stored or returned.
+    const { cleanText, flagged } = extractIssue(result.text);
+    if (flagged) {
+      recordChatIssue({
+        conversationId,
+        userId: sessionUser?.id,
+        channel: "website",
+        userMessage: message,
+      }).catch((err) => console.error("[chat] issue recording failed:", err));
+    }
+
+    await insertChatMessage(conversationId, "assistant", cleanText, {
       tokensUsed: result.tokensUsed.input + result.tokensUsed.output,
       modelUsed: result.model,
     });
 
-    return NextResponse.json({ ok: true, conversationId, reply: result.text });
+    return NextResponse.json({ ok: true, conversationId, reply: cleanText });
   } catch (err) {
     // The user's message is already persisted above, so a provider outage
     // leaves a recoverable transcript rather than losing what they typed.

@@ -2036,3 +2036,171 @@ export async function attachChatConversationUser(conversationId: string, userId:
     .is("user_id", null);
   if (error) throw error;
 }
+
+// ---------------------------------------------------------------------------
+// Admin views over the chat transcripts, plus the complaint log the bot
+// feeds (see src/lib/ai/issues.ts for how a row gets here). Separate from
+// the visitor-scoped functions above on purpose: these join user identity
+// and keep timestamps, which the widget-facing queries deliberately don't.
+// ---------------------------------------------------------------------------
+
+type ChatUserJoin = { last_name: string; first_name: string; phone: string } | { last_name: string; first_name: string; phone: string }[] | null;
+
+function chatUserFromJoin(join: ChatUserJoin): { lastName: string; firstName: string; phone: string } | undefined {
+  const u = Array.isArray(join) ? join[0] : join;
+  return u ? { lastName: u.last_name, firstName: u.first_name, phone: u.phone } : undefined;
+}
+
+export type AdminChatConversation = {
+  id: string;
+  channel: ChatChannel;
+  startedAt: string;
+  user?: { lastName: string; firstName: string; phone: string };
+  messageCount: number;
+  lastMessage?: { role: ChatRole; content: string; createdAt: string };
+};
+
+type AdminChatConversationRow = {
+  id: string;
+  channel: ChatChannel;
+  started_at: string;
+  users: ChatUserJoin;
+  msg_count: { count: number }[];
+  last_message: { role: ChatRole; content: string; created_at: string }[];
+};
+
+// Two embeds of the same chat_messages relation, disambiguated by alias: one
+// aggregates the count, the other is ordered+limited to the newest row so the
+// list can show a preview without pulling whole transcripts.
+const ADMIN_CHAT_SELECT =
+  "id, channel, started_at, users(last_name, first_name, phone), msg_count:chat_messages(count), last_message:chat_messages(role, content, created_at)";
+
+function adminChatFromRow(row: AdminChatConversationRow): AdminChatConversation {
+  const last = row.last_message?.[0];
+  return {
+    id: row.id,
+    channel: row.channel,
+    startedAt: row.started_at,
+    user: chatUserFromJoin(row.users),
+    messageCount: row.msg_count?.[0]?.count ?? 0,
+    lastMessage: last ? { role: last.role, content: last.content, createdAt: last.created_at } : undefined,
+  };
+}
+
+export async function listChatConversationsForAdmin(limit = 100): Promise<AdminChatConversation[]> {
+  const { data, error } = await getSupabase()
+    .from("chat_conversations")
+    .select(ADMIN_CHAT_SELECT)
+    .order("started_at", { ascending: false })
+    .order("created_at", { referencedTable: "last_message", ascending: false })
+    .limit(1, { referencedTable: "last_message" })
+    .limit(limit);
+  if (error) throw error;
+  return (data as unknown as AdminChatConversationRow[]).map(adminChatFromRow);
+}
+
+export async function listChatConversationsByUser(userId: string): Promise<AdminChatConversation[]> {
+  const { data, error } = await getSupabase()
+    .from("chat_conversations")
+    .select(ADMIN_CHAT_SELECT)
+    .eq("user_id", userId)
+    .order("started_at", { ascending: false })
+    .order("created_at", { referencedTable: "last_message", ascending: false })
+    .limit(1, { referencedTable: "last_message" });
+  if (error) throw error;
+  return (data as unknown as AdminChatConversationRow[]).map(adminChatFromRow);
+}
+
+export type AdminChatMessage = { role: ChatRole; content: string; modelUsed?: string; createdAt: string };
+
+/** Full transcript with timestamps — listChatMessages above intentionally drops them for the model's context window. */
+export async function listChatMessagesForAdmin(conversationId: string): Promise<AdminChatMessage[]> {
+  const { data, error } = await getSupabase()
+    .from("chat_messages")
+    .select("role, content, model_used, created_at")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data as { role: ChatRole; content: string; model_used: string | null; created_at: string }[]).map((m) => ({
+    role: m.role,
+    content: m.content,
+    modelUsed: m.model_used ?? undefined,
+    createdAt: m.created_at,
+  }));
+}
+
+export type ChatIssueStatus = "new" | "resolved";
+
+export type ChatIssue = {
+  id: string;
+  conversationId: string;
+  channel: string;
+  message: string;
+  status: ChatIssueStatus;
+  createdAt: string;
+  resolvedAt?: string;
+  user?: { lastName: string; firstName: string; phone: string };
+};
+
+type ChatIssueRow = {
+  id: string;
+  conversation_id: string;
+  channel: string;
+  message: string;
+  status: ChatIssueStatus;
+  created_at: string;
+  resolved_at: string | null;
+  users: ChatUserJoin;
+};
+
+function chatIssueFromRow(row: ChatIssueRow): ChatIssue {
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    channel: row.channel,
+    message: row.message,
+    status: row.status,
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at ?? undefined,
+    user: chatUserFromJoin(row.users),
+  };
+}
+
+export async function createChatIssue(input: {
+  conversationId: string;
+  userId?: string;
+  channel: ChatChannel;
+  message: string;
+}): Promise<void> {
+  const { error } = await getSupabase().from("chat_issues").insert({
+    conversation_id: input.conversationId,
+    user_id: input.userId ?? null,
+    channel: input.channel,
+    message: input.message,
+  });
+  if (error) throw error;
+}
+
+export async function listChatIssues(limit = 100): Promise<ChatIssue[]> {
+  const { data, error } = await getSupabase()
+    .from("chat_issues")
+    .select("id, conversation_id, channel, message, status, created_at, resolved_at, users(last_name, first_name, phone)")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data as unknown as ChatIssueRow[]).map(chatIssueFromRow);
+}
+
+/** Returns false when the id doesn't exist, so the route can 404 instead of pretending. */
+export async function setChatIssueStatus(id: string, status: ChatIssueStatus): Promise<boolean> {
+  const { data, error } = await getSupabase()
+    .from("chat_issues")
+    .update({ status, resolved_at: status === "resolved" ? new Date().toISOString() : null })
+    .eq("id", id)
+    .select("id");
+  if (error) {
+    if (isInvalidUuidError(error)) return false;
+    throw error;
+  }
+  return (data as unknown[]).length > 0;
+}

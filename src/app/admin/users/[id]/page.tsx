@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import UserObjectPage from "@/components/admin/UserObjectPage";
-import { findUserById, listLoginLogs, listRegistrationsByUser, toPublicUser } from "@/lib/db";
+import {
+  findUserById,
+  listChatConversationsByUser,
+  listLoginLogs,
+  listRegistrationsByUser,
+  toPublicUser,
+} from "@/lib/db";
 import { isAdmin } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +25,18 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
   const user = await findUserById(id);
   if (!user) notFound();
 
-  const registrations = await listRegistrationsByUser(id);
-  const loginLogs = await listLoginLogs(id);
+  const [registrations, loginLogs, chatConversations] = await Promise.all([
+    listRegistrationsByUser(id),
+    listLoginLogs(id),
+    listChatConversationsByUser(id),
+  ]);
 
-  return <UserObjectPage user={toPublicUser(user)} registrations={registrations} loginLogs={loginLogs} />;
+  return (
+    <UserObjectPage
+      user={toPublicUser(user)}
+      registrations={registrations}
+      loginLogs={loginLogs}
+      chatConversations={chatConversations}
+    />
+  );
 }
