@@ -5,6 +5,7 @@ import { parsePriceToNumber } from "./price";
 import { transliterate } from "./mnTransliterate";
 import { sendPushToUsers } from "./push";
 import { sendSms } from "./sms/skytel";
+import { extractCourseCategories, getCourseAudience } from "./courseTag";
 
 /**
  * Persistence layer backed by Supabase Postgres (see supabase/schema.sql
@@ -1778,6 +1779,53 @@ export async function notifyNewRecordings(
       channel: "site",
     });
   }
+}
+
+/**
+ * Notifies students who've previously actively registered for a course of
+ * the same category+audience (see courseTag.ts) when a new one at that same
+ * level gets published. Called from the courses/[id] PUT route on the
+ * draft -> published transition, not on every save — a course isn't
+ * something past students should hear about until it's actually live.
+ * Silently no-ops for tags extractCourseCategories can't parse (customLabel
+ * courses like "ДАСГАЛЖУУЛАГЧ БАГШ") since there's no reliable "same level"
+ * match for those.
+ */
+export async function notifyNewCourseForPastStudents(course: Course): Promise<void> {
+  const categories = extractCourseCategories(course.tag);
+  if (categories.length === 0) return;
+  const audience = getCourseAudience(course.tag);
+
+  const allCourses = await listCourses(undefined, { includeDrafts: true });
+  const sameLevelIds = allCourses
+    .filter(
+      (c) =>
+        c.id !== course.id &&
+        getCourseAudience(c.tag) === audience &&
+        extractCourseCategories(c.tag).some((cat) => categories.includes(cat))
+    )
+    .map((c) => c.id);
+  if (sameLevelIds.length === 0) return;
+
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .select("user_id")
+    .in("program_id", sameLevelIds)
+    .eq("status", "active")
+    .not("user_id", "is", null);
+  if (error) throw error;
+
+  const userIds = [...new Set((data as { user_id: string }[]).map((r) => r.user_id))];
+  if (userIds.length === 0) return;
+
+  await createNotification({
+    title: "Танд тохирсон шинэ сургалт нэмэгдлээ",
+    body: `"${course.title}" (${course.tag}) сургалт нээгдлээ.`,
+    targetType: "users",
+    userIds,
+    channel: "site",
+    pushUrl: `/courses/${course.id}`,
+  });
 }
 
 // ---------------------------------------------------------------------------

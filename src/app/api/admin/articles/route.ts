@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addArticle, listArticles } from "@/lib/db";
+import { addArticle, createNotification, listArticles } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
 import { isEmptyHtml, isTooLong, MAX_LEN } from "@/lib/validate";
 import { sanitizeArticleContent } from "@/lib/sanitize";
@@ -41,6 +41,14 @@ export async function POST(request: Request) {
     author: data.author.trim(),
     featured: Boolean(data.featured),
   });
+
+  createNotification({
+    title: "Шинэ нийтлэл нэмэгдлээ",
+    body: `"${article.title}" нийтлэл нэмэгдлээ.`,
+    targetType: "all",
+    channel: "site",
+    pushUrl: `/articles/${article.id}`,
+  }).catch((err) => console.error("[articles] notification failed:", err));
 
   return NextResponse.json({ ok: true, article });
 }

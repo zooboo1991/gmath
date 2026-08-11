@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findCourseById, notifyNewRecordings, updateCourse } from "@/lib/db";
+import { findCourseById, notifyNewCourseForPastStudents, notifyNewRecordings, updateCourse } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { isAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
@@ -83,6 +83,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   notifyNewRecordings(id, `${course.title} (${course.tag})`, previous?.lessons ?? [], course.lessons).catch((err) =>
     console.error("[courses] recording notification failed:", err)
   );
+
+  if (previous && previous.status !== "published" && course.status === "published") {
+    notifyNewCourseForPastStudents(course).catch((err) =>
+      console.error("[courses] new-course notification failed:", err)
+    );
+  }
 
   await logAdminAction(request, {
     actionType: "course.update",
