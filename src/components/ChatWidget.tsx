@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { IconClose } from "@/components/icons";
 
 type Message = { role: "user" | "assistant"; content: string };
@@ -114,6 +114,23 @@ export function openChatWidget() {
   window.dispatchEvent(new Event(OPEN_CHAT_EVENT));
 }
 
+/**
+ * `?chat=1` means "arrive with the chat open" — that's the link the Messenger
+ * persistent menu points at, so tapping "AI туслахаас асуух" on the Facebook
+ * Page lands the visitor in a ready chat instead of on a homepage they have to
+ * hunt around.
+ *
+ * Read through useSyncExternalStore rather than an effect: the server snapshot
+ * is false, so the HTML matches and the flag flips right after hydration, with
+ * no setState inside an effect (which the react-hooks rules reject, and which
+ * would cost an extra render anyway).
+ */
+const NOOP_SUBSCRIBE = () => () => {};
+
+function readChatParam(): boolean {
+  return new URLSearchParams(window.location.search).get("chat") === "1";
+}
+
 const GREETING =
   "Сайн байна уу! Сургалт, үнэ, хуваарийн талаар асуухыг хүссэн зүйлээ бичээрэй.";
 
@@ -128,7 +145,11 @@ const GREETING =
  */
 export default function ChatWidget() {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  // null = the visitor hasn't opened or closed it yet, so the URL decides.
+  // Once they act, their choice wins for the rest of the visit.
+  const [openState, setOpenState] = useState<boolean | null>(null);
+  const wantsChatFromUrl = useSyncExternalStore(NOOP_SUBSCRIBE, readChatParam, () => false);
+  const open = openState ?? wantsChatFromUrl;
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -145,7 +166,7 @@ export default function ChatWidget() {
 
   // Lets other parts of the page (the FAQ panel) open the chat.
   useEffect(() => {
-    const openFromPage = () => setOpen(true);
+    const openFromPage = () => setOpenState(true);
     window.addEventListener(OPEN_CHAT_EVENT, openFromPage);
     return () => window.removeEventListener(OPEN_CHAT_EVENT, openFromPage);
   }, []);
@@ -206,7 +227,7 @@ export default function ChatWidget() {
       {open ? (
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={() => setOpenState(false)}
           aria-label="Чат хаах"
           aria-expanded
           className="fixed bottom-5 right-5 w-14 h-14 rounded-full bg-gold text-gold-ink grid place-items-center ring-[3px] ring-white shadow-lg hover:bg-gold-strong transition-colors z-[90]"
@@ -216,7 +237,7 @@ export default function ChatWidget() {
       ) : (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => setOpenState(true)}
           aria-label="Чат нээх"
           aria-expanded={false}
           className="fixed bottom-5 right-5 flex items-center gap-2.5 pl-1.5 pr-4 py-1.5 rounded-full bg-gold text-gold-ink ring-[3px] ring-white shadow-lg hover:bg-gold-strong transition-colors z-[90]"

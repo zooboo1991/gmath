@@ -11,6 +11,7 @@ export default function ChatPanel() {
     issues?: ChatIssue[];
   }>({ status: "loading" });
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [menuState, setMenuState] = useState<{ busy: boolean; message?: string; error?: boolean }>({ busy: false });
 
   useEffect(() => {
     let cancelled = false;
@@ -26,6 +27,26 @@ export default function ChatPanel() {
       cancelled = true;
     };
   }, []);
+
+  /**
+   * Pushes the greeting + persistent menu to the Facebook Page. Lives here
+   * because it's chatbot plumbing, and it has to run on the server that holds
+   * the Page token.
+   */
+  const applyMessengerMenu = async () => {
+    setMenuState({ busy: true });
+    try {
+      const res = await fetch("/api/admin/messenger/profile", { method: "POST" });
+      const json = await res.json();
+      setMenuState(
+        res.ok
+          ? { busy: false, message: "Messenger цэс болон мэндчилгээ шинэчлэгдлээ." }
+          : { busy: false, error: true, message: json.error ?? "Шинэчлэхэд алдаа гарлаа." }
+      );
+    } catch {
+      setMenuState({ busy: false, error: true, message: "Сүлжээний алдаа гарлаа." });
+    }
+  };
 
   const setIssueStatus = async (id: string, status: "new" | "resolved") => {
     // Optimistic flip; reverted by a reload if the PUT fails, which is rare
@@ -66,6 +87,30 @@ export default function ChatPanel() {
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="card-flat px-6 py-6">
+        <h3 className="font-extrabold text-[1.05rem]">Messenger цэс</h3>
+        <p className="text-ink-3 font-semibold text-[.85rem] mt-1 max-w-[68ch]">
+          Facebook хуудасны чат доор байнга харагдах цэс, мэндчилгээг вэб сайт руу чиглүүлж
+          тохируулна. Цэсний мөрүүд шууд браузер нээдэг тул Meta AI-аас хамаарахгүй. Сургалт, үнэ
+          зэрэг мэдээлэл өөрчлөгдөхөд дахин дарах шаардлагагүй — цэс нь зөвхөн холбоос агуулна.
+        </p>
+        <div className="flex items-center gap-3 flex-wrap mt-4">
+          <button
+            type="button"
+            disabled={menuState.busy}
+            onClick={applyMessengerMenu}
+            className="text-[.85rem] font-extrabold rounded-full bg-blue text-white shadow-blue px-5 py-2.5 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+          >
+            {menuState.busy ? "Тохируулж байна…" : "Цэсийг шинэчлэх"}
+          </button>
+          {menuState.message && (
+            <span className={`text-[.85rem] font-bold ${menuState.error ? "text-red-soft" : "text-green"}`}>
+              {menuState.message}
+            </span>
+          )}
+        </div>
+      </div>
+
       {state.status === "loading" && (
         <div className="card-flat px-6 py-6">
           <p className="text-ink-3 font-semibold text-[.9rem]">Ачааллаж байна…</p>

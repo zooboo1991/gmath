@@ -20,6 +20,7 @@ const ACTION_LABELS: Record<string, string> = {
   "lesson.zoom_meeting_create": "Zoom meeting үүсгэсэн",
   "notification.send": "Мэдэгдэл илгээсэн",
   "setting.update": "Тохиргоо өөрчилсөн",
+  "messenger.profile_update": "Messenger цэс шинэчилсэн",
 };
 
 /** Where a log entry's course/program lives in the admin, if it still can be derived. */
