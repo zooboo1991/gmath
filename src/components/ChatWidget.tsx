@@ -14,15 +14,32 @@ type Message = { role: "user" | "assistant"; content: string };
 const SAFE_PATH = /^\/(?:courses|assessment|certificate|articles|profile|team)(?:\/[A-Za-z0-9-]+)*$/;
 
 /**
+ * The only external hosts worth making clickable: the Facebook group and Zoom
+ * room a paid student's own registration carries. Kept to an allowlist rather
+ * than "any https URL" so a hallucinated — or injected — link can't become a
+ * live one; anything else stays inert text.
+ */
+const SAFE_EXTERNAL = /^https:\/\/(?:[A-Za-z0-9-]+\.)*(?:facebook\.com|fb\.me|zoom\.us)\/[^\s)]*$/i;
+
+/**
  * The model writes markdown-flavoured replies: `[Нэр](/courses/id)` links and
  * `**bold**`. Rendering that small subset keeps replies readable — without it
  * a bare UUID path wrapped over two lines and `**` showed up literally.
  * Deliberately hand-rolled rather than pulling in a markdown library: only
  * these two forms are supported, and no raw HTML is ever rendered.
  */
-const RICH_RE = /(\[[^\]\n]+\]\([^)\s]+\)|\*\*[^*\n]+\*\*|\/[A-Za-z0-9][A-Za-z0-9\-/]*)/g;
+const RICH_RE = /(\[[^\]\n]+\]\([^)\s]+\)|\*\*[^*\n]+\*\*|https?:\/\/[^\s)]+|\/[A-Za-z0-9][A-Za-z0-9\-/]*)/g;
 
 const LINK_CLASS = "underline font-extrabold text-navy break-words";
+
+/** External links open in a new tab so the visitor doesn't lose the chat. */
+function ExternalLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={LINK_CLASS}>
+      {children}
+    </a>
+  );
+}
 
 function renderRich(text: string) {
   // String.split with a capturing group puts the captured matches at the odd
@@ -37,13 +54,21 @@ function renderRich(text: string) {
       // Next's Link, not a bare <a>: client-side nav keeps this widget (it
       // lives in the root layout) mounted, so the panel stays open behind the
       // page the visitor just jumped to.
-      return SAFE_PATH.test(href) ? (
-        <Link key={i} href={href} className={LINK_CLASS}>
-          {label}
-        </Link>
-      ) : (
-        label
-      );
+      if (SAFE_PATH.test(href)) {
+        return (
+          <Link key={i} href={href} className={LINK_CLASS}>
+            {label}
+          </Link>
+        );
+      }
+      if (SAFE_EXTERNAL.test(href)) {
+        return (
+          <ExternalLink key={i} href={href}>
+            {label}
+          </ExternalLink>
+        );
+      }
+      return label;
     }
 
     if (part.startsWith("**")) {
@@ -54,7 +79,14 @@ function renderRich(text: string) {
       );
     }
 
-    // A bare path the model wrote without markdown around it.
+    // A bare URL or path the model wrote without markdown around it.
+    if (SAFE_EXTERNAL.test(part)) {
+      return (
+        <ExternalLink key={i} href={part}>
+          {part}
+        </ExternalLink>
+      );
+    }
     return SAFE_PATH.test(part) ? (
       <Link key={i} href={part} className={LINK_CLASS}>
         {part}
