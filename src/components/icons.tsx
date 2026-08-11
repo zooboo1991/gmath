@@ -323,6 +323,15 @@ export function IconBriefcase(props: IconProps) {
   );
 }
 
+/** Back control on object pages — replaced the old "← Буцах" text row. */
+export function IconArrowLeft(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} {...props}>
+      <path d="M11 5l-7 7 7 7M4 12h16" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function IconLogout(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>

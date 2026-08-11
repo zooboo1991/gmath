@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { PublicUser, Registration } from "@/lib/db";
 import { FILTER_INPUT_CLASS } from "@/components/admin/panels/shared";
+import { compareMn } from "@/lib/sortMn";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 
@@ -59,7 +60,9 @@ export default function UsersPanel({
   };
 
   const schools = useMemo(
-    () => [...new Set(users.map((u) => u.school).filter(Boolean))].sort((a, b) => a.localeCompare(b, "mn")),
+    // compareMn, not localeCompare: this list is rendered on both sides and
+    // the two collators disagree (see lib/sortMn.ts).
+    () => [...new Set(users.map((u) => u.school).filter(Boolean))].sort(compareMn),
     [users]
   );
 

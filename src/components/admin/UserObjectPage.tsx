@@ -6,7 +6,7 @@ import { useState } from "react";
 import type { AdminChatConversation, LoginLog, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import ChatTranscript from "@/components/admin/ChatTranscript";
 import { KpiTile } from "@/components/admin/AdminObjectPageParts";
-import { IconCheckCircle, IconClock } from "@/components/icons";
+import { IconArrowLeft, IconCheckCircle, IconClock } from "@/components/icons";
 import { describeUserAgent } from "@/lib/userAgent";
 import { payMethodLabel, programAdminHref } from "@/lib/registration";
 
@@ -83,39 +83,37 @@ export default function UserObjectPage({
 
   return (
     <div className="min-h-screen bg-bg-soft">
-      <header className="sticky top-0 z-20 bg-surface border-b border-line">
-        <div className="wrap py-3.5 flex items-center gap-4 flex-wrap">
-          <Link
-            href="/admin/users"
-            className="inline-flex items-center gap-1.5 font-extrabold text-ink-2 hover:text-ink text-[.88rem] shrink-0"
-          >
-            ← Буцах
-          </Link>
-          <div className="min-w-0 border-l border-line pl-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span
-                className={`text-[.72rem] font-extrabold px-2 py-0.5 rounded-full ${
-                  user.role === "teacher" ? "text-gold-strong bg-gold-soft" : "text-blue-strong bg-blue-soft"
-                }`}
-              >
-                {user.role === "teacher" ? "Багш" : "Сурагч"}
-              </span>
-            </div>
-            <b className="block text-[1.02rem] truncate max-w-[360px]">
-              {user.lastName || user.firstName ? `${user.lastName} ${user.firstName}` : "Мэдээлэл дутуу"}
-            </b>
-          </div>
-        </div>
-
-        <div className="wrap py-5 flex items-center justify-between gap-5 flex-wrap border-t border-line">
-          <div className="flex items-center gap-4 min-w-0">
+      {/* One header block, one name. The old design had a separate sticky
+          "← Буцах | Нэр" strip stacked above this profile row, which repeated
+          the name twice on screen; the back control is now an icon inside the
+          profile row itself. */}
+      <header className="bg-surface border-b border-line">
+        <div className="wrap py-5 flex items-center justify-between gap-5 flex-wrap">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <Link
+              href="/admin/users"
+              title="Хэрэглэгчид рүү буцах"
+              aria-label="Хэрэглэгчид рүү буцах"
+              className="w-9 h-9 rounded-full border border-line grid place-items-center text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
+            >
+              <IconArrowLeft className="w-4 h-4" />
+            </Link>
             <span className="w-14 h-14 rounded-full bg-blue-soft text-blue-strong grid place-items-center font-extrabold text-[1.3rem] shrink-0">
               {(user.lastName?.[0] ?? "") + (user.firstName?.[0] ?? "") || "?"}
             </span>
             <div className="min-w-0">
-              <b className="block text-[1.15rem] leading-tight truncate">
-                {user.lastName || user.firstName ? `${user.lastName} ${user.firstName}` : "Мэдээлэл дутуу"}
-              </b>
+              <div className="flex items-center gap-2 flex-wrap">
+                <b className="text-[1.15rem] leading-tight truncate">
+                  {user.lastName || user.firstName ? `${user.lastName} ${user.firstName}` : "Мэдээлэл дутуу"}
+                </b>
+                <span
+                  className={`text-[.72rem] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
+                    user.role === "teacher" ? "text-gold-strong bg-gold-soft" : "text-blue-strong bg-blue-soft"
+                  }`}
+                >
+                  {user.role === "teacher" ? "Багш" : "Сурагч"}
+                </span>
+              </div>
               <span className="text-ink-3 font-semibold text-[.85rem]">
                 {user.phone}
                 {" · Бүртгүүлсэн: "}
@@ -123,7 +121,11 @@ export default function UserObjectPage({
               </span>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3 shrink-0">
+          {/* Full width below nav: the three tiles plus the profile block no
+              longer fit on one line once the back icon is in the row, and
+              w-full makes them wrap onto their own line instead of pushing the
+              page into a horizontal scroll. */}
+          <div className="grid grid-cols-3 gap-3 shrink-0 w-full nav:w-auto">
             <KpiTile label="Сургалт" value={String(registrations.length)} />
             <KpiTile label="Идэвхтэй" value={String(active.length)} tone="green" />
             <KpiTile label="Чат" value={String(chatConversations.length)} tone="blue" />

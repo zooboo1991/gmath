@@ -5,6 +5,7 @@ import { parsePriceToNumber } from "./price";
 import { transliterate } from "./mnTransliterate";
 import { sendPushToUsers } from "./push";
 import { sendSms } from "./sms/skytel";
+import { compareMn } from "./sortMn";
 import { extractCourseCategories, getCourseAudience } from "./courseTag";
 
 /**
@@ -396,7 +397,7 @@ export async function listSchoolSuggestions(query: string): Promise<string[]> {
     .limit(50);
   if (error) throw error;
   const distinct = [...new Set((data as { school: string }[]).map((r) => r.school.trim()))];
-  return distinct.sort((a, b) => a.localeCompare(b, "mn")).slice(0, 8);
+  return distinct.sort(compareMn).slice(0, 8);
 }
 
 export async function findUserByPhone(phone: string): Promise<User | undefined> {

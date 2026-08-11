@@ -5,7 +5,7 @@ import { formatDate } from "@/lib/dateFormat";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Course, CourseKind, CourseStatus, Lesson, PublicUser, Registration } from "@/lib/db";
-import { IconCheckCircle, IconClock, IconClose, IconBank, IconQrCode, IconPerson } from "@/components/icons";
+import { IconArrowLeft, IconCheckCircle, IconClock, IconClose, IconBank, IconQrCode, IconPerson } from "@/components/icons";
 import {
   buildCourseTag,
   parseCourseTag,
@@ -256,9 +256,11 @@ export default function CourseObjectPage({
           <div className="flex items-center gap-3 min-w-0">
             <Link
               href="/admin/courses"
-              className="inline-flex items-center gap-1.5 font-extrabold text-ink-2 hover:text-ink text-[.88rem] shrink-0"
+              title="Сургалтууд рүү буцах"
+              aria-label="Сургалтууд рүү буцах"
+              className="w-9 h-9 rounded-full border border-line grid place-items-center text-ink-3 hover:text-ink hover:bg-surface-2 transition-colors shrink-0"
             >
-              ← Буцах
+              <IconArrowLeft className="w-4 h-4" />
             </Link>
             <div className="min-w-0 border-l border-line pl-3">
               <div className="flex items-center gap-2 flex-wrap">
