@@ -7,7 +7,17 @@ const BASE_PROMPT = `Та бол gmath.mn сайтын туслах чатбот
 - Зөвхөн доор өгөгдсөн мэдээлэлд тулгуурлан хариулна уу. Үнэ, хуваарь, хичээлийн агуулгыг өөрөө зохиож болохгүй.
 - Мэдэхгүй бол "Уучлаарай, тэр талаар надад мэдээлэл байхгүй. Б.Ганбат багштай холбогдоно уу." гэж шууд хэлнэ үү.
 - Хувийн мэдээлэл (нэвтрэх нэр, нууц үг, төлбөрийн дэлгэрэнгүй) хэзээ ч асуухгүй.
-- Хариултаа 3-4 өгүүлбэрт багтаана уу. Сургалтын талаар асуувал холбогдох хуудсыг санал болгоно уу (жишээ: /courses).`;
+- Хариултаа 3-4 өгүүлбэрт багтаана уу.
+- Холбоос: зөвхөн доор бичигдсэн хаягуудыг л ашиглана уу, өөрөө хаяг зохиож болохгүй. Тухайн сургалтын талаар асуувал ерөнхий /courses хуудсыг биш, тэр сургалтын өөрийн хуудсыг санал болгоно уу.
+- Холбоосыг үргэлж [Уншигдахуйц нэр](/хаяг) хэлбэрээр бичнэ үү, урт хаягийг нүцгэн тавьж болохгүй. Жишээ: [B ангилал сургалт](/courses/abc123) хуудсыг үзнэ үү.
+
+Сайтын хуудсууд:
+- /courses — бүх сургалтын жагсаалт
+- /assessment — түвшин тогтоох үнэлгээ (сурагчийн ангиллыг тодорхойлох)
+- /certificate — багшийн сертификат шалгах
+- /articles — нийтлэлүүд
+- /profile — хэрэглэгчийн хувийн хуудас (бүртгэл, хичээлийн бичлэг, ирц)
+- /team/ganbat — Б.Ганбат багшийн танилцуулга`;
 
 /**
  * Phase 1's "knowledge base": the live published catalogue, fetched fresh on
@@ -25,9 +35,18 @@ export async function buildSystemPrompt(userId?: string): Promise<string> {
 
   const sections = [BASE_PROMPT];
 
-  const catalogue = [...courses, ...yearly].map(
-    (c) => `- ${c.title} (${c.tag}) — ${c.price}/${c.period}. ${c.topics}`
-  );
+  // `period` already carries its own leading slash ("/ сар"), so it's
+  // concatenated rather than joined with another one.
+  const catalogue = [
+    ...courses.map((c) => `- ${c.title} (${c.tag}) — ${c.price}${c.period}. ${c.topics} Хуудас: /courses/${c.id}`),
+    // Yearly programs aren't in the courses table and don't follow the
+    // course-id URL pattern — they're hand-written pages at /courses/c and
+    // /courses/d, same mapping as src/components/Courses.tsx uses.
+    ...yearly.map(
+      (p) =>
+        `- ${p.title} (${p.tag}) — ${p.price}${p.period}. ${p.topics} Хуудас: /courses/${p.id.replace("program-", "")}`
+    ),
+  ];
   sections.push(
     catalogue.length > 0
       ? `Одоо нээлттэй сургалтууд:\n${catalogue.join("\n")}`
@@ -41,7 +60,7 @@ export async function buildSystemPrompt(userId?: string): Promise<string> {
     );
     sections.push(
       mine.length > 0
-        ? `Энэ хэрэглэгчийн бүртгүүлсэн сургалтууд:\n${mine.join("\n")}`
+        ? `Энэ хэрэглэгчийн бүртгүүлсэн сургалтууд (дэлгэрэнгүйг /profile хуудаснаас харна):\n${mine.join("\n")}`
         : "Энэ хэрэглэгч одоогоор ямар ч сургалтад бүртгүүлээгүй байна."
     );
   } else {

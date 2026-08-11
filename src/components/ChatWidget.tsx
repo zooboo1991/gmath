@@ -1,9 +1,69 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { IconChat, IconClose } from "@/components/icons";
 
 type Message = { role: "user" | "assistant"; content: string };
+
+/**
+ * Only internal paths the site actually has — the model must never be able to
+ * turn its own output into a link pointing somewhere arbitrary. Anything else
+ * it emits (external URLs, /admin, a made-up path) stays plain text.
+ */
+const SAFE_PATH = /^\/(?:courses|assessment|certificate|articles|profile|team)(?:\/[A-Za-z0-9-]+)*$/;
+
+/**
+ * The model writes markdown-flavoured replies: `[Нэр](/courses/id)` links and
+ * `**bold**`. Rendering that small subset keeps replies readable — without it
+ * a bare UUID path wrapped over two lines and `**` showed up literally.
+ * Deliberately hand-rolled rather than pulling in a markdown library: only
+ * these two forms are supported, and no raw HTML is ever rendered.
+ */
+const RICH_RE = /(\[[^\]\n]+\]\([^)\s]+\)|\*\*[^*\n]+\*\*|\/[A-Za-z0-9][A-Za-z0-9\-/]*)/g;
+
+const LINK_CLASS = "underline font-extrabold text-navy break-words";
+
+function renderRich(text: string) {
+  // String.split with a capturing group puts the captured matches at the odd
+  // indices — used instead of re-testing RICH_RE, whose /g lastIndex is
+  // stateful and would misfire on a second call.
+  return text.split(RICH_RE).map((part, i) => {
+    if (i % 2 === 0) return part;
+
+    const mdLink = part.match(/^\[([^\]\n]+)\]\(([^)\s]+)\)$/);
+    if (mdLink) {
+      const [, label, href] = mdLink;
+      // Next's Link, not a bare <a>: client-side nav keeps this widget (it
+      // lives in the root layout) mounted, so the panel stays open behind the
+      // page the visitor just jumped to.
+      return SAFE_PATH.test(href) ? (
+        <Link key={i} href={href} className={LINK_CLASS}>
+          {label}
+        </Link>
+      ) : (
+        label
+      );
+    }
+
+    if (part.startsWith("**")) {
+      return (
+        <b key={i} className="font-extrabold">
+          {part.slice(2, -2)}
+        </b>
+      );
+    }
+
+    // A bare path the model wrote without markdown around it.
+    return SAFE_PATH.test(part) ? (
+      <Link key={i} href={part} className={LINK_CLASS}>
+        {part}
+      </Link>
+    ) : (
+      part
+    );
+  });
+}
 
 const STORAGE_KEY = "gmath_chat_conversation_id";
 
@@ -108,7 +168,7 @@ export default function ChatWidget() {
                     : "self-start max-w-[85%] bg-bg-soft text-ink-2 font-medium text-[.85rem] leading-[1.55] px-3.5 py-2.5 rounded-md whitespace-pre-wrap"
                 }
               >
-                {m.content}
+                {m.role === "assistant" ? renderRich(m.content) : m.content}
               </p>
             ))}
             {busy && (

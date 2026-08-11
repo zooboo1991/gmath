@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { randomUUID } from "crypto";
 import {
+  attachChatConversationUser,
   createChatConversation,
   findChatConversation,
+  findLatestChatConversation,
   insertChatMessage,
   listChatMessages,
 } from "@/lib/db";
@@ -54,7 +56,15 @@ export async function POST(request: Request) {
     const existing = await findChatConversation(data.conversationId, visitorId);
     conversationId = existing?.id;
   }
+  // The widget's id lives in sessionStorage, which closing the tab clears —
+  // so fall back to whatever thread this visitor/account was last on before
+  // starting a brand new one.
+  conversationId ??= await findLatestChatConversation(visitorId, sessionUser?.id);
   conversationId ??= await createChatConversation(visitorId, sessionUser?.id);
+
+  // Signed in partway through an anonymous conversation: claim it for the
+  // account so it's still theirs on the next visit / another device.
+  if (sessionUser) await attachChatConversationUser(conversationId, sessionUser.id);
 
   const history = await listChatMessages(conversationId);
   await insertChatMessage(conversationId, "user", message);

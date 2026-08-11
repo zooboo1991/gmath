@@ -1996,3 +1996,38 @@ export async function insertChatMessage(
   });
   if (error) throw error;
 }
+
+/**
+ * Resumes a returning visitor's most recent thread instead of starting from
+ * scratch. The widget keeps its conversation id in sessionStorage, which
+ * closing the tab wipes — without this, every new visit lost the history.
+ *
+ * Scoped to the last 24 hours on purpose: resuming a weeks-old thread is
+ * confusing to the visitor and drags stale context (and its token cost) into
+ * every later question. A signed-in user is matched on user_id so their
+ * thread follows them across devices; an anonymous visitor falls back to the
+ * per-browser `vid` cookie.
+ */
+export async function findLatestChatConversation(visitorId: string, userId?: string): Promise<string | undefined> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  let query = getSupabase().from("chat_conversations").select("id").gte("started_at", since);
+  query = userId ? query.eq("user_id", userId) : query.eq("visitor_id", visitorId);
+  const { data, error } = await query.order("started_at", { ascending: false }).limit(1).maybeSingle();
+  if (error) throw error;
+  return (data as { id: string } | null)?.id;
+}
+
+/**
+ * Claims an anonymous conversation for an account once its visitor signs in,
+ * so the thread they started before logging in keeps going. Guarded on
+ * user_id being null — never reassigns a conversation that already belongs
+ * to someone.
+ */
+export async function attachChatConversationUser(conversationId: string, userId: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("chat_conversations")
+    .update({ user_id: userId })
+    .eq("id", conversationId)
+    .is("user_id", null);
+  if (error) throw error;
+}
