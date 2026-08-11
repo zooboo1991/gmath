@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { IconChat, IconClose } from "@/components/icons";
+import { IconClose } from "@/components/icons";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -173,18 +174,41 @@ export default function ChatWidget() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label={open ? "Чат хаах" : "Чат нээх"}
-        aria-expanded={open}
-        // Gold, not navy: the launcher sits over the navy hero on most pages,
-        // where a navy circle disappears entirely. Gold reads clearly against
-        // both the hero and the white/soft page sections further down.
-        className="fixed bottom-5 right-5 w-14 h-14 rounded-full bg-gold text-gold-ink grid place-items-center shadow-gold hover:bg-gold-strong transition-colors z-[90]"
-      >
-        {open ? <IconClose className="w-6 h-6" /> : <IconChat className="w-6 h-6" />}
-      </button>
+      {/* Closed: the mascot plus an invitation, so it reads as "ask me
+          something" rather than an anonymous icon. Open: shrinks back to a
+          plain close circle — a full-width pill would sit on top of the panel
+          it belongs to. Gold either way, not navy: the launcher floats over the
+          navy hero on most pages, where a navy circle disappears. */}
+      {open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label="Чат хаах"
+          aria-expanded
+          className="fixed bottom-5 right-5 w-14 h-14 rounded-full bg-gold text-gold-ink grid place-items-center shadow-gold hover:bg-gold-strong transition-colors z-[90]"
+        >
+          <IconClose className="w-6 h-6" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Чат нээх"
+          aria-expanded={false}
+          className="fixed bottom-5 right-5 flex items-center gap-2.5 pl-1.5 pr-4 py-1.5 rounded-full bg-gold text-gold-ink shadow-gold hover:bg-gold-strong transition-colors z-[90]"
+        >
+          <span className="w-11 h-11 rounded-full bg-surface grid place-items-center shrink-0 overflow-hidden">
+            <Image
+              src="/images/mascot-head.png"
+              alt=""
+              width={965}
+              height={835}
+              className="w-8 h-8 object-contain"
+            />
+          </span>
+          <b className="font-extrabold text-[.85rem] whitespace-nowrap">Асуух зүйл байна уу?</b>
+        </button>
+      )}
 
       {open && (
         <div className="fixed bottom-[88px] left-3 right-3 sm:left-auto sm:right-5 sm:w-[360px] h-[min(70vh,480px)] bg-surface border border-line rounded-lg shadow-lg flex flex-col overflow-hidden z-[90]">
