@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Reveal from "./Reveal";
-import { IconPlus, IconMessenger, IconPhone } from "./icons";
+import { IconPlus, IconChat, IconPhone } from "./icons";
+import { openChatWidget } from "./ChatWidget";
 // Shared with the chatbot's system prompt — see src/lib/siteContent.ts.
 import { siteFaqs as faqs } from "@/lib/siteContent";
 
@@ -71,20 +72,21 @@ export default function Faq() {
             className="panel-blue text-white rounded-lg px-[30px] py-[32px] shadow-sm nav:sticky nav:top-24"
           >
             <span className="w-[54px] h-[54px] rounded-2xl bg-white/18 grid place-items-center">
-              <IconMessenger className="w-7 h-7" />
+              <IconChat className="w-7 h-7" />
             </span>
             <h3 className="text-[1.4rem] font-extrabold mt-[18px]">Асуулт байна уу?</h3>
             <p className="text-[.98rem] text-white/85 mt-1.5">
-              Facebook хуудасны AI туслахтай холбогдож хүссэн зүйлээ асууж тодруулаарай.
+              Сайт дээрх AI туслахаас хүссэн зүйлээ шууд асууж тодруулаарай.
             </p>
-            <a
-              href="https://www.facebook.com/ganbat.surgalt/"
-              target="_blank"
-              rel="noreferrer"
+            {/* Opens the site's own chat instead of sending the visitor off to
+                Facebook — the answer is right here. */}
+            <button
+              type="button"
+              onClick={openChatWidget}
               className="flex items-center justify-center gap-[10px] w-full mt-[22px] bg-white text-blue-strong font-extrabold px-4 py-4 rounded-full shadow-sm transition-transform hover:-translate-y-0.5"
             >
-              <IconMessenger className="w-5 h-5" /> AI туслахтай чатлах
-            </a>
+              <IconChat className="w-5 h-5" /> AI туслахтай чатлах
+            </button>
             <div className="flex flex-col gap-2.5 mt-5 pt-5 border-t border-white/20">
               <a href="tel:90777400" className="flex items-center gap-2">
                 <IconPhone className="w-4 h-4 shrink-0 text-white/80" />

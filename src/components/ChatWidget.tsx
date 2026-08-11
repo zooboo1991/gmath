@@ -101,6 +101,19 @@ function renderRich(text: string) {
 
 const STORAGE_KEY = "gmath_chat_conversation_id";
 
+const OPEN_CHAT_EVENT = "gmath:open-chat";
+
+/**
+ * Opens the chat from anywhere on the site (the FAQ's "ask us" panel calls
+ * this). A window event rather than context or a store: this widget is
+ * mounted once in the root layout as a *sibling* of {children}, so a provider
+ * would have to wrap both just to carry one boolean, and the widget keeps its
+ * "no props, owns its own state" shape.
+ */
+export function openChatWidget() {
+  window.dispatchEvent(new Event(OPEN_CHAT_EVENT));
+}
+
 const GREETING =
   "Сайн байна уу! Сургалт, үнэ, хуваарийн талаар асуухыг хүссэн зүйлээ бичээрэй.";
 
@@ -129,6 +142,13 @@ export default function ChatWidget() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, busy]);
+
+  // Lets other parts of the page (the FAQ panel) open the chat.
+  useEffect(() => {
+    const openFromPage = () => setOpen(true);
+    window.addEventListener(OPEN_CHAT_EVENT, openFromPage);
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, openFromPage);
+  }, []);
 
   // The widget is for visitors; on admin pages it just floats over the
   // sidebar's own chat-oversight UI. After every hook, per the rules of hooks.
