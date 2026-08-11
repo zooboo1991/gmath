@@ -217,7 +217,7 @@ export default function ChatWidget() {
       {open && (
         <div className="fixed bottom-[88px] left-3 right-3 sm:left-auto sm:right-5 sm:w-[360px] h-[min(70vh,480px)] bg-surface border border-line rounded-lg shadow-lg flex flex-col overflow-hidden z-[90]">
           <div className="bg-navy text-white px-4 py-3.5 shrink-0">
-            <b className="font-extrabold text-[.95rem] block">Онлайн туслах</b>
+            <b className="font-extrabold text-[.95rem] block">AI туслах</b>
             <span className="text-[.78rem] font-semibold opacity-80">Сургалтын талаар асууна уу</span>
           </div>
 
