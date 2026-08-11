@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { setChatIssueStatus } from "@/lib/db";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 
 /** Flip an issue between new/resolved from the admin "Чат" tab. */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;

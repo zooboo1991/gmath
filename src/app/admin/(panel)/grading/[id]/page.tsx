@@ -4,6 +4,7 @@ import GradingDetail from "@/components/admin/GradingDetail";
 import { listLevels } from "@/lib/assessment/db";
 import { buildGradingDetail } from "@/lib/assessment/gradingDetail";
 import { isAdmin } from "@/lib/session";
+import { requireAdminSection } from "@/lib/adminAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function GradingDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdminSection("assessment");
   if (!(await isAdmin())) {
     redirect("/admin/login");
   }

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import ProblemsPanel from "@/components/admin/ProblemsPanel";
 import { listProblems } from "@/lib/assessment/db";
 import { isAdmin } from "@/lib/session";
+import { requireAdminSection } from "@/lib/adminAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminProblemsPage() {
+  await requireAdminSection("assessment");
   if (!(await isAdmin())) {
     redirect("/admin/login");
   }

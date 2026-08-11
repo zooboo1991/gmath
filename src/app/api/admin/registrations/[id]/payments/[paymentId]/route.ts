@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { deleteRegistrationPayment, findRegistrationById } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 
 /** Removes a mis-entered payment row — admin correction, not a student-facing cancel. */
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string; paymentId: string }> }
 ) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id, paymentId } = await params;

@@ -6,6 +6,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Analytics scoped to an admin-picked date range — see the Хандалт tab's filter bar. */
 export async function GET(request: Request) {
+  // The one admin GET the read-only account needs: the analytics filter bar
+  // refetches through here. Every other admin endpoint requires isFullAdmin.
   if (!(await isAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }

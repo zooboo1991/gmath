@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { addManualRegistration, findRegistrationByUserAndProgram, findUserByPhone, listAllRegistrations } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { resolveProgram } from "@/lib/resolveProgram";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 
 const PHONE_RE = /^[0-9]{8}$/;
 
 export async function GET() {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const registrations = await listAllRegistrations();
@@ -16,7 +16,7 @@ export async function GET() {
 
 /** Admin manually adding someone to a course/program by phone — see addManualRegistration() for why this always lands as "active". */
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const data = await request.json().catch(() => ({}));

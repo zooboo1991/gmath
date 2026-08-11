@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { addCourse, listCourses } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
 import { normalizeLessons, validateLessons } from "@/lib/lessonInput";
 
@@ -27,7 +27,7 @@ function validateCourseFields(data: Record<string, unknown>): string | null {
 }
 
 export async function GET() {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   // Admin listings include drafts; only the public pages filter them out.
@@ -35,7 +35,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const data = await request.json();

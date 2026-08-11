@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { createCertificate, listCertificates, upsertCertificates, type CertificateImportRow } from "@/lib/db";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { parseCertificateWorkbook, validateCertificateManualInput } from "@/lib/certificateImport";
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
 export async function GET() {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const certificates = await listCertificates();
@@ -14,7 +14,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
 

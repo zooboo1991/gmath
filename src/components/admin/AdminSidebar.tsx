@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
+import { canView, type AdminRole, type AdminSection } from "@/lib/adminSections";
+import type { IconProps } from "@/components/icons";
 import {
   IconBell,
   IconBook,
@@ -19,18 +21,26 @@ import {
   IconTarget,
 } from "@/components/icons";
 
-const MENU = [
-  { href: "/admin", label: "Хяналтын самбар", icon: IconGrid },
-  { href: "/admin/registrations", label: "Бүртгэлүүд", icon: IconCheckCircle },
-  { href: "/admin/courses", label: "Сургалтууд", icon: IconBook },
-  { href: "/admin/articles", label: "Нийтлэл", icon: IconDocument },
-  { href: "/admin/users", label: "Хэрэглэгчид", icon: IconPerson },
-  { href: "/admin/analytics", label: "Аналитик", icon: IconMonitor },
-  { href: "/admin/certificates", label: "Сертификат", icon: IconMedal },
-  { href: "/admin/assessment", label: "Үнэлгээ", icon: IconTarget },
-  { href: "/admin/notifications", label: "Мэдэгдэл", icon: IconBell },
-  { href: "/admin/chat", label: "Чат", icon: IconChat },
-  { href: "/admin/logs", label: "Түүх", icon: IconClock },
+/**
+ * Labels are deliberately singular ("Бүртгэл", not "Бүртгэлүүд") — a column
+ * of plural forms reads noticeably busier at this width.
+ *
+ * `section` ties each row to lib/adminAccess.ts, which decides what the
+ * read-only account sees. The list is filtered here for looks; the real gate
+ * is requireAdminSection() on each page.
+ */
+const MENU: { href: string; label: string; icon: (p: IconProps) => React.ReactNode; section: AdminSection }[] = [
+  { href: "/admin", label: "Хяналтын самбар", icon: IconGrid, section: "dashboard" },
+  { href: "/admin/registrations", label: "Бүртгэл", icon: IconCheckCircle, section: "registrations" },
+  { href: "/admin/courses", label: "Сургалт", icon: IconBook, section: "courses" },
+  { href: "/admin/articles", label: "Нийтлэл", icon: IconDocument, section: "articles" },
+  { href: "/admin/users", label: "Хэрэглэгч", icon: IconPerson, section: "users" },
+  { href: "/admin/analytics", label: "Аналитик", icon: IconMonitor, section: "analytics" },
+  { href: "/admin/certificates", label: "Сертификат", icon: IconMedal, section: "certificates" },
+  { href: "/admin/assessment", label: "Үнэлгээ", icon: IconTarget, section: "assessment" },
+  { href: "/admin/notifications", label: "Мэдэгдэл", icon: IconBell, section: "notifications" },
+  { href: "/admin/chat", label: "Чат", icon: IconChat, section: "chat" },
+  { href: "/admin/logs", label: "Түүх", icon: IconClock, section: "logs" },
 ];
 
 const STORAGE_KEY = "gmath_admin_sidebar_collapsed";
@@ -73,7 +83,7 @@ function setCollapsed(value: boolean) {
  * /admin/yearly/[id] and /admin/courses/new all belong to "Сургалтууд", and
  * the assessment sub-pages (grading/levels/problems) to "Үнэлгээ".
  */
-export default function AdminSidebar() {
+export default function AdminSidebar({ role }: { role: AdminRole }) {
   const pathname = usePathname();
   const router = useRouter();
   const collapsed = useSyncExternalStore(subscribe, getSnapshot, () => false);
@@ -142,8 +152,14 @@ export default function AdminSidebar() {
         </button>
       )}
 
+      {role === "viewer" && !collapsed && (
+        <span className="hidden lg:block mx-4 mt-3 text-[.68rem] font-extrabold tracking-[.08em] uppercase text-white/45">
+          Харах эрх
+        </span>
+      )}
+
       <nav className="flex-1 py-3 flex flex-col gap-0.5">
-        {MENU.map(({ href, label, icon: Icon }) => (
+        {MENU.filter(({ section }) => canView(role, section)).map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

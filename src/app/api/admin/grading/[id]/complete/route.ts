@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { findAssessment, findLevel, updateAssessment } from "@/lib/assessment/db";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 
 /** The teacher's final call: a written verdict plus the level. */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;

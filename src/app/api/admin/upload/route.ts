@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { uploadCoverImage } from "@/lib/storage";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { uploadProblemImage } from "@/lib/storage";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
@@ -9,7 +9,7 @@ const MAX_SIZE = 5 * 1024 * 1024;
  * solutions, a problem image is shown to every candidate anyway.
  */
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
 

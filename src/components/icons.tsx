@@ -1,4 +1,4 @@
-type IconProps = React.SVGProps<SVGSVGElement>;
+export type IconProps = React.SVGProps<SVGSVGElement>;
 
 export function IconTrophy({ withBase = false, ...props }: IconProps & { withBase?: boolean }) {
   return (

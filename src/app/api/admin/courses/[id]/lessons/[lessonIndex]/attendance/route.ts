@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { findLessonMeeting, listAttendanceForLessonWithNames } from "@/lib/zoom/db";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string; lessonIndex: string }> }) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id: courseId, lessonIndex: lessonIndexRaw } = await params;

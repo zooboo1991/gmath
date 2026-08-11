@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { findCourseById, findYearlyProgramById, updateCourse, updateYearlyProgram, type Lesson } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { parseScheduleString } from "@/lib/lessonSchedule";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { createMeeting } from "@/lib/zoom/client";
 import {
   createLessonMeeting,
@@ -34,7 +34,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string; lessonIndex: string }> }
 ) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id: courseId, lessonIndex: lessonIndexRaw } = await params;

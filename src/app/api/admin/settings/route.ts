@@ -1,21 +1,21 @@
 import { NextResponse } from "next/server";
 import { getAssessmentFee, setSetting } from "@/lib/assessment/db";
 import { logAdminAction } from "@/lib/adminLog";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 
 /** Only keys listed here can be written, so the endpoint can't set anything. */
 const EDITABLE_KEYS = new Set(["assessment_fee"]);
 
 export async function GET() {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   return NextResponse.json({ ok: true, settings: { assessment_fee: await getAssessmentFee() } });
 }
 
 export async function PUT(request: Request) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
 

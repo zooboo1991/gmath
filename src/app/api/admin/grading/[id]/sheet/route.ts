@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { findAssessment, updateAssessment } from "@/lib/assessment/db";
 import { SIGNED_URL_TTL_SECONDS } from "@/lib/assessment/config";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { createSignedUrl, GRADED_SHEETS_BUCKET, uploadPrivateImage } from "@/lib/storage";
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
 /** The teacher's scanned, marked-up sheet. Private, like the solutions. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;

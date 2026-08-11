@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { addRegistrationPayment, findRegistrationById } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Logs one installment payment against a registration — see the schema comment on registration_payments. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;

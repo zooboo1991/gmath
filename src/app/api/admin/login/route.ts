@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkAdminPassword, setAdminSession } from "@/lib/session";
+import { resolveAdminLogin, setAdminSession } from "@/lib/session";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
@@ -15,12 +15,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const { password } = await request.json();
+  const { username, password } = await request.json();
 
-  if (!checkAdminPassword(password ?? "")) {
-    return NextResponse.json({ ok: false, error: "Нууц үг буруу байна" }, { status: 401 });
+  // One message for both a wrong name and a wrong password: naming which half
+  // failed would tell an attacker which usernames exist.
+  const role = resolveAdminLogin(typeof username === "string" ? username : "", password ?? "");
+  if (!role) {
+    return NextResponse.json({ ok: false, error: "Нэвтрэх нэр эсвэл нууц үг буруу байна" }, { status: 401 });
   }
 
-  await setAdminSession();
-  return NextResponse.json({ ok: true });
+  await setAdminSession(role);
+  return NextResponse.json({ ok: true, role });
 }

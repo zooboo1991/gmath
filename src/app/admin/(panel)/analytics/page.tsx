@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import AnalyticsPanel from "@/components/admin/panels/AnalyticsPanel";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { getAnalyticsStatsForRange, getTotalPageViews, type AnalyticsRangeStats } from "@/lib/db";
+import { requireAdminSection } from "@/lib/adminAccess";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Аналитик — Админ" };
@@ -22,6 +23,8 @@ function toDateStr(d: Date): string {
 }
 
 export default async function AdminAnalyticsPage() {
+  await requireAdminSection("analytics");
+
   // Defaults to the current calendar month — the filter bar lets the admin
   // pick a different range client-side.
   const now = new Date();

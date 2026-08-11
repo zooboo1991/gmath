@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createUser, linkPendingRegistrationsToUser, toPublicUser } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 
 const PHONE_RE = /^[0-9]{8}$/;
@@ -15,7 +15,7 @@ const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
  * all of it before it'll save (see /api/account/profile).
  */
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
 

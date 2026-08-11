@@ -4,6 +4,7 @@ import ArticleForm from "@/components/admin/ArticleForm";
 import { findArticleById } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
 import { toEditableHtml } from "@/lib/articleContent";
+import { requireAdminSection } from "@/lib/adminAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function EditArticlePage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdminSection("articles");
   if (!(await isAdmin())) {
     redirect("/admin/login");
   }

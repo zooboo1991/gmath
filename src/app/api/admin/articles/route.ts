@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { addArticle, createNotification, listArticles } from "@/lib/db";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { isEmptyHtml, isTooLong, MAX_LEN } from "@/lib/validate";
 import { sanitizeArticleContent } from "@/lib/sanitize";
 
@@ -13,14 +13,14 @@ function validateArticleFields(data: Record<string, unknown>): string | null {
 }
 
 export async function GET() {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   return NextResponse.json({ ok: true, articles: await listArticles() });
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const data = await request.json();

@@ -2,6 +2,7 @@ import { cookies, headers } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
 import { createSession, deleteSession, findSessionUserId, findUserById, logLogin, type User } from "./db";
 import { getClientIp } from "./rateLimit";
+import type { AdminRole } from "./adminSections";
 
 /**
  * Placeholder auth: a signed cookie stands in for a real session store
@@ -26,6 +27,16 @@ import { getClientIp } from "./rateLimit";
 const SESSION_COOKIE = "session_user_id";
 const ADMIN_COOKIE = "admin_session";
 const ADMIN_MARKER = "admin-ok";
+
+/**
+ * The role is baked into the signed cookie value ("admin-ok:viewer"), so it
+ * can't be escalated client-side without the signing secret. A bare
+ * "admin-ok" is an older cookie from before roles existed and still reads as
+ * full. See lib/adminSections.ts for what each role may see.
+ */
+
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME ?? "Admin";
+const ADMIN_VIEWER_USERNAME = process.env.ADMIN_VIEWER_USERNAME ?? "Ganbat";
 
 // Not forced in dev, where the site runs over plain http://localhost and a
 // `secure` cookie would just silently fail to be set at all.
@@ -101,16 +112,34 @@ export async function clearSessionUser() {
   store.delete(SESSION_COOKIE);
 }
 
-export async function isAdmin(): Promise<boolean> {
+export async function getAdminRole(): Promise<AdminRole | null> {
   const store = await cookies();
   const raw = store.get(ADMIN_COOKIE)?.value;
-  if (!raw) return false;
-  return unsign(raw) === ADMIN_MARKER;
+  if (!raw) return null;
+  const value = unsign(raw);
+  if (value === ADMIN_MARKER) return "full";
+  if (value === `${ADMIN_MARKER}:full`) return "full";
+  if (value === `${ADMIN_MARKER}:viewer`) return "viewer";
+  return null;
 }
 
-export async function setAdminSession() {
+/** Signed in as either admin. Use for pages and read-only endpoints. */
+export async function isAdmin(): Promise<boolean> {
+  return (await getAdminRole()) !== null;
+}
+
+/**
+ * Write access. Every mutating admin endpoint checks this instead of
+ * isAdmin(), which is what makes the viewer account genuinely read-only —
+ * hiding buttons in the UI only hides them.
+ */
+export async function isFullAdmin(): Promise<boolean> {
+  return (await getAdminRole()) === "full";
+}
+
+export async function setAdminSession(role: AdminRole) {
   const store = await cookies();
-  store.set(ADMIN_COOKIE, sign(ADMIN_MARKER), {
+  store.set(ADMIN_COOKIE, sign(`${ADMIN_MARKER}:${role}`), {
     httpOnly: true,
     secure: SECURE_COOKIE,
     sameSite: "lax",
@@ -124,13 +153,39 @@ export async function clearAdminSession() {
   store.delete(ADMIN_COOKIE);
 }
 
-export function checkAdminPassword(password: string) {
-  const expected = process.env.ADMIN_PASSWORD;
-  if (!expected) {
-    throw new Error("Missing ADMIN_PASSWORD environment variable.");
-  }
-  const a = Buffer.from(password);
+function passwordsMatch(given: string, expected: string): boolean {
+  const a = Buffer.from(given);
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
+}
+
+/**
+ * Resolves a username + password pair to the role it grants, or null.
+ *
+ * Usernames are compared case-insensitively — they're identifiers, not
+ * secrets, and "ganbat" vs "Ganbat" failing to log in is only a support
+ * call. Passwords use a constant-time compare.
+ *
+ * ADMIN_PASSWORD must be set (as before). ADMIN_VIEWER_PASSWORD is optional:
+ * unset simply means the read-only account doesn't exist on that deploy,
+ * rather than every login attempt throwing.
+ */
+export function resolveAdminLogin(username: string, password: string): AdminRole | null {
+  const name = username.trim().toLowerCase();
+
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    throw new Error("Missing ADMIN_PASSWORD environment variable.");
+  }
+  if (name === ADMIN_USERNAME.toLowerCase()) {
+    return passwordsMatch(password, adminPassword) ? "full" : null;
+  }
+
+  const viewerPassword = process.env.ADMIN_VIEWER_PASSWORD;
+  if (viewerPassword && name === ADMIN_VIEWER_USERNAME.toLowerCase()) {
+    return passwordsMatch(password, viewerPassword) ? "viewer" : null;
+  }
+
+  return null;
 }

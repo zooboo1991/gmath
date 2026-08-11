@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { findYearlyProgramById, notifyNewRecordings, updateYearlyProgram } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
 import { normalizeLessons, validateLessons } from "@/lib/lessonInput";
 
@@ -29,7 +29,7 @@ function validateProgramFields(data: Record<string, unknown>): string | null {
 // against the database and never created or deleted through the app, same
 // convention as courses' own hard-delete lockout.
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;

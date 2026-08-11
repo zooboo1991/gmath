@@ -35,6 +35,7 @@ function CourseGroup({
   onRestore,
   viewCounts,
   programStats,
+  canEdit,
 }: {
   title: string;
   courses: Course[];
@@ -44,12 +45,13 @@ function CourseGroup({
   onRestore?: (id: string) => void;
   viewCounts: Record<string, number>;
   programStats: Map<string, { active: number; pending: number }>;
+  canEdit: boolean;
 }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-[1.15rem] font-extrabold">{title}</h2>
-        {addHref && (
+        {addHref && canEdit && (
           <Link
             href={addHref}
             className="text-[.85rem] font-extrabold text-blue-strong bg-blue-soft px-4 py-2 rounded-full"
@@ -86,13 +88,18 @@ function CourseGroup({
                 </div>
               </div>
               <div className="flex gap-2">
-                <Link
-                  href={`/admin/courses/${c.id}`}
-                  className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
-                >
-                  Дэлгэрэнгүй
-                </Link>
-                {onRestore && (
+                {/* The detail view is the course *editor*, so it's hidden from
+                    the read-only admin — the card above already carries the
+                    figures they need, and the page itself redirects them. */}
+                {canEdit && (
+                  <Link
+                    href={`/admin/courses/${c.id}`}
+                    className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
+                  >
+                    Дэлгэрэнгүй
+                  </Link>
+                )}
+                {canEdit && onRestore && (
                   <button
                     type="button"
                     disabled={busyId === c.id}
@@ -102,7 +109,7 @@ function CourseGroup({
                     Сэргээх
                   </button>
                 )}
-                {onArchive && (
+                {canEdit && onArchive && (
                   <button
                     type="button"
                     disabled={busyId === c.id}
@@ -127,10 +134,12 @@ function YearlyProgramGroup({
   programs,
   viewCounts,
   programStats,
+  canEdit,
 }: {
   programs: YearlyProgram[];
   viewCounts: Record<string, number>;
   programStats: Map<string, { active: number; pending: number }>;
+  canEdit: boolean;
 }) {
   return (
     <div>
@@ -157,12 +166,14 @@ function YearlyProgramGroup({
                   />
                 </div>
               </div>
-              <Link
-                href={`/admin/yearly/${p.id}`}
-                className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
-              >
-                Дэлгэрэнгүй
-              </Link>
+              {canEdit && (
+                <Link
+                  href={`/admin/yearly/${p.id}`}
+                  className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
+                >
+                  Дэлгэрэнгүй
+                </Link>
+              )}
             </div>
           );
         })}
@@ -181,11 +192,13 @@ export default function CoursesPanel({
   yearlyPrograms,
   registrations,
   viewCounts,
+  canEdit,
 }: {
   initialCourses: Course[];
   yearlyPrograms: YearlyProgram[];
   registrations: RegistrationWithUser[];
   viewCounts: Record<string, number>;
+  canEdit: boolean;
 }) {
   const [courses, setCourses] = useState(initialCourses);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -243,7 +256,12 @@ export default function CoursesPanel({
 
   return (
     <div>
-      <YearlyProgramGroup programs={yearlyPrograms} viewCounts={viewCounts} programStats={programStats} />
+      <YearlyProgramGroup
+        programs={yearlyPrograms}
+        viewCounts={viewCounts}
+        programStats={programStats}
+        canEdit={canEdit}
+      />
       <div className="mt-10">
         <CourseGroup
           title="Удахгүй эхлэх сургалтууд"
@@ -253,6 +271,7 @@ export default function CoursesPanel({
           onArchive={archiveCourse}
           viewCounts={viewCounts}
           programStats={programStats}
+          canEdit={canEdit}
         />
       </div>
       <div className="mt-10">
@@ -264,6 +283,7 @@ export default function CoursesPanel({
           onArchive={archiveCourse}
           viewCounts={viewCounts}
           programStats={programStats}
+          canEdit={canEdit}
         />
       </div>
       {archived.length > 0 && (
@@ -275,6 +295,7 @@ export default function CoursesPanel({
             onRestore={restoreCourse}
             viewCounts={viewCounts}
             programStats={programStats}
+            canEdit={canEdit}
           />
         </div>
       )}

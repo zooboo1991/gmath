@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { findCourseById, notifyNewCourseForPastStudents, notifyNewRecordings, updateCourse } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
 import { normalizeLessons, validateLessons } from "@/lib/lessonInput";
 
@@ -27,7 +27,7 @@ function validateCourseFields(data: Record<string, unknown>): string | null {
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;

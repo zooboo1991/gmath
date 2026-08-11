@@ -12,9 +12,13 @@ type RegistrationWithUser = Registration & { user?: PublicUser };
 export default function UsersPanel({
   initialUsers,
   registrations,
+  canEdit,
 }: {
   initialUsers: PublicUser[];
   registrations: RegistrationWithUser[];
+  // The read-only admin gets the list and the filters, not the add form.
+  // Cosmetic only — POST /api/admin/users checks the role itself.
+  canEdit: boolean;
 }) {
   const router = useRouter();
   // Owned here now that the tab is a standalone route — the old dashboard
@@ -93,10 +97,10 @@ export default function UsersPanel({
     <div>
       <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
         <h2 className="text-[1.15rem] font-extrabold">
-          Хэрэглэгчид ({filtered.length}
+          Хэрэглэгч ({filtered.length}
           {filtered.length !== users.length && ` / ${users.length}`})
         </h2>
-        {!addOpen && (
+        {canEdit && !addOpen && (
           <button
             type="button"
             onClick={() => setAddOpen(true)}
@@ -107,7 +111,7 @@ export default function UsersPanel({
         )}
       </div>
 
-      {addOpen && (
+      {canEdit && addOpen && (
         <div className="bg-surface border border-line rounded-md shadow-xs px-5 py-4 mb-4">
           <h3 className="font-extrabold text-[.95rem] mb-1">Хэрэглэгч гараар нэмэх</h3>
           <p className="text-ink-3 font-semibold text-[.85rem] mb-3">

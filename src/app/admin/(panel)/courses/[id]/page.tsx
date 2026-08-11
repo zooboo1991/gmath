@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import CourseObjectPage from "@/components/admin/CourseObjectPage";
 import { findCourseById, listRegistrationsByProgram } from "@/lib/db";
-import { isAdmin } from "@/lib/session";
+import { requireAdminSection } from "@/lib/adminAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function EditCoursePage({ params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
-    redirect("/admin/login");
-  }
+  await requireAdminSection("courseEditor");
 
   const { id } = await params;
   const course = await findCourseById(id);

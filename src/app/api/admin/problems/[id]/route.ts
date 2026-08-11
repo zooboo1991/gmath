@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { deactivateProblem, listProblems, updateProblem } from "@/lib/assessment/db";
 import { hasProblemContent, validateProblemInput } from "@/lib/assessment/validateProblem";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;
@@ -42,7 +42,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
  * it (the FK is ON DELETE RESTRICT), so it is only hidden from new ones.
  */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;

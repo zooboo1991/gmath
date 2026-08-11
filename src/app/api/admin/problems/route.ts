@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { createProblem, listProblems, type ProblemInput } from "@/lib/assessment/db";
 import { hasProblemContent, validateProblemInput } from "@/lib/assessment/validateProblem";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 
 export async function GET() {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   // Inactive problems stay listed here so the admin can see and restore them.
@@ -12,7 +12,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
 

@@ -11,8 +11,12 @@ type RegistrationWithUser = Registration & { user?: PublicUser };
 /** The registrations tab as its own route component — approve/cancel state used to live in the dashboard parent. */
 export default function RegistrationsPanel({
   initialRegistrations,
+  canEdit,
 }: {
   initialRegistrations: RegistrationWithUser[];
+  // The read-only admin sees the same list without the two action buttons.
+  // Cosmetic only — the approve/cancel endpoints check the role themselves.
+  canEdit: boolean;
 }) {
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -88,6 +92,10 @@ export default function RegistrationsPanel({
           {r.status === "active" ? (
             <span className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-green bg-green-soft px-3 py-1.5 rounded-full">
               <IconCheckCircle className="w-3.5 h-3.5" /> Идэвхтэй
+            </span>
+          ) : !canEdit ? (
+            <span className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-gold-strong bg-gold-soft px-3 py-1.5 rounded-full">
+              <IconClock className="w-3.5 h-3.5" /> Хүлээгдэж буй
             </span>
           ) : (
             <div className="flex items-center gap-2">

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { deleteRegistration, findRegistrationById, setRegistrationTotalDue } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 
 /**
  * Admin removing a registered student from a course/program — any status,
@@ -10,7 +10,7 @@ import { isAdmin } from "@/lib/session";
  * reconcile, so a plain delete is the whole operation.
  */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;
@@ -38,7 +38,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
 /** Sets the actual agreed total for a student — yearly-program installment tracking, see the schema comment on registrations.total_due. */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;

@@ -3,11 +3,13 @@ import AssessmentPanel from "@/components/admin/panels/AssessmentPanel";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { getAssessmentFee } from "@/lib/assessment/db";
 import { DEFAULT_ASSESSMENT_FEE } from "@/lib/assessment/config";
+import { requireAdminSection } from "@/lib/adminAccess";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Үнэлгээ — Админ" };
 
 export default async function AdminAssessmentPage() {
+  await requireAdminSection("assessment");
   const assessmentFee = await getAssessmentFee().catch(() => DEFAULT_ASSESSMENT_FEE);
   return (
     <div className="px-6 lg:px-10 py-8">

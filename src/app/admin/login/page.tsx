@@ -3,8 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const INPUT_CLASS =
+  "w-full px-4 py-[14px] rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold focus:outline-none focus:border-blue focus:bg-surface transition-colors";
+
 export default function AdminLoginPage() {
   const router = useRouter();
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -17,7 +21,7 @@ export default function AdminLoginPage() {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username, password }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -41,14 +45,28 @@ export default function AdminLoginPage() {
       >
         <h1 className="text-[1.3rem] font-extrabold text-center">Админ нэвтрэх</h1>
         <div className="mt-6">
+          <label className="block text-[.9rem] font-extrabold text-ink mb-2">Нэвтрэх нэр</label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
+            autoCapitalize="off"
+            spellCheck={false}
+            className={INPUT_CLASS}
+            placeholder="Нэвтрэх нэр"
+            autoFocus
+          />
+        </div>
+        <div className="mt-4">
           <label className="block text-[.9rem] font-extrabold text-ink mb-2">Нууц үг</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-[14px] rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold focus:outline-none focus:border-blue focus:bg-surface transition-colors"
+            autoComplete="current-password"
+            className={INPUT_CLASS}
             placeholder="••••••••"
-            autoFocus
           />
         </div>
         {error && <p className="text-[.85rem] font-semibold text-red-soft mt-3">{error}</p>}

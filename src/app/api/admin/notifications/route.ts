@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { createNotification, findCourseById, findYearlyProgramById, listNotificationsForAdmin } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
-import { isAdmin } from "@/lib/session";
+import { isFullAdmin } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 
 const TARGET_TYPES = new Set(["all", "students", "teachers", "course", "users"]);
 const CHANNELS = new Set(["site", "sms", "both"]);
 
 export async function GET() {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const notifications = await listNotificationsForAdmin();
@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
+  if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
 
