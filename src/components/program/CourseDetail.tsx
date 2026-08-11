@@ -3,6 +3,7 @@ import Reveal from "@/components/Reveal";
 import { RegisterTriggerButton } from "./ProgramRegister";
 import CourseCard from "@/components/CourseCard";
 import { formatCourseDate } from "@/lib/courseDate";
+import { courseAboutItems } from "@/lib/siteContent";
 import {
   IconCalendar,
   IconMonitor,
@@ -14,44 +15,27 @@ import {
   IconFacebook,
 } from "@/components/icons";
 
-const aboutItems = (lessonCount: number) => [
-  {
-    icon: <IconMonitor className="w-6 h-6" />,
-    iconBg: "bg-blue-soft text-blue-strong",
-    title: "Хаанаас ч хамрагдана",
-    text: "Улаанбаатар, орон нутаг ялгаагүй интернэттэй газраас онлайнаар хамрагдах боломжтой.",
-  },
-  {
+// Wording lives in src/lib/siteContent.ts so the chatbot answers from the same
+// copy; only the visuals stay here. Order must match courseAboutItems, with the
+// per-course lesson-count block spliced in at position 2.
+const aboutVisuals = [
+  { icon: <IconMonitor className="w-6 h-6" />, iconBg: "bg-blue-soft text-blue-strong" },
+  { icon: <IconPlayBox className="w-6 h-6" />, iconBg: "bg-green-soft text-green" },
+  { icon: <IconPeopleHero className="w-6 h-6" />, iconBg: "bg-purple-soft text-purple" },
+  { icon: <IconTarget className="w-6 h-6" />, iconBg: "bg-blue-soft text-blue-strong" },
+  { icon: <IconFacebook className="w-6 h-6" />, iconBg: "bg-gold-soft text-gold-strong" },
+];
+
+const aboutItems = (lessonCount: number) => {
+  const shared = courseAboutItems.map((item, i) => ({ ...item, ...aboutVisuals[i] }));
+  const lessonBlock = {
     icon: <IconCalendar className="w-6 h-6" />,
     iconBg: "bg-gold-soft text-gold-strong",
     title: lessonCount > 0 ? `Нийт ${lessonCount} хичээл` : "Тогтмол хуваарь",
     text: "Хуваарийн дагуу тогтмол үргэлжлэх эрчимжүүлсэн хичээллэлт.",
-  },
-  {
-    icon: <IconPlayBox className="w-6 h-6" />,
-    iconBg: "bg-green-soft text-green",
-    title: "Бичлэг үлдэнэ",
-    text: "Тасалсан хичээлээ бичлэгээр нөхөж, дахин үзэх боломжтой.",
-  },
-  {
-    icon: <IconPeopleHero className="w-6 h-6" />,
-    iconBg: "bg-purple-soft text-purple",
-    title: "Zoom-ээр хичээллэнэ",
-    text: "Сургалтыг zoom-ээр орох ба багш сурагчидтай харилцаад хичээллэдэг.",
-  },
-  {
-    icon: <IconTarget className="w-6 h-6" />,
-    iconBg: "bg-blue-soft text-blue-strong",
-    title: "Бодлогод суурилсан арга зүй",
-    text: "Практик буюу олимпиадад ирдэг бодлогуудыг хэрхэн бодох талаар бодлого дээр суурилж заадаг.",
-  },
-  {
-    icon: <IconFacebook className="w-6 h-6" />,
-    iconBg: "bg-gold-soft text-gold-strong",
-    text: "Сургалтын фэйсбүүк групп үүсгэх ба группт сургалтын талаарх зүйлсээ чөлөөтэй ярилцдаг.",
-    title: "Facebook групп",
-  },
-];
+  };
+  return [shared[0], lessonBlock, ...shared.slice(1)];
+};
 
 export type RelatedCourse = {
   tag: string;

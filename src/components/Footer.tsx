@@ -90,7 +90,16 @@ export default function Footer() {
 
         <div className="mt-12 pt-6 border-t border-white/10 flex justify-between gap-4 flex-wrap text-[.86rem] text-navy-ink-3">
           <span>© 2026 Б.Ганбат багшийн математик. Бүх эрх хуулиар хамгаалагдсан.</span>
-          <span>Олимпиадын математикийн онлайн сургалт</span>
+          {/* Policy pages belong in the footer on every page — it's where
+              visitors (and Meta's app reviewer) look for them. */}
+          <span className="flex gap-4">
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              Нууцлалын бодлого
+            </Link>
+            <Link href="/data-deletion" className="hover:text-white transition-colors">
+              Мэдээлэл устгах
+            </Link>
+          </span>
         </div>
       </div>
     </footer>

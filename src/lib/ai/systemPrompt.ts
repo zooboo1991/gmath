@@ -1,6 +1,6 @@
 import type { ChatChannel } from "../db";
-import { listPublishedCourseSummaries, listRegistrationsByUser, listYearlyPrograms } from "../db";
-import { siteAchievements, siteFaqs, siteFeatures } from "../siteContent";
+import { listArticles, listPublishedCourseSummaries, listRegistrationsByUser, listYearlyPrograms } from "../db";
+import { courseAboutItems, siteAchievements, siteFaqs, siteFeatures } from "../siteContent";
 import { SITE_URL } from "../siteUrl";
 
 const BASE_PROMPT = `Та бол gmath.mn сайтын туслах чатбот. gmath.mn нь Б.Ганбат багшийн олимпиадын математикийн онлайн сургалтын сайт бөгөөд 4–12-р ангийн сурагчид болон багш нарт зориулсан сургалт, түвшин тогтоох үнэлгээ, сертификатын үйлчилгээ үзүүлдэг.
@@ -32,11 +32,17 @@ const MAX_LESSONS_IN_PROMPT = 20;
  */
 const SITE_COPY = [
   `Сургалтын онцлог, давуу тал:\n${siteFeatures.map((f) => `- ${f.title}: ${f.text}`).join("\n")}`,
+  `Хичээл хэрхэн явагддаг (бүх сургалтад хамаарна):\n${courseAboutItems
+    .map((i) => `- ${i.title}: ${i.text}`)
+    .join("\n")}`,
   `Б.Ганбат багшийн үзүүлэлт:\n${siteAchievements.map((a) => `- ${a.value} — ${a.label}`).join("\n")}`,
   `Байнга асуудаг асуултууд (сайтын Асуулт хариулт хэсгээс):\n${siteFaqs
     .map((f) => `- ${f.q}\n  ${f.a}`)
     .join("\n")}`,
 ].join("\n\n");
+
+/** Titles only — the bodies would be tens of thousands of tokens, and a title plus its link is enough to recommend the right read. */
+const MAX_ARTICLES_IN_PROMPT = 40;
 
 /**
  * The two channels need different link conventions. The website widget renders
@@ -85,7 +91,11 @@ export async function buildSystemPrompt({
   userId,
   channel = "website",
 }: { userId?: string; channel?: ChatChannel } = {}): Promise<string> {
-  const [courses, yearly] = await Promise.all([listPublishedCourseSummaries(), listYearlyPrograms()]);
+  const [courses, yearly, articles] = await Promise.all([
+    listPublishedCourseSummaries(),
+    listYearlyPrograms(),
+    listArticles(),
+  ]);
 
   const base = channel === "messenger" ? SITE_URL : "";
   const sections = [BASE_PROMPT, channelRules(channel), sitePages(channel), SITE_COPY];
@@ -109,6 +119,19 @@ export async function buildSystemPrompt({
       ? `Одоо нээлттэй сургалтууд:\n${catalogue.join("\n")}`
       : "Одоогоор нээлттэй сургалт байхгүй байна."
   );
+
+  // Titles + links only. Enough for "хүүхэд минь бодлого бодохдоо гацдаг" to
+  // get pointed at the article that actually covers it, without pulling 36
+  // article bodies into every request.
+  if (articles.length > 0) {
+    const list = articles
+      .slice(0, MAX_ARTICLES_IN_PROMPT)
+      .map((a) => `- ${a.title} → ${base}/articles/${a.id}`)
+      .join("\n");
+    sections.push(
+      `Сайт дээрх нийтлэлүүд. Хэрэглэгчийн асуултад тохирох нийтлэл байвал холбоосыг санал болгоно уу (агуулгыг зохиож болохгүй, зөвхөн гарчигт таарвал зөвлөнө):\n${list}`
+    );
+  }
 
   if (userId) {
     const registrations = await listRegistrationsByUser(userId);

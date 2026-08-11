@@ -66,3 +66,33 @@ export const siteAchievements = [
   { value: "10+ жил", label: "Багшлах туршлага" },
   { value: "500+ сурагч", label: "Амжилттай төгссөн" },
 ];
+
+/**
+ * The "Сургалтын тухай" blocks on every course detail page. The lesson-count
+ * one is generated per course (see CourseDetail.tsx), so it isn't here — these
+ * are the parts that hold for every course, which is exactly what makes them
+ * useful to the chatbot when someone asks how the teaching actually works.
+ * Order matches the icon list in CourseDetail.tsx.
+ */
+export const courseAboutItems = [
+  {
+    title: "Хаанаас ч хамрагдана",
+    text: "Улаанбаатар, орон нутаг ялгаагүй интернэттэй газраас онлайнаар хамрагдах боломжтой.",
+  },
+  {
+    title: "Бичлэг үлдэнэ",
+    text: "Тасалсан хичээлээ бичлэгээр нөхөж, дахин үзэх боломжтой.",
+  },
+  {
+    title: "Zoom-ээр хичээллэнэ",
+    text: "Сургалтыг zoom-ээр орох ба багш сурагчидтай харилцаад хичээллэдэг.",
+  },
+  {
+    title: "Бодлогод суурилсан арга зүй",
+    text: "Практик буюу олимпиадад ирдэг бодлогуудыг хэрхэн бодох талаар бодлого дээр суурилж заадаг.",
+  },
+  {
+    title: "Facebook групп",
+    text: "Сургалтын фэйсбүүк групп үүсгэх ба группт сургалтын талаарх зүйлсээ чөлөөтэй ярилцдаг.",
+  },
+];
