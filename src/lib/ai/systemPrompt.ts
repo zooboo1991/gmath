@@ -1,4 +1,6 @@
+import type { ChatChannel } from "../db";
 import { listPublishedCourseSummaries, listRegistrationsByUser, listYearlyPrograms } from "../db";
+import { SITE_URL } from "../siteUrl";
 
 const BASE_PROMPT = `Та бол gmath.mn сайтын туслах чатбот. gmath.mn нь Б.Ганбат багшийн олимпиадын математикийн онлайн сургалтын сайт бөгөөд 4–12-р ангийн сурагчид болон багш нарт зориулсан сургалт, түвшин тогтоох үнэлгээ, сертификатын үйлчилгээ үзүүлдэг.
 
@@ -8,16 +10,7 @@ const BASE_PROMPT = `Та бол gmath.mn сайтын туслах чатбот
 - Мэдэхгүй бол "Уучлаарай, тэр талаар надад мэдээлэл байхгүй. Б.Ганбат багштай холбогдоно уу." гэж шууд хэлнэ үү.
 - Хувийн мэдээлэл (нэвтрэх нэр, нууц үг, төлбөрийн дэлгэрэнгүй) хэзээ ч асуухгүй.
 - Хариултаа 3-4 өгүүлбэрт багтаана уу.
-- Холбоос: зөвхөн доор бичигдсэн хаягуудыг л ашиглана уу, өөрөө хаяг зохиож болохгүй. Тухайн сургалтын талаар асуувал ерөнхий /courses хуудсыг биш, тэр сургалтын өөрийн хуудсыг санал болгоно уу.
-- Холбоосыг үргэлж [Уншигдахуйц нэр](/хаяг) хэлбэрээр бичнэ үү, урт хаягийг нүцгэн тавьж болохгүй. Жишээ: [B ангилал сургалт](/courses/abc123) хуудсыг үзнэ үү.
-
-Сайтын хуудсууд:
-- /courses — бүх сургалтын жагсаалт
-- /assessment — түвшин тогтоох үнэлгээ (сурагчийн ангиллыг тодорхойлох)
-- /certificate — багшийн сертификат шалгах
-- /articles — нийтлэлүүд
-- /profile — хэрэглэгчийн хувийн хуудас (бүртгэл, хичээлийн бичлэг, ирц)
-- /team/ganbat — Б.Ганбат багшийн танилцуулга
+- Холбоос: зөвхөн доор бичигдсэн хаягуудыг л ашиглана уу, өөрөө хаяг зохиож болохгүй. Тухайн сургалтын талаар асуувал бүх сургалтын жагсаалтыг биш, тэр сургалтын өөрийн хуудсыг санал болгоно уу.
 
 Холбоо барих (сайтын footer дээр нийтэд байгаа мэдээлэл):
 - Утас: 9077 7400, 9939 5945
@@ -27,6 +20,32 @@ const BASE_PROMPT = `Та бол gmath.mn сайтын туслах чатбот
 
 /** A 100-lesson yearly programme would swamp the prompt; the first chunk plus a total is enough to answer "хэзээ эхлэх вэ". */
 const MAX_LESSONS_IN_PROMPT = 20;
+
+/**
+ * The two channels need different link conventions. The website widget renders
+ * a markdown subset and does client-side nav, so relative paths are ideal.
+ * Messenger renders neither — markdown shows up as literal asterisks and
+ * brackets, and a relative path means nothing inside the Facebook app — so it
+ * gets plain text and absolute URLs.
+ */
+function channelRules(channel: ChatChannel): string {
+  if (channel === "messenger") {
+    return `- Холбоосыг бүтэн хаягаар (${SITE_URL}/... ) бичнэ үү. Markdown хэлбэр (**тод**, [нэр](хаяг)) ХЭРЭГЛЭЖ БОЛОХГҮЙ — Messenger дээр тэр нь зүгээр од, хаалт болж харагдана. Зөвхөн энгийн текст бичнэ үү.`;
+  }
+  return `- Холбоосыг үргэлж [Уншигдахуйц нэр](/хаяг) хэлбэрээр бичнэ үү, урт хаягийг нүцгэн тавьж болохгүй. Жишээ: [B ангилал сургалт](/courses/abc123) хуудсыг үзнэ үү.`;
+}
+
+/** Site pages, relative for the widget and absolute for Messenger. */
+function sitePages(channel: ChatChannel): string {
+  const base = channel === "messenger" ? SITE_URL : "";
+  return `Сайтын хуудсууд:
+- ${base}/courses — бүх сургалтын жагсаалт
+- ${base}/assessment — түвшин тогтоох үнэлгээ (сурагчийн ангиллыг тодорхойлох)
+- ${base}/certificate — багшийн сертификат шалгах
+- ${base}/articles — нийтлэлүүд
+- ${base}/profile — хэрэглэгчийн хувийн хуудас (бүртгэл, хичээлийн бичлэг, ирц)
+- ${base}/team/ganbat — Б.Ганбат багшийн танилцуулга`;
+}
 
 /**
  * Phase 1's "knowledge base": the live published catalogue, fetched fresh on
@@ -45,21 +64,27 @@ const MAX_LESSONS_IN_PROMPT = 20;
  * An earlier version withheld them out of caution, which just meant a paying
  * student asking "фэйсбүүк группын линк юу вэ" got told we didn't know.
  */
-export async function buildSystemPrompt(userId?: string): Promise<string> {
+export async function buildSystemPrompt({
+  userId,
+  channel = "website",
+}: { userId?: string; channel?: ChatChannel } = {}): Promise<string> {
   const [courses, yearly] = await Promise.all([listPublishedCourseSummaries(), listYearlyPrograms()]);
 
-  const sections = [BASE_PROMPT];
+  const base = channel === "messenger" ? SITE_URL : "";
+  const sections = [BASE_PROMPT, channelRules(channel), sitePages(channel)];
 
   // `period` already carries its own leading slash ("/ сар"), so it's
   // concatenated rather than joined with another one.
   const catalogue = [
-    ...courses.map((c) => `- ${c.title} (${c.tag}) — ${c.price}${c.period}. ${c.topics} Хуудас: /courses/${c.id}`),
+    ...courses.map(
+      (c) => `- ${c.title} (${c.tag}) — ${c.price}${c.period}. ${c.topics} Хуудас: ${base}/courses/${c.id}`
+    ),
     // Yearly programs aren't in the courses table and don't follow the
     // course-id URL pattern — they're hand-written pages at /courses/c and
     // /courses/d, same mapping as src/components/Courses.tsx uses.
     ...yearly.map(
       (p) =>
-        `- ${p.title} (${p.tag}) — ${p.price}${p.period}. ${p.topics} Хуудас: /courses/${p.id.replace("program-", "")}`
+        `- ${p.title} (${p.tag}) — ${p.price}${p.period}. ${p.topics} Хуудас: ${base}/courses/${p.id.replace("program-", "")}`
     ),
   ];
   sections.push(
@@ -91,7 +116,7 @@ export async function buildSystemPrompt(userId?: string): Promise<string> {
           lines.push(`    ${i + 1}. ${lesson.topic}${bits.length ? ` — ${bits.join(", ")}` : ""}`);
         });
         if (r.lessons.length > shown.length) {
-          lines.push(`    … бусад ${r.lessons.length - shown.length} хичээлийг /profile хуудаснаас харна.`);
+          lines.push(`    … бусад ${r.lessons.length - shown.length} хичээлийг ${base}/profile хуудаснаас харна.`);
         }
       }
       return lines.join("\n");
@@ -100,6 +125,12 @@ export async function buildSystemPrompt(userId?: string): Promise<string> {
       mine.length > 0
         ? `Энэ хэрэглэгчийн бүртгүүлсэн сургалтууд. Доорх Facebook групп, Zoom холбоос, хичээлийн хуваарийг зөвхөн энэ хэрэглэгчид л асуувал хэлж болно:\n${mine.join("\n")}`
         : "Энэ хэрэглэгч одоогоор ямар ч сургалтад бүртгүүлээгүй байна."
+    );
+  } else if (channel === "messenger") {
+    // Messenger's own wording: there's no "log in" here, the account has to be
+    // linked from the website first (see /api/messenger/link).
+    sections.push(
+      `Энэ Facebook хэрэглэгч gmath.mn эрхтэй холбогдоогүй байна. Хувийн бүртгэл, хичээлийн хуваарь, Facebook групп, Zoom холбоосын талаар асуувал: "${SITE_URL}/profile хуудсанд нэвтэрч, «Messenger-тэй холбох» товчийг дарж холбоно уу" гэж хэлнэ үү. Ерөнхий асуултад хэвийн хариулна уу.`
     );
   } else {
     sections.push("Хэрэглэгч нэвтрээгүй байна. Хувийн бүртгэлийн талаар асуувал нэвтрэхийг санал болгоно уу.");

@@ -1939,11 +1939,16 @@ export async function markNotificationsRead(notificationIds: string[], userId: s
 // ---------------------------------------------------------------------------
 
 export type ChatRole = "user" | "assistant";
+export type ChatChannel = "website" | "messenger";
 
-export async function createChatConversation(visitorId: string, userId?: string): Promise<string> {
+export async function createChatConversation(
+  visitorId: string,
+  userId?: string,
+  channel: ChatChannel = "website"
+): Promise<string> {
   const { data, error } = await getSupabase()
     .from("chat_conversations")
-    .insert({ visitor_id: visitorId, user_id: userId ?? null })
+    .insert({ visitor_id: visitorId, user_id: userId ?? null, channel })
     .select("id")
     .single();
   if (error) throw error;

@@ -70,7 +70,7 @@ export async function POST(request: Request) {
   await insertChatMessage(conversationId, "user", message);
 
   try {
-    const system = await buildSystemPrompt(sessionUser?.id);
+    const system = await buildSystemPrompt({ userId: sessionUser?.id, channel: "website" });
     const result = await routeChat({ system, messages: [...history, { role: "user", content: message }] });
 
     await insertChatMessage(conversationId, "assistant", result.text, {

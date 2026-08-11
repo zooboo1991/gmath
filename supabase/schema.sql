@@ -547,3 +547,37 @@ create table if not exists chat_messages (
   created_at timestamptz not null default now()
 );
 create index if not exists chat_messages_conversation_id_idx on chat_messages (conversation_id);
+
+-- Facebook Messenger ↔ gmath account links (src/app/api/messenger/webhook).
+-- A separate table rather than a column on `users` on purpose: one student may
+-- message from more than one Facebook account, unlinking is a row delete
+-- instead of nulling a user column, and the same shape extends to other
+-- platforms later. psid is Facebook's Page-Scoped ID — permanent for a given
+-- person↔Page pair, so one link keeps recognising them on every later message.
+create table if not exists messenger_links (
+  psid text primary key,
+  user_id uuid not null references users(id) on delete cascade,
+  linked_at timestamptz not null default now()
+);
+create index if not exists messenger_links_user_id_idx on messenger_links (user_id);
+
+-- One-time tokens behind the "Messenger-тэй холбох" button. The signed-in
+-- student gets an m.me/<page>?ref=<token> link; Facebook hands the token back
+-- on their first message, which is what proves the PSID belongs to that
+-- account. Short-lived and single-use (consumed_at) so a leaked link can't be
+-- replayed to attach someone else's Facebook to the account.
+create table if not exists messenger_link_tokens (
+  token text primary key,
+  user_id uuid not null references users(id) on delete cascade,
+  expires_at timestamptz not null,
+  consumed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- Which channel a conversation came in on. Default 'website' so every row that
+-- existed before Messenger keeps its meaning; Messenger rows store the PSID in
+-- visitor_id, which is that person's stable per-Page identity.
+alter table chat_conversations add column if not exists channel text not null default 'website';
+alter table chat_conversations drop constraint if exists chat_conversations_channel_check;
+alter table chat_conversations add constraint chat_conversations_channel_check
+  check (channel in ('website', 'messenger'));
