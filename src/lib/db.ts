@@ -1931,3 +1931,68 @@ export async function markNotificationsRead(notificationIds: string[], userId: s
     .upsert(notificationIds.map((id) => ({ notification_id: id, user_id: userId })));
   if (error) throw error;
 }
+
+// ---------------------------------------------------------------------------
+// AI chatbot transcripts (src/app/api/chat). One conversation per visitor
+// session; the widget passes its conversation id back so a page navigation
+// doesn't restart the thread.
+// ---------------------------------------------------------------------------
+
+export type ChatRole = "user" | "assistant";
+
+export async function createChatConversation(visitorId: string, userId?: string): Promise<string> {
+  const { data, error } = await getSupabase()
+    .from("chat_conversations")
+    .insert({ visitor_id: visitorId, user_id: userId ?? null })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return (data as { id: string }).id;
+}
+
+/**
+ * Scoped by visitorId as well as id so one visitor can't resume someone
+ * else's conversation by guessing/replaying an id — the id alone is the only
+ * thing the client sends back.
+ */
+export async function findChatConversation(id: string, visitorId: string): Promise<{ id: string } | undefined> {
+  const { data, error } = await getSupabase()
+    .from("chat_conversations")
+    .select("id")
+    .eq("id", id)
+    .eq("visitor_id", visitorId)
+    .maybeSingle();
+  if (error) {
+    if (isInvalidUuidError(error)) return undefined;
+    throw error;
+  }
+  return (data as { id: string } | null) ?? undefined;
+}
+
+/** Oldest-first, and capped: only the tail of a long thread is worth re-sending to the model. */
+export async function listChatMessages(conversationId: string, limit = 20): Promise<{ role: ChatRole; content: string }[]> {
+  const { data, error } = await getSupabase()
+    .from("chat_messages")
+    .select("role, content, created_at")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data as { role: ChatRole; content: string }[]).reverse();
+}
+
+export async function insertChatMessage(
+  conversationId: string,
+  role: ChatRole,
+  content: string,
+  meta?: { tokensUsed?: number; modelUsed?: string }
+): Promise<void> {
+  const { error } = await getSupabase().from("chat_messages").insert({
+    conversation_id: conversationId,
+    role,
+    content,
+    tokens_used: meta?.tokensUsed ?? null,
+    model_used: meta?.modelUsed ?? null,
+  });
+  if (error) throw error;
+}

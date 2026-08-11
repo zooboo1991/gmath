@@ -280,6 +280,14 @@ export function IconBell(props: IconProps) {
   );
 }
 
+export function IconChat(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>
+      <path d="M21 12a8 8 0 01-8 8H8l-4 3v-4.4A8 8 0 014 12a8 8 0 018-8h1a8 8 0 018 8z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function IconClose(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} {...props}>

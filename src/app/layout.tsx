@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Nunito } from "next/font/google";
 import Analytics from "@/components/Analytics";
+import ChatWidget from "@/components/ChatWidget";
 import HashScroll from "@/components/HashScroll";
 import ProgramRegisterProvider from "@/components/program/ProgramRegister";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
@@ -65,6 +66,7 @@ export default function RootLayout({
         <Analytics />
         <ServiceWorkerRegister />
         <ProgramRegisterProvider>{children}</ProgramRegisterProvider>
+        <ChatWidget />
       </body>
     </html>
   );

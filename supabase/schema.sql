@@ -522,3 +522,28 @@ create table if not exists lesson_reminders_sent (
   sent_at timestamptz not null default now(),
   primary key (program_id, lesson_index)
 );
+
+-- AI chatbot (src/app/api/chat, src/components/ChatWidget.tsx). visitor_id is
+-- the anonymous `vid` cookie the pageview tracker already mints
+-- (src/app/api/track/route.ts) so a not-logged-in visitor's conversation
+-- survives a page navigation; user_id fills in on top of it when they're
+-- signed in, and is nulled rather than cascaded on account deletion so the
+-- transcript survives for review.
+create table if not exists chat_conversations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete set null,
+  visitor_id text not null,
+  started_at timestamptz not null default now()
+);
+create index if not exists chat_conversations_visitor_id_idx on chat_conversations (visitor_id);
+
+create table if not exists chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references chat_conversations(id) on delete cascade,
+  role text not null check (role in ('user', 'assistant')),
+  content text not null,
+  tokens_used int,
+  model_used text,
+  created_at timestamptz not null default now()
+);
+create index if not exists chat_messages_conversation_id_idx on chat_messages (conversation_id);
