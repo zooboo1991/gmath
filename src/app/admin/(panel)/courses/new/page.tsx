@@ -19,5 +19,5 @@ export default async function NewCoursePage({
   const { kind } = await searchParams;
   const initialKind: CourseKind = kind === "vod" ? "vod" : "upcoming";
 
-  return <CourseObjectPage course={null} initialKind={initialKind} initialRegistrations={[]} />;
+  return <CourseObjectPage canEdit course={null} initialKind={initialKind} initialRegistrations={[]} />;
 }

@@ -37,6 +37,7 @@ export default function RegistrationRoster({
   trackPayments,
   payments,
   onPaymentsChange,
+  canEdit = true,
 }: {
   programId: string;
   registrations: RegistrationWithUser[];
@@ -44,6 +45,13 @@ export default function RegistrationRoster({
   trackPayments?: boolean;
   payments?: RegistrationPayment[];
   onPaymentsChange?: (payments: RegistrationPayment[]) => void;
+  /**
+   * False for the read-only admin: the roster, the balances and the payment
+   * history all stay visible — only the controls that write go away. The
+   * expand toggle deliberately keeps working, since collapsing the payment
+   * history would hide data the account is allowed to see.
+   */
+  canEdit?: boolean;
 }) {
   const [phone, setPhone] = useState("");
   const [lookup, setLookup] = useState<{ status: "loading" | "done" | "error"; user?: PublicUser | null } | null>(
@@ -185,6 +193,7 @@ export default function RegistrationRoster({
 
   return (
     <div className="flex flex-col gap-4">
+      {canEdit && (
       <div className="bg-bg-soft rounded-md p-4">
         <b className="font-extrabold text-[.9rem] block mb-2.5">Утасны дугаараар бүртгэл нэмэх</b>
         <div className="flex gap-2 flex-wrap">
@@ -235,6 +244,7 @@ export default function RegistrationRoster({
         )}
         {addError && <p className="text-[.82rem] font-semibold text-red-soft mt-2.5">{addError}</p>}
       </div>
+      )}
 
       {registrations.length === 0 ? (
         <p className="text-ink-3 font-semibold text-[.9rem]">Одоогоор бүртгэл алга байна.</p>
@@ -312,20 +322,23 @@ export default function RegistrationRoster({
                         </td>
                       )}
                       <td className="px-2 py-3 text-right">
-                        <button
-                          type="button"
-                          disabled={busyId === r.id}
-                          onClick={() => remove(r.id)}
-                          aria-label="Хасах"
-                          className="w-7 h-7 rounded-full bg-surface border border-line-2 grid place-items-center disabled:opacity-50"
-                        >
-                          <IconClose className="w-3 h-3 text-ink-3" />
-                        </button>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            disabled={busyId === r.id}
+                            onClick={() => remove(r.id)}
+                            aria-label="Хасах"
+                            className="w-7 h-7 rounded-full bg-surface border border-line-2 grid place-items-center disabled:opacity-50"
+                          >
+                            <IconClose className="w-3 h-3 text-ink-3" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                     {trackPayments && expanded && (
                       <tr className="border-t border-line">
                         <td colSpan={6} className="px-2 py-4 bg-bg-soft">
+                          {canEdit && (
                           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2.5 items-end max-w-[420px]">
                             <label className="flex flex-col gap-1.5">
                               <span className="text-[.78rem] font-extrabold text-ink-3">Төлөх дүн</span>
@@ -347,6 +360,7 @@ export default function RegistrationRoster({
                               {savingTotalDueId === r.id ? "…" : "Хадгалах"}
                             </button>
                           </div>
+                          )}
 
                           {regPayments.length > 0 && (
                             <div className="grid grid-cols-[1fr_1fr_auto] gap-x-4 gap-y-1.5 max-w-[420px] mt-4">
@@ -357,20 +371,25 @@ export default function RegistrationRoster({
                                 <Fragment key={p.id}>
                                   <span className="text-[.88rem] font-semibold">{formatDate(p.paidAt)}</span>
                                   <span className="text-[.88rem] font-extrabold">{formatMnt(p.amount)}</span>
-                                  <button
-                                    type="button"
-                                    disabled={removingPaymentId === p.id}
-                                    onClick={() => removePayment(r.id, p.id)}
-                                    aria-label="Төлбөр хасах"
-                                    className="w-5 h-5 rounded-full bg-surface border border-line-2 grid place-items-center disabled:opacity-50 justify-self-start"
-                                  >
-                                    <IconClose className="w-2.5 h-2.5 text-ink-3" />
-                                  </button>
+                                  {canEdit ? (
+                                    <button
+                                      type="button"
+                                      disabled={removingPaymentId === p.id}
+                                      onClick={() => removePayment(r.id, p.id)}
+                                      aria-label="Төлбөр хасах"
+                                      className="w-5 h-5 rounded-full bg-surface border border-line-2 grid place-items-center disabled:opacity-50 justify-self-start"
+                                    >
+                                      <IconClose className="w-2.5 h-2.5 text-ink-3" />
+                                    </button>
+                                  ) : (
+                                    <span />
+                                  )}
                                 </Fragment>
                               ))}
                             </div>
                           )}
 
+                          {canEdit && (
                           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-2.5 items-end max-w-[520px] mt-4">
                             <label className="flex flex-col gap-1.5">
                               <span className="text-[.78rem] font-extrabold text-ink-3">Төлсөн огноо</span>
@@ -405,6 +424,7 @@ export default function RegistrationRoster({
                               {addingPaymentId === r.id ? "…" : "Төлбөр нэмэх"}
                             </button>
                           </div>
+                          )}
 
                           <p className="text-[.85rem] font-bold text-ink-2 mt-4">
                             Нийт төлсөн {formatMnt(paidSum)}

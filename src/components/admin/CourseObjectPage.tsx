@@ -69,10 +69,18 @@ export default function CourseObjectPage({
   course,
   initialKind = "upcoming",
   initialRegistrations,
+  canEdit,
 }: {
   course: Course | null;
   initialKind?: CourseKind;
   initialRegistrations: RegistrationWithUser[];
+  /**
+   * False for the read-only admin: the same page, minus everything that
+   * writes. The form fields stay on screen (inside a disabled fieldset, so a
+   * newly added input can't accidentally become editable) and the roster,
+   * payments and report tabs keep all their figures.
+   */
+  canEdit: boolean;
 }) {
   const router = useRouter();
   const isEditing = course !== null;
@@ -274,8 +282,13 @@ export default function CourseObjectPage({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {!canEdit && (
+              <span className="text-[.78rem] font-extrabold text-ink-3 bg-bg-soft px-3 py-1.5 rounded-full">
+                Зөвхөн харах
+              </span>
+            )}
             {savedMessage && <span className="text-[.82rem] font-bold text-green">{savedMessage}</span>}
-            {isEditing && status === "archived" && (
+            {canEdit && isEditing && status === "archived" && (
               <button
                 type="button"
                 disabled={archiving}
@@ -285,7 +298,7 @@ export default function CourseObjectPage({
                 {archiving ? "…" : "Сэргээх"}
               </button>
             )}
-            {isEditing && status !== "archived" && (
+            {canEdit && isEditing && status !== "archived" && (
               <button
                 type="button"
                 disabled={archiving}
@@ -295,7 +308,7 @@ export default function CourseObjectPage({
                 {archiving ? "…" : "Архивлах"}
               </button>
             )}
-            {isEditing && status !== "archived" && (
+            {canEdit && isEditing && status !== "archived" && (
               <button
                 type="button"
                 disabled={publishing}
@@ -305,14 +318,16 @@ export default function CourseObjectPage({
                 {publishing ? "…" : status === "published" ? "Ноорог болгох" : "Нийтлэх"}
               </button>
             )}
-            <button
-              type="button"
-              disabled={saving || coverUploading}
-              onClick={save}
-              className="text-[.85rem] font-extrabold rounded-full bg-blue text-white shadow-blue px-5 py-2.5 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
-            >
-              {saving ? "Хадгалж байна…" : "Хадгалах"}
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                disabled={saving || coverUploading}
+                onClick={save}
+                className="text-[.85rem] font-extrabold rounded-full bg-blue text-white shadow-blue px-5 py-2.5 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+              >
+                {saving ? "Хадгалж байна…" : "Хадгалах"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -345,7 +360,9 @@ export default function CourseObjectPage({
         )}
 
         {tab === "info" && (
-          <div className="flex flex-col gap-5">
+          // A fieldset, not per-input `disabled` props: one attribute disables
+          // every control inside it, including ones added later.
+          <fieldset disabled={!canEdit} className="flex flex-col gap-5 min-w-0 border-0 p-0 m-0">
             <Card title="Ерөнхий мэдээлэл">
               <div className="flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-3">
@@ -507,12 +524,17 @@ export default function CourseObjectPage({
               id={course?.id}
               courseZoomLink={form.zoomLink}
             />
-          </div>
+          </fieldset>
         )}
 
         {tab === "roster" && isEditing && (
           <Card title={`Бүртгүүлсэн сурагчид (${registrations.length})`}>
-            <RegistrationRoster programId={course.id} registrations={registrations} onChange={setRegistrations} />
+            <RegistrationRoster
+              programId={course.id}
+              registrations={registrations}
+              onChange={setRegistrations}
+              canEdit={canEdit}
+            />
           </Card>
         )}
 
@@ -542,14 +564,16 @@ export default function CourseObjectPage({
                         {payMethodLabel(r.payMethod)} · {r.price}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      disabled={busyRegId === r.id}
-                      onClick={() => approve(r.id)}
-                      className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-white bg-gold-strong px-4 py-2 rounded-full disabled:opacity-50"
-                    >
-                      {busyRegId === r.id ? "…" : "Баталгаажуулах"}
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        disabled={busyRegId === r.id}
+                        onClick={() => approve(r.id)}
+                        className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-white bg-gold-strong px-4 py-2 rounded-full disabled:opacity-50"
+                      >
+                        {busyRegId === r.id ? "…" : "Баталгаажуулах"}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

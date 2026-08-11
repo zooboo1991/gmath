@@ -11,7 +11,8 @@ export const metadata: Metadata = {
 };
 
 export default async function EditYearlyProgramPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdminSection("courseEditor");
+  // Section "courses": readable by the read-only account, with canEdit=false.
+  const role = await requireAdminSection("courses");
 
   const { id } = await params;
   const program = await findYearlyProgramById(id);
@@ -20,5 +21,12 @@ export default async function EditYearlyProgramPage({ params }: { params: Promis
   const registrations = await listRegistrationsByProgram(id);
   const payments = await listPaymentsForRegistrations(registrations.map((r) => r.id));
 
-  return <YearlyProgramObjectPage program={program} initialRegistrations={registrations} initialPayments={payments} />;
+  return (
+    <YearlyProgramObjectPage
+      program={program}
+      initialRegistrations={registrations}
+      initialPayments={payments}
+      canEdit={role === "full"}
+    />
+  );
 }

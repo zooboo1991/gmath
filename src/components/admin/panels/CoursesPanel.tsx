@@ -88,17 +88,12 @@ function CourseGroup({
                 </div>
               </div>
               <div className="flex gap-2">
-                {/* The detail view is the course *editor*, so it's hidden from
-                    the read-only admin — the card above already carries the
-                    figures they need, and the page itself redirects them. */}
-                {canEdit && (
-                  <Link
-                    href={`/admin/courses/${c.id}`}
-                    className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
-                  >
-                    Дэлгэрэнгүй
-                  </Link>
-                )}
+                <Link
+                  href={`/admin/courses/${c.id}`}
+                  className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
+                >
+                  Дэлгэрэнгүй
+                </Link>
                 {canEdit && onRestore && (
                   <button
                     type="button"
@@ -134,12 +129,10 @@ function YearlyProgramGroup({
   programs,
   viewCounts,
   programStats,
-  canEdit,
 }: {
   programs: YearlyProgram[];
   viewCounts: Record<string, number>;
   programStats: Map<string, { active: number; pending: number }>;
-  canEdit: boolean;
 }) {
   return (
     <div>
@@ -166,14 +159,12 @@ function YearlyProgramGroup({
                   />
                 </div>
               </div>
-              {canEdit && (
-                <Link
-                  href={`/admin/yearly/${p.id}`}
-                  className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
-                >
-                  Дэлгэрэнгүй
-                </Link>
-              )}
+              <Link
+                href={`/admin/yearly/${p.id}`}
+                className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
+              >
+                Дэлгэрэнгүй
+              </Link>
             </div>
           );
         })}
@@ -256,12 +247,7 @@ export default function CoursesPanel({
 
   return (
     <div>
-      <YearlyProgramGroup
-        programs={yearlyPrograms}
-        viewCounts={viewCounts}
-        programStats={programStats}
-        canEdit={canEdit}
-      />
+      <YearlyProgramGroup programs={yearlyPrograms} viewCounts={viewCounts} programStats={programStats} />
       <div className="mt-10">
         <CourseGroup
           title="Удахгүй эхлэх сургалтууд"

@@ -11,7 +11,9 @@ export const metadata: Metadata = {
 };
 
 export default async function EditCoursePage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdminSection("courseEditor");
+  // Section "courses", not "courseEditor": the read-only account may open
+  // this page, it just arrives with canEdit=false.
+  const role = await requireAdminSection("courses");
 
   const { id } = await params;
   const course = await findCourseById(id);
@@ -19,5 +21,5 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
 
   const registrations = await listRegistrationsByProgram(id);
 
-  return <CourseObjectPage course={course} initialRegistrations={registrations} />;
+  return <CourseObjectPage course={course} initialRegistrations={registrations} canEdit={role === "full"} />;
 }

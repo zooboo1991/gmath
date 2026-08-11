@@ -20,10 +20,13 @@ export default function YearlyProgramObjectPage({
   program,
   initialRegistrations,
   initialPayments,
+  canEdit,
 }: {
   program: YearlyProgram;
   initialRegistrations: RegistrationWithUser[];
   initialPayments: RegistrationPayment[];
+  /** False for the read-only admin — see CourseObjectPage for the reasoning. */
+  canEdit: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<SectionTab>("info");
@@ -117,15 +120,22 @@ export default function YearlyProgramObjectPage({
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {!canEdit && (
+              <span className="text-[.78rem] font-extrabold text-ink-3 bg-bg-soft px-3 py-1.5 rounded-full">
+                Зөвхөн харах
+              </span>
+            )}
             {savedMessage && <span className="text-[.82rem] font-bold text-green">{savedMessage}</span>}
-            <button
-              type="button"
-              disabled={saving}
-              onClick={save}
-              className="text-[.85rem] font-extrabold rounded-full bg-blue text-white shadow-blue px-5 py-2.5 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
-            >
-              {saving ? "Хадгалж байна…" : "Хадгалах"}
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={save}
+                className="text-[.85rem] font-extrabold rounded-full bg-blue text-white shadow-blue px-5 py-2.5 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+              >
+                {saving ? "Хадгалж байна…" : "Хадгалах"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -153,7 +163,8 @@ export default function YearlyProgramObjectPage({
         )}
 
         {tab === "info" && (
-          <div className="flex flex-col gap-5">
+          // See CourseObjectPage: one disabled fieldset instead of per-input flags.
+          <fieldset disabled={!canEdit} className="flex flex-col gap-5 min-w-0 border-0 p-0 m-0">
             <Card title="Ерөнхий мэдээлэл">
               <div className="flex flex-col gap-3">
                 <AdminField label="Ангиллын тэмдэглэгээ (жишээ: C АНГИЛАЛ СУРАГЧ)">
@@ -245,7 +256,7 @@ export default function YearlyProgramObjectPage({
               id={program.id}
               courseZoomLink={form.zoomLink}
             />
-          </div>
+          </fieldset>
         )}
 
         {tab === "roster" && (
@@ -257,6 +268,7 @@ export default function YearlyProgramObjectPage({
               trackPayments
               payments={payments}
               onPaymentsChange={setPayments}
+              canEdit={canEdit}
             />
           </Card>
         )}
@@ -287,14 +299,16 @@ export default function YearlyProgramObjectPage({
                         {payMethodLabel(r.payMethod)} · {r.price}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      disabled={busyRegId === r.id}
-                      onClick={() => approve(r.id)}
-                      className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-white bg-gold-strong px-4 py-2 rounded-full disabled:opacity-50"
-                    >
-                      {busyRegId === r.id ? "…" : "Баталгаажуулах"}
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        disabled={busyRegId === r.id}
+                        onClick={() => approve(r.id)}
+                        className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-white bg-gold-strong px-4 py-2 rounded-full disabled:opacity-50"
+                      >
+                        {busyRegId === r.id ? "…" : "Баталгаажуулах"}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
