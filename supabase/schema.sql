@@ -602,3 +602,29 @@ create index if not exists chat_issues_status_idx on chat_issues (status);
 -- filters by user_id — neither had an index before that tab existed.
 create index if not exists chat_conversations_started_at_idx on chat_conversations (started_at desc);
 create index if not exists chat_conversations_user_id_idx on chat_conversations (user_id);
+
+-- Scheduled publishing for articles. Null publish_at means "live from the
+-- moment it was created" (every row that existed before this column), a future
+-- value keeps the article out of every public query until then. notified_at
+-- records when the "шинэ нийтлэл" push went out, so the cron that publishes
+-- scheduled articles can tell which ones still owe a notification — and so an
+-- immediate publish, which notifies inline, is never notified twice.
+alter table articles add column if not exists publish_at timestamptz;
+alter table articles add column if not exists notified_at timestamptz;
+create index if not exists articles_publish_at_idx on articles (publish_at);
+
+-- Existing articles were all live already; stamping notified_at keeps the
+-- publish cron from re-announcing them.
+update articles set notified_at = created_at where notified_at is null;
+
+-- One row per click on an article's share button. Counted the same way
+-- pageviews are (group in JS over a narrow select) rather than kept as a
+-- counter column, so the rows stay available for "who shared what, when".
+create table if not exists article_shares (
+  id uuid primary key default gen_random_uuid(),
+  article_id uuid not null references articles(id) on delete cascade,
+  channel text not null default 'facebook',
+  visitor_id text,
+  created_at timestamptz not null default now()
+);
+create index if not exists article_shares_article_id_idx on article_shares (article_id);

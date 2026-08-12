@@ -14,7 +14,24 @@ type FormState = {
   coverImage: string;
   author: string;
   featured: boolean;
+  /**
+   * `datetime-local` value ("2026-08-20T09:00") or "" for "publish now". Kept
+   * in the browser's local wall-clock format on purpose — the admin thinks in
+   * Ulaanbaatar time, and the conversion to UTC happens once, on save.
+   */
+  publishAtLocal: string;
 };
+
+/** UTC ISO → the "YYYY-MM-DDTHH:mm" a datetime-local input expects, in local time. */
+function isoToLocalInput(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
+    d.getMinutes()
+  )}`;
+}
 
 export default function ArticleForm({ initialArticle }: { initialArticle?: Article }) {
   const router = useRouter();
@@ -27,6 +44,7 @@ export default function ArticleForm({ initialArticle }: { initialArticle?: Artic
     coverImage: initialArticle?.coverImage ?? "",
     author: initialArticle?.author ?? "Б.Ганбат багш",
     featured: initialArticle?.featured ?? false,
+    publishAtLocal: isoToLocalInput(initialArticle?.publishAt),
   });
   const [coverUploading, setCoverUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +88,12 @@ export default function ArticleForm({ initialArticle }: { initialArticle?: Artic
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          // "" tells the API "publish immediately"; anything else is converted
+          // from the admin's local time to UTC here, once.
+          publishAt: form.publishAtLocal ? new Date(form.publishAtLocal).toISOString() : "",
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -184,6 +207,32 @@ export default function ArticleForm({ initialArticle }: { initialArticle?: Artic
             />
             Онцлох нийтлэл болгож, жагсаалтын дээд банерт харуулах
           </label>
+        </div>
+
+        <div className="mt-7 pt-6 border-t border-line">
+          <b className="font-extrabold text-[.95rem] text-ink block">Нийтлэх цаг</b>
+          <p className="text-ink-3 font-semibold text-[.85rem] mt-1 max-w-[68ch]">
+            Хоосон бол хадгалахад шууд нийтлэгдэнэ. Цаг тохируулбал тэр цаг хүртэл вэб дээр
+            харагдахгүй, хайлтын систем, чатбот ч харахгүй. Тохируулсан цаг болмогц автоматаар
+            нийтлэгдэж, хэрэглэгчид рүү мэдэгдэл явна.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap mt-3">
+            <input
+              type="datetime-local"
+              value={form.publishAtLocal}
+              onChange={(e) => setForm((f) => ({ ...f, publishAtLocal: e.target.value }))}
+              className="px-3.5 py-2.5 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold focus:outline-none focus:border-blue focus:bg-surface"
+            />
+            {form.publishAtLocal && (
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, publishAtLocal: "" }))}
+                className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 px-3.5 py-2 rounded-full"
+              >
+                Шууд нийтлэх
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

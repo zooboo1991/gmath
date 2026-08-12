@@ -137,6 +137,13 @@ export type Article = {
   author: string;
   featured: boolean;
   createdAt: string;
+  /**
+   * When the article becomes public. Undefined means "already live" — that's
+   * every article written before scheduling existed, so the absence of a value
+   * can never hide one. A future value keeps it out of every public query
+   * until then; see PUBLISHED_FILTER.
+   */
+  publishAt?: string;
 };
 
 export type Registration = {
@@ -240,6 +247,7 @@ type ArticleRow = {
   author: string;
   featured: boolean;
   created_at: string;
+  publish_at: string | null;
 };
 
 type RegistrationRow = {
@@ -340,6 +348,7 @@ function articleFromRow(row: ArticleRow): Article {
     author: row.author,
     featured: row.featured,
     createdAt: row.created_at,
+    publishAt: row.publish_at ?? undefined,
   };
 }
 
@@ -730,11 +739,35 @@ export async function deleteCourse(id: string): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
-export async function listArticles(): Promise<Article[]> {
+/**
+ * "Live now": no publish time set, or one that has already passed. `now` is
+ * evaluated by Postgres rather than Node, so a clock difference between the
+ * app server and the database can't make a scheduled article appear early.
+ *
+ * Every article read defaults to applying this. Hiding a scheduled post is the
+ * safe direction to be wrong in, so the admin callers opt out explicitly with
+ * `{ includeScheduled: true }` instead of the public ones having to opt in.
+ */
+const PUBLISHED_FILTER = "publish_at.is.null,publish_at.lte.now";
+
+type ArticleReadOptions = { includeScheduled?: boolean };
+
+export async function listArticles(options: ArticleReadOptions = {}): Promise<Article[]> {
+  let query = getSupabase().from("articles").select("*").order("created_at", { ascending: false });
+  if (!options.includeScheduled) query = query.or(PUBLISHED_FILTER);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data as ArticleRow[]).map(articleFromRow);
+}
+
+/** Scheduled-but-not-yet-live articles, newest first — the admin list shows these first. */
+export async function listScheduledArticles(): Promise<Article[]> {
   const { data, error } = await getSupabase()
     .from("articles")
     .select("*")
-    .order("created_at", { ascending: false });
+    .not("publish_at", "is", null)
+    .gt("publish_at", "now")
+    .order("publish_at", { ascending: true });
   if (error) throw error;
   return (data as ArticleRow[]).map(articleFromRow);
 }
@@ -747,11 +780,15 @@ export type ArticleSummary = Omit<Article, "content">;
  * `content` of every article — each one a rich-text HTML blob — just to render
  * three cards is a lot of rows to haul over the wire for nothing.
  */
-export async function listArticleSummaries(limit?: number): Promise<ArticleSummary[]> {
+export async function listArticleSummaries(
+  limit?: number,
+  options: ArticleReadOptions = {}
+): Promise<ArticleSummary[]> {
   let query = getSupabase()
     .from("articles")
-    .select("id, title, excerpt, cover_image, author, featured, created_at")
+    .select("id, title, excerpt, cover_image, author, featured, created_at, publish_at")
     .order("created_at", { ascending: false });
+  if (!options.includeScheduled) query = query.or(PUBLISHED_FILTER);
   if (limit) query = query.limit(limit);
   const { data, error } = await query;
   if (error) throw error;
@@ -763,11 +800,17 @@ export async function listArticleSummaries(limit?: number): Promise<ArticleSumma
     author: row.author,
     featured: row.featured,
     createdAt: row.created_at,
+    publishAt: row.publish_at ?? undefined,
   }));
 }
 
-export async function findArticleById(id: string): Promise<Article | undefined> {
-  const { data, error } = await getSupabase().from("articles").select("*").eq("id", id).maybeSingle();
+export async function findArticleById(
+  id: string,
+  options: ArticleReadOptions = {}
+): Promise<Article | undefined> {
+  let query = getSupabase().from("articles").select("*").eq("id", id);
+  if (!options.includeScheduled) query = query.or(PUBLISHED_FILTER);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isInvalidUuidError(error)) return undefined;
     throw error;
@@ -776,6 +819,7 @@ export async function findArticleById(id: string): Promise<Article | undefined> 
 }
 
 export async function addArticle(input: Omit<Article, "id" | "createdAt">): Promise<Article> {
+  const scheduled = isFutureIso(input.publishAt);
   const { data, error } = await getSupabase()
     .from("articles")
     .insert({
@@ -785,11 +829,22 @@ export async function addArticle(input: Omit<Article, "id" | "createdAt">): Prom
       cover_image: input.coverImage,
       author: input.author,
       featured: input.featured,
+      publish_at: input.publishAt ?? null,
+      // An immediate publish notifies from the route that created it, so it's
+      // already accounted for. A scheduled one leaves this null, which is
+      // exactly what the publish cron looks for.
+      notified_at: scheduled ? null : new Date().toISOString(),
     })
     .select("*")
     .single();
   if (error) throw error;
   return articleFromRow(data as ArticleRow);
+}
+
+function isFutureIso(iso?: string): boolean {
+  if (!iso) return false;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) && t > Date.now();
 }
 
 export async function updateArticle(
@@ -803,6 +858,13 @@ export async function updateArticle(
   if (input.coverImage !== undefined) patch.cover_image = input.coverImage;
   if (input.author !== undefined) patch.author = input.author;
   if (input.featured !== undefined) patch.featured = input.featured;
+  if (input.publishAt !== undefined) {
+    // "" / null from the form means "publish immediately"; a future value
+    // re-arms the cron by clearing notified_at, so moving a post's date
+    // forward announces it at the new time instead of silently never.
+    patch.publish_at = input.publishAt || null;
+    if (isFutureIso(input.publishAt)) patch.notified_at = null;
+  }
 
   const { data, error } = await getSupabase().from("articles").update(patch).eq("id", id).select("*").maybeSingle();
   if (error) throw error;
@@ -813,6 +875,60 @@ export async function deleteArticle(id: string): Promise<boolean> {
   const { error, count } = await getSupabase().from("articles").delete({ count: "exact" }).eq("id", id);
   if (error) throw error;
   return (count ?? 0) > 0;
+}
+
+/**
+ * Scheduled articles whose time has come and which haven't been announced yet.
+ * Visibility doesn't depend on this — PUBLISHED_FILTER already makes them
+ * public the moment publish_at passes — only the notification does.
+ */
+export async function listArticlesDueForNotify(): Promise<Article[]> {
+  const { data, error } = await getSupabase()
+    .from("articles")
+    .select("*")
+    .is("notified_at", null)
+    .not("publish_at", "is", null)
+    .lte("publish_at", "now")
+    .order("publish_at", { ascending: true });
+  if (error) throw error;
+  return (data as ArticleRow[]).map(articleFromRow);
+}
+
+/** Conditional on notified_at still being null, so two overlapping cron runs can't both announce. */
+export async function markArticleNotified(id: string): Promise<boolean> {
+  const { data, error } = await getSupabase()
+    .from("articles")
+    .update({ notified_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("notified_at", null)
+    .select("id");
+  if (error) throw error;
+  return (data as { id: string }[]).length > 0;
+}
+
+/** One row per share-button click. Best-effort: a visitor sharing must not see an error. */
+export async function recordArticleShare(input: {
+  articleId: string;
+  channel: string;
+  visitorId?: string;
+}): Promise<void> {
+  const { error } = await getSupabase().from("article_shares").insert({
+    article_id: input.articleId,
+    channel: input.channel,
+    visitor_id: input.visitorId ?? null,
+  });
+  if (error) throw error;
+}
+
+/** articleId → share count, grouped in JS the same way getPageViewCountsByPrefix does. */
+export async function getArticleShareCounts(): Promise<Record<string, number>> {
+  const { data, error } = await getSupabase().from("article_shares").select("article_id");
+  if (error) throw error;
+  const counts: Record<string, number> = {};
+  for (const row of data as { article_id: string }[]) {
+    counts[row.article_id] = (counts[row.article_id] ?? 0) + 1;
+  }
+  return counts;
 }
 
 // ---------------------------------------------------------------------------

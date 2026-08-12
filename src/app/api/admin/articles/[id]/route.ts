@@ -4,6 +4,16 @@ import { isFullAdmin } from "@/lib/session";
 import { isEmptyHtml, isTooLong, MAX_LEN } from "@/lib/validate";
 import { sanitizeArticleContent } from "@/lib/sanitize";
 
+/** Same rules as the create route: "" clears the schedule, garbage is rejected. */
+function parsePublishAt(value: unknown): { ok: true; value: string | undefined } | { ok: false; error: string } {
+  if (value === undefined) return { ok: true, value: undefined };
+  if (value === null || value === "") return { ok: true, value: "" };
+  if (typeof value !== "string") return { ok: false, error: "Нийтлэх цаг буруу байна" };
+  const t = Date.parse(value);
+  if (!Number.isFinite(t)) return { ok: false, error: "Нийтлэх цаг буруу байна" };
+  return { ok: true, value: new Date(t).toISOString() };
+}
+
 function validateArticleFields(data: Record<string, unknown>): string | null {
   if (isTooLong(data.title, MAX_LEN.articleTitle)) return "Гарчиг хэт урт байна";
   if (isTooLong(data.excerpt, MAX_LEN.articleExcerpt)) return "Товч танилцуулга хэт урт байна";
@@ -33,6 +43,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ ok: false, error: lengthError }, { status: 400 });
   }
 
+  const publishAt = parsePublishAt(data.publishAt);
+  if (!publishAt.ok) {
+    return NextResponse.json({ ok: false, error: publishAt.error }, { status: 400 });
+  }
+
   const article = await updateArticle(id, {
     title: data.title?.trim(),
     excerpt: data.excerpt?.trim(),
@@ -40,6 +55,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     coverImage: data.coverImage?.trim(),
     author: data.author?.trim(),
     featured: typeof data.featured === "boolean" ? data.featured : undefined,
+    publishAt: publishAt.value,
   });
 
   if (!article) {

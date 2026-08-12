@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ArticleCard from "@/components/ArticleCard";
-import { IconFacebook, IconPerson } from "@/components/icons";
+import { IconPerson } from "@/components/icons";
+import ArticleShareButton from "@/components/ArticleShareButton";
 import JsonLd, { SITE_URL } from "@/components/JsonLd";
 import { findArticleById, listArticleSummaries } from "@/lib/db";
 import { isHtmlContent } from "@/lib/articleContent";
@@ -108,14 +109,7 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
                   {article.author} · {formatDate(article.createdAt)}
                 </span>
               </div>
-              <a
-                href={facebookShareUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft px-4 py-2 rounded-full shrink-0"
-              >
-                <IconFacebook className="w-4 h-4" /> Facebook-т хуваалцах
-              </a>
+              <ArticleShareButton articleId={article.id} shareUrl={facebookShareUrl} />
             </div>
 
             <div className="h-px bg-line my-8" />

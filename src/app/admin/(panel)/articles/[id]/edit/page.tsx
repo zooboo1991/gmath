@@ -19,7 +19,7 @@ export default async function EditArticlePage({ params }: { params: Promise<{ id
   }
 
   const { id } = await params;
-  const article = await findArticleById(id);
+  const article = await findArticleById(id, { includeScheduled: true });
   if (!article) notFound();
 
   return <ArticleForm initialArticle={{ ...article, content: toEditableHtml(article.content) }} />;
