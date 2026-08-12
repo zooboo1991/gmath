@@ -4,37 +4,19 @@ import Link from "next/link";
 import { useState } from "react";
 import { FILTER_INPUT_CLASS } from "@/components/admin/panels/shared";
 
-export default function AssessmentPanel({ initialFee }: { initialFee: string }) {
-  const [fee, setFee] = useState(initialFee);
-  const [savingFee, setSavingFee] = useState(false);
-  const [feeError, setFeeError] = useState<string | null>(null);
-  const [feeSaved, setFeeSaved] = useState(false);
-
-  const saveFee = async () => {
-    setSavingFee(true);
-    setFeeError(null);
-    setFeeSaved(false);
-    try {
-      const res = await fetch("/api/admin/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: "assessment_fee", value: fee }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setFeeError(json.error ?? "Хадгалахад алдаа гарлаа");
-        return;
-      }
-      setFee(json.value);
-      setFeeSaved(true);
-    } catch {
-      setFeeError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
-    } finally {
-      setSavingFee(false);
-    }
-  };
-
+export default function AssessmentPanel({
+  initialFee,
+  initialQuizFee,
+}: {
+  initialFee: string;
+  initialQuizFee: string;
+}) {
   const cards = [
+    {
+      href: "/admin/quiz",
+      title: "Тестийн асуултын сан",
+      text: "Энгийн/Сонгон ангийн сонголттой асуултууд — анги тус бүрээр.",
+    },
     {
       href: "/admin/problems",
       title: "Бодлогын сан",
@@ -54,37 +36,21 @@ export default function AssessmentPanel({ initialFee }: { initialFee: string }) 
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="bg-surface border border-line rounded-md shadow-xs px-5 py-4">
-        <h2 className="text-[1.05rem] font-extrabold mb-1">Үнэлгээний төлбөр</h2>
-        <p className="text-ink-3 font-semibold text-[.85rem] mb-3">
-          Сурагч түвшин тогтоох тестээ эхлүүлэхийн өмнө төлөх дүн.
-        </p>
-        <div className="flex gap-2.5 flex-wrap items-start">
-          <input
-            type="text"
-            value={fee}
-            onChange={(e) => {
-              setFee(e.target.value);
-              setFeeSaved(false);
-            }}
-            placeholder="20,000₮"
-            className={`${FILTER_INPUT_CLASS} max-w-[200px]`}
-          />
-          <button
-            type="button"
-            disabled={savingFee}
-            onClick={saveFee}
-            className="text-[.85rem] font-extrabold text-white bg-blue px-4 py-2.5 rounded-full disabled:opacity-50"
-          >
-            {savingFee ? "Хадгалж байна…" : "Хадгалах"}
-          </button>
-          {feeSaved && (
-            <span className="text-[.82rem] font-extrabold text-green bg-green-soft px-3 py-2 rounded-full">
-              Хадгаллаа
-            </span>
-          )}
-        </div>
-        {feeError && <p className="text-red-soft font-semibold text-[.85rem] mt-2">{feeError}</p>}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <FeeCard
+          title="Олимпиадын үнэлгээний төлбөр"
+          text="Багш бодолтыг гардан шалгадаг төрлийн үнэ."
+          settingKey="assessment_fee"
+          initialValue={initialFee}
+          placeholder="20,000₮"
+        />
+        <FeeCard
+          title="Энгийн/Сонгон тестийн төлбөр"
+          text="Автоматаар дүгнэгдэж, AI зөвлөмж өгдөг тестийн үнэ."
+          settingKey="quiz_fee"
+          initialValue={initialQuizFee}
+          placeholder="10,000₮"
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -100,6 +66,83 @@ export default function AssessmentPanel({ initialFee }: { initialFee: string }) 
           </Link>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** One editable app_settings price. The two fee cards differ only by key and copy. */
+function FeeCard({
+  title,
+  text,
+  settingKey,
+  initialValue,
+  placeholder,
+}: {
+  title: string;
+  text: string;
+  settingKey: string;
+  initialValue: string;
+  placeholder: string;
+}) {
+  const [value, setValue] = useState(initialValue);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: settingKey, value }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Хадгалахад алдаа гарлаа");
+        return;
+      }
+      setValue(json.value);
+      setSaved(true);
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-surface border border-line rounded-md shadow-xs px-5 py-4">
+      <h2 className="text-[1.05rem] font-extrabold mb-1">{title}</h2>
+      <p className="text-ink-3 font-semibold text-[.85rem] mb-3">{text}</p>
+      <div className="flex gap-2.5 flex-wrap items-start">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setSaved(false);
+          }}
+          placeholder={placeholder}
+          className={`${FILTER_INPUT_CLASS} max-w-[200px]`}
+        />
+        <button
+          type="button"
+          disabled={saving}
+          onClick={save}
+          className="text-[.85rem] font-extrabold text-white bg-blue px-4 py-2.5 rounded-full disabled:opacity-50"
+        >
+          {saving ? "Хадгалж байна…" : "Хадгалах"}
+        </button>
+        {saved && (
+          <span className="text-[.82rem] font-extrabold text-green bg-green-soft px-3 py-2 rounded-full">
+            Хадгаллаа
+          </span>
+        )}
+      </div>
+      {error && <p className="text-red-soft font-semibold text-[.85rem] mt-2">{error}</p>}
     </div>
   );
 }

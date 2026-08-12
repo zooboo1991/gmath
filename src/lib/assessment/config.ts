@@ -17,6 +17,12 @@ export const MAX_PROBLEMS_SHOWN = 25;
 /** Used when app_settings has no assessment_fee row yet. */
 export const DEFAULT_ASSESSMENT_FEE = "20,000₮";
 
+/** Used when app_settings has no quiz_fee row yet (Энгийн/Сонгон tracks). */
+export const DEFAULT_QUIZ_FEE = "10,000₮";
+
+/** Questions per quiz attempt. Fewer are served when the bank is thin, never zero. */
+export const QUIZ_QUESTIONS_PER_TEST = 10;
+
 /** Upload limits for the handwritten solution photos. */
 export const MAX_SOLUTION_IMAGES_PER_PROBLEM = 3;
 export const MAX_SOLUTION_IMAGE_BYTES = 5 * 1024 * 1024;

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { IconCheckCircle, IconClock, IconTarget, IconTrophy } from "@/components/icons";
+import { TRACK_LABELS } from "@/lib/assessment/types";
 import type { Assessment, Level, Solution } from "@/lib/assessment/types";
 import type { Course } from "@/lib/db";
 
@@ -83,6 +84,42 @@ export default function AssessmentResult({
             {copy.cta} →
           </Link>
         )}
+      </div>
+    );
+  }
+
+  // A completed quiz (Энгийн/Сонгон) has a score and an AI зөвлөмж instead of
+  // a teacher-assigned level — its result card is a different shape entirely.
+  if (assessment.track === "regular" || assessment.track === "advanced") {
+    return (
+      <div className={CARD}>
+        <div className="text-center">
+          <span className="inline-grid place-items-center w-24 h-24 rounded-full bg-blue-soft">
+            <b className="text-[1.6rem] font-extrabold text-blue-strong">
+              {assessment.quizScore ?? 0}/{assessment.quizTotal ?? 0}
+            </b>
+          </span>
+          <h2 className="text-[1.3rem] font-extrabold mt-4">{TRACK_LABELS[assessment.track]}</h2>
+          {assessment.quizGrade && (
+            <p className="text-ink-3 font-semibold text-[.9rem] mt-1">{assessment.quizGrade}-р ангийн тест</p>
+          )}
+        </div>
+        {assessment.aiRecommendation && (
+          <div className="bg-bg-soft rounded-md px-5 py-4 mt-5">
+            <b className="font-extrabold text-[.95rem] block mb-2">Зөвлөмж</b>
+            <p className="text-ink-2 font-medium leading-[1.75] whitespace-pre-wrap text-[.95rem]">
+              {assessment.aiRecommendation}
+            </p>
+          </div>
+        )}
+        <div className="text-center mt-6">
+          <Link
+            href="/courses"
+            className="inline-flex items-center justify-center font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-3.5 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+          >
+            Сургалтууд үзэх →
+          </Link>
+        </div>
       </div>
     );
   }

@@ -98,7 +98,8 @@ export default function AdminSidebar({ role }: { role: AdminRole }) {
         pathname.startsWith("/admin/assessment") ||
         pathname.startsWith("/admin/grading") ||
         pathname.startsWith("/admin/levels") ||
-        pathname.startsWith("/admin/problems")
+        pathname.startsWith("/admin/problems") ||
+        pathname.startsWith("/admin/quiz")
       );
     }
     return pathname.startsWith(href);

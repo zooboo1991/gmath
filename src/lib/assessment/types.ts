@@ -3,6 +3,23 @@
  * assessment feature can grow without making that file any longer.
  */
 
+/**
+ * Which of the three assessment tracks this is.
+ *  - regular / advanced: the multiple-choice quiz, auto-scored, AI writes the
+ *    recommendation. Status walks awaiting_payment → paid → completed.
+ *  - olympiad: the original flow — questionnaire, hand-picked problems,
+ *    photographed solutions, a teacher grades and concludes.
+ */
+export type AssessmentTrack = "regular" | "advanced" | "olympiad";
+
+export type QuizTrack = Exclude<AssessmentTrack, "olympiad">;
+
+export const TRACK_LABELS: Record<AssessmentTrack, string> = {
+  regular: "Энгийн ангийн тест",
+  advanced: "Сонгон ангийн тест",
+  olympiad: "Олимпиадын түвшин тогтоолт",
+};
+
 export type AssessmentStatus =
   | "awaiting_payment"
   | "paid"
@@ -60,6 +77,13 @@ export type Assessment = {
   id: string;
   userId: string;
   status: AssessmentStatus;
+  track: AssessmentTrack;
+  /** Quiz tracks only — the grade the student picked, which chose the question set. */
+  quizGrade?: number;
+  quizScore?: number;
+  quizTotal?: number;
+  /** The AI-written recommendation a completed quiz shows. */
+  aiRecommendation?: string;
   estimatedLevel?: number;
   finalLevel?: number;
   teacherComment?: string;
@@ -108,5 +132,42 @@ export type Solution = {
   graderScore?: number;
   graderComment?: string;
   gradedAt?: string;
+  createdAt: string;
+};
+
+// ---------------------------------------------------------------------------
+// Quiz (regular / advanced tracks)
+// ---------------------------------------------------------------------------
+
+export type QuizQuestion = {
+  id: string;
+  track: QuizTrack;
+  grade: number;
+  topic: string;
+  /** Mongolian prose with `$...$` math, rendered via MathText — same convention as problems. */
+  bodyLatex: string;
+  /** Exactly four options, rendered with MathText as well. */
+  choices: string[];
+  /** Admin-only. Never include this in a response sent to a student. */
+  correctIndex: number;
+  active: boolean;
+  createdAt: string;
+};
+
+/** The shape a student is allowed to see — correctIndex deliberately absent. */
+export type PublicQuizQuestion = Omit<QuizQuestion, "correctIndex" | "active" | "createdAt">;
+
+export function toPublicQuizQuestion(q: QuizQuestion): PublicQuizQuestion {
+  return { id: q.id, track: q.track, grade: q.grade, topic: q.topic, bodyLatex: q.bodyLatex, choices: q.choices };
+}
+
+export type QuizAnswer = {
+  id: string;
+  assessmentId: string;
+  questionId: string;
+  shownOrder: number;
+  /** Null until the student submits. */
+  chosenIndex?: number;
+  isCorrect?: boolean;
   createdAt: string;
 };

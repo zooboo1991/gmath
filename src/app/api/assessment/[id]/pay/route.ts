@@ -54,7 +54,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     // by reading the description on the QPay/bank side — name alone isn't
     // reliably unique.
     const audienceLabel = guard.user.role === "teacher" ? "Багш" : "Сурагч";
-    const description = `${guard.user.phone} Түвшин тогтоох ${audienceLabel}`;
+    const trackLabel = guard.assessment.track === "olympiad" ? "Түвшин тогтоох" : "Түвшний тест";
+    const description = `${guard.user.phone} ${trackLabel} ${audienceLabel}`;
 
     const start = await provider.createPayment({
       amountMnt: parsePriceToNumber(guard.assessment.amount),

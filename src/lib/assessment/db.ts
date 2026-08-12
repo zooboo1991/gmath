@@ -1,18 +1,22 @@
 import { getPaymentProvider } from "../payment";
 import { getSupabase } from "../supabase";
 import { publicUserFromJoin, type PublicUser } from "../db";
-import { DEFAULT_ASSESSMENT_FEE, MAX_PROBLEMS_SHOWN, PROBLEMS_TO_SOLVE } from "./config";
+import { DEFAULT_ASSESSMENT_FEE, DEFAULT_QUIZ_FEE, MAX_PROBLEMS_SHOWN, PROBLEMS_TO_SOLVE, QUIZ_QUESTIONS_PER_TEST } from "./config";
 import { estimateLevel } from "./levelEstimator";
 import { nextTargetDifficulty, pickNextProblem } from "./problemPicker";
 import type {
   Assessment,
   AssessmentProblem,
   AssessmentStatus,
+  AssessmentTrack,
   Level,
   Problem,
   ProblemAction,
   QuestionnaireAnswers,
   QuestionnaireInput,
+  QuizAnswer,
+  QuizQuestion,
+  QuizTrack,
   Solution,
 } from "./types";
 
@@ -58,6 +62,11 @@ type AssessmentRow = {
   id: string;
   user_id: string;
   status: AssessmentStatus;
+  track: AssessmentTrack;
+  quiz_grade: number | null;
+  quiz_score: number | null;
+  quiz_total: number | null;
+  ai_recommendation: string | null;
   estimated_level: number | null;
   final_level: number | null;
   teacher_comment: string | null;
@@ -135,6 +144,11 @@ function assessmentFromRow(row: AssessmentRow): Assessment {
     id: row.id,
     userId: row.user_id,
     status: row.status,
+    track: row.track,
+    quizGrade: row.quiz_grade ?? undefined,
+    quizScore: row.quiz_score ?? undefined,
+    quizTotal: row.quiz_total ?? undefined,
+    aiRecommendation: row.ai_recommendation ?? undefined,
     estimatedLevel: row.estimated_level ?? undefined,
     finalLevel: row.final_level ?? undefined,
     teacherComment: row.teacher_comment ?? undefined,
@@ -211,6 +225,15 @@ export async function setSetting(key: string, value: string): Promise<void> {
 
 export async function getAssessmentFee(): Promise<string> {
   return (await getSetting("assessment_fee")) ?? DEFAULT_ASSESSMENT_FEE;
+}
+
+export async function getQuizFee(): Promise<string> {
+  return (await getSetting("quiz_fee")) ?? DEFAULT_QUIZ_FEE;
+}
+
+/** The price an assessment of this track starts at. */
+export async function getFeeForTrack(track: AssessmentTrack): Promise<string> {
+  return track === "olympiad" ? getAssessmentFee() : getQuizFee();
 }
 
 // ---------------------------------------------------------------------------
@@ -348,10 +371,15 @@ export async function findOpenAssessment(userId: string): Promise<Assessment | u
   return all.find((a) => a.status !== "completed");
 }
 
-export async function createAssessment(userId: string, amount: string): Promise<Assessment> {
+export async function createAssessment(
+  userId: string,
+  amount: string,
+  track: AssessmentTrack,
+  quizGrade?: number
+): Promise<Assessment> {
   const { data, error } = await getSupabase()
     .from("assessments")
-    .insert({ user_id: userId, amount })
+    .insert({ user_id: userId, amount, track, quiz_grade: quizGrade ?? null })
     .select("*")
     .single();
   if (error) throw error;
@@ -615,4 +643,273 @@ export async function gradeSolution(
     throw error;
   }
   return data ? solutionFromRow(data as SolutionRow) : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Quiz (regular / advanced tracks)
+// ---------------------------------------------------------------------------
+
+type QuizQuestionRow = {
+  id: string;
+  track: QuizTrack;
+  grade: number;
+  topic: string;
+  body_latex: string;
+  choices: string[];
+  correct_index: number;
+  active: boolean;
+  created_at: string;
+};
+
+type QuizAnswerRow = {
+  id: string;
+  assessment_id: string;
+  question_id: string;
+  shown_order: number;
+  chosen_index: number | null;
+  is_correct: boolean | null;
+  created_at: string;
+};
+
+function quizQuestionFromRow(row: QuizQuestionRow): QuizQuestion {
+  return {
+    id: row.id,
+    track: row.track,
+    grade: row.grade,
+    topic: row.topic,
+    bodyLatex: row.body_latex,
+    choices: row.choices,
+    correctIndex: row.correct_index,
+    active: row.active,
+    createdAt: row.created_at,
+  };
+}
+
+function quizAnswerFromRow(row: QuizAnswerRow): QuizAnswer {
+  return {
+    id: row.id,
+    assessmentId: row.assessment_id,
+    questionId: row.question_id,
+    shownOrder: row.shown_order,
+    chosenIndex: row.chosen_index ?? undefined,
+    isCorrect: row.is_correct ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+/** Admin bank view. `activeOnly: false` keeps soft-deleted questions listed (greyed out). */
+export async function listQuizQuestions(filter?: {
+  track?: QuizTrack;
+  grade?: number;
+  activeOnly?: boolean;
+}): Promise<QuizQuestion[]> {
+  let query = getSupabase().from("quiz_questions").select("*").order("created_at", { ascending: false });
+  if (filter?.track) query = query.eq("track", filter.track);
+  if (filter?.grade) query = query.eq("grade", filter.grade);
+  if (filter?.activeOnly) query = query.eq("active", true);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data as QuizQuestionRow[]).map(quizQuestionFromRow);
+}
+
+export async function addQuizQuestion(
+  input: Omit<QuizQuestion, "id" | "active" | "createdAt">
+): Promise<QuizQuestion> {
+  const { data, error } = await getSupabase()
+    .from("quiz_questions")
+    .insert({
+      track: input.track,
+      grade: input.grade,
+      topic: input.topic,
+      body_latex: input.bodyLatex,
+      choices: input.choices,
+      correct_index: input.correctIndex,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return quizQuestionFromRow(data as QuizQuestionRow);
+}
+
+export async function updateQuizQuestion(
+  id: string,
+  input: Partial<Omit<QuizQuestion, "id" | "createdAt">>
+): Promise<QuizQuestion | undefined> {
+  const patch: Record<string, unknown> = {};
+  if (input.track !== undefined) patch.track = input.track;
+  if (input.grade !== undefined) patch.grade = input.grade;
+  if (input.topic !== undefined) patch.topic = input.topic;
+  if (input.bodyLatex !== undefined) patch.body_latex = input.bodyLatex;
+  if (input.choices !== undefined) patch.choices = input.choices;
+  if (input.correctIndex !== undefined) patch.correct_index = input.correctIndex;
+  if (input.active !== undefined) patch.active = input.active;
+
+  const { data, error } = await getSupabase()
+    .from("quiz_questions")
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    if (isInvalidUuidError(error)) return undefined;
+    throw error;
+  }
+  return data ? quizQuestionFromRow(data as QuizQuestionRow) : undefined;
+}
+
+/** How many active questions each grade has, per track — the admin list header and the picker's guard. */
+export async function countQuizQuestionsByGrade(track: QuizTrack): Promise<Record<number, number>> {
+  const { data, error } = await getSupabase()
+    .from("quiz_questions")
+    .select("grade")
+    .eq("track", track)
+    .eq("active", true);
+  if (error) throw error;
+  const counts: Record<number, number> = {};
+  for (const row of data as { grade: number }[]) {
+    counts[row.grade] = (counts[row.grade] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * Assembles the attempt's question set once, at first request, and returns it
+ * (without answers) on every later call — so a refresh resumes the same test
+ * instead of re-rolling for easier questions.
+ *
+ * Random pick happens in JS over the ids only; the bank per (track, grade) is
+ * small enough that this is simpler and no slower than a DB-side shuffle.
+ */
+export async function getOrAssembleQuiz(
+  assessment: Assessment
+): Promise<{ questions: QuizQuestion[]; answers: QuizAnswer[] }> {
+  if (assessment.track === "olympiad" || !assessment.quizGrade) {
+    throw new Error("not a quiz assessment");
+  }
+
+  const existing = await listQuizAnswers(assessment.id);
+  if (existing.length > 0) {
+    const questions = await listQuizQuestionsByIds(existing.map((a) => a.questionId));
+    const byId = new Map(questions.map((q) => [q.id, q]));
+    return {
+      questions: existing
+        .map((a) => byId.get(a.questionId))
+        .filter((q): q is QuizQuestion => Boolean(q)),
+      answers: existing,
+    };
+  }
+
+  const bank = await listQuizQuestions({
+    track: assessment.track,
+    grade: assessment.quizGrade,
+    activeOnly: true,
+  });
+  if (bank.length === 0) return { questions: [], answers: [] };
+
+  const picked = shuffle(bank).slice(0, QUIZ_QUESTIONS_PER_TEST);
+  const rows = picked.map((q, i) => ({
+    assessment_id: assessment.id,
+    question_id: q.id,
+    shown_order: i + 1,
+  }));
+  // Ignore a unique-violation race (two tabs assembling at once): whoever lost
+  // simply reads the winner's set on the next call.
+  const { data, error } = await getSupabase().from("quiz_answers").insert(rows).select("*");
+  if (error) {
+    if ((error as { code?: string }).code === "23505") {
+      return getOrAssembleQuiz(assessment);
+    }
+    throw error;
+  }
+  return { questions: picked, answers: (data as QuizAnswerRow[]).map(quizAnswerFromRow) };
+}
+
+async function listQuizAnswers(assessmentId: string): Promise<QuizAnswer[]> {
+  const { data, error } = await getSupabase()
+    .from("quiz_answers")
+    .select("*")
+    .eq("assessment_id", assessmentId)
+    .order("shown_order");
+  if (error) throw error;
+  return (data as QuizAnswerRow[]).map(quizAnswerFromRow);
+}
+
+async function listQuizQuestionsByIds(ids: string[]): Promise<QuizQuestion[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await getSupabase().from("quiz_questions").select("*").in("id", ids);
+  if (error) throw error;
+  return (data as QuizQuestionRow[]).map(quizQuestionFromRow);
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * Scores a submitted quiz. The answer key never leaves the server: the client
+ * sends only {questionId → chosenIndex}, correctness is decided here.
+ *
+ * The status flip is conditional on still being 'paid', so a double submit
+ * (two tabs, a retried request) scores exactly once — the same conditional-
+ * update pattern the QPay settle and the article-notify cron use.
+ */
+export async function scoreQuiz(
+  assessment: Assessment,
+  chosen: Record<string, number>
+): Promise<{ scored: boolean; score: number; total: number; wrongTopics: string[] }> {
+  const { questions, answers } = await getOrAssembleQuiz(assessment);
+  const byId = new Map(questions.map((q) => [q.id, q]));
+
+  let score = 0;
+  const wrongTopics: string[] = [];
+  const updates = answers.map((a) => {
+    const q = byId.get(a.questionId);
+    const pick = chosen[a.questionId];
+    const chosenIndex = typeof pick === "number" && pick >= 0 && pick <= 3 ? pick : null;
+    const isCorrect = q !== undefined && chosenIndex !== null && chosenIndex === q.correctIndex;
+    if (isCorrect) score += 1;
+    else if (q) wrongTopics.push(q.topic || "бусад");
+    return { id: a.id, chosen_index: chosenIndex, is_correct: isCorrect };
+  });
+
+  // Claim the assessment first; only the winner writes answer rows.
+  const { data: claimed, error: claimError } = await getSupabase()
+    .from("assessments")
+    .update({
+      status: "completed",
+      quiz_score: score,
+      quiz_total: answers.length,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", assessment.id)
+    .eq("status", "paid")
+    .select("id");
+  if (claimError) throw claimError;
+  if ((claimed as { id: string }[]).length === 0) {
+    return { scored: false, score: 0, total: answers.length, wrongTopics: [] };
+  }
+
+  for (const u of updates) {
+    const { error } = await getSupabase()
+      .from("quiz_answers")
+      .update({ chosen_index: u.chosen_index, is_correct: u.is_correct })
+      .eq("id", u.id);
+    if (error) throw error;
+  }
+
+  return { scored: true, score, total: answers.length, wrongTopics };
+}
+
+/** Stores the AI-written (or fallback) recommendation on a completed quiz. */
+export async function setQuizRecommendation(assessmentId: string, text: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("assessments")
+    .update({ ai_recommendation: text, updated_at: new Date().toISOString() })
+    .eq("id", assessmentId);
+  if (error) throw error;
 }

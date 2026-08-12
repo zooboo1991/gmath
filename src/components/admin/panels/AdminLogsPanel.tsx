@@ -21,6 +21,8 @@ const ACTION_LABELS: Record<string, string> = {
   "notification.send": "Мэдэгдэл илгээсэн",
   "setting.update": "Тохиргоо өөрчилсөн",
   "messenger.profile_update": "Messenger цэс шинэчилсэн",
+  "quiz_question.create": "Тестийн асуулт нэмсэн",
+  "quiz_question.update": "Тестийн асуулт засварласан",
 };
 
 /** Where a log entry's course/program lives in the admin, if it still can be derived. */

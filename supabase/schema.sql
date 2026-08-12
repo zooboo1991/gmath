@@ -628,3 +628,63 @@ create table if not exists article_shares (
   created_at timestamptz not null default now()
 );
 create index if not exists article_shares_article_id_idx on article_shares (article_id);
+
+-- ---------------------------------------------------------------------------
+-- Assessment tracks + the multiple-choice quiz (Энгийн / Сонгон)
+-- ---------------------------------------------------------------------------
+-- The original flow (pay → questionnaire → problems → teacher grading) is the
+-- olympiad track; every pre-existing row is stamped as such. The two quiz
+-- tracks reuse the same assessments row — and with it the whole QPay
+-- invoice/resume machinery — but skip straight from 'paid' to 'completed'.
+alter table assessments add column if not exists track text not null default 'olympiad';
+alter table assessments drop constraint if exists assessments_track_check;
+alter table assessments add constraint assessments_track_check
+  check (track in ('regular','advanced','olympiad'));
+alter table assessments add column if not exists quiz_grade smallint
+  check (quiz_grade between 1 and 12);
+alter table assessments add column if not exists quiz_score smallint;
+alter table assessments add column if not exists quiz_total smallint;
+alter table assessments add column if not exists ai_recommendation text;
+
+-- Question bank for the quiz tracks. Grade-scoped: a 4th grader and a 9th
+-- grader must never receive the same test. body_latex follows the problems
+-- convention (Mongolian prose with $...$ math, rendered by MathText), and
+-- choices is a jsonb array of 4 strings rendered the same way. correct_index
+-- never leaves the server — see toPublicQuizQuestion.
+create table if not exists quiz_questions (
+  id uuid primary key default gen_random_uuid(),
+  track text not null check (track in ('regular','advanced')),
+  grade smallint not null check (grade between 1 and 12),
+  topic text not null default '',
+  body_latex text not null,
+  choices jsonb not null,
+  correct_index smallint not null check (correct_index between 0 and 3),
+  -- Soft delete, like problems: a hard delete would orphan quiz_answers rows
+  -- of every attempt that already used this question.
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  constraint quiz_questions_has_body check (body_latex <> ''),
+  constraint quiz_questions_four_choices check (jsonb_array_length(choices) = 4)
+);
+create index if not exists quiz_questions_track_grade_idx
+  on quiz_questions (track, grade) where active;
+
+-- One row per question shown in one attempt, written when the test is
+-- assembled (chosen_index null until submit). Assembling up front freezes the
+-- question set, so a refresh resumes the same test instead of re-rolling for
+-- easier questions.
+create table if not exists quiz_answers (
+  id uuid primary key default gen_random_uuid(),
+  assessment_id uuid not null references assessments(id) on delete cascade,
+  question_id uuid not null references quiz_questions(id) on delete restrict,
+  shown_order smallint not null,
+  chosen_index smallint check (chosen_index between 0 and 3),
+  is_correct boolean,
+  created_at timestamptz not null default now(),
+  unique (assessment_id, question_id)
+);
+create index if not exists quiz_answers_assessment_idx on quiz_answers (assessment_id, shown_order);
+
+-- The quiz has its own, cheaper fee (admin-editable next to assessment_fee).
+insert into app_settings (key, value) values ('quiz_fee', '10,000₮')
+on conflict (key) do nothing;

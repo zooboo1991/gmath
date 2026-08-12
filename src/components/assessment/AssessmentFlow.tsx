@@ -6,9 +6,20 @@ import { useCallback, useEffect, useState } from "react";
 import MathText from "@/components/assessment/MathText";
 import FormField from "@/components/FormField";
 import { useProgramRegister } from "@/components/program/ProgramRegister";
-import type { Assessment, PublicProblem } from "@/lib/assessment/types";
+import { TRACK_LABELS, type Assessment, type AssessmentTrack, type PublicQuizQuestion } from "@/lib/assessment/types";
+import type { PublicProblem } from "@/lib/assessment/types";
 
-type Step = "loading" | "payment" | "qpay-wait" | "questionnaire" | "problems" | "submitted";
+type Step =
+  | "loading"
+  | "track"
+  | "grade"
+  | "payment"
+  | "qpay-wait"
+  | "questionnaire"
+  | "problems"
+  | "quiz"
+  | "quiz-result"
+  | "submitted";
 
 const CARD = "bg-surface border border-line rounded-lg shadow-sm px-[26px] py-[26px]";
 
@@ -19,6 +30,10 @@ export default function AssessmentFlow() {
   const [step, setStep] = useState<Step>("loading");
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [fee, setFee] = useState("");
+  const [fees, setFees] = useState<{ olympiad: string; quiz: string } | null>(null);
+  // The picker's choices, before an assessment row exists to carry them.
+  const [pickedTrack, setPickedTrack] = useState<AssessmentTrack | null>(null);
+  const [pickedGrade, setPickedGrade] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [qpayQr, setQpayQr] = useState<{ qrImage: string; shortUrl: string } | null>(null);
@@ -29,9 +44,12 @@ export default function AssessmentFlow() {
   const [needed, setNeeded] = useState(5);
 
   const stepForStatus = (a: Assessment | null): Step => {
-    if (!a || a.status === "awaiting_payment") return "payment";
-    if (a.status === "paid") return "questionnaire";
+    if (!a) return "track";
+    const isQuiz = a.track === "regular" || a.track === "advanced";
+    if (a.status === "awaiting_payment") return "payment";
+    if (a.status === "paid") return isQuiz ? "quiz" : "questionnaire";
     if (a.status === "questionnaire_done") return "problems";
+    if (a.status === "completed" && isQuiz) return "quiz-result";
     return "submitted";
   };
 
@@ -68,6 +86,7 @@ export default function AssessmentFlow() {
         if (cancelled || !res.ok) return;
         setAssessment(json.assessment);
         setFee(json.fee);
+        setFees(json.fees ?? null);
         const next = stepForStatus(json.assessment);
         setStep(next);
         if (next === "problems" && json.assessment) {
@@ -87,7 +106,11 @@ export default function AssessmentFlow() {
     setError(null);
     try {
       // Create-or-resume first, so a double click can't open two assessments.
-      const createRes = await fetch("/api/assessment", { method: "POST" });
+      const createRes = await fetch("/api/assessment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ track: pickedTrack ?? "olympiad", grade: pickedGrade ?? undefined }),
+      });
       const created = await createRes.json();
       if (!createRes.ok) {
         setError(created.error ?? "Алдаа гарлаа");
@@ -103,7 +126,7 @@ export default function AssessmentFlow() {
       }
       setAssessment(paid.assessment);
       if (paid.paid) {
-        setStep("questionnaire");
+        setStep(stepForStatus(paid.assessment));
       } else {
         setQpayQr({ qrImage: paid.qrImage, shortUrl: paid.shortUrl });
         setStep("qpay-wait");
@@ -128,7 +151,7 @@ export default function AssessmentFlow() {
       }
       setAssessment(json.assessment);
       if (json.paid) {
-        setStep("questionnaire");
+        setStep(stepForStatus(json.assessment));
         return true;
       }
       return false;
@@ -161,7 +184,7 @@ export default function AssessmentFlow() {
         if (json.paid) {
           clearInterval(timer);
           setAssessment(json.assessment);
-          setStep("questionnaire");
+          setStep(stepForStatus(json.assessment));
         }
       } catch {
         // Retried on the next tick.
@@ -236,7 +259,35 @@ export default function AssessmentFlow() {
         <div className={`${CARD} text-center text-ink-3 font-semibold`}>Ачаалж байна…</div>
       )}
 
-      {step === "payment" && <PaymentStep fee={fee} busy={busy} onPay={pay} />}
+      {step === "track" && (
+        <TrackStep
+          fees={fees}
+          onPick={(t) => {
+            setPickedTrack(t);
+            setFee(t === "olympiad" ? fees?.olympiad ?? "" : fees?.quiz ?? "");
+            setStep(t === "olympiad" ? "payment" : "grade");
+          }}
+        />
+      )}
+
+      {step === "grade" && (
+        <GradeStep
+          onBack={() => setStep("track")}
+          onPick={(g) => {
+            setPickedGrade(g);
+            setStep("payment");
+          }}
+        />
+      )}
+
+      {step === "payment" && (
+        <PaymentStep
+          track={assessment?.track ?? pickedTrack ?? "olympiad"}
+          fee={fee}
+          busy={busy}
+          onPay={pay}
+        />
+      )}
 
       {step === "qpay-wait" && qpayQr && (
         <QpayWaitStep
@@ -263,27 +314,136 @@ export default function AssessmentFlow() {
         <ProblemStep problem={problem} chosen={chosen} needed={needed} busy={busy} onAnswer={answer} />
       )}
 
+      {step === "quiz" && assessment && (
+        <QuizStep
+          assessmentId={assessment.id}
+          onDone={(a) => {
+            setAssessment(a);
+            setStep("quiz-result");
+          }}
+        />
+      )}
+
+      {step === "quiz-result" && assessment && <QuizResultStep assessment={assessment} />}
+
       {step === "submitted" && <SubmittedStep />}
     </>
   );
 }
 
-function PaymentStep({ fee, busy, onPay }: { fee: string; busy: boolean; onPay: () => void }) {
+function TrackStep({
+  fees,
+  onPick,
+}: {
+  fees: { olympiad: string; quiz: string } | null;
+  onPick: (track: AssessmentTrack) => void;
+}) {
+  const cards: { track: AssessmentTrack; title: string; text: string; fee: string }[] = [
+    {
+      track: "regular",
+      title: "Энгийн анги",
+      text: "Ангийн хөтөлбөрийн хялбар тест. Оноо болон AI зөвлөмж шууд гарна.",
+      fee: fees?.quiz ?? "",
+    },
+    {
+      track: "advanced",
+      title: "Сонгон анги",
+      text: "Сонгон суралцагчдад зориулсан ахисан тест. Оноо болон AI зөвлөмж шууд гарна.",
+      fee: fees?.quiz ?? "",
+    },
+    {
+      track: "olympiad",
+      title: "Олимпиад",
+      text: "Бодолтоо бичгээр илгээж, Ганбат багш шалгаад 1-10 түвшин, хувийн дүгнэлт өгнө.",
+      fee: fees?.olympiad ?? "",
+    },
+  ];
   return (
     <div className={CARD}>
-      <h2 className="text-[1.3rem] font-extrabold">Түвшин тогтоох үнэлгээ</h2>
+      <h2 className="text-[1.3rem] font-extrabold">Аль төрлөөр түвшнээ тогтоох вэ?</h2>
+      <p className="text-ink-2 font-medium mt-2 text-[.95rem]">
+        Хүүхдийнхээ одоогийн ангид тохирохыг сонгоорой — эргэлзвэл Энгийнээс эхлэхэд болно.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+        {cards.map((c) => (
+          <button
+            key={c.track}
+            type="button"
+            onClick={() => onPick(c.track)}
+            className="text-left bg-surface-2 border-[1.5px] border-line-2 rounded-md px-4 py-4 hover:border-blue transition-colors flex flex-col gap-2"
+          >
+            <b className="font-extrabold text-[1.02rem]">{c.title}</b>
+            <span className="text-[.85rem] text-ink-2 font-medium leading-[1.55] flex-1">{c.text}</span>
+            <span className="text-[.95rem] font-extrabold text-navy">{c.fee || "—"}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GradeStep({ onBack, onPick }: { onBack: () => void; onPick: (grade: number) => void }) {
+  return (
+    <div className={CARD}>
+      <h2 className="text-[1.25rem] font-extrabold">Хэддүгээр ангид сурдаг вэ?</h2>
+      <p className="text-ink-2 font-medium mt-1.5 text-[.95rem]">
+        Тест нь сонгосон ангийн хөтөлбөрөөс бүрдэнэ.
+      </p>
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5 mt-5">
+        {Array.from({ length: 9 }, (_, i) => i + 4).map((g) => (
+          <button
+            key={g}
+            type="button"
+            onClick={() => onPick(g)}
+            className="bg-surface-2 border-[1.5px] border-line-2 rounded-md py-3.5 font-extrabold text-[1rem] hover:border-blue transition-colors"
+          >
+            {g}-р анги
+          </button>
+        ))}
+      </div>
+      <button type="button" onClick={onBack} className="mt-5 text-[.88rem] font-extrabold text-ink-3 hover:text-ink">
+        ← Буцах
+      </button>
+    </div>
+  );
+}
+
+function PaymentStep({
+  track,
+  fee,
+  busy,
+  onPay,
+}: {
+  track: AssessmentTrack;
+  fee: string;
+  busy: boolean;
+  onPay: () => void;
+}) {
+  const isQuiz = track !== "olympiad";
+  const bullets = isQuiz
+    ? [
+        "Ангийн хөтөлбөрт тохирсон сонголттой асуултууд гарч ирнэ",
+        "Хариултаа сонгоод илгээнэ — цаас, бичиг шаардлагагүй",
+        "Оноо болон хиймэл оюуны бичсэн зөвлөмж шууд гарна",
+        "Үр дүн профайлд тань хадгалагдана",
+      ]
+    : [
+        "Товч анкет бөглөнө",
+        "Танд тохирох бодлогууд гарч ирнэ — амархан бол алгасаж, хүнд бол хөнгөрүүлнэ",
+        "Сонгосон бодлогоо цаасан дээр бодоод зургаа оруулна",
+        "Багшийн үнэлгээ профайлд тань ирнэ",
+      ];
+  return (
+    <div className={CARD}>
+      <h2 className="text-[1.3rem] font-extrabold">{TRACK_LABELS[track]}</h2>
       <p className="text-ink-2 font-medium mt-2.5 leading-[1.7]">
-        Хэдэн асуултад хариулаад, өөрт тохирох хүндрэлийн бодлогуудаас сонгож бодно. Ганбат багш
-        бодолтыг шалгаж, танд 1-10 хүртэлх түвшин болон хувийн зөвлөмж өгнө.
+        {isQuiz
+          ? "Богино тест бөглөөд хүүхдийнхээ өнөөгийн түвшинг мэдэж, юуг давтах, аль сургалт тохирохыг шууд олж мэдээрэй."
+          : "Хэдэн асуултад хариулаад, өөрт тохирох хүндрэлийн бодлогуудаас сонгож бодно. Ганбат багш бодолтыг шалгаж, танд 1-10 хүртэлх түвшин болон хувийн зөвлөмж өгнө."}
       </p>
 
       <ol className="flex flex-col gap-2.5 mt-5">
-        {[
-          "Товч анкет бөглөнө",
-          "Танд тохирох бодлогууд гарч ирнэ — амархан бол алгасаж, хүнд бол хөнгөрүүлнэ",
-          "Сонгосон бодлогоо цаасан дээр бодоод зургаа оруулна",
-          "Багшийн үнэлгээ профайлд тань ирнэ",
-        ].map((text, i) => (
+        {bullets.map((text, i) => (
           <li key={text} className="flex items-start gap-3">
             <span className="w-6 h-6 rounded-full bg-blue-soft text-blue-strong font-extrabold text-[.8rem] grid place-items-center shrink-0 mt-0.5">
               {i + 1}
@@ -295,7 +455,9 @@ function PaymentStep({ fee, busy, onPay }: { fee: string; busy: boolean; onPay: 
 
       <div className="flex items-center justify-between gap-4 flex-wrap mt-6 pt-5 border-t border-line">
         <div>
-          <small className="text-[.82rem] font-extrabold text-ink-3 block">Үнэлгээний төлбөр</small>
+          <small className="text-[.82rem] font-extrabold text-ink-3 block">
+            {isQuiz ? "Тестийн төлбөр" : "Үнэлгээний төлбөр"}
+          </small>
           <b className="text-[1.5rem] font-extrabold text-navy">{fee || "—"}</b>
         </div>
         <button
@@ -574,6 +736,181 @@ function SubmittedStep() {
       >
         Үр дүн харах
       </Link>
+    </div>
+  );
+}
+
+/**
+ * The quiz itself: every question on one page, radio choices, one submit.
+ * One page rather than one-question-at-a-time on purpose — parents sit next
+ * to younger kids, and being able to scroll back and reconsider mirrors a
+ * paper test, which is what this replaces.
+ */
+function QuizStep({
+  assessmentId,
+  onDone,
+}: {
+  assessmentId: string;
+  onDone: (a: Assessment) => void;
+}) {
+  const [questions, setQuestions] = useState<PublicQuizQuestion[] | null>(null);
+  const [picked, setPicked] = useState<Record<string, number>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/assessment/${assessmentId}/quiz`);
+        const json = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(json.error ?? "Тест ачаалахад алдаа гарлаа");
+          return;
+        }
+        setQuestions(json.questions);
+      } catch {
+        if (!cancelled) setError("Сүлжээний алдаа гарлаа. Хуудсаа шинэчилнэ үү.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [assessmentId]);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/assessment/${assessmentId}/quiz/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: picked }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Илгээхэд алдаа гарлаа");
+        return;
+      }
+      onDone(json.assessment);
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (error && !questions) {
+    return <div className={`${CARD} text-center text-red-soft font-semibold`}>{error}</div>;
+  }
+  if (!questions) {
+    return <div className={`${CARD} text-center text-ink-3 font-semibold`}>Тест ачаалж байна…</div>;
+  }
+
+  const answered = Object.keys(picked).length;
+
+  return (
+    <div className={CARD}>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-[1.25rem] font-extrabold">Тест</h2>
+        <span className="text-[.88rem] font-extrabold text-ink-3">
+          {answered} / {questions.length} хариулсан
+        </span>
+      </div>
+
+      <ol className="flex flex-col gap-6 mt-5">
+        {questions.map((q, qi) => (
+          <li key={q.id}>
+            <div className="flex items-start gap-3">
+              <span className="w-7 h-7 rounded-full bg-blue-soft text-blue-strong font-extrabold text-[.85rem] grid place-items-center shrink-0 mt-0.5">
+                {qi + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-[1rem] leading-[1.6]">
+                  <MathText source={q.bodyLatex} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                  {q.choices.map((choice, ci) => {
+                    const chosen = picked[q.id] === ci;
+                    return (
+                      <button
+                        key={ci}
+                        type="button"
+                        onClick={() => setPicked((prev) => ({ ...prev, [q.id]: ci }))}
+                        className={`text-left rounded-md border-[1.5px] px-3.5 py-2.5 text-[.95rem] font-semibold transition-colors ${
+                          chosen
+                            ? "border-blue bg-blue-soft text-blue-strong"
+                            : "border-line-2 bg-surface-2 hover:border-blue"
+                        }`}
+                      >
+                        <span className="inline-flex items-baseline gap-1.5">
+                          <span className="font-extrabold">{"АБВГ"[ci]}.</span>
+                          <MathText source={choice} inline className="!text-inherit" />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      {error && <p className="text-red-soft font-semibold text-[.9rem] mt-4">{error}</p>}
+
+      <button
+        type="button"
+        disabled={busy || answered === 0}
+        onClick={submit}
+        className="w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 mt-6 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50"
+      >
+        {busy ? "Дүгнэж байна…" : "Тест дуусгах →"}
+      </button>
+      {answered < questions.length && answered > 0 && (
+        <p className="text-ink-3 font-medium text-[.82rem] mt-2.5 text-center">
+          Хариулаагүй асуулт буруу гэж тооцогдоно.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function QuizResultStep({ assessment }: { assessment: Assessment }) {
+  const score = assessment.quizScore ?? 0;
+  const total = assessment.quizTotal ?? 0;
+  return (
+    <div className={CARD}>
+      <div className="text-center">
+        <span className="inline-grid place-items-center w-24 h-24 rounded-full bg-blue-soft">
+          <b className="text-[1.6rem] font-extrabold text-blue-strong">
+            {score}/{total}
+          </b>
+        </span>
+        <h2 className="text-[1.3rem] font-extrabold mt-4">Тестийн үр дүн</h2>
+      </div>
+
+      {assessment.aiRecommendation && (
+        <div className="bg-bg-soft rounded-md px-5 py-4 mt-5">
+          <b className="font-extrabold text-[.95rem] block mb-2">Зөвлөмж</b>
+          <p className="text-ink-2 font-medium leading-[1.75] whitespace-pre-wrap text-[.95rem]">
+            {assessment.aiRecommendation}
+          </p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-center gap-3 flex-wrap mt-6">
+        <Link
+          href="/courses"
+          className="inline-flex items-center justify-center font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-3.5 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+        >
+          Сургалтууд үзэх →
+        </Link>
+        <Link href="/profile/assessment" className="font-extrabold text-[.9rem] text-blue-strong">
+          Профайл дээрх үр дүн
+        </Link>
+      </div>
     </div>
   );
 }
