@@ -5,7 +5,7 @@ import ChatWidget from "@/components/ChatWidget";
 import HashScroll from "@/components/HashScroll";
 import ProgramRegisterProvider from "@/components/program/ProgramRegister";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
-import { SITE_URL } from "@/lib/siteUrl";
+import { SITE_NAME, SITE_URL } from "@/lib/siteUrl";
 import "./globals.css";
 
 // Cyrillic + latin means every weight here is two font files. 900 was used
@@ -18,7 +18,6 @@ const nunito = Nunito({
   display: "swap",
 });
 
-const SITE_NAME = "Б.Ганбат багшийн математикийн сургалт";
 const DESCRIPTION =
   "4–12-р ангийн сурагчдад зориулсан олимпиадын математикийн онлайн сургалт. Б.Ганбат багшийн 10 жилийн туршлагад суурилсан системтэй хөтөлбөр.";
 

@@ -7,6 +7,7 @@ import ArticleCard from "@/components/ArticleCard";
 import { IconPerson } from "@/components/icons";
 import ArticleShareButton from "@/components/ArticleShareButton";
 import JsonLd, { SITE_URL } from "@/components/JsonLd";
+import { SITE_NAME } from "@/lib/siteUrl";
 import { findArticleById, listArticleSummaries } from "@/lib/db";
 import { isHtmlContent } from "@/lib/articleContent";
 
@@ -25,7 +26,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     description: article.excerpt,
     alternates: { canonical: `/articles/${article.id}` },
     openGraph: {
+      // Next replaces the parent openGraph object wholesale rather than merging
+      // it, so url/siteName/locale from the root layout have to be repeated
+      // here — without them a shared article carried no og:url and no site
+      // name, which is what Facebook uses to attribute and de-duplicate a link.
       type: "article",
+      url: `${SITE_URL}/articles/${article.id}`,
+      siteName: SITE_NAME,
+      locale: "mn_MN",
       title: article.title,
       description: article.excerpt,
       publishedTime: article.createdAt,
