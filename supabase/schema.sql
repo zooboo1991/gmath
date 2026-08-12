@@ -365,9 +365,9 @@ create table if not exists sessions (
 );
 create index if not exists sessions_user_id_idx on sessions (user_id);
 
--- Append-only history of logins, separate from `sessions` (which only ever
--- holds the one currently-active session and gets overwritten on every new
--- login). This is what the admin's Хэрэглэгч → Төхөөрөмж tab reads to show
+-- Append-only history of logins, separate from `sessions` (which only holds
+-- the few currently-active sessions — see MAX_SESSIONS_PER_USER — and evicts
+-- the oldest on a new login). This is what the admin's Хэрэглэгч → Төхөөрөмж tab reads to show
 -- which devices a user has accessed from over time.
 create table if not exists login_logs (
   id uuid primary key default gen_random_uuid(),

@@ -460,14 +460,39 @@ export async function verifyUserPassword(phone: string, password: string): Promi
   return verifyPasswordHash(password, user.passwordHash, user.passwordSalt) ? user : null;
 }
 
-// Enforces one active session per user: any existing session row for this
-// user is deleted before the new one is created, so an older device's
-// session id no longer resolves (see findSessionUserId) the next time it's
-// checked.
+/**
+ * How many devices one account may stay signed in on at once. Two, so a
+ * parent's phone and the child's computer can both hold a session — a third
+ * login evicts the oldest.
+ */
+export const MAX_SESSIONS_PER_USER = 2;
+
+/**
+ * Caps concurrent sessions at MAX_SESSIONS_PER_USER: the newest
+ * MAX_SESSIONS_PER_USER - 1 rows are kept, everything older is deleted, and
+ * then this login's row is inserted — so the total after a login is exactly
+ * the cap. An evicted session id stops resolving (see findSessionUserId), which
+ * is what logs that device out the next time it's checked.
+ *
+ * Eviction happens by age of *login*, not of last use: `sessions` has no
+ * last-seen column, and adding one would mean a write on every page view.
+ */
 export async function createSession(userId: string): Promise<string> {
   const supabase = getSupabase();
-  const { error: deleteError } = await supabase.from("sessions").delete().eq("user_id", userId);
-  if (deleteError) throw deleteError;
+
+  const { data: existing, error: listError } = await supabase
+    .from("sessions")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (listError) throw listError;
+
+  const stale = (existing as { id: string }[]).slice(MAX_SESSIONS_PER_USER - 1).map((row) => row.id);
+  if (stale.length > 0) {
+    const { error: deleteError } = await supabase.from("sessions").delete().in("id", stale);
+    if (deleteError) throw deleteError;
+  }
+
   const { data, error } = await supabase.from("sessions").insert({ user_id: userId }).select("id").single();
   if (error) throw error;
   return (data as { id: string }).id;

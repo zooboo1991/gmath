@@ -12,10 +12,10 @@ import type { AdminRole } from "./adminSections";
  * withstand serious attack.
  *
  * The cookie holds a session id (see the `sessions` table), not the user id
- * directly. Logging in deletes any other session row for that user first,
- * so only the newest login's cookie still resolves to a user — an older
- * device's cookie starts reading as logged out the next time it's checked.
- * That's the whole "one active session per user" mechanism.
+ * directly. Logging in keeps only the newest MAX_SESSIONS_PER_USER session
+ * rows for that user, so an account can be signed in on that many devices and
+ * a further login makes the oldest one's cookie stop resolving — that device
+ * reads as logged out the next time it's checked.
  *
  * If SESSION_SECRET isn't set, sessions fall back to unsigned (the old
  * behavior) rather than crashing every page load — a missing env var on a
