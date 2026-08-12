@@ -117,7 +117,14 @@ export async function cancelInvoice(invoiceId: string): Promise<void> {
   const res = await authedFetch(`/v2/invoice/${invoiceId}`, { method: "DELETE" });
   if (res.ok || res.status === 404) return;
   const detail = await errorDetail(res);
-  if (detail.includes("INVOICE_ALREADY_CANCELED")) return;
+  // Both mean the same thing for our purposes: there is no live invoice left
+  // that could take money, which is exactly what the caller wanted. QPay
+  // answers a missing invoice with 422 INVOICE_NOTFOUND rather than a 404 —
+  // observed, not documented. Treating it as an error stranded rows nobody
+  // could then delete.
+  if (detail.includes("INVOICE_ALREADY_CANCELED") || detail.includes("INVOICE_NOTFOUND")) return;
+  // Everything else still throws — most importantly INVOICE_PAID, where the
+  // customer paid after all and the invoice must not be torn down.
   throw new Error(`QPay нэхэмжлэл цуцлахад алдаа гарлаа: ${res.status} ${detail}`);
 }
 
