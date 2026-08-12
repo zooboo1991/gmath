@@ -4,6 +4,7 @@ import {
   findLatestChatConversation,
   insertChatMessage,
   listChatMessages,
+  toModelMessages,
 } from "@/lib/db";
 import { extractIssue, recordChatIssue } from "@/lib/ai/issues";
 import { routeChat } from "@/lib/ai/router";
@@ -156,7 +157,12 @@ async function handleEvent(event: MessagingEvent): Promise<void> {
   await sendTypingOn(psid);
 
   const system = await buildSystemPrompt({ userId, channel: "messenger" });
-  const result = await routeChat({ system, messages: [...history, { role: "user", content: text }] });
+  const result = await routeChat({
+    system,
+    // toModelMessages: the transcript can also hold admin replies, and the
+    // provider accepts only user/assistant.
+    messages: toModelMessages([...history, { role: "user", content: text }]),
+  });
 
   // Same marker handling as the website route: strip before storing/sending,
   // record the issue in the background.

@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { IconClose } from "@/components/icons";
 
-type Message = { role: "user" | "assistant"; content: string };
+/** "admin" is a human reply that arrived during a takeover — labelled as such in the thread. */
+type Message = { role: "user" | "assistant" | "admin"; content: string; createdAt?: string };
 
 /**
  * Only internal paths the site actually has — the model must never be able to
@@ -153,6 +154,11 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // "admin" once a person has taken the conversation over; the bot stays quiet
+  // until they hand it back, and the visitor is told so.
+  const [mode, setMode] = useState<"bot" | "admin">("bot");
+  // created_at of the newest message we've already shown — the poll's cursor.
+  const lastSeenRef = useRef<string | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -170,6 +176,53 @@ export default function ChatWidget() {
     window.addEventListener(OPEN_CHAT_EVENT, openFromPage);
     return () => window.removeEventListener(OPEN_CHAT_EVENT, openFromPage);
   }, []);
+
+  /**
+   * Picks up whatever was added to the thread server-side — an admin's reply,
+   * or the takeover itself. Polling (not a socket) because this hits our own
+   * database, only while the panel is open, and the alternative is a
+   * websocket layer for a handful of conversations a day.
+   */
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const tick = async () => {
+      const conversationId = sessionStorage.getItem(STORAGE_KEY);
+      if (!conversationId) return;
+      try {
+        const params = new URLSearchParams({ conversationId });
+        if (lastSeenRef.current) params.set("after", lastSeenRef.current);
+        const res = await fetch(`/api/chat/messages?${params}`);
+        if (cancelled) return;
+        // The stored id no longer resolves for this visitor — the row is gone,
+        // or the visitor cookie changed under it. Forget it instead of polling
+        // a 404 every four seconds for as long as the panel stays open; the
+        // next message simply starts a fresh thread.
+        if (res.status === 404) {
+          sessionStorage.removeItem(STORAGE_KEY);
+          return;
+        }
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.mode) setMode(json.mode);
+        const incoming: Message[] = json.messages ?? [];
+        if (incoming.length === 0) return;
+        lastSeenRef.current = incoming[incoming.length - 1].createdAt;
+        // Only what this widget didn't render itself: the visitor's own lines
+        // and the bot's reply are already on screen from the POST.
+        const fresh = incoming.filter((m) => m.role === "admin");
+        if (fresh.length > 0) setMessages((prev) => [...prev, ...fresh]);
+      } catch {
+        // Retried on the next tick.
+      }
+    };
+    void tick();
+    const timer = setInterval(tick, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [open]);
 
   // The widget is for visitors; on admin pages it just floats over the
   // sidebar's own chat-oversight UI. After every hook, per the rules of hooks.
@@ -198,6 +251,12 @@ export default function ChatWidget() {
       // the retry lands in the same thread rather than orphaning the message
       // it already persisted.
       if (json.conversationId) sessionStorage.setItem(STORAGE_KEY, json.conversationId);
+      // Handed over: there is no bot reply to show, so say who is coming
+      // instead of leaving the visitor watching a dead thread.
+      if (json.handedOver) {
+        setMode("admin");
+        return;
+      }
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: json.ok ? json.reply : json.error ?? "Алдаа гарлаа." },
@@ -258,28 +317,50 @@ export default function ChatWidget() {
       {open && (
         <div className="fixed bottom-[88px] left-3 right-3 sm:left-auto sm:right-5 sm:w-[360px] h-[min(70vh,480px)] bg-surface border border-line rounded-lg shadow-lg flex flex-col overflow-hidden z-[90]">
           <div className="bg-navy text-white px-4 py-3.5 shrink-0">
-            <b className="font-extrabold text-[.95rem] block">AI туслах</b>
-            <span className="text-[.78rem] font-semibold opacity-80">Сургалтын талаар асууна уу</span>
+            <b className="font-extrabold text-[.95rem] block">
+              {mode === "admin" ? "Багштай чатлаж байна" : "AI туслах"}
+            </b>
+            <span className="text-[.78rem] font-semibold opacity-80">
+              {mode === "admin" ? "Хүн шууд хариулж байна" : "Сургалтын талаар асууна уу"}
+            </span>
           </div>
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-3.5 py-3.5 flex flex-col gap-2.5">
             <p className="self-start max-w-[85%] bg-bg-soft text-ink-2 font-medium text-[.85rem] leading-[1.55] px-3.5 py-2.5 rounded-md">
               {GREETING}
             </p>
-            {messages.map((m, i) => (
-              <p
-                key={i}
-                className={
-                  m.role === "user"
-                    ? "self-end max-w-[85%] bg-navy text-white font-semibold text-[.85rem] leading-[1.55] px-3.5 py-2.5 rounded-md whitespace-pre-wrap"
-                    : "self-start max-w-[85%] bg-bg-soft text-ink-2 font-medium text-[.85rem] leading-[1.55] px-3.5 py-2.5 rounded-md whitespace-pre-wrap"
-                }
-              >
-                {m.role === "assistant" ? renderRich(m.content) : m.content}
-              </p>
-            ))}
-            {busy && (
+            {messages.map((m, i) =>
+              m.role === "admin" ? (
+                // Visually distinct from the bot on purpose: a parent should be
+                // able to tell at a glance that a person answered this line.
+                <span key={i} className="self-start max-w-[85%]">
+                  <small className="block text-[.7rem] font-extrabold text-gold-strong mb-1">Багш</small>
+                  <p className="bg-gold-soft text-ink font-medium text-[.85rem] leading-[1.55] px-3.5 py-2.5 rounded-md whitespace-pre-wrap">
+                    {renderRich(m.content)}
+                  </p>
+                </span>
+              ) : (
+                <p
+                  key={i}
+                  className={
+                    m.role === "user"
+                      ? "self-end max-w-[85%] bg-navy text-white font-semibold text-[.85rem] leading-[1.55] px-3.5 py-2.5 rounded-md whitespace-pre-wrap"
+                      : "self-start max-w-[85%] bg-bg-soft text-ink-2 font-medium text-[.85rem] leading-[1.55] px-3.5 py-2.5 rounded-md whitespace-pre-wrap"
+                  }
+                >
+                  {m.role === "assistant" ? renderRich(m.content) : m.content}
+                </p>
+              )
+            )}
+            {busy && mode === "bot" && (
               <span className="self-start text-ink-3 font-semibold text-[.8rem] px-1">Бичиж байна…</span>
+            )}
+            {mode === "admin" && (
+              // No "typing" animation here — a human may take minutes, and a
+              // fake indicator would read as the page being stuck.
+              <span className="self-start text-ink-3 font-semibold text-[.8rem] px-1">
+                Багш хариултаа бичих хүртэл хүлээнэ үү.
+              </span>
             )}
           </div>
 
@@ -289,7 +370,7 @@ export default function ChatWidget() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               type="text"
-              placeholder="Асуултаа бичнэ үү…"
+              placeholder={mode === "admin" ? "Багшид бичнэ үү…" : "Асуултаа бичнэ үү…"}
               maxLength={2000}
               className="flex-1 min-w-0 px-3.5 py-3 text-[.88rem] font-medium bg-transparent outline-none"
             />

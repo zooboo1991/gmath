@@ -688,3 +688,26 @@ create index if not exists quiz_answers_assessment_idx on quiz_answers (assessme
 -- The quiz has its own, cheaper fee (admin-editable next to assessment_fee).
 insert into app_settings (key, value) values ('quiz_fee', '10,000₮')
 on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Live takeover: an admin pausing the bot to answer a visitor themselves
+-- ---------------------------------------------------------------------------
+-- Who is answering right now. 'bot' is the default and what every existing
+-- conversation keeps; 'admin' makes /api/chat store the visitor's message
+-- without calling the model at all — so a takeover costs nothing per message
+-- and, more importantly, the bot can't talk over the person who took over.
+alter table chat_conversations add column if not exists mode text not null default 'bot';
+alter table chat_conversations drop constraint if exists chat_conversations_mode_check;
+alter table chat_conversations add constraint chat_conversations_mode_check
+  check (mode in ('bot', 'admin'));
+alter table chat_conversations add column if not exists mode_changed_at timestamptz;
+
+-- Admin replies live in the same transcript as the bot's, under their own
+-- role, so the thread reads in order and the visitor's widget can label them.
+alter table chat_messages drop constraint if exists chat_messages_role_check;
+alter table chat_messages add constraint chat_messages_role_check
+  check (role in ('user', 'assistant', 'admin'));
+
+-- The visitor's widget polls for messages newer than the last one it has.
+create index if not exists chat_messages_conversation_created_idx
+  on chat_messages (conversation_id, created_at);

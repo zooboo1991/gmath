@@ -13,20 +13,42 @@ export default function ChatPanel() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [menuState, setMenuState] = useState<{ busy: boolean; message?: string; error?: boolean }>({ busy: false });
 
+  // Polled, not fetched once: while an admin has taken a conversation over
+  // they need the list (and its "waiting" markers) to move on its own. 8s is
+  // slow enough to be free and fast enough that nobody sits refreshing.
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/admin/chats")
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((json) => {
-        if (!cancelled) setState({ status: "done", conversations: json.conversations, issues: json.issues });
-      })
-      .catch(() => {
-        if (!cancelled) setState({ status: "error" });
-      });
+    const load = () =>
+      fetch("/api/admin/chats")
+        .then((res) => (res.ok ? res.json() : Promise.reject()))
+        .then((json) => {
+          if (!cancelled) setState({ status: "done", conversations: json.conversations, issues: json.issues });
+        })
+        .catch(() => {
+          // A failed refresh keeps the list that's already on screen.
+          if (!cancelled) setState((prev) => (prev.status === "done" ? prev : { status: "error" }));
+        });
+
+    void load();
+    const timer = setInterval(load, 8000);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, []);
+
+  /** Flips who answers this conversation. Optimistic — the poll corrects it if the call fails. */
+  const setMode = async (id: string, mode: "bot" | "admin") => {
+    setState((s) => ({
+      ...s,
+      conversations: s.conversations?.map((c) => (c.id === id ? { ...c, mode } : c)),
+    }));
+    await fetch(`/api/admin/chats/${id}/mode`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    }).catch(() => {});
+  };
 
   /**
    * Pushes the greeting + persistent menu to the Facebook Page. Lives here
@@ -84,6 +106,12 @@ export default function ChatPanel() {
     a.status === b.status ? 0 : a.status === "new" ? -1 : 1
   );
   const newIssueCount = sortedIssues.filter((i) => i.status === "new").length;
+
+  // Taken over by a human, and the last thing said was the visitor's — i.e.
+  // somebody is sitting there waiting for an answer.
+  const waitingCount = (state.conversations ?? []).filter(
+    (c) => c.mode === "admin" && c.lastMessage?.role === "user"
+  ).length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -181,9 +209,15 @@ export default function ChatPanel() {
 
       {state.status === "done" && (
         <div className="card-flat px-6 py-6">
-          <h3 className="font-extrabold text-[1.05rem]">Харилцан яриа ({state.conversations?.length ?? 0})</h3>
+          <h3 className="font-extrabold text-[1.05rem]">
+            Харилцан яриа ({state.conversations?.length ?? 0})
+            {waitingCount > 0 && (
+              <span className="text-gold-strong"> — {waitingCount} хариу хүлээж байна</span>
+            )}
+          </h3>
           <p className="text-ink-3 font-semibold text-[.85rem] mt-1">
-            Вэб болон Messenger дээрх чатботын бүх яриа. Мөр дээр дарж бүрэн харна.
+            Вэб болон Messenger дээрх чатботын бүх яриа. Мөр дээр дарж бүрэн харах, шаардлагатай бол
+            ботыг зогсоож өөрөө хариулна.
           </p>
           {state.conversations?.length === 0 && (
             <p className="text-ink-3 font-semibold text-[.9rem] mt-4">Одоогоор яриа алга.</p>
@@ -201,6 +235,16 @@ export default function ChatPanel() {
                       {channelBadge(c.channel)}
                       <b className="font-extrabold text-[.9rem]">{userLabel(c.user)}</b>
                       <span className="text-ink-3 font-semibold text-[.8rem]">{c.messageCount} мессеж</span>
+                      {c.mode === "admin" && (
+                        <span className="inline-flex items-center text-[.72rem] font-extrabold px-2.5 py-0.5 rounded-full text-gold-strong bg-gold-soft shrink-0">
+                          Бот зогссон
+                        </span>
+                      )}
+                      {c.mode === "admin" && c.lastMessage?.role === "user" && (
+                        <span className="inline-flex items-center text-[.72rem] font-extrabold px-2.5 py-0.5 rounded-full text-red-soft bg-[oklch(0.95_0.03_25)] shrink-0">
+                          Хариу хүлээж байна
+                        </span>
+                      )}
                     </div>
                     <span className="text-ink-3 font-semibold text-[.78rem] shrink-0">
                       {new Date(c.lastMessage?.createdAt ?? c.startedAt).toLocaleString("mn-MN")}
@@ -208,14 +252,18 @@ export default function ChatPanel() {
                   </div>
                   {c.lastMessage && (
                     <p className="text-ink-3 font-medium text-[.83rem] mt-1 truncate">
-                      {c.lastMessage.role === "user" ? "Хэрэглэгч: " : "Бот: "}
+                      {c.lastMessage.role === "user"
+                        ? "Хэрэглэгч: "
+                        : c.lastMessage.role === "admin"
+                        ? "Багш: "
+                        : "Бот: "}
                       {c.lastMessage.content}
                     </p>
                   )}
                 </button>
                 {expandedId === c.id && (
-                  <div className="px-1 pb-2">
-                    <ChatTranscript conversationId={c.id} />
+                  <div className="px-1 pb-3">
+                    <ChatReply conversation={c} onSetMode={setMode} />
                   </div>
                 )}
               </div>
@@ -224,5 +272,105 @@ export default function ChatPanel() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The expanded conversation: transcript plus everything needed to answer it by
+ * hand. Kept in this file rather than a shared component because the reply flow
+ * only makes sense inside the admin chat list.
+ *
+ * Sending a message takes the conversation over server-side, so the bot can't
+ * answer on top of a half-typed human reply — the "Өөрөө хариулах" button is
+ * only for pausing the bot *before* writing anything.
+ */
+function ChatReply({
+  conversation,
+  onSetMode,
+}: {
+  conversation: AdminChatConversation;
+  onSetMode: (id: string, mode: "bot" | "admin") => void;
+}) {
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const send = async () => {
+    const content = text.trim();
+    if (!content) return;
+    setSending(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/chats/${conversation.id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Илгээхэд алдаа гарлаа");
+        return;
+      }
+      setText("");
+      onSetMode(conversation.id, "admin");
+      setRefreshKey((k) => k + 1);
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const isMessenger = conversation.channel === "messenger";
+
+  return (
+    <>
+      {/* Poll only while the row is open: a closed row costs nothing. */}
+      <ChatTranscript conversationId={conversation.id} pollMs={5000} refreshKey={refreshKey} />
+
+      {isMessenger ? (
+        <p className="text-ink-3 font-semibold text-[.83rem] bg-bg-soft rounded-md px-3.5 py-2.5">
+          Энэ яриа Messenger дээр байна. Гараар хариулахын тулд Facebook хуудасны inbox-оос бичнэ үү —
+          энд бичсэн мессеж тэр хүнд хүрэхгүй.
+        </p>
+      ) : (
+        <div className="bg-bg-soft rounded-md px-3.5 py-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-2.5">
+            <span className="text-[.83rem] font-extrabold text-ink-2">
+              {conversation.mode === "admin" ? "Бот зогссон — та хариулж байна" : "Бот хариулж байна"}
+            </span>
+            <button
+              type="button"
+              onClick={() => onSetMode(conversation.id, conversation.mode === "admin" ? "bot" : "admin")}
+              className="text-[.8rem] font-extrabold text-ink-2 bg-surface border border-line px-3.5 py-1.5 rounded-full"
+            >
+              {conversation.mode === "admin" ? "Ботод буцаах" : "Ботыг зогсоох"}
+            </button>
+          </div>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={2}
+            placeholder="Хэрэглэгчид бичих…"
+            className="w-full px-3.5 py-2.5 rounded-xs border-[1.5px] border-line-2 bg-surface text-ink font-semibold text-[.88rem] focus:outline-none focus:border-blue"
+          />
+          <div className="flex items-center gap-2.5 mt-2">
+            <button
+              type="button"
+              disabled={sending || !text.trim()}
+              onClick={send}
+              className="text-[.85rem] font-extrabold text-white bg-blue px-4 py-2 rounded-full disabled:opacity-50"
+            >
+              {sending ? "Илгээж байна…" : "Илгээх"}
+            </button>
+            <span className="text-ink-3 font-semibold text-[.78rem]">
+              Илгээмэгц бот автоматаар зогсоно. Хэрэглэгч 4 секундын дотор харна.
+            </span>
+          </div>
+          {error && <p className="text-red-soft font-semibold text-[.83rem] mt-2">{error}</p>}
+        </div>
+      )}
+    </>
   );
 }

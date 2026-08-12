@@ -2080,8 +2080,15 @@ export async function markNotificationsRead(notificationIds: string[], userId: s
 // doesn't restart the thread.
 // ---------------------------------------------------------------------------
 
-export type ChatRole = "user" | "assistant";
+/**
+ * "admin" is a human reply sent from the admin panel during a takeover. The AI
+ * providers only accept user/assistant, so anything handed to the model goes
+ * through toModelMessages() below rather than being passed straight through.
+ */
+export type ChatRole = "user" | "assistant" | "admin";
 export type ChatChannel = "website" | "messenger";
+/** Who answers this conversation right now — see the schema comment on chat_conversations.mode. */
+export type ChatMode = "bot" | "admin";
 
 export async function createChatConversation(
   visitorId: string,
@@ -2100,12 +2107,16 @@ export async function createChatConversation(
 /**
  * Scoped by visitorId as well as id so one visitor can't resume someone
  * else's conversation by guessing/replaying an id — the id alone is the only
- * thing the client sends back.
+ * thing the client sends back. Returns the mode too, since every caller that
+ * loads a conversation also needs to know whether the bot still owns it.
  */
-export async function findChatConversation(id: string, visitorId: string): Promise<{ id: string } | undefined> {
+export async function findChatConversation(
+  id: string,
+  visitorId: string
+): Promise<{ id: string; mode: ChatMode } | undefined> {
   const { data, error } = await getSupabase()
     .from("chat_conversations")
-    .select("id")
+    .select("id, mode")
     .eq("id", id)
     .eq("visitor_id", visitorId)
     .maybeSingle();
@@ -2113,7 +2124,60 @@ export async function findChatConversation(id: string, visitorId: string): Promi
     if (isInvalidUuidError(error)) return undefined;
     throw error;
   }
-  return (data as { id: string } | null) ?? undefined;
+  return (data as { id: string; mode: ChatMode } | null) ?? undefined;
+}
+
+export async function getChatConversationMode(id: string): Promise<ChatMode> {
+  const { data, error } = await getSupabase()
+    .from("chat_conversations")
+    .select("mode")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    if (isInvalidUuidError(error)) return "bot";
+    throw error;
+  }
+  return (data as { mode: ChatMode } | null)?.mode ?? "bot";
+}
+
+/** Pauses the bot for this conversation, or hands it back. */
+export async function setChatConversationMode(id: string, mode: ChatMode): Promise<boolean> {
+  const { data, error } = await getSupabase()
+    .from("chat_conversations")
+    .update({ mode, mode_changed_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("id");
+  if (error) {
+    if (isInvalidUuidError(error)) return false;
+    throw error;
+  }
+  return (data as { id: string }[]).length > 0;
+}
+
+/**
+ * Messages newer than `after`, for the visitor's widget to pick up an admin's
+ * reply. `after` is exclusive and compared on created_at, so passing the
+ * timestamp of the newest message the client already has returns only what it
+ * hasn't seen.
+ */
+export async function listChatMessagesSince(
+  conversationId: string,
+  after?: string
+): Promise<{ role: ChatRole; content: string; createdAt: string }[]> {
+  let query = getSupabase()
+    .from("chat_messages")
+    .select("role, content, created_at")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true })
+    .limit(50);
+  if (after) query = query.gt("created_at", after);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data as { role: ChatRole; content: string; created_at: string }[]).map((m) => ({
+    role: m.role,
+    content: m.content,
+    createdAt: m.created_at,
+  }));
 }
 
 /** Oldest-first, and capped: only the tail of a long thread is worth re-sending to the model. */
@@ -2126,6 +2190,18 @@ export async function listChatMessages(conversationId: string, limit = 20): Prom
     .limit(limit);
   if (error) throw error;
   return (data as { role: ChatRole; content: string }[]).reverse();
+}
+
+/**
+ * Collapses the transcript into the two roles an AI provider accepts. A human
+ * admin's reply is context the model must see when the conversation is handed
+ * back — dropping it would make the bot repeat what the admin already said —
+ * so it arrives as an assistant turn.
+ */
+export function toModelMessages(
+  messages: { role: ChatRole; content: string }[]
+): { role: "user" | "assistant"; content: string }[] {
+  return messages.map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.content }));
 }
 
 export async function insertChatMessage(
@@ -2196,6 +2272,7 @@ function chatUserFromJoin(join: ChatUserJoin): { lastName: string; firstName: st
 export type AdminChatConversation = {
   id: string;
   channel: ChatChannel;
+  mode: ChatMode;
   startedAt: string;
   user?: { lastName: string; firstName: string; phone: string };
   messageCount: number;
@@ -2205,6 +2282,7 @@ export type AdminChatConversation = {
 type AdminChatConversationRow = {
   id: string;
   channel: ChatChannel;
+  mode: ChatMode;
   started_at: string;
   users: ChatUserJoin;
   msg_count: { count: number }[];
@@ -2215,13 +2293,14 @@ type AdminChatConversationRow = {
 // aggregates the count, the other is ordered+limited to the newest row so the
 // list can show a preview without pulling whole transcripts.
 const ADMIN_CHAT_SELECT =
-  "id, channel, started_at, users(last_name, first_name, phone), msg_count:chat_messages(count), last_message:chat_messages(role, content, created_at)";
+  "id, channel, mode, started_at, users(last_name, first_name, phone), msg_count:chat_messages(count), last_message:chat_messages(role, content, created_at)";
 
 function adminChatFromRow(row: AdminChatConversationRow): AdminChatConversation {
   const last = row.last_message?.[0];
   return {
     id: row.id,
     channel: row.channel,
+    mode: row.mode,
     startedAt: row.started_at,
     user: chatUserFromJoin(row.users),
     messageCount: row.msg_count?.[0]?.count ?? 0,

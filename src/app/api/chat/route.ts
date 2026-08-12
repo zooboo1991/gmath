@@ -6,9 +6,12 @@ import {
   createChatConversation,
   findChatConversation,
   findLatestChatConversation,
+  getChatConversationMode,
   insertChatMessage,
   listChatMessages,
+  toModelMessages,
 } from "@/lib/db";
+import { notifyAdminsOfWaitingVisitor } from "@/lib/chatHandover";
 import { getSessionUser } from "@/lib/session";
 import { extractIssue, recordChatIssue } from "@/lib/ai/issues";
 import { routeChat } from "@/lib/ai/router";
@@ -70,9 +73,30 @@ export async function POST(request: Request) {
   const history = await listChatMessages(conversationId);
   await insertChatMessage(conversationId, "user", message);
 
+  // An admin has paused the bot for this conversation: store what the visitor
+  // said and stop. Calling the model here would talk over the person who took
+  // over — and cost money doing it.
+  if ((await getChatConversationMode(conversationId)) === "admin") {
+    // Only ping the admins on the first message since their last reply, so a
+    // visitor typing three lines in a row doesn't send three pushes. The
+    // history loaded above is exactly what's needed to tell.
+    const lastRole = history[history.length - 1]?.role;
+    if (lastRole !== "user") {
+      notifyAdminsOfWaitingVisitor({ conversationId, message }).catch((err) =>
+        console.error("[chat] handover notification failed:", err)
+      );
+    }
+    return NextResponse.json({ ok: true, conversationId, handedOver: true });
+  }
+
   try {
     const system = await buildSystemPrompt({ userId: sessionUser?.id, channel: "website" });
-    const result = await routeChat({ system, messages: [...history, { role: "user", content: message }] });
+    const result = await routeChat({
+      system,
+      // toModelMessages folds an admin's earlier replies into assistant turns —
+      // the provider accepts only those two roles.
+      messages: toModelMessages([...history, { role: "user", content: message }]),
+    });
 
     // The complaint marker never reaches the visitor or the transcript —
     // extractIssue strips it before anything is stored or returned.
