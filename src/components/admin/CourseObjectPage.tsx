@@ -17,6 +17,7 @@ import { toIsoDate } from "@/lib/courseDate";
 import { parsePriceToNumber, formatMnt } from "@/lib/price";
 import { payMethodLabel } from "@/lib/registration";
 import AdminField from "./AdminField";
+import { downscaleImage, formatMb, MAX_UPLOAD_BYTES } from "@/lib/imageResize";
 import { AnchorTab, Card, KpiTile } from "./AdminObjectPageParts";
 import LessonScheduleEditor from "./LessonScheduleEditor";
 import RegistrationRoster from "./RegistrationRoster";
@@ -124,12 +125,22 @@ export default function CourseObjectPage({
     setCoverUploading(true);
     setError(null);
     try {
+      // Same reasoning as ArticleForm: shrink first, and never post a body
+      // the platform will refuse before our route sees it.
+      const prepared = await downscaleImage(file);
+      if (prepared.size > MAX_UPLOAD_BYTES) {
+        setError(
+          `Зураг хэт том байна (${formatMb(prepared.size)}). ${formatMb(MAX_UPLOAD_BYTES)}-ээс бага зураг оруулна уу.`
+        );
+        return;
+      }
+
       const body = new FormData();
-      body.append("file", file);
+      body.append("file", prepared);
       const res = await fetch("/api/admin/upload", { method: "POST", body });
-      const json = await res.json();
+      const json = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(json.error ?? "Байршуулахад алдаа гарлаа");
+        setError(json?.error ?? `Байршуулахад алдаа гарлаа (${res.status})`);
         return;
       }
       setForm((f) => ({ ...f, coverImage: json.url }));

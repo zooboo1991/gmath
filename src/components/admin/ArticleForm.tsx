@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Article } from "@/lib/db";
 import RichTextEditor from "./RichTextEditor";
+import { downscaleImage, formatMb, MAX_UPLOAD_BYTES } from "@/lib/imageResize";
 import { IconClose } from "@/components/icons";
 
 type FormState = {
@@ -21,6 +22,15 @@ type FormState = {
    */
   publishAtLocal: string;
 };
+
+/** Response bodies aren't always JSON — a 413 from the platform is plain text. */
+async function readJson(res: Response): Promise<{ error?: string; url?: string } | null> {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
 
 /** UTC ISO → the "YYYY-MM-DDTHH:mm" a datetime-local input expects, in local time. */
 function isoToLocalInput(iso?: string): string {
@@ -54,15 +64,32 @@ export default function ArticleForm({ initialArticle }: { initialArticle?: Artic
     setCoverUploading(true);
     setError(null);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      const res = await fetch("/api/admin/upload", { method: "POST", body });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Байршуулахад алдаа гарлаа");
+      // Phone photos are far bigger than a cover needs to be, and anything
+      // over the platform's request-body cap never reaches the API at all —
+      // which used to surface as "Сүлжээний алдаа".
+      const prepared = await downscaleImage(file);
+      if (prepared.size > MAX_UPLOAD_BYTES) {
+        setError(
+          `Зураг хэт том байна (${formatMb(prepared.size)}). ${formatMb(MAX_UPLOAD_BYTES)}-ээс бага зураг оруулна уу.`
+        );
         return;
       }
-      setForm((f) => ({ ...f, coverImage: json.url }));
+
+      const body = new FormData();
+      body.append("file", prepared);
+      const res = await fetch("/api/admin/upload", { method: "POST", body });
+      const json = await readJson(res);
+      if (!res.ok) {
+        // A platform-level rejection has no JSON body; showing the status is
+        // the difference between a fixable message and a mystery.
+        setError(json?.error ?? `Байршуулахад алдаа гарлаа (${res.status})`);
+        return;
+      }
+      if (!json?.url) {
+        setError("Байршуулсан зургийн хаяг ирсэнгүй. Дахин оролдоно уу.");
+        return;
+      }
+      setForm((f) => ({ ...f, coverImage: json.url as string }));
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
@@ -95,9 +122,9 @@ export default function ArticleForm({ initialArticle }: { initialArticle?: Artic
           publishAt: form.publishAtLocal ? new Date(form.publishAtLocal).toISOString() : "",
         }),
       });
-      const json = await res.json();
+      const json = await readJson(res);
       if (!res.ok) {
-        setError(json.error ?? "Хадгалахад алдаа гарлаа");
+        setError(json?.error ?? `Хадгалахад алдаа гарлаа (${res.status})`);
         return;
       }
       router.push("/admin/articles");
