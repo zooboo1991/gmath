@@ -1,5 +1,12 @@
 "use client";
 
+/** Same rule the server uses (lib/bunny.ts) — a bare GUID or a mediadelivery.net link. */
+function isBunnyRecording(value: string): boolean {
+  const v = value.trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return true;
+  return /mediadelivery\.net/i.test(v) && /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(v);
+}
+
 import { useState } from "react";
 import type { Lesson } from "@/lib/db";
 import { IconClose } from "@/components/icons";
@@ -192,9 +199,23 @@ export default function LessonScheduleEditor({
                   <input
                     value={lesson.recordingLink ?? ""}
                     onChange={(e) => updateRow(i, { recordingLink: e.target.value })}
-                    placeholder="Бичлэгийн холбоос (хичээл орсны дараа)"
+                    placeholder="Бичлэг: Bunny видеоны ID эсвэл холбоос"
                     className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
                   />
+                  {/* Tells the teacher which of the two behaviours this row will
+                      get before they save, instead of finding out from a
+                      student. */}
+                  {lesson.recordingLink?.trim() ? (
+                    isBunnyRecording(lesson.recordingLink) ? (
+                      <span className="text-[.75rem] font-extrabold text-green">
+                        ✓ Bunny — сайт дээрээ тоглоно
+                      </span>
+                    ) : (
+                      <span className="text-[.75rem] font-semibold text-ink-3">
+                        Гадаад холбоос — шинэ цонхонд нээгдэнэ
+                      </span>
+                    )
+                  ) : null}
                 </div>
                 {id && isOnline && (
                   <div className="flex flex-col gap-1.5">

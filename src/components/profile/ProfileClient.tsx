@@ -6,6 +6,7 @@ import FormField from "@/components/FormField";
 import SchoolAutocomplete from "@/components/SchoolAutocomplete";
 import MessengerLink from "@/components/profile/MessengerLink";
 import PushSettings from "@/components/profile/PushSettings";
+import RecordingPlayer from "@/components/profile/RecordingPlayer";
 import type { Certificate, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import {
   IconCheckCircle,
@@ -16,7 +17,6 @@ import {
   IconTarget,
   IconClose,
   IconVideoCamera,
-  IconPlay,
   IconDocument,
 } from "@/components/icons";
 import { compareByStartDate, formatCourseDate } from "@/lib/courseDate";
@@ -543,16 +543,9 @@ function LessonAction({
   if (!info) return null;
 
   if (info.lesson.recordingLink) {
-    return (
-      <a
-        href={info.lesson.recordingLink}
-        target="_blank"
-        rel="noreferrer"
-        className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.8rem] text-blue-strong bg-blue-soft rounded-full px-3.5 py-2"
-      >
-        <IconPlay className="w-3 h-3" /> Бичлэг үзэх
-      </a>
-    );
+    // The link itself is no longer rendered: RecordingPlayer asks the server
+    // for a signed, expiring URL and plays it here on the page.
+    return <RecordingPlayer courseId={courseId} lessonIndex={lessonIndex} topic={info.lesson.topic} />;
   }
 
   if (info.state === "past") {
