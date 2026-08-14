@@ -168,10 +168,12 @@ export async function buildSystemPrompt({
         : "Энэ хэрэглэгч одоогоор ямар ч сургалтад бүртгүүлээгүй байна."
     );
   } else if (channel === "messenger") {
-    // Messenger's own wording: there's no "log in" here, the account has to be
-    // linked from the website first (see /api/messenger/link).
+    // The account-linking button was taken off the profile page while Facebook
+    // app verification is stuck, so the bot must not send anyone looking for
+    // it. Personal data still lives behind a login on the website — that is
+    // the only instruction that is true right now.
     sections.push(
-      `Энэ Facebook хэрэглэгч gmath.mn эрхтэй холбогдоогүй байна. Хувийн бүртгэл, хичээлийн хуваарь, Facebook групп, Zoom холбоосын талаар асуувал: "${SITE_URL}/profile хуудсанд нэвтэрч, «Messenger-тэй холбох» товчийг дарж холбоно уу" гэж хэлнэ үү. Ерөнхий асуултад хэвийн хариулна уу.`
+      `Энэ Facebook хэрэглэгчийг gmath.mn дээрх бүртгэлтэй нь таних боломжгүй. Хувийн бүртгэл, хичээлийн хуваарь, Facebook групп, Zoom холбоосын талаар асуувал: "Эдгээр мэдээлэл ${SITE_URL}/profile хуудсанд нэвтэрснээр харагдана" гэж хэлнэ үү. Ямар нэг товч дарж холбохыг санал болгож БОЛОХГҮЙ. Ерөнхий асуултад хэвийн хариулна уу.`
     );
   } else {
     sections.push("Хэрэглэгч нэвтрээгүй байна. Хувийн бүртгэлийн талаар асуувал нэвтрэхийг санал болгоно уу.");

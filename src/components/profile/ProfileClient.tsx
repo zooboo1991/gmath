@@ -4,7 +4,6 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import FormField from "@/components/FormField";
 import SchoolAutocomplete from "@/components/SchoolAutocomplete";
-import MessengerLink from "@/components/profile/MessengerLink";
 import PushSettings from "@/components/profile/PushSettings";
 import RecordingPlayer from "@/components/profile/RecordingPlayer";
 import type { Certificate, PublicUser, RegistrationWithGroup } from "@/lib/db";
@@ -152,7 +151,6 @@ export default function ProfileClient({
 
       <div className="wrap pt-5 flex flex-col gap-3">
         <PushSettings />
-        <MessengerLink />
       </div>
 
       <div className="wrap border-b border-line">
