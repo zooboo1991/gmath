@@ -47,7 +47,7 @@ export default function VideoEmbed({ url, title }: { url: string; title: string 
             src={posterFailed ? poster.fallback : poster.best}
             alt=""
             fill
-            sizes="(max-width: 780px) 100vw, 780px"
+            sizes="(max-width: 900px) 100vw, 570px"
             className="object-cover"
             onError={() => setPosterFailed(true)}
             unoptimized

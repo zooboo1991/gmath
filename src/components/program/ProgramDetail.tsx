@@ -148,25 +148,26 @@ export default async function ProgramDetail({
       {parseYouTubeId(yearlyProgram.introVideoUrl) && (
         <section className="section-pad">
           <div className="wrap">
-            <div className="max-w-[780px] mx-auto">
-              <div className="text-center">
-                <span className="inline-flex items-center justify-center gap-2 text-[.76rem] font-extrabold tracking-[.14em] uppercase text-blue-strong before:content-[''] before:w-[22px] before:h-[2px] before:rounded-sm before:bg-gold-strong">
+            {/* Text left, player right on a wide screen; stacked with the text
+                first on a phone, where a 16:9 frame beside a paragraph would
+                leave both too narrow to read. */}
+            <div className="grid grid-cols-1 nav:grid-cols-[.9fr_1.1fr] gap-8 nav:gap-12 items-center max-w-[1040px] mx-auto">
+              <div>
+                <span className="inline-flex items-center gap-2 text-[.76rem] font-extrabold tracking-[.14em] uppercase text-blue-strong before:content-[''] before:w-[22px] before:h-[2px] before:rounded-sm before:bg-gold-strong">
                   Танилцуулга
                 </span>
                 <h2 className="text-[clamp(1.6rem,3vw,2.1rem)] font-extrabold leading-[1.14] tracking-[-.02em] text-ink mt-4 text-balance">
-                  Эцэг эхийн асуултад Б.Ганбат багш хариулж байна
+                  1 жилийн хөтөлбөрийн талаар
                 </h2>
-                <p className="text-ink-2 font-medium mt-3 leading-[1.7] max-w-[54ch] mx-auto">
+                <p className="text-ink-2 font-medium mt-3.5 leading-[1.75] max-w-[46ch]">
                   Хөтөлбөр хэрхэн явагддаг, хүүхэд юу сурах, эцэг эхээс юу шаардагдах талаар
-                  дэлгэрэнгүй.
+                  Б.Ганбат багш эцэг эхийн асуултад дэлгэрэнгүй хариулж байна.
                 </p>
               </div>
-              <div className="mt-[30px]">
-                <VideoEmbed
-                  url={yearlyProgram.introVideoUrl!}
-                  title={`${categoryWord} ангиллын хөтөлбөрийн танилцуулга`}
-                />
-              </div>
+              <VideoEmbed
+                url={yearlyProgram.introVideoUrl!}
+                title={`${categoryWord} ангиллын хөтөлбөрийн танилцуулга`}
+              />
             </div>
           </div>
         </section>
