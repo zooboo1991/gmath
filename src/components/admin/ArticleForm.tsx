@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Article } from "@/lib/db";
 import RichTextEditor from "./RichTextEditor";
+import { apiError, readJson } from "@/lib/fetchJson";
 import { downscaleImage, formatMb, MAX_UPLOAD_BYTES } from "@/lib/imageResize";
 import { IconClose } from "@/components/icons";
 
@@ -22,15 +23,6 @@ type FormState = {
    */
   publishAtLocal: string;
 };
-
-/** Response bodies aren't always JSON — a 413 from the platform is plain text. */
-async function readJson(res: Response): Promise<{ error?: string; url?: string } | null> {
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
 
 /** UTC ISO → the "YYYY-MM-DDTHH:mm" a datetime-local input expects, in local time. */
 function isoToLocalInput(iso?: string): string {
@@ -78,18 +70,19 @@ export default function ArticleForm({ initialArticle }: { initialArticle?: Artic
       const body = new FormData();
       body.append("file", prepared);
       const res = await fetch("/api/admin/upload", { method: "POST", body });
-      const json = await readJson(res);
+      const json = await readJson<{ url: string }>(res);
       if (!res.ok) {
-        // A platform-level rejection has no JSON body; showing the status is
-        // the difference between a fixable message and a mystery.
-        setError(json?.error ?? `Байршуулахад алдаа гарлаа (${res.status})`);
+        // A platform-level rejection has no JSON body; the status is what makes
+        // this a fixable message instead of a mystery.
+        setError(apiError(res, json, `Байршуулахад алдаа гарлаа (${res.status})`));
         return;
       }
-      if (!json?.url) {
+      const url = json.url;
+      if (!url) {
         setError("Байршуулсан зургийн хаяг ирсэнгүй. Дахин оролдоно уу.");
         return;
       }
-      setForm((f) => ({ ...f, coverImage: json.url as string }));
+      setForm((f) => ({ ...f, coverImage: url }));
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
@@ -124,7 +117,7 @@ export default function ArticleForm({ initialArticle }: { initialArticle?: Artic
       });
       const json = await readJson(res);
       if (!res.ok) {
-        setError(json?.error ?? `Хадгалахад алдаа гарлаа (${res.status})`);
+        setError(apiError(res, json, `Хадгалахад алдаа гарлаа (${res.status})`));
         return;
       }
       router.push("/admin/articles");

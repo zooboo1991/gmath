@@ -1,7 +1,14 @@
 import { getPaymentProvider } from "../payment";
 import { getSupabase } from "../supabase";
 import { publicUserFromJoin, type PublicUser } from "../db";
-import { DEFAULT_ASSESSMENT_FEE, DEFAULT_QUIZ_FEE, MAX_PROBLEMS_SHOWN, PROBLEMS_TO_SOLVE, QUIZ_QUESTIONS_PER_TEST } from "./config";
+import {
+  DEFAULT_ASSESSMENT_FEE,
+  DEFAULT_ASSESSMENT_SLA,
+  DEFAULT_QUIZ_FEE,
+  MAX_PROBLEMS_SHOWN,
+  PROBLEMS_TO_SOLVE,
+  QUIZ_QUESTIONS_PER_TEST,
+} from "./config";
 import { estimateLevel } from "./levelEstimator";
 import { nextTargetDifficulty, pickNextProblem } from "./problemPicker";
 import type {
@@ -229,6 +236,11 @@ export async function getAssessmentFee(): Promise<string> {
 
 export async function getQuizFee(): Promise<string> {
   return (await getSetting("quiz_fee")) ?? DEFAULT_QUIZ_FEE;
+}
+
+/** How long the teacher's verdict takes, as shown to parents before they pay. */
+export async function getAssessmentSla(): Promise<string> {
+  return (await getSetting("assessment_sla")) ?? DEFAULT_ASSESSMENT_SLA;
 }
 
 /** The price an assessment of this track starts at. */
@@ -658,6 +670,7 @@ type QuizQuestionRow = {
   choices: string[];
   correct_index: number;
   active: boolean;
+  sample: boolean;
   created_at: string;
 };
 
@@ -681,6 +694,7 @@ function quizQuestionFromRow(row: QuizQuestionRow): QuizQuestion {
     choices: row.choices,
     correctIndex: row.correct_index,
     active: row.active,
+    sample: row.sample,
     createdAt: row.created_at,
   };
 }
@@ -702,18 +716,21 @@ export async function listQuizQuestions(filter?: {
   track?: QuizTrack;
   grade?: number;
   activeOnly?: boolean;
+  /** true = only free samples, false = only paid-test questions, undefined = both. */
+  sample?: boolean;
 }): Promise<QuizQuestion[]> {
   let query = getSupabase().from("quiz_questions").select("*").order("created_at", { ascending: false });
   if (filter?.track) query = query.eq("track", filter.track);
   if (filter?.grade) query = query.eq("grade", filter.grade);
   if (filter?.activeOnly) query = query.eq("active", true);
+  if (filter?.sample !== undefined) query = query.eq("sample", filter.sample);
   const { data, error } = await query;
   if (error) throw error;
   return (data as QuizQuestionRow[]).map(quizQuestionFromRow);
 }
 
 export async function addQuizQuestion(
-  input: Omit<QuizQuestion, "id" | "active" | "createdAt">
+  input: Omit<QuizQuestion, "id" | "active" | "createdAt" | "sample"> & { sample?: boolean }
 ): Promise<QuizQuestion> {
   const { data, error } = await getSupabase()
     .from("quiz_questions")
@@ -724,6 +741,7 @@ export async function addQuizQuestion(
       body_latex: input.bodyLatex,
       choices: input.choices,
       correct_index: input.correctIndex,
+      sample: input.sample ?? false,
     })
     .select("*")
     .single();
@@ -743,6 +761,7 @@ export async function updateQuizQuestion(
   if (input.choices !== undefined) patch.choices = input.choices;
   if (input.correctIndex !== undefined) patch.correct_index = input.correctIndex;
   if (input.active !== undefined) patch.active = input.active;
+  if (input.sample !== undefined) patch.sample = input.sample;
 
   const { data, error } = await getSupabase()
     .from("quiz_questions")
@@ -763,7 +782,8 @@ export async function countQuizQuestionsByGrade(track: QuizTrack): Promise<Recor
     .from("quiz_questions")
     .select("grade")
     .eq("track", track)
-    .eq("active", true);
+    .eq("active", true)
+    .eq("sample", false);
   if (error) throw error;
   const counts: Record<number, number> = {};
   for (const row of data as { grade: number }[]) {
@@ -803,6 +823,9 @@ export async function getOrAssembleQuiz(
     track: assessment.track,
     grade: assessment.quizGrade,
     activeOnly: true,
+    // Never the free taster's questions: a parent who tried those must not be
+    // asked the same five again after paying.
+    sample: false,
   });
   if (bank.length === 0) return { questions: [], answers: [] };
 
@@ -874,7 +897,17 @@ export async function scoreQuiz(
     const isCorrect = q !== undefined && chosenIndex !== null && chosenIndex === q.correctIndex;
     if (isCorrect) score += 1;
     else if (q) wrongTopics.push(q.topic || "бусад");
-    return { id: a.id, chosen_index: chosenIndex, is_correct: isCorrect };
+    // The unchanged columns ride along because an upsert replaces the whole
+    // row; leaving them out would blank `shown_order` and break the ordering
+    // the result page reads back.
+    return {
+      id: a.id,
+      assessment_id: a.assessmentId,
+      question_id: a.questionId,
+      shown_order: a.shownOrder,
+      chosen_index: chosenIndex,
+      is_correct: isCorrect,
+    };
   });
 
   // Claim the assessment first; only the winner writes answer rows.
@@ -894,13 +927,11 @@ export async function scoreQuiz(
     return { scored: false, score: 0, total: answers.length, wrongTopics: [] };
   }
 
-  for (const u of updates) {
-    const { error } = await getSupabase()
-      .from("quiz_answers")
-      .update({ chosen_index: u.chosen_index, is_correct: u.is_correct })
-      .eq("id", u.id);
-    if (error) throw error;
-  }
+  // One round trip for the whole sheet. It used to be one UPDATE per question,
+  // so a 10-question quiz paid ten times the latency and could halt half-marked
+  // if the connection dropped between two of them.
+  const { error: answerError } = await getSupabase().from("quiz_answers").upsert(updates);
+  if (answerError) throw answerError;
 
   return { scored: true, score, total: answers.length, wrongTopics };
 }

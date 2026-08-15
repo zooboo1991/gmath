@@ -711,3 +711,30 @@ alter table chat_messages add constraint chat_messages_role_check
 -- The visitor's widget polls for messages newer than the last one it has.
 create index if not exists chat_messages_conversation_created_idx
   on chat_messages (conversation_id, created_at);
+
+-- ---------------------------------------------------------------------------
+-- Free sample questions + the turnaround promise
+-- ---------------------------------------------------------------------------
+-- A handful of questions per grade that anyone can try without signing in or
+-- paying. Marked rather than kept in a second table so the admin writes them
+-- in the same place; the paid test explicitly excludes them, so the free
+-- sample never gives away a question a paying student will then be asked.
+alter table quiz_questions add column if not exists sample boolean not null default false;
+create index if not exists quiz_questions_sample_idx
+  on quiz_questions (track, grade) where active and sample;
+
+-- How long the teacher's written verdict takes, shown to parents before they
+-- pay. A setting rather than hard-coded copy: it is a promise to a customer,
+-- so the teacher owns its wording.
+insert into app_settings (key, value) values ('assessment_sla', '1-2 хоног')
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Roster lookups by program
+-- ---------------------------------------------------------------------------
+-- Every course/program admin page, the payment roster and notifyNewRecordings
+-- read registrations filtered by program_id alone. The unique index on
+-- (user_id, program_id) cannot serve that — a btree is only usable from its
+-- leading column — so those pages were doing a sequential scan of the whole
+-- table. Cheap now, quietly not cheap once the table has a few thousand rows.
+create index if not exists registrations_program_id_idx on registrations (program_id);

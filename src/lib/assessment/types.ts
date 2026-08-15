@@ -151,11 +151,16 @@ export type QuizQuestion = {
   /** Admin-only. Never include this in a response sent to a student. */
   correctIndex: number;
   active: boolean;
+  /**
+   * Free sample: anyone can try it without signing in or paying, and the paid
+   * test never serves it — so the taster can't spoil a real attempt.
+   */
+  sample: boolean;
   createdAt: string;
 };
 
 /** The shape a student is allowed to see — correctIndex deliberately absent. */
-export type PublicQuizQuestion = Omit<QuizQuestion, "correctIndex" | "active" | "createdAt">;
+export type PublicQuizQuestion = Omit<QuizQuestion, "correctIndex" | "active" | "sample" | "createdAt">;
 
 export function toPublicQuizQuestion(q: QuizQuestion): PublicQuizQuestion {
   return { id: q.id, track: q.track, grade: q.grade, topic: q.topic, bodyLatex: q.bodyLatex, choices: q.choices };

@@ -4,7 +4,9 @@ const MAX_BODY = 2000;
 const MAX_CHOICE = 400;
 const MAX_TOPIC = 100;
 
-export type QuizQuestionInput = Omit<QuizQuestion, "id" | "active" | "createdAt">;
+export type QuizQuestionInput = Omit<QuizQuestion, "id" | "active" | "createdAt" | "sample"> & {
+  sample: boolean;
+};
 
 /**
  * One validator for both the create and edit routes, so the rules can't
@@ -47,6 +49,14 @@ export function validateQuizQuestionInput(
 
   return {
     ok: true,
-    value: { track: track as QuizTrack, grade, topic, bodyLatex: body, choices, correctIndex },
+    value: {
+      track: track as QuizTrack,
+      grade,
+      topic,
+      bodyLatex: body,
+      choices,
+      correctIndex,
+      sample: d.sample === true,
+    },
   };
 }

@@ -1,9 +1,11 @@
 "use client";
 
+import { apiError, readJson } from "@/lib/fetchJson";
+import { formatMb, MAX_UPLOAD_BYTES } from "@/lib/imageResize";
 import { useMemo, useRef, useState } from "react";
 import type { Certificate } from "@/lib/db";
 import { formatCourseDate } from "@/lib/courseDate";
-import { FILTER_INPUT_CLASS } from "@/components/admin/panels/shared";
+import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
 const emptyCertForm = {
   certificateNumber: "",
@@ -73,15 +75,16 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setFormError(json.error ?? "Хадгалахад алдаа гарлаа");
+      const json = await readJson<{ certificate: Certificate }>(res);
+      const saved = json.certificate;
+      if (!res.ok || !saved) {
+        setFormError(apiError(res, json, "Хадгалахад алдаа гарлаа"));
         return;
       }
       if (editingId) {
-        setCertificates((cs) => cs.map((c) => (c.id === editingId ? json.certificate : c)));
+        setCertificates((cs) => cs.map((c) => (c.id === editingId ? saved : c)));
       } else {
-        setCertificates((cs) => [json.certificate, ...cs]);
+        setCertificates((cs) => [saved, ...cs]);
       }
       closeForm();
     } catch {
@@ -96,18 +99,25 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
     setError(null);
     setResult(null);
     try {
+      if (file.size > MAX_UPLOAD_BYTES) {
+        setError(
+          `Файл хэт том байна (${formatMb(file.size)}). ${formatMb(MAX_UPLOAD_BYTES)}-ээс бага файл оруулна уу.`
+        );
+        return;
+      }
+
       const body = new FormData();
       body.append("file", file);
       const res = await fetch("/api/admin/certificates", { method: "POST", body });
-      const json = await res.json();
+      const json = await readJson<{ imported: number; skipped: { row: number; reason: string }[] }>(res);
       if (!res.ok) {
-        setError(json.error ?? "Импорт хийхэд алдаа гарлаа");
+        setError(apiError(res, json, "Импорт хийхэд алдаа гарлаа"));
         return;
       }
-      setResult({ imported: json.imported, skipped: json.skipped });
+      setResult({ imported: json.imported ?? 0, skipped: json.skipped ?? [] });
       const listRes = await fetch("/api/admin/certificates");
-      const listJson = await listRes.json();
-      if (listRes.ok) setCertificates(listJson.certificates);
+      const listJson = await readJson<{ certificates: Certificate[] }>(listRes);
+      if (listRes.ok && listJson.certificates) setCertificates(listJson.certificates);
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
@@ -194,7 +204,7 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
                 required
                 value={form.certificateNumber}
                 onChange={(e) => setForm((f) => ({ ...f, certificateNumber: e.target.value }))}
-                className={FILTER_INPUT_CLASS}
+                className={INPUT_CLASS}
               />
             </label>
             <label className="flex flex-col gap-1.5">
@@ -204,7 +214,7 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
                 required
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                className={FILTER_INPUT_CLASS}
+                className={INPUT_CLASS}
               />
             </label>
             <label className="flex flex-col gap-1.5">
@@ -214,7 +224,7 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
                 required
                 value={form.lastName}
                 onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
-                className={FILTER_INPUT_CLASS}
+                className={INPUT_CLASS}
               />
             </label>
             <label className="flex flex-col gap-1.5">
@@ -224,7 +234,7 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
                 required
                 value={form.firstName}
                 onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
-                className={FILTER_INPUT_CLASS}
+                className={INPUT_CLASS}
               />
             </label>
             <label className="flex flex-col gap-1.5">
@@ -234,7 +244,7 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
                 required
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                className={FILTER_INPUT_CLASS}
+                className={INPUT_CLASS}
               />
             </label>
             <label className="flex flex-col gap-1.5">
@@ -244,7 +254,7 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
                 required
                 value={form.course}
                 onChange={(e) => setForm((f) => ({ ...f, course: e.target.value }))}
-                className={FILTER_INPUT_CLASS}
+                className={INPUT_CLASS}
               />
             </label>
             <label className="flex flex-col gap-1.5">
@@ -254,7 +264,7 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
                 required
                 value={form.issuedDate}
                 onChange={(e) => setForm((f) => ({ ...f, issuedDate: e.target.value }))}
-                className={FILTER_INPUT_CLASS}
+                className={INPUT_CLASS}
               />
             </label>
           </div>
@@ -289,7 +299,7 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
             placeholder="Дугаар эсвэл нэрээр хайх"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className={`${FILTER_INPUT_CLASS} max-w-[260px]`}
+            className={`${INPUT_CLASS} max-w-[260px]`}
           />
           {!formOpen && (
             <button

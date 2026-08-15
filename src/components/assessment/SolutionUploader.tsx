@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import MathText from "@/components/assessment/MathText";
-import { compressImage } from "@/lib/assessment/compressImage";
 import { MAX_SOLUTION_IMAGES_PER_PROBLEM } from "@/lib/assessment/config";
+import { apiError, readJson } from "@/lib/fetchJson";
+import { downscaleImage } from "@/lib/imageResize";
 import type { PublicProblem } from "@/lib/assessment/types";
 
 type ChosenProblem = { problem: PublicProblem | null; imageUrls: string[] };
@@ -24,14 +25,14 @@ export default function SolutionUploader({ assessmentId }: { assessmentId: strin
     (async () => {
       try {
         const res = await fetch(`/api/assessment/${assessmentId}/solutions`);
-        const json = await res.json();
+        const json = await readJson<{ chosen: ChosenProblem[]; status: string }>(res);
         if (cancelled) return;
         if (!res.ok) {
-          setError(json.error ?? "Ачаалахад алдаа гарлаа");
+          setError(apiError(res, json, "Ачаалахад алдаа гарлаа"));
           return;
         }
-        setChosen(json.chosen);
-        setStatus(json.status);
+        setChosen(json.chosen ?? []);
+        setStatus(json.status ?? "");
       } catch {
         if (!cancelled) setError("Сүлжээний алдаа гарлаа.");
       }
@@ -50,17 +51,19 @@ export default function SolutionUploader({ assessmentId }: { assessmentId: strin
       // Shrink on the phone before sending — a raw camera photo is usually
       // several MB and would be rejected by the server limit.
       for (const file of Array.from(files)) {
-        body.append("files", await compressImage(file));
+        body.append("files", await downscaleImage(file));
       }
       const res = await fetch(`/api/assessment/${assessmentId}/solutions`, { method: "POST", body });
-      const json = await res.json();
+      const json = await readJson<{ imageUrls: string[] }>(res);
       if (!res.ok) {
-        setError(json.error ?? "Байршуулахад алдаа гарлаа");
+        setError(apiError(res, json, "Байршуулахад алдаа гарлаа"));
         return;
       }
       setChosen((cs) =>
         cs
-          ? cs.map((c) => (c.problem?.id === problemId ? { ...c, imageUrls: json.imageUrls } : c))
+          ? cs.map((c) =>
+              c.problem?.id === problemId ? { ...c, imageUrls: json.imageUrls ?? c.imageUrls } : c
+            )
           : cs
       );
     } catch {
@@ -75,9 +78,9 @@ export default function SolutionUploader({ assessmentId }: { assessmentId: strin
     setError(null);
     try {
       const res = await fetch(`/api/assessment/${assessmentId}/submit`, { method: "POST" });
-      const json = await res.json();
+      const json = await readJson(res);
       if (!res.ok) {
-        setError(json.error ?? "Илгээхэд алдаа гарлаа");
+        setError(apiError(res, json, "Илгээхэд алдаа гарлаа"));
         return;
       }
       router.push("/profile/assessment");

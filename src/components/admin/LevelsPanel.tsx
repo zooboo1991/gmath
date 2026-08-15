@@ -4,9 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Level } from "@/lib/assessment/types";
 import type { Course } from "@/lib/db";
+import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
-const INPUT_CLASS =
-  "w-full px-3.5 py-2.5 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.88rem] focus:outline-none focus:border-blue focus:bg-surface";
 
 export default function LevelsPanel({
   initialLevels,

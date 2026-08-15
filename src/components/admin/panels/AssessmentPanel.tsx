@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { FILTER_INPUT_CLASS } from "@/components/admin/panels/shared";
+import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
 export default function AssessmentPanel({
   initialFee,
   initialQuizFee,
+  initialSla,
 }: {
   initialFee: string;
   initialQuizFee: string;
+  initialSla: string;
 }) {
   const cards = [
     {
@@ -36,7 +38,7 @@ export default function AssessmentPanel({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <FeeCard
           title="Олимпиадын үнэлгээний төлбөр"
           text="Багш бодолтыг гардан шалгадаг төрлийн үнэ."
@@ -50,6 +52,13 @@ export default function AssessmentPanel({
           settingKey="quiz_fee"
           initialValue={initialQuizFee}
           placeholder="10,000₮"
+        />
+        <FeeCard
+          title="Хариу гарах хугацаа"
+          text="Төлбөр төлөхийн өмнө эцэг эхэд амлаж буй хугацаа. Олимпиадын төрөлд харагдана."
+          settingKey="assessment_sla"
+          initialValue={initialSla}
+          placeholder="1-2 хоног"
         />
       </div>
 
@@ -126,7 +135,7 @@ function FeeCard({
             setSaved(false);
           }}
           placeholder={placeholder}
-          className={`${FILTER_INPUT_CLASS} max-w-[200px]`}
+          className={`${INPUT_CLASS} max-w-[200px]`}
         />
         <button
           type="button"

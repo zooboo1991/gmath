@@ -1,18 +1,25 @@
 import { NextResponse } from "next/server";
-import { getAssessmentFee, getQuizFee, setSetting } from "@/lib/assessment/db";
+import { getAssessmentFee, getAssessmentSla, getQuizFee, setSetting } from "@/lib/assessment/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { isFullAdmin } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 
 /** Only keys listed here can be written, so the endpoint can't set anything. */
-const EDITABLE_KEYS = new Set(["assessment_fee", "quiz_fee"]);
+const EDITABLE_KEYS = new Set(["assessment_fee", "quiz_fee", "assessment_sla"]);
 
 export async function GET() {
   if (!(await isFullAdmin())) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
-  const [assessmentFee, quizFee] = await Promise.all([getAssessmentFee(), getQuizFee()]);
-  return NextResponse.json({ ok: true, settings: { assessment_fee: assessmentFee, quiz_fee: quizFee } });
+  const [assessmentFee, quizFee, sla] = await Promise.all([
+    getAssessmentFee(),
+    getQuizFee(),
+    getAssessmentSla(),
+  ]);
+  return NextResponse.json({
+    ok: true,
+    settings: { assessment_fee: assessmentFee, quiz_fee: quizFee, assessment_sla: sla },
+  });
 }
 
 export async function PUT(request: Request) {

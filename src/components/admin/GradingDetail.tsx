@@ -6,9 +6,8 @@ import { useState } from "react";
 import MathText from "@/components/assessment/MathText";
 import type { GradingDetail as Detail } from "@/lib/assessment/gradingDetail";
 import type { Level } from "@/lib/assessment/types";
+import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
-const INPUT =
-  "w-full px-3.5 py-2.5 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.88rem] focus:outline-none focus:border-blue focus:bg-surface";
 const CARD = "bg-surface border border-line rounded-md shadow-xs px-[20px] py-[18px]";
 
 const ACTION_LABEL: Record<string, string> = {
@@ -201,7 +200,7 @@ export default function GradingDetail({ detail, levels }: { detail: Detail; leve
               rows={5}
               disabled={done}
               placeholder="Хүчтэй тал, сул тал, юун дээр анхаарах вэ…"
-              className={`${INPUT} resize-y disabled:opacity-60`}
+              className={`${INPUT_CLASS} resize-y disabled:opacity-60`}
             />
           </label>
 
@@ -211,7 +210,7 @@ export default function GradingDetail({ detail, levels }: { detail: Detail; leve
               value={finalLevel}
               onChange={(e) => setFinalLevel(e.target.value)}
               disabled={done}
-              className={`${INPUT} disabled:opacity-60`}
+              className={`${INPUT_CLASS} disabled:opacity-60`}
             >
               <option value="">— Түвшин сонгоно уу —</option>
               {levels.map((l) => (
@@ -355,7 +354,7 @@ function SolutionCard({
               value={score}
               onChange={(e) => setScore(e.target.value)}
               disabled={done}
-              className={`${INPUT} disabled:opacity-60`}
+              className={`${INPUT_CLASS} disabled:opacity-60`}
             />
           </label>
           <label className="flex flex-col gap-1.5">
@@ -366,7 +365,7 @@ function SolutionCard({
               onChange={(e) => setComment(e.target.value)}
               disabled={done}
               placeholder="Алдаа хаана гарсан бэ"
-              className={`${INPUT} disabled:opacity-60`}
+              className={`${INPUT_CLASS} disabled:opacity-60`}
             />
           </label>
           {!done && (

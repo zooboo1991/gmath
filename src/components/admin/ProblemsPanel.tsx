@@ -5,9 +5,10 @@ import { useMemo, useState } from "react";
 import MathText from "@/components/assessment/MathText";
 import { IconClose } from "@/components/icons";
 import type { Problem } from "@/lib/assessment/types";
+import { apiError, readJson } from "@/lib/fetchJson";
+import { downscaleImage, formatMb, MAX_UPLOAD_BYTES } from "@/lib/imageResize";
+import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
-const INPUT_CLASS =
-  "w-full px-3.5 py-2.5 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.88rem] focus:outline-none focus:border-blue focus:bg-surface";
 
 const emptyForm = {
   level: 1,
@@ -72,12 +73,22 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
     setUploading(true);
     setError(null);
     try {
+      // A photographed olympiad problem comes off a phone at several MB and
+      // would be rejected by the platform before the route ever sees it.
+      const prepared = await downscaleImage(file);
+      if (prepared.size > MAX_UPLOAD_BYTES) {
+        setError(
+          `Зураг хэт том байна (${formatMb(prepared.size)}). ${formatMb(MAX_UPLOAD_BYTES)}-ээс бага зураг оруулна уу.`
+        );
+        return;
+      }
+
       const body = new FormData();
-      body.append("file", file);
+      body.append("file", prepared);
       const res = await fetch("/api/admin/problems/upload", { method: "POST", body });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Байршуулахад алдаа гарлаа");
+      const json = await readJson<{ url: string }>(res);
+      if (!res.ok || !json.url) {
+        setError(apiError(res, json, "Байршуулахад алдаа гарлаа"));
         return;
       }
       setField("imageUrl", json.url);
@@ -101,13 +112,14 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Хадгалахад алдаа гарлаа");
+      const json = await readJson<{ problem: Problem }>(res);
+      const saved = json.problem;
+      if (!res.ok || !saved) {
+        setError(apiError(res, json, "Хадгалахад алдаа гарлаа"));
         return;
       }
       setProblems((ps) =>
-        editingId ? ps.map((p) => (p.id === editingId ? json.problem : p)) : [json.problem, ...ps]
+        editingId ? ps.map((p) => (p.id === editingId ? saved : p)) : [saved, ...ps]
       );
       closeForm();
     } catch {
@@ -138,8 +150,9 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active: true }),
       });
-      const json = await res.json();
-      if (res.ok) setProblems((ps) => ps.map((p) => (p.id === problem.id ? json.problem : p)));
+      const json = await readJson<{ problem: Problem }>(res);
+      const saved = json.problem;
+      if (res.ok && saved) setProblems((ps) => ps.map((p) => (p.id === problem.id ? saved : p)));
     } finally {
       setBusyId(null);
     }

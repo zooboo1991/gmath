@@ -5,9 +5,8 @@ import { useMemo, useState } from "react";
 import MathText from "@/components/assessment/MathText";
 import { IconArrowLeft } from "@/components/icons";
 import type { QuizQuestion, QuizTrack } from "@/lib/assessment/types";
+import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
-const INPUT_CLASS =
-  "w-full px-3.5 py-2.5 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.88rem] focus:outline-none focus:border-blue focus:bg-surface";
 
 const GRADES = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -18,6 +17,7 @@ const emptyForm = {
   bodyLatex: "",
   choices: ["", "", "", ""],
   correctIndex: 0,
+  sample: false,
 };
 
 type FormState = typeof emptyForm;
@@ -30,6 +30,7 @@ function toForm(q: QuizQuestion): FormState {
     bodyLatex: q.bodyLatex,
     choices: [...q.choices],
     correctIndex: q.correctIndex,
+    sample: q.sample,
   };
 }
 
@@ -48,6 +49,7 @@ export default function QuizQuestionsPanel({ initialQuestions }: { initialQuesti
   const [busyId, setBusyId] = useState<string | null>(null);
   const [trackFilter, setTrackFilter] = useState<"all" | QuizTrack>("all");
   const [gradeFilter, setGradeFilter] = useState("all");
+  const [kindFilter, setKindFilter] = useState<"all" | "paid" | "sample">("all");
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -57,16 +59,17 @@ export default function QuizQuestionsPanel({ initialQuestions }: { initialQuesti
       questions.filter(
         (q) =>
           (trackFilter === "all" || q.track === trackFilter) &&
-          (gradeFilter === "all" || q.grade === Number(gradeFilter))
+          (gradeFilter === "all" || q.grade === Number(gradeFilter)) &&
+          (kindFilter === "all" || (kindFilter === "sample" ? q.sample : !q.sample))
       ),
-    [questions, trackFilter, gradeFilter]
+    [questions, trackFilter, gradeFilter, kindFilter]
   );
 
   /** Active-question counts per (track, grade), so thin grades are visible at a glance. */
   const coverage = useMemo(() => {
     const map = new Map<string, number>();
     for (const q of questions) {
-      if (!q.active) continue;
+      if (!q.active || q.sample) continue;
       const key = `${q.track}:${q.grade}`;
       map.set(key, (map.get(key) ?? 0) + 1);
     }
@@ -246,6 +249,22 @@ export default function QuizQuestionsPanel({ initialQuestions }: { initialQuesti
             Дугуй товчоор зөв хариултаа тэмдэглэнэ. Зөв хариулт сурагчид хэзээ ч илгээгддэггүй.
           </p>
 
+          <label className="flex items-start gap-2.5 mt-4 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.sample}
+              onChange={(e) => setField("sample", e.target.checked)}
+              className="w-4 h-4 mt-0.5 shrink-0"
+            />
+            <span>
+              <b className="font-extrabold text-[.9rem] block">Үнэгүй жишээ асуулт</b>
+              <span className="text-ink-3 font-semibold text-[.82rem]">
+                Түвшин тогтоох хуудсанд бүртгэлгүй хүнд харагдана. Төлбөртэй тестэд ОРОХГҮЙ —
+                тиймээс туршсан хүнд дахин ижил асуулт таарахгүй. Анги тус бүрд 5 асуулт хангалттай.
+              </span>
+            </span>
+          </label>
+
           {error && <p className="text-red-soft font-semibold text-[.88rem] mt-3">{error}</p>}
 
           <div className="flex gap-2.5 mt-4">
@@ -290,6 +309,15 @@ export default function QuizQuestionsPanel({ initialQuestions }: { initialQuesti
             </option>
           ))}
         </select>
+        <select
+          value={kindFilter}
+          onChange={(e) => setKindFilter(e.target.value as "all" | "paid" | "sample")}
+          className={`${INPUT_CLASS} max-w-[190px]`}
+        >
+          <option value="all">Бүгд</option>
+          <option value="paid">Төлбөртэй тестийнх</option>
+          <option value="sample">Үнэгүй жишээ</option>
+        </select>
         <span className="text-[.85rem] font-bold text-ink-3 self-center">
           {filtered.length} асуулт
           {trackFilter !== "all" && gradeFilter !== "all" && (
@@ -317,6 +345,9 @@ export default function QuizQuestionsPanel({ initialQuestions }: { initialQuesti
                   </span>
                   <span className="text-ink-2 bg-surface-2 px-2 py-0.5 rounded-full">{q.grade}-р анги</span>
                   {q.topic && <span className="text-ink-3">{q.topic}</span>}
+                  {q.sample && (
+                    <span className="text-green bg-green-soft px-2 py-0.5 rounded-full">Үнэгүй жишээ</span>
+                  )}
                   {!q.active && <span className="text-red-soft">Архивласан</span>}
                 </div>
                 <div className="font-bold text-[.95rem] mt-2 leading-[1.6]">

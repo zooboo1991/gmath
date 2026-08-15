@@ -11,7 +11,7 @@ import type {
   YearlyProgram,
 } from "@/lib/db";
 import { programAdminHref } from "@/lib/registration";
-import { FILTER_INPUT_CLASS } from "@/components/admin/panels/shared";
+import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
 const TARGET_LABELS: Record<NotificationTargetType, string> = {
   all: "Бүх хэрэглэгч",
@@ -159,14 +159,14 @@ export default function NotificationsPanel({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Гарчиг"
-            className={FILTER_INPUT_CLASS}
+            className={INPUT_CLASS}
           />
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Текст"
             rows={4}
-            className={`${FILTER_INPUT_CLASS} resize-y`}
+            className={`${INPUT_CLASS} resize-y`}
           />
 
           <div className="flex items-center gap-3 flex-wrap">
@@ -222,7 +222,7 @@ export default function NotificationsPanel({
             <select
               value={targetCourseId}
               onChange={(e) => setTargetCourseId(e.target.value)}
-              className={FILTER_INPUT_CLASS}
+              className={INPUT_CLASS}
             >
               <option value="">Сургалт сонгох</option>
               {courseOptions.map((c) => (
@@ -239,7 +239,7 @@ export default function NotificationsPanel({
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
                 placeholder="Нэр, утасны дугаараар хайх"
-                className={FILTER_INPUT_CLASS}
+                className={INPUT_CLASS}
               />
               <div className="mt-2 max-h-[240px] overflow-y-auto border border-line-2 rounded-xs">
                 {filteredUsers.length === 0 && (

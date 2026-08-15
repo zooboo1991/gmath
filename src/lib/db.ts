@@ -1912,15 +1912,22 @@ export async function notifyNewRecordings(
   const userIds = [...new Set(registrations.filter((r) => r.status === "active" && r.userId).map((r) => r.userId!))];
   if (userIds.length === 0) return;
 
-  for (const lesson of newlyRecorded) {
-    await createNotification({
-      title: "Хичээлийн бичлэг орлоо",
-      body: `"${programLabel}" — "${lesson.topic}" хичээлийн бичлэг нэмэгдлээ.`,
-      targetType: "users",
-      userIds,
-      channel: "site",
-    });
-  }
+  // One notification for the whole save, not one per lesson: an admin who
+  // pastes a term's worth of links in a single sitting would otherwise send
+  // every student eight separate alerts (and eight push messages) at once.
+  const topics = newlyRecorded.map((l) => l.topic).filter(Boolean);
+  const body =
+    topics.length === 1
+      ? `"${programLabel}" — "${topics[0]}" хичээлийн бичлэг нэмэгдлээ.`
+      : `"${programLabel}" — ${newlyRecorded.length} хичээлийн бичлэг нэмэгдлээ: ${topics.join(", ")}.`;
+
+  await createNotification({
+    title: "Хичээлийн бичлэг орлоо",
+    body,
+    targetType: "users",
+    userIds,
+    channel: "site",
+  });
 }
 
 /**

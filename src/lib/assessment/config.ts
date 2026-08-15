@@ -23,6 +23,12 @@ export const DEFAULT_QUIZ_FEE = "10,000₮";
 /** Questions per quiz attempt. Fewer are served when the bank is thin, never zero. */
 export const QUIZ_QUESTIONS_PER_TEST = 10;
 
+/** Questions in the free, sign-in-free taster. Short enough to finish standing up. */
+export const SAMPLE_QUESTIONS_PER_TEST = 5;
+
+/** Used when app_settings has no assessment_sla row yet. */
+export const DEFAULT_ASSESSMENT_SLA = "1-2 хоног";
+
 /** Upload limits for the handwritten solution photos. */
 export const MAX_SOLUTION_IMAGES_PER_PROBLEM = 3;
 export const MAX_SOLUTION_IMAGE_BYTES = 5 * 1024 * 1024;

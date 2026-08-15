@@ -1,17 +1,11 @@
 "use client";
 
-/** Same rule the server uses (lib/bunny.ts) — a bare GUID or a mediadelivery.net link. */
-function isBunnyRecording(value: string): boolean {
-  const v = value.trim();
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return true;
-  return /mediadelivery\.net/i.test(v) && /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(v);
-}
-
 import { useState } from "react";
 import type { Lesson } from "@/lib/db";
 import { IconClose } from "@/components/icons";
 import { getWeekdayNameMn } from "@/lib/courseDate";
 import { buildScheduleString, parseScheduleString } from "@/lib/lessonSchedule";
+import { parseBunnyVideoId } from "@/lib/bunnyVideo";
 
 type AttendanceRow = { lastName: string; firstName: string; phone: string; joinedAt: string; leftAt?: string };
 
@@ -206,7 +200,7 @@ export default function LessonScheduleEditor({
                       get before they save, instead of finding out from a
                       student. */}
                   {lesson.recordingLink?.trim() ? (
-                    isBunnyRecording(lesson.recordingLink) ? (
+                    parseBunnyVideoId(lesson.recordingLink) ? (
                       <span className="text-[.75rem] font-extrabold text-green">
                         ✓ Bunny — сайт дээрээ тоглоно
                       </span>

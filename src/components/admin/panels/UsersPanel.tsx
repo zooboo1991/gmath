@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { PublicUser, Registration } from "@/lib/db";
-import { FILTER_INPUT_CLASS } from "@/components/admin/panels/shared";
+import { INPUT_CLASS } from "@/components/admin/panels/shared";
 import { compareMn } from "@/lib/sortMn";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
@@ -125,7 +125,7 @@ export default function UsersPanel({
                 value={newPhone}
                 onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, "").slice(0, 8))}
                 placeholder="99XXXXXX"
-                className={FILTER_INPUT_CLASS}
+                className={INPUT_CLASS}
               />
               {addErrors.phone && <span className="text-[.78rem] font-semibold text-red-soft">{addErrors.phone}</span>}
             </label>
@@ -136,7 +136,7 @@ export default function UsersPanel({
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Том, жижиг үсэг, тоо, 6+ тэмдэгт"
-                className={FILTER_INPUT_CLASS}
+                className={INPUT_CLASS}
               />
               {addErrors.password && (
                 <span className="text-[.78rem] font-semibold text-red-soft">{addErrors.password}</span>
@@ -144,7 +144,7 @@ export default function UsersPanel({
             </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-[.8rem] font-extrabold text-ink-3">Төрөл</span>
-              <select value={newRole} onChange={(e) => setNewRole(e.target.value as "student" | "teacher")} className={FILTER_INPUT_CLASS}>
+              <select value={newRole} onChange={(e) => setNewRole(e.target.value as "student" | "teacher")} className={INPUT_CLASS}>
                 <option value="student">Сурагч</option>
                 <option value="teacher">Багш</option>
               </select>
@@ -179,23 +179,23 @@ export default function UsersPanel({
           placeholder="Нэрээр хайх"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className={FILTER_INPUT_CLASS}
+          className={INPUT_CLASS}
         />
         <input
           type="text"
           placeholder="Утасны дугаараар хайх"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          className={FILTER_INPUT_CLASS}
+          className={INPUT_CLASS}
         />
         <input
           type="text"
           placeholder="Имэйлээр хайх"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className={FILTER_INPUT_CLASS}
+          className={INPUT_CLASS}
         />
-        <select value={school} onChange={(e) => setSchool(e.target.value)} className={FILTER_INPUT_CLASS}>
+        <select value={school} onChange={(e) => setSchool(e.target.value)} className={INPUT_CLASS}>
           <option value="">Бүх сургууль</option>
           {schools.map((s) => (
             <option key={s} value={s}>
@@ -206,7 +206,7 @@ export default function UsersPanel({
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as "" | "teacher" | "student")}
-          className={FILTER_INPUT_CLASS}
+          className={INPUT_CLASS}
         >
           <option value="">Бүх төрөл</option>
           <option value="student">Сурагч</option>

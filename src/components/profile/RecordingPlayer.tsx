@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { IconClose, IconPlay } from "@/components/icons";
+import { apiError, readJson } from "@/lib/fetchJson";
 
 /**
  * "Бичлэг үзэх" that keeps the student on gmath.mn.
@@ -34,9 +35,9 @@ export default function RecordingPlayer({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ courseId, lessonIndex }),
       });
-      const json = await res.json();
+      const json = await readJson<{ url: string; external: boolean }>(res);
       if (!res.ok || !json.url) {
-        setError(json.error ?? "Бичлэг нээхэд алдаа гарлаа");
+        setError(apiError(res, json, "Бичлэг нээхэд алдаа гарлаа"));
         return;
       }
       if (json.external) {

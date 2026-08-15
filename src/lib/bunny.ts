@@ -16,35 +16,16 @@ import { createHash } from "crypto";
  *      stops working within hours rather than being shareable forever.
  * Both matter: without (1) anyone could ask for any video, and without (2) one
  * paying student could hand the link to a group chat.
+ *
+ * Recognising a Bunny link lives in `bunnyVideo.ts` instead, because the admin
+ * lesson editor needs the same rule in the browser and this module cannot go
+ * there — it imports node's `crypto`.
  */
 
-/** 8-4-4-4-12 hex, the shape of a Bunny video GUID. */
-const GUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+export { parseBunnyVideoId } from "./bunnyVideo";
 
 export function bunnyConfigured(): boolean {
   return Boolean(process.env.BUNNY_STREAM_LIBRARY_ID && process.env.BUNNY_STREAM_TOKEN_KEY);
-}
-
-/**
- * Pulls a video GUID out of whatever the teacher pasted: a bare GUID, a player
- * URL, or a whole `<iframe …>` block copied from the dashboard. Returns null
- * for anything that isn't a Bunny video — a Drive or YouTube link included,
- * which is how the caller decides whether to render the embedded player.
- */
-export function parseBunnyVideoId(value: string | undefined | null): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-
-  // A bare GUID is the whole value, not just a substring of some other URL.
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
-    return trimmed.toLowerCase();
-  }
-
-  // Otherwise it must look like a Bunny player link before a GUID inside it
-  // means anything — a Drive URL can contain hex that resembles one.
-  if (!/mediadelivery\.net/i.test(trimmed)) return null;
-  const match = trimmed.match(GUID_RE);
-  return match ? match[0].toLowerCase() : null;
 }
 
 /** Default lifetime of a playback URL. Long enough to watch a lesson twice, short enough that a leaked link dies the same day. */
