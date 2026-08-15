@@ -144,9 +144,14 @@ export default async function ProgramDetail({
       {/* Parent Q&A video. Directly under the hero because a parent who has
           just read the pitch is exactly who watches it — and it answers, once,
           the questions that otherwise arrive one phone call at a time. No
-          link, no section. */}
+          link, no section.
+
+          Deliberately not `section-pad`: this block reads as part of the hero,
+          and a full section's padding on both sides of a short two-column row
+          left a screenful of empty space before "Тухай". The gap below it is
+          the next section's own top padding. */}
       {parseYouTubeId(yearlyProgram.introVideoUrl) && (
-        <section className="section-pad">
+        <section className="pt-[clamp(44px,6vw,76px)]">
           <div className="wrap">
             {/* Text left, player right on a wide screen; stacked with the text
                 first on a phone, where a 16:9 frame beside a paragraph would
