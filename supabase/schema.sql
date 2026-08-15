@@ -738,3 +738,12 @@ on conflict (key) do nothing;
 -- leading column — so those pages were doing a sequential scan of the whole
 -- table. Cheap now, quietly not cheap once the table has a few thousand rows.
 create index if not exists registrations_program_id_idx on registrations (program_id);
+
+-- ---------------------------------------------------------------------------
+-- Хөтөлбөрийн танилцуулга бичлэг
+-- ---------------------------------------------------------------------------
+-- A public marketing video (the teacher's parent Q&A session) shown on the
+-- yearly programme's own page. A column rather than hard-coded markup because
+-- the teacher swaps the video far more often than we deploy — and C and D want
+-- different ones. Any YouTube link/ID; empty means the section is not rendered.
+alter table yearly_programs add column if not exists intro_video_url text;

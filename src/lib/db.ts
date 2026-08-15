@@ -126,6 +126,8 @@ export type YearlyProgram = {
   zoomPasscode?: string;
   lessons: Lesson[];
   showOnHomepage: boolean;
+  /** Public YouTube link for this programme page's intro video. */
+  introVideoUrl?: string;
 };
 
 export type Article = {
@@ -236,6 +238,7 @@ type YearlyProgramRow = {
   zoom_passcode: string | null;
   lessons: Lesson[] | null;
   show_on_homepage: boolean;
+  intro_video_url: string | null;
 };
 
 type ArticleRow = {
@@ -335,6 +338,7 @@ function yearlyProgramFromRow(row: YearlyProgramRow): YearlyProgram {
     zoomPasscode: row.zoom_passcode ?? undefined,
     lessons: row.lessons ?? [],
     showOnHomepage: row.show_on_homepage,
+    introVideoUrl: row.intro_video_url ?? undefined,
   };
 }
 
@@ -736,6 +740,7 @@ export async function updateYearlyProgram(
   if (input.zoomPasscode !== undefined) patch.zoom_passcode = input.zoomPasscode || null;
   if (input.lessons !== undefined) patch.lessons = input.lessons;
   if (input.showOnHomepage !== undefined) patch.show_on_homepage = input.showOnHomepage;
+  if (input.introVideoUrl !== undefined) patch.intro_video_url = input.introVideoUrl || null;
   patch.updated_at = new Date().toISOString();
 
   const { data, error } = await getSupabase()

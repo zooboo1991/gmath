@@ -4,6 +4,8 @@ import Reveal from "@/components/Reveal";
 import { RegisterTriggerButton } from "./ProgramRegister";
 import { findYearlyProgramById } from "@/lib/db";
 import { IconTrophy, IconPerson, IconClock, IconPlayBox, IconCheckCircle, IconPeopleHero, IconGraduationCap, IconGrid, IconDocument } from "@/components/icons";
+import VideoEmbed from "@/components/VideoEmbed";
+import { parseYouTubeId } from "@/lib/youtube";
 
 const whyItems = [
   {
@@ -138,6 +140,37 @@ export default async function ProgramDetail({
           </div>
         </div>
       </section>
+
+      {/* Parent Q&A video. Directly under the hero because a parent who has
+          just read the pitch is exactly who watches it — and it answers, once,
+          the questions that otherwise arrive one phone call at a time. No
+          link, no section. */}
+      {parseYouTubeId(yearlyProgram.introVideoUrl) && (
+        <section className="section-pad">
+          <div className="wrap">
+            <div className="max-w-[780px] mx-auto">
+              <div className="text-center">
+                <span className="inline-flex items-center justify-center gap-2 text-[.76rem] font-extrabold tracking-[.14em] uppercase text-blue-strong before:content-[''] before:w-[22px] before:h-[2px] before:rounded-sm before:bg-gold-strong">
+                  Танилцуулга
+                </span>
+                <h2 className="text-[clamp(1.6rem,3vw,2.1rem)] font-extrabold leading-[1.14] tracking-[-.02em] text-ink mt-4 text-balance">
+                  Эцэг эхийн асуултад Б.Ганбат багш хариулж байна
+                </h2>
+                <p className="text-ink-2 font-medium mt-3 leading-[1.7] max-w-[54ch] mx-auto">
+                  Хөтөлбөр хэрхэн явагддаг, хүүхэд юу сурах, эцэг эхээс юу шаардагдах талаар
+                  дэлгэрэнгүй.
+                </p>
+              </div>
+              <div className="mt-[30px]">
+                <VideoEmbed
+                  url={yearlyProgram.introVideoUrl!}
+                  title={`${categoryWord} ангиллын хөтөлбөрийн танилцуулга`}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="section-pad">
         <div className="wrap">

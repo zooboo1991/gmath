@@ -22,6 +22,10 @@ function validateProgramFields(data: Record<string, unknown>): string | null {
   }
   if (isTooLong(data.zoomMeetingId, MAX_LEN.courseZoomMeetingId)) return "Zoom Meeting ID хэт урт байна";
   if (isTooLong(data.zoomPasscode, MAX_LEN.courseZoomPasscode)) return "Zoom нэвтрэх код хэт урт байна";
+  if (isTooLong(data.introVideoUrl, MAX_LEN.courseZoomLink)) return "Танилцуулга бичлэгийн холбоос хэт урт байна";
+  if (typeof data.introVideoUrl === "string" && data.introVideoUrl.trim() && !isValidHttpUrl(data.introVideoUrl)) {
+    return "Танилцуулга бичлэгийн холбоос буруу байна (http:// эсвэл https:// -ээр эхэлнэ)";
+  }
   return validateLessons(data.lessons);
 }
 
@@ -60,10 +64,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     topics: data.topics?.trim() ?? "",
     price: data.price.trim(),
     period: data.period.trim(),
-    facebookGroup: data.facebookGroup?.trim() || undefined,
-    zoomLink: data.zoomLink?.trim() || undefined,
-    zoomMeetingId: data.zoomMeetingId?.trim() || undefined,
-    zoomPasscode: data.zoomPasscode?.trim() || undefined,
+    // "" rather than undefined: undefined tells updateYearlyProgram to leave
+    // the column alone, which made a link impossible to remove once saved.
+    facebookGroup: data.facebookGroup?.trim() ?? "",
+    zoomLink: data.zoomLink?.trim() ?? "",
+    zoomMeetingId: data.zoomMeetingId?.trim() ?? "",
+    zoomPasscode: data.zoomPasscode?.trim() ?? "",
+    introVideoUrl: data.introVideoUrl?.trim() ?? "",
     lessons,
     showOnHomepage: data.showOnHomepage === true,
   });

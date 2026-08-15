@@ -12,6 +12,7 @@ import AdminField from "./AdminField";
 import { AnchorTab, Card, KpiTile } from "./AdminObjectPageParts";
 import LessonScheduleEditor from "./LessonScheduleEditor";
 import RegistrationRoster from "./RegistrationRoster";
+import { parseYouTubeId } from "@/lib/youtube";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 type SectionTab = "info" | "roster" | "confirm" | "report";
@@ -47,6 +48,7 @@ export default function YearlyProgramObjectPage({
     zoomPasscode: program.zoomPasscode ?? "",
     lessons: program.lessons ?? ([] as Lesson[]),
     showOnHomepage: program.showOnHomepage,
+    introVideoUrl: program.introVideoUrl ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,6 +205,26 @@ export default function YearlyProgramObjectPage({
                     />
                   </AdminField>
                 </div>
+                <AdminField label="Танилцуулга бичлэг — YouTube (хуудсанд нээлттэй харагдана)">
+                  <input
+                    value={form.introVideoUrl}
+                    onChange={(e) => setForm((f) => ({ ...f, introVideoUrl: e.target.value }))}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                  />
+                </AdminField>
+                {/* Says which of the two outcomes this value produces before
+                    the save, rather than after a visit to the public page. */}
+                {form.introVideoUrl.trim() ? (
+                  parseYouTubeId(form.introVideoUrl) ? (
+                    <span className="text-[.78rem] font-extrabold text-green -mt-1.5">
+                      ✓ YouTube — хуудсанд тоглуулагч гарна
+                    </span>
+                  ) : (
+                    <span className="text-[.78rem] font-bold text-red-soft -mt-1.5">
+                      YouTube холбоос танигдсангүй — хэсэг харагдахгүй
+                    </span>
+                  )
+                ) : null}
                 <AdminField label="Facebook группын холбоос (бүртгэл баталгаажсан сурагчид харагдана)">
                   <input
                     value={form.facebookGroup}
