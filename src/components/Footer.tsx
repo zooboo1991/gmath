@@ -45,6 +45,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/team" className="inline-block py-2.5 px-1 text-[.96rem] hover:text-white transition-colors">
+                  Манай баг
+                </Link>
+              </li>
+              <li>
                 <Link href="/#why" className="inline-block py-2.5 px-1 text-[.96rem] hover:text-white transition-colors">
                   Яагаад бид
                 </Link>

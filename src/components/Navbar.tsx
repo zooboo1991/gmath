@@ -11,10 +11,13 @@ import NotificationBell from "@/components/NotificationBell";
 
 type NavLink = { href: string; label: string; match?: string; children?: { href: string; label: string }[] };
 
-// "Манай баг" removed for now (page not ready) — re-add once /team is done.
+// "Манай баг" sits right after the courses: a parent who has just seen what is
+// taught asks who teaches it next, and the answer (two gold medallists) is one
+// of the strongest things this site has to say.
 const links: NavLink[] = [
   { href: "/#about", label: "Нүүр" },
   { href: "/courses", label: "Сургалтууд", match: "/courses" },
+  { href: "/team", label: "Манай баг", match: "/team" },
   { href: "/articles", label: "Нийтлэл", match: "/articles" },
   { href: "/certificate", label: "Сертификат", match: "/certificate" },
 ];
@@ -93,12 +96,12 @@ export default function Navbar() {
             alt="Б.Ганбат багшийн математикийн сургалт"
             width={1087}
             height={200}
-            className="w-auto h-9 nav:h-[34px] object-contain"
+            className="w-auto h-9 min-[1060px]:h-[34px] object-contain"
             priority
           />
         </Link>
 
-        <nav className="hidden nav:flex gap-1 ml-auto">
+        <nav className="hidden min-[1060px]:flex gap-1 ml-auto">
           {links.map((l) => {
             const active = l.match && pathname.startsWith(l.match);
             const linkClass = `font-bold text-[.97rem] px-[14px] py-[11px] rounded-full transition-colors ${
@@ -134,7 +137,7 @@ export default function Navbar() {
           })}
         </nav>
 
-        <div className="hidden nav:flex items-center gap-[10px] ml-2">
+        <div className="hidden min-[1060px]:flex items-center gap-[10px] ml-2">
           {!sessionLoaded ? (
             // Placeholder of the same footprint: showing "Нэвтрэх" here first
             // and swapping to the profile link a moment later told signed-in
@@ -193,7 +196,7 @@ export default function Navbar() {
           )}
         </div>
 
-        <div className="nav:hidden ml-auto">
+        <div className="min-[1060px]:hidden ml-auto">
           <NotificationBell />
         </div>
 
@@ -202,7 +205,7 @@ export default function Navbar() {
           aria-label="Цэс"
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="nav:hidden w-12 h-12 shrink-0 rounded-[12px] border border-line-2 bg-surface relative z-[61] grid place-items-center"
+          className="min-[1060px]:hidden w-12 h-12 shrink-0 rounded-[12px] border border-line-2 bg-surface relative z-[61] grid place-items-center"
         >
           <span className="sr-only">Цэс</span>
           <div className="flex flex-col gap-[3px] items-center">
@@ -226,7 +229,7 @@ export default function Navbar() {
       </div>
 
       <div
-        className={`nav:hidden flex flex-col gap-1 px-[clamp(20px,5vw,48px)] border-t bg-surface overflow-hidden transition-[max-height,padding] duration-300 ease-in-out ${
+        className={`min-[1060px]:hidden flex flex-col gap-1 px-[clamp(20px,5vw,48px)] border-t bg-surface overflow-hidden transition-[max-height,padding] duration-300 ease-in-out ${
           open ? "pt-[10px] pb-[22px] border-line" : "pt-0 pb-0 border-transparent"
         }`}
         style={{ maxHeight: open ? 420 : 0 }}
