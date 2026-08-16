@@ -773,3 +773,22 @@ alter table courses add column if not exists capacity smallint;
 -- working, so links already shared do not break.
 alter table courses add column if not exists slug text;
 create unique index if not exists courses_slug_unique on courses (slug) where slug is not null;
+
+-- ---------------------------------------------------------------------------
+-- Сургалт ↔ нийтлэлийн холбоос
+-- ---------------------------------------------------------------------------
+-- Which articles belong beside which course. `program_id` is plain text with
+-- no foreign key on purpose — it holds both a course's uuid and a yearly
+-- programme's "program-c", exactly like registrations.program_id does, so one
+-- table serves every kind of course instead of two near-identical ones.
+--
+-- `position` keeps the teacher's chosen order; without it the strip would
+-- reshuffle itself on every read.
+create table if not exists course_articles (
+  program_id text not null,
+  article_id uuid not null references articles(id) on delete cascade,
+  position smallint not null default 0,
+  created_at timestamptz not null default now(),
+  primary key (program_id, article_id)
+);
+create index if not exists course_articles_program_idx on course_articles (program_id);

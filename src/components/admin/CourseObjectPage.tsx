@@ -21,6 +21,7 @@ import { downscaleImage, formatMb, MAX_UPLOAD_BYTES } from "@/lib/imageResize";
 import { AnchorTab, Card, KpiTile } from "./AdminObjectPageParts";
 import LessonScheduleEditor from "./LessonScheduleEditor";
 import RegistrationRoster from "./RegistrationRoster";
+import ProgramArticlesEditor, { type ArticleOption } from "@/components/admin/ProgramArticlesEditor";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 type SectionTab = "info" | "roster" | "confirm" | "report";
@@ -70,11 +71,15 @@ export default function CourseObjectPage({
   course,
   initialKind = "upcoming",
   initialRegistrations,
+  articleOptions,
+  initialArticleIds,
   canEdit,
 }: {
   course: Course | null;
   initialKind?: CourseKind;
   initialRegistrations: RegistrationWithUser[];
+  articleOptions: ArticleOption[];
+  initialArticleIds: string[];
   /**
    * False for the read-only admin: the same page, minus everything that
    * writes. The form fields stay on screen (inside a disabled fieldset, so a
@@ -108,6 +113,7 @@ export default function CourseObjectPage({
     showOnHomepage: course?.showOnHomepage ?? false,
     weeklySchedule: course?.weeklySchedule ?? "",
     capacity: course?.capacity !== undefined ? String(course.capacity) : "",
+    articleIds: initialArticleIds,
   });
   const parsedTag = parseCourseTag(course?.tag ?? "");
   const [tagCategory, setTagCategory] = useState<CourseCategory | "">(parsedTag.category);
@@ -487,6 +493,17 @@ export default function CourseObjectPage({
                   />
                 </AdminField>
               </div>
+            </Card>
+
+            <Card title="Холбоотой нийтлэл">
+              <p className="text-ink-3 font-semibold text-[.85rem] -mt-2 mb-3.5">
+                Энэ сургалтын хуудасны доод хэсэгт харагдана. Дарааллыг сумаар өөрчилнө.
+              </p>
+              <ProgramArticlesEditor
+                articles={articleOptions}
+                value={form.articleIds}
+                onChange={(articleIds) => setForm((f) => ({ ...f, articleIds }))}
+              />
             </Card>
 
             <Card title="Zoom өрөө (бүх хичээлд)">

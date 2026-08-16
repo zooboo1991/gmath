@@ -1,4 +1,4 @@
-import type { Course } from "@/lib/db";
+import type { ArticleSummary, Course } from "@/lib/db";
 import Reveal from "@/components/Reveal";
 import { RegisterTriggerButton } from "./ProgramRegister";
 import CourseCard from "@/components/CourseCard";
@@ -14,6 +14,7 @@ import {
   IconTarget,
   IconFacebook,
 } from "@/components/icons";
+import RelatedArticles from "./RelatedArticles";
 
 // Wording lives in src/lib/siteContent.ts so the chatbot answers from the same
 // copy; only the visuals stay here. Order must match courseAboutItems, with the
@@ -46,7 +47,15 @@ export type RelatedCourse = {
   href: string;
 };
 
-export default function CourseDetail({ course, related }: { course: Course; related: RelatedCourse[] }) {
+export default function CourseDetail({
+  course,
+  related,
+  articles,
+}: {
+  course: Course;
+  related: RelatedCourse[];
+  articles: ArticleSummary[];
+}) {
   // tag is the raw course.tag, matching what /api/enroll uses server-side to
   // build the payment description — see the comment on the Program type in
   // ProgramRegister.tsx. label (title + tag) is only for on-screen display.
@@ -217,6 +226,7 @@ export default function CourseDetail({ course, related }: { course: Course; rela
           </div>
         </section>
       )}
+      <RelatedArticles articles={articles} />
     </>
   );
 }

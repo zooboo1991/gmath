@@ -8,6 +8,7 @@ import JsonLd, { SITE_URL } from "@/components/JsonLd";
 import {
   countRegistrationsForProgram,
   findCourseById,
+  listArticlesForProgram,
   listPublishedCourseSummaries,
   listYearlyPrograms,
 } from "@/lib/db";
@@ -33,10 +34,11 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
 
   // Four, so dropping the current course still leaves three to show.
   // The seat count is only read for a course that actually has a limit.
-  const [otherCourses, yearlyPrograms, seatsTaken] = await Promise.all([
+  const [otherCourses, yearlyPrograms, seatsTaken, articles] = await Promise.all([
     listPublishedCourseSummaries(4),
     listYearlyPrograms(),
     course.capacity !== undefined ? countRegistrationsForProgram(course.id) : Promise.resolve(0),
+    listArticlesForProgram(course.id),
   ]);
   const otherDbCourses = otherCourses.filter((c) => c.id !== course.id);
   const related: RelatedCourse[] = [
@@ -86,9 +88,9 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
         {/* `template` picks the layout; every course without one keeps the
             page it has always had. */}
         {course.template === "songon" ? (
-          <SonginDetail course={course} related={related} seatsTaken={seatsTaken} />
+          <SonginDetail course={course} related={related} seatsTaken={seatsTaken} articles={articles} />
         ) : (
-          <CourseDetail course={course} related={related} />
+          <CourseDetail course={course} related={related} articles={articles} />
         )}
       </main>
       <Footer />

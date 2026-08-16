@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import CourseObjectPage from "@/components/admin/CourseObjectPage";
-import { findCourseById, listRegistrationsByProgram } from "@/lib/db";
+import { findCourseById, listArticleIdsForProgram, listArticles, listRegistrationsByProgram } from "@/lib/db";
 import { requireAdminSection } from "@/lib/adminAccess";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,22 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
   const course = await findCourseById(id);
   if (!course) notFound();
 
-  const registrations = await listRegistrationsByProgram(id);
+  const [registrations, articleIds, articles] = await Promise.all([
+    listRegistrationsByProgram(id),
+    listArticleIdsForProgram(id),
+    // Scheduled articles are offered too: a course page written today may well
+    // want to point at next week's post. The public page still hides it until
+    // it goes live.
+    listArticles({ includeScheduled: true }),
+  ]);
 
-  return <CourseObjectPage course={course} initialRegistrations={registrations} canEdit={role === "full"} />;
+  return (
+    <CourseObjectPage
+      course={course}
+      initialRegistrations={registrations}
+      articleOptions={articles.map((a) => ({ id: a.id, title: a.title, createdAt: a.createdAt }))}
+      initialArticleIds={articleIds}
+      canEdit={role === "full"}
+    />
+  );
 }

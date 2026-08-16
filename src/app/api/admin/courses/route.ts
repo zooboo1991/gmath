@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addCourse, listCourses } from "@/lib/db";
+import { addCourse, listCourses, setProgramArticles } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { isFullAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
@@ -76,6 +76,13 @@ export async function POST(request: Request) {
     lessons,
     showOnHomepage: data.showOnHomepage === true,
   });
+
+  // The picker is on the create form too, so its choices have to be written
+  // once the course has an id to attach them to.
+  if (Array.isArray(data.articleIds)) {
+    const ids = data.articleIds.filter((v: unknown): v is string => typeof v === "string").slice(0, 20);
+    await setProgramArticles(course.id, ids);
+  }
 
   await logAdminAction(request, {
     actionType: "course.create",

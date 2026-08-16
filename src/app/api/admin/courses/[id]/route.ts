@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { findCourseById, notifyNewCourseForPastStudents, notifyNewRecordings, updateCourse } from "@/lib/db";
+import {
+  findCourseById,
+  notifyNewCourseForPastStudents,
+  notifyNewRecordings,
+  setProgramArticles,
+  updateCourse,
+} from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { isFullAdmin } from "@/lib/session";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "@/lib/validate";
@@ -88,6 +94,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   if (!course) {
     return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
+  }
+
+  // Article links live in their own table, so they are written after the row
+  // update rather than as part of it. Only when the field was actually sent —
+  // a save from a form that has no article picker must not wipe the list.
+  if (Array.isArray(data.articleIds)) {
+    const ids = data.articleIds.filter((v: unknown): v is string => typeof v === "string").slice(0, 20);
+    await setProgramArticles(id, ids);
   }
 
   notifyNewRecordings(id, `${course.title} (${course.tag})`, previous?.lessons ?? [], course.lessons).catch((err) =>

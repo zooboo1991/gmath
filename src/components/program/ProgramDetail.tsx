@@ -2,10 +2,11 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import Reveal from "@/components/Reveal";
 import { RegisterTriggerButton } from "./ProgramRegister";
-import { findYearlyProgramById } from "@/lib/db";
+import { findYearlyProgramById, listArticlesForProgram } from "@/lib/db";
 import { IconTrophy, IconPerson, IconClock, IconPlayBox, IconCheckCircle, IconPeopleHero, IconGraduationCap, IconGrid, IconDocument } from "@/components/icons";
 import VideoEmbed from "@/components/VideoEmbed";
 import { parseYouTubeId } from "@/lib/youtube";
+import RelatedArticles from "./RelatedArticles";
 
 const whyItems = [
   {
@@ -79,6 +80,7 @@ export default async function ProgramDetail({
   const programId = `program-${category.toLowerCase()}`;
   const yearlyProgram = await findYearlyProgramById(programId);
   if (!yearlyProgram) notFound();
+  const articles = await listArticlesForProgram(programId);
   const { label, price } = yearlyProgram;
   // tag mirrors what /api/enroll uses server-side for this program (its own
   // label) — see the comment on the Program type in ProgramRegister.tsx.
@@ -281,6 +283,7 @@ export default async function ProgramDetail({
           </RegisterTriggerButton>
         </div>
       </section>
+      <RelatedArticles articles={articles} />
     </>
   );
 }

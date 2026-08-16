@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Course } from "@/lib/db";
+import type { ArticleSummary, Course } from "@/lib/db";
 import Reveal from "@/components/Reveal";
 import CourseCard from "@/components/CourseCard";
 import { RegisterTriggerButton } from "./ProgramRegister";
@@ -36,6 +36,7 @@ import {
   IconPeopleHero,
   IconTarget,
 } from "@/components/icons";
+import RelatedArticles from "./RelatedArticles";
 
 /**
  * The in-person "Сонгон бэлтгэл" classes (5th-8th grade).
@@ -55,10 +56,12 @@ export default function SonginDetail({
   course,
   related,
   seatsTaken,
+  articles,
 }: {
   course: Course;
   related: RelatedCourse[];
   seatsTaken: number;
+  articles: ArticleSummary[];
 }) {
   // Same shape the ordinary course page builds — /api/enroll reads `tag`
   // server-side for the payment description.
@@ -289,6 +292,7 @@ export default function SonginDetail({
           </div>
         </section>
       )}
+      <RelatedArticles articles={articles} />
     </>
   );
 }

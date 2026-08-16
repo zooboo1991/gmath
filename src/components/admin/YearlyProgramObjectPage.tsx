@@ -13,6 +13,7 @@ import { AnchorTab, Card, KpiTile } from "./AdminObjectPageParts";
 import LessonScheduleEditor from "./LessonScheduleEditor";
 import RegistrationRoster from "./RegistrationRoster";
 import { parseYouTubeId } from "@/lib/youtube";
+import ProgramArticlesEditor, { type ArticleOption } from "@/components/admin/ProgramArticlesEditor";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 type SectionTab = "info" | "roster" | "confirm" | "report";
@@ -21,11 +22,15 @@ export default function YearlyProgramObjectPage({
   program,
   initialRegistrations,
   initialPayments,
+  articleOptions,
+  initialArticleIds,
   canEdit,
 }: {
   program: YearlyProgram;
   initialRegistrations: RegistrationWithUser[];
   initialPayments: RegistrationPayment[];
+  articleOptions: ArticleOption[];
+  initialArticleIds: string[];
   /** False for the read-only admin — see CourseObjectPage for the reasoning. */
   canEdit: boolean;
 }) {
@@ -49,6 +54,7 @@ export default function YearlyProgramObjectPage({
     lessons: program.lessons ?? ([] as Lesson[]),
     showOnHomepage: program.showOnHomepage,
     introVideoUrl: program.introVideoUrl ?? "",
+    articleIds: initialArticleIds,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -233,6 +239,17 @@ export default function YearlyProgramObjectPage({
                   />
                 </AdminField>
               </div>
+            </Card>
+
+            <Card title="Холбоотой нийтлэл">
+              <p className="text-ink-3 font-semibold text-[.85rem] -mt-2 mb-3.5">
+                Энэ хөтөлбөрийн хуудасны доод хэсэгт харагдана. Дарааллыг сумаар өөрчилнө.
+              </p>
+              <ProgramArticlesEditor
+                articles={articleOptions}
+                value={form.articleIds}
+                onChange={(articleIds) => setForm((f) => ({ ...f, articleIds }))}
+              />
             </Card>
 
             <Card title="Zoom өрөө (бүх хичээлд)">

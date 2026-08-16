@@ -821,6 +821,11 @@ export async function deleteCourse(id: string): Promise<boolean> {
   const { error: regError } = await getSupabase().from("registrations").delete().eq("program_id", id);
   if (regError) throw regError;
 
+  // program_id has no foreign key (it spans courses and yearly programmes), so
+  // the links have to be swept up by hand or they outlive the course.
+  const { error: linkError } = await getSupabase().from("course_articles").delete().eq("program_id", id);
+  if (linkError) throw linkError;
+
   const { error, count } = await getSupabase().from("courses").delete({ count: "exact" }).eq("id", id);
   if (error) throw error;
   return (count ?? 0) > 0;
@@ -845,6 +850,61 @@ export async function listArticles(options: ArticleReadOptions = {}): Promise<Ar
   const { data, error } = await query;
   if (error) throw error;
   return (data as ArticleRow[]).map(articleFromRow);
+}
+
+/**
+ * The articles an admin has pinned to one course, in the order they chose.
+ *
+ * Scheduled articles are filtered out the same way every other public read
+ * does it: pinning next week's post to a course must not publish it early.
+ */
+export async function listArticlesForProgram(programId: string): Promise<Article[]> {
+  const { data, error } = await getSupabase()
+    .from("course_articles")
+    .select("article_id, position, articles(*)")
+    .eq("program_id", programId)
+    .order("position");
+  if (error) throw error;
+
+  const rows = data as unknown as { article_id: string; position: number; articles: ArticleRow | null }[];
+  return rows
+    .map((r) => r.articles)
+    .filter((a): a is ArticleRow => a !== null)
+    .map(articleFromRow)
+    .filter((a) => !a.publishAt || new Date(a.publishAt) <= new Date());
+}
+
+/** Article ids only — what the admin form needs to show its current selection. */
+export async function listArticleIdsForProgram(programId: string): Promise<string[]> {
+  const { data, error } = await getSupabase()
+    .from("course_articles")
+    .select("article_id")
+    .eq("program_id", programId)
+    .order("position");
+  if (error) throw error;
+  return (data as { article_id: string }[]).map((r) => r.article_id);
+}
+
+/**
+ * Replaces a course's whole article list. Delete-then-insert rather than a
+ * diff: the set is a handful of rows chosen by hand, and reordering is as
+ * common as adding, which a diff would have to handle anyway.
+ */
+export async function setProgramArticles(programId: string, articleIds: string[]): Promise<void> {
+  const { error: clearError } = await getSupabase()
+    .from("course_articles")
+    .delete()
+    .eq("program_id", programId);
+  if (clearError) throw clearError;
+  if (articleIds.length === 0) return;
+
+  const rows = articleIds.map((articleId, position) => ({
+    program_id: programId,
+    article_id: articleId,
+    position,
+  }));
+  const { error } = await getSupabase().from("course_articles").insert(rows);
+  if (error) throw error;
 }
 
 /** Scheduled-but-not-yet-live articles, newest first — the admin list shows these first. */
