@@ -3,6 +3,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import CourseCard from "@/components/CourseCard";
+import SongonClassCard from "@/components/SongonClassCard";
 import CourseBrowser from "@/components/CourseBrowser";
 import { countRegistrationsForProgram, listCourses, listYearlyPrograms } from "@/lib/db";
 import { parseWeeklySchedule } from "@/lib/weeklySchedule";
@@ -83,31 +84,19 @@ export default async function CoursesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 nav:grid-cols-4 gap-5 mt-[30px]">
                 {songon.map((c, i) => {
                   const taken = songonSeats[i];
-                  const full = c.capacity !== undefined && taken >= c.capacity;
-                  const left = c.capacity !== undefined ? Math.max(0, c.capacity - taken) : null;
+                  // The grade is the card's headline, so it is pulled out of the
+                  // title rather than repeating "Сонгон бэлтгэл" four times.
+                  const grade = c.title.replace(/^.*—\s*/, "");
                   return (
-                    <CourseCard
+                    <SongonClassCard
                       key={c.id}
-                      tag={c.tag}
-                      title={c.title}
-                      topics={parseWeeklySchedule(c.weeklySchedule)
-                        .map((s) => s.day)
-                        .join(", ")}
+                      grade={grade}
+                      slots={parseWeeklySchedule(c.weeklySchedule)}
                       price={c.price}
                       period={c.period}
-                      ctaHref={courseHref(c)}
-                      ctaLabel={full ? "Бүртгэл дүүрсэн" : "Дэлгэрэнгүй"}
-                      extra={
-                        full ? (
-                          <span className="inline-block text-[.8rem] font-extrabold text-red-soft bg-red-soft/12 px-3 py-1.5 rounded-full">
-                            Бүртгэл дүүрсэн байна
-                          </span>
-                        ) : left !== null && left <= 5 ? (
-                          <span className="inline-block text-[.8rem] font-extrabold text-gold-strong bg-gold-soft px-3 py-1.5 rounded-full">
-                            Үлдсэн {left} суудал
-                          </span>
-                        ) : null
-                      }
+                      href={courseHref(c)}
+                      capacity={c.capacity}
+                      seatsLeft={c.capacity === undefined ? null : Math.max(0, c.capacity - taken)}
                     />
                   );
                 })}
