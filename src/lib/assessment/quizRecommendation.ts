@@ -3,6 +3,7 @@ import { deepseekChat } from "../ai/providers/deepseek";
 import { listPublishedCourseSummaries, listYearlyPrograms } from "../db";
 import { SITE_URL } from "../siteUrl";
 import { TRACK_LABELS, type QuizTrack } from "./types";
+import { courseHref } from "@/lib/courseHref";
 
 /**
  * Writes the personalised зөвлөмж a completed quiz shows.
@@ -30,7 +31,7 @@ export async function writeQuizRecommendation(input: {
 
     const catalogue = [
       ...programs.map((p) => `- ${p.label || p.title}: ${p.price} ${p.period} — ${SITE_URL}/courses/${p.id.replace(/^program-/, "")}`),
-      ...courses.map((c) => `- ${c.title} (${c.tag}): ${c.price} ${c.period} — ${SITE_URL}/courses/${c.id}`),
+      ...courses.map((c) => `- ${c.title} (${c.tag}): ${c.price} ${c.period} — ${SITE_URL}${courseHref(c)}`),
     ].join("\n");
 
     const wrong = summariseTopics(input.wrongTopics);

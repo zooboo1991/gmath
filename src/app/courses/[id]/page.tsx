@@ -12,6 +12,7 @@ import {
   listYearlyPrograms,
 } from "@/lib/db";
 import { toIsoDate } from "@/lib/courseDate";
+import { courseHref } from "@/lib/courseHref";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
       topics: c.topics,
       price: c.price,
       period: c.period,
-      href: `/courses/${c.id}`,
+      href: courseHref(c),
     })),
     ...yearlyPrograms.map((p) => ({
       tag: p.tag,
@@ -65,7 +66,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
           "@type": "Course",
           name: course.title,
           description: course.topics,
-          url: `${SITE_URL}/courses/${course.id}`,
+          url: `${SITE_URL}${courseHref(course)}`,
           inLanguage: "mn",
           provider: {
             "@type": "EducationalOrganization",

@@ -11,6 +11,7 @@ import {
   type CourseCategory,
 } from "@/lib/courseTag";
 import type { Course } from "@/lib/db";
+import { courseHref } from "@/lib/courseHref";
 
 type AudienceFilter = "all" | CourseAudience;
 type CategoryFilter = "all" | CourseCategory;
@@ -134,7 +135,7 @@ export default function CourseBrowser({ upcoming, vod }: { upcoming: Course[]; v
                   topics={c.topics}
                   price={c.price}
                   period={c.period}
-                  ctaHref={`/courses/${c.id}`}
+                  ctaHref={courseHref(c)}
                   ctaLabel="Дэлгэрэнгүй"
                   extra={<CourseMeta startDate={c.startDate ?? ""} mode={c.mode ?? ""} />}
                 />
@@ -166,7 +167,7 @@ export default function CourseBrowser({ upcoming, vod }: { upcoming: Course[]; v
                   topics={c.topics}
                   price={c.price}
                   period={c.period}
-                  ctaHref={`/courses/${c.id}`}
+                  ctaHref={courseHref(c)}
                   ctaLabel="Дэлгэрэнгүй"
                   extra={<VodStatus />}
                 />

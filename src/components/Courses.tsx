@@ -1,11 +1,12 @@
 import Link from "next/link";
 import CourseCard from "./CourseCard";
 import { listHomepageCourses, listHomepageYearlyPrograms } from "@/lib/db";
+import { courseHref } from "@/lib/courseHref";
 
 export default async function Courses() {
   const [dbCourses, yearlyPrograms] = await Promise.all([listHomepageCourses(), listHomepageYearlyPrograms()]);
   const courses = [
-    ...dbCourses.map((c) => ({ ...c, href: `/courses/${c.id}` })),
+    ...dbCourses.map((c) => ({ ...c, href: courseHref(c) })),
     // Yearly programs live outside the courses table (see the schema
     // comment on yearly_programs) — hand-written pages at /courses/c
     // and /courses/d, so the href doesn't follow the course-id pattern.

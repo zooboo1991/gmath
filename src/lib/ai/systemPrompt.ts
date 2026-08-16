@@ -2,6 +2,7 @@ import type { ChatChannel } from "../db";
 import { listArticles, listPublishedCourseSummaries, listRegistrationsByUser, listYearlyPrograms } from "../db";
 import { courseAboutItems, siteAchievements, siteFaqs, siteFeatures } from "../siteContent";
 import { SITE_URL } from "../siteUrl";
+import { courseHref } from "@/lib/courseHref";
 
 const BASE_PROMPT = `Та бол gmath.mn сайтын туслах чатбот. gmath.mn нь Б.Ганбат багшийн олимпиадын математикийн онлайн сургалтын сайт бөгөөд 4–12-р ангийн сурагчид болон багш нарт зориулсан сургалт, түвшин тогтоох үнэлгээ, сертификатын үйлчилгээ үзүүлдэг.
 
@@ -105,7 +106,7 @@ export async function buildSystemPrompt({
   // concatenated rather than joined with another one.
   const catalogue = [
     ...courses.map(
-      (c) => `- ${c.title} (${c.tag}) — ${c.price}${c.period}. ${c.topics} Хуудас: ${base}/courses/${c.id}`
+      (c) => `- ${c.title} (${c.tag}) — ${c.price}${c.period}. ${c.topics} Хуудас: ${base}${courseHref(c)}`
     ),
     // Yearly programs aren't in the courses table and don't follow the
     // course-id URL pattern — they're hand-written pages at /courses/c and

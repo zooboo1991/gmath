@@ -3,6 +3,7 @@ import { IconCheckCircle, IconClock, IconTarget, IconTrophy } from "@/components
 import { TRACK_LABELS } from "@/lib/assessment/types";
 import type { Assessment, Level, Solution } from "@/lib/assessment/types";
 import type { Course } from "@/lib/db";
+import { courseHref } from "@/lib/courseHref";
 
 const CARD = "bg-surface border border-line rounded-lg shadow-sm px-[26px] py-[26px]";
 
@@ -207,7 +208,7 @@ export default function AssessmentResult({
             <span className="text-[.9rem] text-ink-3 font-bold">{course.period}</span>
           </div>
           <Link
-            href={`/courses/${course.id}`}
+            href={courseHref(course)}
             className="flex items-center justify-center gap-[10px] w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 mt-5 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
           >
             Сургалт үзэх <span>→</span>

@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { listArticles, listPublishedCourseSummaries, listYearlyPrograms } from "@/lib/db";
 import { SITE_URL } from "@/lib/siteUrl";
+import { courseHref } from "@/lib/courseHref";
 
 /**
  * Generated rather than static, because the valuable half of this site is
@@ -36,7 +37,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return [
       ...staticPages,
       ...courses.map((c) => ({
-        url: `${SITE_URL}/courses/${c.id}`,
+        url: `${SITE_URL}${courseHref(c)}`,
         changeFrequency: "weekly" as const,
         priority: 0.8,
       })),

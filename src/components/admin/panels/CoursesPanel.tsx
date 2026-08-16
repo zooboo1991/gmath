@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Course, PublicUser, Registration, YearlyProgram } from "@/lib/db";
 import { formatCourseDate } from "@/lib/courseDate";
+import { courseHref } from "@/lib/courseHref";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 
@@ -84,7 +85,14 @@ function CourseGroup({
                   {c.mode && ` · ${c.mode}`}
                 </span>
                 <div className="mt-1.5">
-                  <CardStats viewed={viewCounts[`/courses/${c.id}`] ?? 0} active={stats.active} pending={stats.pending} />
+                  {/* Views are recorded against the address the visitor actually
+                      opened, so a course with a slug has them under both — the
+                      uuid from before the slug existed, and the slug since. */}
+                  <CardStats
+                    viewed={(viewCounts[courseHref(c)] ?? 0) + (c.slug ? (viewCounts[`/courses/${c.id}`] ?? 0) : 0)}
+                    active={stats.active}
+                    pending={stats.pending}
+                  />
                 </div>
               </div>
               <div className="flex gap-2">

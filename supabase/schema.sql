@@ -767,3 +767,9 @@ alter table courses add column if not exists weekly_schedule text;
 -- Both 'pending' and 'active' count against it: a seat is claimed the moment
 -- somebody registers, and an abandoned pending row is for the admin to remove.
 alter table courses add column if not exists capacity smallint;
+
+-- Short, human-typable URL for a course: /courses/songon5 rather than a uuid.
+-- Optional — a course without one keeps its uuid address, and both keep
+-- working, so links already shared do not break.
+alter table courses add column if not exists slug text;
+create unique index if not exists courses_slug_unique on courses (slug) where slug is not null;

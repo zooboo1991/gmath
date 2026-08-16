@@ -6,6 +6,7 @@ import CourseCard from "@/components/CourseCard";
 import CourseBrowser from "@/components/CourseBrowser";
 import { countRegistrationsForProgram, listCourses, listYearlyPrograms } from "@/lib/db";
 import { parseWeeklySchedule } from "@/lib/weeklySchedule";
+import { courseHref } from "@/lib/courseHref";
 
 export const metadata: Metadata = {
   title: "Сургалтууд",
@@ -94,7 +95,7 @@ export default async function CoursesPage() {
                         .join(", ")}
                       price={c.price}
                       period={c.period}
-                      ctaHref={`/courses/${c.id}`}
+                      ctaHref={courseHref(c)}
                       ctaLabel={full ? "Бүртгэл дүүрсэн" : "Дэлгэрэнгүй"}
                       extra={
                         full ? (

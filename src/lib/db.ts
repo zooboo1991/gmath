@@ -7,6 +7,7 @@ import { sendPushToUsers } from "./push";
 import { sendSms } from "./sms/skytel";
 import { compareMn } from "./sortMn";
 import { extractCourseCategories, getCourseAudience } from "./courseTag";
+import { courseHref } from "./courseHref";
 
 /**
  * Persistence layer backed by Supabase Postgres (see supabase/schema.sql
@@ -110,6 +111,8 @@ export type Course = {
   weeklySchedule?: string;
   /** Seats in the group. Undefined = no limit. */
   capacity?: number;
+  /** Short URL segment ("songon5"). Undefined = addressed by uuid. */
+  slug?: string;
 };
 
 /**
@@ -231,6 +234,7 @@ type CourseRow = {
   template: string | null;
   weekly_schedule: string | null;
   capacity: number | null;
+  slug: string | null;
 };
 
 type YearlyProgramRow = {
@@ -332,6 +336,7 @@ function courseFromRow(row: CourseRow): Course {
     template: row.template ?? undefined,
     weeklySchedule: row.weekly_schedule ?? undefined,
     capacity: row.capacity ?? undefined,
+    slug: row.slug ?? undefined,
   };
 }
 
@@ -623,13 +628,16 @@ export async function listCourses(
 }
 
 /** Card-sized course: no lesson schedule, which is the bulky part of a row. */
-export type CourseSummary = Pick<Course, "id" | "tag" | "title" | "topics" | "price" | "period">;
+// slug comes straight off the row, so it is null rather than undefined here.
+export type CourseSummary = Pick<Course, "id" | "tag" | "title" | "topics" | "price" | "period"> & {
+  slug?: string | null;
+};
 
 /** Used by the "related courses" strip, which never renders lessons. */
 export async function listPublishedCourseSummaries(limit?: number): Promise<CourseSummary[]> {
   let query = getSupabase()
     .from("courses")
-    .select("id, tag, title, topics, price, period")
+    .select("id, tag, title, topics, price, period, slug")
     .eq("status", "published");
   if (limit) query = query.limit(limit);
   const { data, error } = await query;
@@ -641,20 +649,26 @@ export async function listPublishedCourseSummaries(limit?: number): Promise<Cour
 export async function listHomepageCourses(): Promise<CourseSummary[]> {
   const { data, error } = await getSupabase()
     .from("courses")
-    .select("id, tag, title, topics, price, period")
+    .select("id, tag, title, topics, price, period, slug")
     .eq("status", "published")
     .eq("show_on_homepage", true);
   if (error) throw error;
   return data as CourseSummary[];
 }
 
-export async function findCourseById(id: string): Promise<Course | undefined> {
-  const { data, error } = await getSupabase().from("courses").select("*").eq("id", id).maybeSingle();
-  if (error) {
-    if (isInvalidUuidError(error)) return undefined;
-    throw error;
-  }
-  return data ? courseFromRow(data as CourseRow) : undefined;
+/**
+ * Finds a course by uuid or by its short slug, so /courses/songon5 and the
+ * uuid address resolve to the same page. Callers holding a real id (the enroll
+ * route, the admin) are unaffected: a uuid never matches a slug.
+ */
+export async function findCourseById(idOrSlug: string): Promise<Course | undefined> {
+  const { data, error } = await getSupabase().from("courses").select("*").eq("id", idOrSlug).maybeSingle();
+  if (error && !isInvalidUuidError(error)) throw error;
+  if (data) return courseFromRow(data as CourseRow);
+
+  const bySlug = await getSupabase().from("courses").select("*").eq("slug", idOrSlug).maybeSingle();
+  if (bySlug.error) throw bySlug.error;
+  return bySlug.data ? courseFromRow(bySlug.data as CourseRow) : undefined;
 }
 
 export async function addCourse(input: Omit<Course, "id">): Promise<Course> {
@@ -708,6 +722,7 @@ export async function updateCourse(
   if (input.showOnHomepage !== undefined) patch.show_on_homepage = input.showOnHomepage;
   if (input.weeklySchedule !== undefined) patch.weekly_schedule = input.weeklySchedule || null;
   if (input.capacity !== undefined) patch.capacity = input.capacity ?? null;
+  if (input.slug !== undefined) patch.slug = input.slug || null;
 
   const { data, error } = await getSupabase().from("courses").update(patch).eq("id", id).select("*").maybeSingle();
   if (error) throw error;
@@ -727,7 +742,7 @@ export type YearlyProgramSummary = Pick<YearlyProgram, "id" | "tag" | "title" | 
 export async function listHomepageYearlyPrograms(): Promise<YearlyProgramSummary[]> {
   const { data, error } = await getSupabase()
     .from("yearly_programs")
-    .select("id, tag, title, topics, price, period")
+    .select("id, tag, title, topics, price, period, slug")
     .eq("show_on_homepage", true);
   if (error) throw error;
   return data as YearlyProgramSummary[];
@@ -2010,7 +2025,7 @@ export async function notifyNewCourseForPastStudents(course: Course): Promise<vo
     targetType: "users",
     userIds,
     channel: "site",
-    pushUrl: `/courses/${course.id}`,
+    pushUrl: courseHref(course),
   });
 }
 
