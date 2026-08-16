@@ -58,7 +58,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ ok: false, error: lengthError }, { status: 400 });
   }
 
-  const lessons = normalizeLessons(data.lessons) ?? [];
+  // Only when lessons were actually sent. `?? []` looked harmless and was not:
+  // a request that simply doesn't mention lessons would erase the schedule.
+  const lessons = data.lessons === undefined ? undefined : (normalizeLessons(data.lessons) ?? []);
 
   const previous = await findYearlyProgramById(id);
 
@@ -69,15 +71,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     topics: data.topics?.trim() ?? "",
     price: data.price.trim(),
     period: data.period.trim(),
-    // "" rather than undefined: undefined tells updateYearlyProgram to leave
-    // the column alone, which made a link impossible to remove once saved.
-    facebookGroup: data.facebookGroup?.trim() ?? "",
-    zoomLink: data.zoomLink?.trim() ?? "",
-    zoomMeetingId: data.zoomMeetingId?.trim() ?? "",
-    zoomPasscode: data.zoomPasscode?.trim() ?? "",
-    introVideoUrl: data.introVideoUrl?.trim() ?? "",
+    // Present-but-empty clears the field; absent leaves it alone. The first
+    // version of this cleared on absence too, so any request that didn't
+    // mention a field wiped it — which is exactly how this programme lost its
+    // Facebook group, its intro video and its lesson row.
+    facebookGroup: data.facebookGroup !== undefined ? data.facebookGroup?.trim() || "" : undefined,
+    zoomLink: data.zoomLink !== undefined ? data.zoomLink?.trim() || "" : undefined,
+    zoomMeetingId: data.zoomMeetingId !== undefined ? data.zoomMeetingId?.trim() || "" : undefined,
+    zoomPasscode: data.zoomPasscode !== undefined ? data.zoomPasscode?.trim() || "" : undefined,
+    introVideoUrl: data.introVideoUrl !== undefined ? data.introVideoUrl?.trim() || "" : undefined,
     lessons,
-    showOnHomepage: data.showOnHomepage === true,
+    showOnHomepage: data.showOnHomepage !== undefined ? data.showOnHomepage === true : undefined,
   });
 
   if (!program) {
