@@ -14,8 +14,12 @@ export default function RelatedArticles({ articles }: { articles: ArticleSummary
 
   // Plain background: the related-courses strip below is the grey one, and two
   // grey bands in a row read as a single undivided block.
+  //
+  // Tighter on top than a normal section: the price card above it is also
+  // white, so there is no colour change to mark the seam — the full stacked
+  // padding just looked like the page had ended.
   return (
-    <section className="section-pad">
+    <section className="pt-[clamp(24px,3vw,40px)] pb-[clamp(48px,7vw,88px)]">
       <div className="wrap">
         <div className="flex items-baseline gap-3.5 mb-[22px]">
           <h2 className="text-[1.4rem] font-extrabold">Холбоотой нийтлэл</h2>
