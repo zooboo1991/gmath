@@ -742,7 +742,7 @@ export type YearlyProgramSummary = Pick<YearlyProgram, "id" | "tag" | "title" | 
 export async function listHomepageYearlyPrograms(): Promise<YearlyProgramSummary[]> {
   const { data, error } = await getSupabase()
     .from("yearly_programs")
-    .select("id, tag, title, topics, price, period, slug")
+    .select("id, tag, title, topics, price, period")
     .eq("show_on_homepage", true);
   if (error) throw error;
   return data as YearlyProgramSummary[];
