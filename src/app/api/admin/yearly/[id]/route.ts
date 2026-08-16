@@ -87,9 +87,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   // Article links live in their own table, so they are written after the row
   // update rather than as part of it. Only when the field was actually sent —
   // a save from a form that has no article picker must not wipe the list.
+  let articleIds: string[] | undefined;
   if (Array.isArray(data.articleIds)) {
     const ids = data.articleIds.filter((v: unknown): v is string => typeof v === "string").slice(0, 20);
     await setProgramArticles(id, ids);
+    articleIds = ids;
   }
 
   notifyNewRecordings(id, program.label, previous?.lessons ?? [], program.lessons).catch((err) =>
@@ -99,7 +101,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   await logAdminAction(request, {
     actionType: "yearly_program.update",
     targetId: id,
-    details: { title: program.title, price: program.price },
+    details: {
+      title: program.title,
+      price: program.price,
+      ...(articleIds !== undefined && { articleIds }),
+    },
   });
 
   return NextResponse.json({ ok: true, program });
