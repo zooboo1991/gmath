@@ -12,8 +12,10 @@ import ArticleCard from "@/components/ArticleCard";
 export default function RelatedArticles({ articles }: { articles: ArticleSummary[] }) {
   if (articles.length === 0) return null;
 
+  // Plain background: the related-courses strip below is the grey one, and two
+  // grey bands in a row read as a single undivided block.
   return (
-    <section className="section-pad bg-bg-soft">
+    <section className="section-pad">
       <div className="wrap">
         <div className="flex items-baseline gap-3.5 mb-[22px]">
           <h2 className="text-[1.4rem] font-extrabold">Холбоотой нийтлэл</h2>

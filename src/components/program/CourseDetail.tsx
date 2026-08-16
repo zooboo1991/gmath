@@ -211,6 +211,8 @@ export default function CourseDetail({
         </div>
       </section>
 
+      <RelatedArticles articles={articles} />
+
       {related.length > 0 && (
         <section className="section-pad bg-bg-soft">
           <div className="wrap">
@@ -226,7 +228,6 @@ export default function CourseDetail({
           </div>
         </section>
       )}
-      <RelatedArticles articles={articles} />
     </>
   );
 }
