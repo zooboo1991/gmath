@@ -30,7 +30,7 @@ export default function DataDeletionPage() {
         <li>Овог, нэрээ</li>
       </ul>
       <p>
-        Эсвэл <strong>9077 7400</strong> / <strong>9939 5945</strong> дугаарт холбогдож хүсэлтээ
+        Эсвэл <strong>9077 7400</strong> / <strong>9034 5577</strong> дугаарт холбогдож хүсэлтээ
         гаргаж болно.
       </p>
       <p>

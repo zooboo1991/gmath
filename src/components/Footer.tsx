@@ -71,7 +71,7 @@ export default function Footer() {
                 <IconMail className="w-4 h-4 text-navy-ink-3 shrink-0" /> math.ganbat@gmail.com
               </li>
               <li className="flex items-center gap-[9px] text-[.96rem]">
-                <IconPhone className="w-4 h-4 text-navy-ink-3 shrink-0" /> 9077 7400, 9939 5945
+                <IconPhone className="w-4 h-4 text-navy-ink-3 shrink-0" /> 9077 7400, 9034 5577
               </li>
               <li className="flex items-start gap-[9px] text-[.96rem]">
                 <IconLocation className="w-4 h-4 text-navy-ink-3 shrink-0 mt-0.5" />

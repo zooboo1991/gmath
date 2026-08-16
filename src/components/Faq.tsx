@@ -92,9 +92,9 @@ export default function Faq() {
                 <IconPhone className="w-4 h-4 shrink-0 text-white/80" />
                 <span className="text-[1.05rem] font-bold tracking-[.02em]">9077 7400</span>
               </a>
-              <a href="tel:99395945" className="flex items-center gap-2">
+              <a href="tel:90345577" className="flex items-center gap-2">
                 <IconPhone className="w-4 h-4 shrink-0 text-white/80" />
-                <span className="text-[1.05rem] font-bold tracking-[.02em]">9939 5945</span>
+                <span className="text-[1.05rem] font-bold tracking-[.02em]">9034 5577</span>
               </a>
               <small className="block text-[.85rem] text-white/80">10:00–18:00 цагийн хооронд хариулна</small>
             </div>
