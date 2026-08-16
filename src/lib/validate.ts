@@ -17,6 +17,7 @@ export const MAX_LEN = {
   courseZoomLink: 500,
   courseZoomMeetingId: 60,
   courseZoomPasscode: 60,
+  courseWeeklySchedule: 400,
   lessonTopic: 200,
   lessonSchedule: 200,
   articleTitle: 200,

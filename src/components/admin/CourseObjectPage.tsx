@@ -106,6 +106,7 @@ export default function CourseObjectPage({
     zoomPasscode: course?.zoomPasscode ?? "",
     lessons: course?.lessons ?? ([] as Lesson[]),
     showOnHomepage: course?.showOnHomepage ?? false,
+    weeklySchedule: course?.weeklySchedule ?? "",
   });
   const parsedTag = parseCourseTag(course?.tag ?? "");
   const [tagCategory, setTagCategory] = useState<CourseCategory | "">(parsedTag.category);
@@ -454,6 +455,19 @@ export default function CourseObjectPage({
                       </select>
                     </AdminField>
                   </div>
+                )}
+                {/* Only the classroom-course layout renders a weekly
+                    timetable, so only it shows the field. */}
+                {course?.template === "songon" && (
+                  <AdminField label="7 хоногийн хуваарь (мөр тутамд нэг өдөр)">
+                    <textarea
+                      rows={4}
+                      value={form.weeklySchedule}
+                      onChange={(e) => setForm((f) => ({ ...f, weeklySchedule: e.target.value }))}
+                      placeholder={"Даваа 14:30–16:30\nЛхагва 14:30–16:30\nБаасан 14:00–16:00"}
+                      className="resize-y"
+                    />
+                  </AdminField>
                 )}
                 <AdminField label="Facebook группын холбоос (бүртгэл баталгаажсан сурагчид харагдана)">
                   <input

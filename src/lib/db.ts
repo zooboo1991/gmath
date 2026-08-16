@@ -104,6 +104,10 @@ export type Course = {
   zoomPasscode?: string;
   lessons: Lesson[];
   showOnHomepage: boolean;
+  /** Picks the public page's layout. Undefined = the ordinary course page. */
+  template?: string;
+  /** Recurring timetable, one "<өдөр> <цаг>" line per day. */
+  weeklySchedule?: string;
 };
 
 /**
@@ -222,6 +226,8 @@ type CourseRow = {
   zoom_passcode: string | null;
   lessons: Lesson[] | null;
   show_on_homepage: boolean;
+  template: string | null;
+  weekly_schedule: string | null;
 };
 
 type YearlyProgramRow = {
@@ -320,6 +326,8 @@ function courseFromRow(row: CourseRow): Course {
     zoomPasscode: row.zoom_passcode ?? undefined,
     lessons: row.lessons ?? [],
     showOnHomepage: row.show_on_homepage,
+    template: row.template ?? undefined,
+    weeklySchedule: row.weekly_schedule ?? undefined,
   };
 }
 
@@ -692,6 +700,7 @@ export async function updateCourse(
   if (input.zoomPasscode !== undefined) patch.zoom_passcode = input.zoomPasscode || null;
   if (input.lessons !== undefined) patch.lessons = input.lessons;
   if (input.showOnHomepage !== undefined) patch.show_on_homepage = input.showOnHomepage;
+  if (input.weeklySchedule !== undefined) patch.weekly_schedule = input.weeklySchedule || null;
 
   const { data, error } = await getSupabase().from("courses").update(patch).eq("id", id).select("*").maybeSingle();
   if (error) throw error;

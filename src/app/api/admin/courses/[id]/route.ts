@@ -23,6 +23,7 @@ function validateCourseFields(data: Record<string, unknown>): string | null {
   if (isTooLong(data.period, MAX_LEN.coursePeriod)) return "Хугацааны нэгж хэт урт байна";
   if (isTooLong(data.startDate, MAX_LEN.courseDate)) return "Хичээллэх өдөр хэт урт байна";
   if (isTooLong(data.mode, MAX_LEN.courseMode)) return "Төрөл хэт урт байна";
+  if (isTooLong(data.weeklySchedule, MAX_LEN.courseWeeklySchedule)) return "7 хоногийн хуваарь хэт урт байна";
   return validateLessons(data.lessons);
 }
 
@@ -74,6 +75,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     zoomPasscode: data.zoomPasscode !== undefined ? data.zoomPasscode?.trim() || "" : undefined,
     lessons,
     showOnHomepage: data.showOnHomepage !== undefined ? data.showOnHomepage === true : undefined,
+    weeklySchedule: data.weeklySchedule !== undefined ? data.weeklySchedule?.trim() || "" : undefined,
   });
 
   if (!course) {

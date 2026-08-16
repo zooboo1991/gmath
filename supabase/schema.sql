@@ -747,3 +747,17 @@ create index if not exists registrations_program_id_idx on registrations (progra
 -- the teacher swaps the video far more often than we deploy — and C and D want
 -- different ones. Any YouTube link/ID; empty means the section is not rendered.
 alter table yearly_programs add column if not exists intro_video_url text;
+
+-- ---------------------------------------------------------------------------
+-- Сонгон бэлтгэлийн танхимын ангиуд
+-- ---------------------------------------------------------------------------
+-- Four in-person classes (5th-8th grade) that share one marketing layout but
+-- differ in timetable and price. `template` picks the public page's layout;
+-- null means the ordinary course page, so every existing course is unaffected.
+alter table courses add column if not exists template text;
+
+-- A recurring weekly timetable, one line per day: "<өдөр> <цаг>", e.g.
+--   Даваа 14:30–16:30
+-- Free text rather than a table of its own: the teacher edits three lines a
+-- term, and a jsonb schema would buy nothing but an editor to maintain.
+alter table courses add column if not exists weekly_schedule text;
