@@ -22,6 +22,15 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  async redirects() {
+    return [
+      // /team/ganbat is gone: the founder already had a fuller page at
+      // /teacher, written before /team existed, and two pages about the same
+      // person only compete with each other in search. A permanent redirect
+      // rather than a 404 so links already shared keep landing somewhere.
+      { source: "/team/ganbat", destination: "/teacher", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;
