@@ -12,29 +12,28 @@ export const metadata: Metadata = {
 };
 
 type TeamMember = {
-  slug?: string;
+  /** Where "Дэлгэрэнгүй" goes. Absent = no detail page, no link. */
+  href?: string;
   photo?: string;
   name: string;
-  role: string;
   achievements?: string[];
 };
 
 const team: TeamMember[] = [
   {
-    slug: "ganbat",
+    // The founder's own page is /teacher, written long before /team existed.
+    href: "/teacher",
     photo: "/images/teacher-photo.jpg",
     name: "Б.ГАНБАТ",
-    role: "Үүсгэн байгуулагч · Олимпиадын багш",
     achievements: [
       "Монголын математикийн олимпиадын Дархан аварга",
       "Олон улсын багш, дасгалжуулагчдын олимпиадын алтан медаль",
     ],
   },
   {
-    slug: "batchimeg",
+    href: "/team/batchimeg",
     photo: "/images/batchimeg-photo.jpg",
     name: "Б.БАТЧИМЭГ",
-    role: "Ахлах багш",
     achievements: ["Алтан гадас одонт багш", "Улсын математикийн олимпиадын аварга"],
   },
 ];
@@ -85,7 +84,6 @@ export default function TeamPage() {
 
                   <div className="px-6 py-6 flex flex-col flex-1">
                     <b className="text-[1.1rem] font-extrabold tracking-[-.01em]">{member.name}</b>
-                    <span className="text-[.88rem] text-blue-strong font-bold mt-0.5">{member.role}</span>
 
                     {member.achievements && (
                       <div className="flex flex-col gap-2 mt-4">
@@ -98,9 +96,9 @@ export default function TeamPage() {
                       </div>
                     )}
 
-                    {member.slug && (
+                    {member.href && (
                       <Link
-                        href={`/team/${member.slug}`}
+                        href={member.href}
                         className="inline-flex items-center gap-1.5 font-extrabold text-[.88rem] text-blue-strong mt-auto pt-5"
                       >
                         Дэлгэрэнгүй <span>→</span>
