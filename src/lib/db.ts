@@ -898,7 +898,19 @@ export async function setProgramArticles(programId: string, articleIds: string[]
   if (clearError) throw clearError;
   if (articleIds.length === 0) return;
 
-  const rows = articleIds.map((articleId, position) => ({
+  // Drop ids whose article no longer exists. Without this the foreign key
+  // rejects the whole insert and the course save fails with a 500 — losing the
+  // teacher's other edits because somebody deleted an article in another tab.
+  const { data: live, error: liveError } = await getSupabase()
+    .from("articles")
+    .select("id")
+    .in("id", articleIds);
+  if (liveError) throw liveError;
+  const existing = new Set((live as { id: string }[]).map((a) => a.id));
+  const kept = articleIds.filter((id) => existing.has(id));
+  if (kept.length === 0) return;
+
+  const rows = kept.map((articleId, position) => ({
     program_id: programId,
     article_id: articleId,
     position,
