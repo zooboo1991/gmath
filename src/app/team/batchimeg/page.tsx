@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -21,10 +22,18 @@ export default function BatchimegPage() {
         <section className="section-pad">
           <div className="wrap">
             <div className="grid grid-cols-1 nav:grid-cols-[.9fr_1.1fr] gap-[30px] nav:gap-[48px] items-center max-w-[980px] mx-auto">
-              <div className="relative aspect-[4/5] rounded-lg border border-line shadow-sm overflow-hidden max-w-[360px] nav:max-w-none mx-auto nav:mx-0 w-full bg-bg-soft grid place-items-center">
-                <span className="w-24 h-24 rounded-full bg-surface border border-line grid place-items-center text-ink-3 font-extrabold text-[1.6rem]">
-                  ББ
-                </span>
+              <div className="relative aspect-[4/5] rounded-lg border border-line shadow-sm overflow-hidden max-w-[360px] nav:max-w-none mx-auto nav:mx-0 w-full bg-bg-soft">
+                <Image
+                  src="/images/batchimeg-photo.jpg"
+                  alt="Багш Б.Батчимэг"
+                  fill
+                  sizes="(max-width: 980px) 360px, 45vw"
+                  /* The portrait is taller than the 4:5 frame, and the face
+                     sits high in it, so the crop is biased upward instead of
+                     trimming equally from both ends. */
+                  className="object-cover object-[center_28%]"
+                  priority
+                />
               </div>
 
               <div>

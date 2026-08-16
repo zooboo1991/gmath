@@ -32,6 +32,7 @@ const team: TeamMember[] = [
   },
   {
     slug: "batchimeg",
+    photo: "/images/batchimeg-photo.jpg",
     name: "Б.БАТЧИМЭГ",
     role: "Ахлах багш",
     achievements: ["Алтан гадас одонт багш", "Улсын математикийн олимпиадын аварга"],

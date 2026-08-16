@@ -63,8 +63,15 @@
 
   /* ---- Layout ---- */
   --container-page: 1180px;
-  --breakpoint-nav: 980px;
-  --breakpoint-xs: 460px;
+  /* In rem, not px, and that is load-bearing: Tailwind emits px-valued
+     breakpoints in a block *before* the rem-valued defaults, so at any width
+     above both, `sm:` (40rem) came later in the file and beat `nav:` (980px)
+     on equal specificity. Every `sm:… nav:…` pair on the site — the team
+     grid, the related-course strips, the classroom-class row — silently
+     rendered at the `sm:` column count. Same rem scale as the defaults keeps
+     them sorted together and in ascending order. */
+  --breakpoint-nav: 61.25rem; /* 980px */
+  --breakpoint-xs: 28.75rem; /* 460px */
 
   /* ---- Font ---- */
   --font-sans: var(--font-nunito), system-ui, -apple-system, "Segoe UI", sans-serif;
