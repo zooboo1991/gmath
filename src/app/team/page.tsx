@@ -37,10 +37,6 @@ const team: TeamMember[] = [
     role: "Ахлах багш",
     achievements: ["Алтан гадас одонт багш", "Улсын математикийн олимпиадын аварга"],
   },
-  {
-    name: "Т.ЗОЛБОО",
-    role: "Менежер",
-  },
 ];
 
 export default function TeamPage() {
@@ -57,7 +53,13 @@ export default function TeamPage() {
               түвшинд өрсөлдөх чадвартай багш нарын гарт даатгахыг эрхэмлэдэг.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 nav:grid-cols-3 gap-6 mt-[44px] max-w-[980px] mx-auto">
+            {/* Columns follow the head count: three members fill a three-column
+                row, two would leave a hole beside them. */}
+            <div
+              className={`grid grid-cols-1 sm:grid-cols-2 gap-6 mt-[44px] mx-auto ${
+                team.length >= 3 ? "nav:grid-cols-3 max-w-[980px]" : "max-w-[660px]"
+              }`}
+            >
               {team.map((member) => (
                 <div key={member.name} className="card-flat flex flex-col overflow-hidden">
                   <div className="relative aspect-[4/5] bg-bg-soft">
