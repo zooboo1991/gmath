@@ -65,11 +65,32 @@ const teachers = [
 
 const LOCATION = "Чонон бүрт төв, 4 давхар, 403 тоот";
 
-export default function SonginDetail({ course, related }: { course: Course; related: RelatedCourse[] }) {
+export default function SonginDetail({
+  course,
+  related,
+  seatsTaken,
+}: {
+  course: Course;
+  related: RelatedCourse[];
+  seatsTaken: number;
+}) {
   // Same shape the ordinary course page builds — /api/enroll reads `tag`
   // server-side for the payment description.
   const program = { id: course.id, label: `${course.title} (${course.tag})`, price: course.price, tag: course.tag };
   const slots = parseWeeklySchedule(course.weeklySchedule);
+
+  const capacity = course.capacity;
+  const full = capacity !== undefined && seatsTaken >= capacity;
+  const seatsLeft = capacity !== undefined ? Math.max(0, capacity - seatsTaken) : null;
+  // "3 seats left" is worth saying; "17 seats left" only says the room is
+  // empty, which is not what a parent should be told about a class.
+  const showSeatsLeft = seatsLeft !== null && seatsLeft > 0 && seatsLeft <= 5;
+
+  const fullNotice = (
+    <div className="rounded-full bg-red-soft/12 text-red-soft font-extrabold px-[26px] py-4 text-center">
+      Бүртгэл дүүрсэн байна
+    </div>
+  );
 
   return (
     <>
@@ -113,9 +134,15 @@ export default function SonginDetail({ course, related }: { course: Course; rela
           </div>
 
           <div className="mt-7">
-            <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
-              Сургалтанд бүртгүүлэх <span>→</span>
-            </RegisterTriggerButton>
+            {full ? (
+              <span className="inline-flex items-center gap-2.5 font-extrabold rounded-full bg-white/12 text-white px-[30px] py-[17px] text-[1.02rem]">
+                Бүртгэл дүүрсэн байна
+              </span>
+            ) : (
+              <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
+                Сургалтанд бүртгүүлэх <span>→</span>
+              </RegisterTriggerButton>
+            )}
           </div>
         </div>
       </section>
@@ -243,13 +270,23 @@ export default function SonginDetail({ course, related }: { course: Course; rela
               {course.price} <span className="text-[1rem] text-ink-3 font-bold">{course.period}</span>
             </b>
             <p className="text-ink-3 font-semibold text-[.92rem] mt-3">
-              Төлбөрийг улирлаар төлнө. Групп 18 сурагчтай тул суудлын тоо хязгаарлагдмал —
-              дүүрэхэд элсэлт хаагдана.
+              {full
+                ? `Энэ ангийн ${capacity} суудал дүүрсэн тул шинээр бүртгэхээ түр зогсоолоо. Дараагийн улирлын элсэлтийг сайтаар зарлана.`
+                : `Төлбөрийг улирлаар төлнө. Групп ${capacity ?? 18} сурагчтай тул суудлын тоо хязгаарлагдмал — дүүрэхэд элсэлт хаагдана.`}
             </p>
+            {showSeatsLeft && (
+              <p className="text-gold-strong font-extrabold text-[.92rem] mt-2">
+                Үлдсэн {seatsLeft} суудал
+              </p>
+            )}
             <div className="mt-6">
-              <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
-                Бүртгүүлэх <span>→</span>
-              </RegisterTriggerButton>
+              {full ? (
+                fullNotice
+              ) : (
+                <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
+                  Бүртгүүлэх <span>→</span>
+                </RegisterTriggerButton>
+              )}
             </div>
           </div>
         </div>

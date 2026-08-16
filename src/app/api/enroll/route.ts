@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   addRegistration,
+  countRegistrationsForProgram,
   findCourseById,
   findRegistrationByUserAndProgram,
   findYearlyProgramById,
@@ -50,6 +51,17 @@ export async function POST(request: Request) {
     const course = await findCourseById(programId);
     if (!course) {
       return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
+    }
+    // The seat limit is enforced here, not only on the page: the page a
+    // visitor is looking at may have been rendered before the last seat went.
+    if (course.capacity !== undefined) {
+      const taken = await countRegistrationsForProgram(course.id);
+      if (taken >= course.capacity) {
+        return NextResponse.json(
+          { ok: false, error: "Энэ ангийн бүртгэл дүүрсэн байна." },
+          { status: 409 }
+        );
+      }
     }
     programLabel = `${course.title} (${course.tag})`;
     price = course.price;

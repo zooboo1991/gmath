@@ -108,6 +108,8 @@ export type Course = {
   template?: string;
   /** Recurring timetable, one "<өдөр> <цаг>" line per day. */
   weeklySchedule?: string;
+  /** Seats in the group. Undefined = no limit. */
+  capacity?: number;
 };
 
 /**
@@ -228,6 +230,7 @@ type CourseRow = {
   show_on_homepage: boolean;
   template: string | null;
   weekly_schedule: string | null;
+  capacity: number | null;
 };
 
 type YearlyProgramRow = {
@@ -328,6 +331,7 @@ function courseFromRow(row: CourseRow): Course {
     showOnHomepage: row.show_on_homepage,
     template: row.template ?? undefined,
     weeklySchedule: row.weekly_schedule ?? undefined,
+    capacity: row.capacity ?? undefined,
   };
 }
 
@@ -682,7 +686,9 @@ export async function addCourse(input: Omit<Course, "id">): Promise<Course> {
 
 export async function updateCourse(
   id: string,
-  input: Partial<Omit<Course, "id">>
+  // `capacity: null` is how the admin clears the seat limit — undefined would
+  // mean "leave it alone", which would make a limit impossible to remove.
+  input: Partial<Omit<Course, "id" | "capacity">> & { capacity?: number | null }
 ): Promise<Course | undefined> {
   const patch: Record<string, unknown> = {};
   if (input.status !== undefined) patch.status = input.status;
@@ -701,6 +707,7 @@ export async function updateCourse(
   if (input.lessons !== undefined) patch.lessons = input.lessons;
   if (input.showOnHomepage !== undefined) patch.show_on_homepage = input.showOnHomepage;
   if (input.weeklySchedule !== undefined) patch.weekly_schedule = input.weeklySchedule || null;
+  if (input.capacity !== undefined) patch.capacity = input.capacity ?? null;
 
   const { data, error } = await getSupabase().from("courses").update(patch).eq("id", id).select("*").maybeSingle();
   if (error) throw error;
@@ -1434,6 +1441,22 @@ export async function listAllRegistrations(): Promise<(Registration & { user?: P
       user: users ? toPublicUser(userFromRow(users)) : undefined,
     };
   });
+}
+
+/**
+ * Seats claimed on a course. Counts 'pending' alongside 'active' because a
+ * seat is taken the moment somebody registers — waiting for a bank transfer to
+ * clear should not let a nineteenth child in. An abandoned pending row is the
+ * admin's to delete from the roster, which frees the seat again.
+ */
+export async function countRegistrationsForProgram(programId: string): Promise<number> {
+  const { count, error } = await getSupabase()
+    .from("registrations")
+    .select("id", { count: "exact", head: true })
+    .eq("program_id", programId)
+    .in("status", ["pending", "active"]);
+  if (error) throw error;
+  return count ?? 0;
 }
 
 export async function listRegistrationsByProgram(

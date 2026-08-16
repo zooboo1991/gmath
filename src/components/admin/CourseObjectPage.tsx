@@ -107,6 +107,7 @@ export default function CourseObjectPage({
     lessons: course?.lessons ?? ([] as Lesson[]),
     showOnHomepage: course?.showOnHomepage ?? false,
     weeklySchedule: course?.weeklySchedule ?? "",
+    capacity: course?.capacity !== undefined ? String(course.capacity) : "",
   });
   const parsedTag = parseCourseTag(course?.tag ?? "");
   const [tagCategory, setTagCategory] = useState<CourseCategory | "">(parsedTag.category);
@@ -456,6 +457,15 @@ export default function CourseObjectPage({
                     </AdminField>
                   </div>
                 )}
+                <AdminField label="Суудлын хязгаар (хоосон бол хязгааргүй)">
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.capacity}
+                    onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+                    placeholder="18"
+                  />
+                </AdminField>
                 {/* Only the classroom-course layout renders a weekly
                     timetable, so only it shows the field. */}
                 {course?.template === "songon" && (

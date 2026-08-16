@@ -761,3 +761,9 @@ alter table courses add column if not exists template text;
 -- Free text rather than a table of its own: the teacher edits three lines a
 -- term, and a jsonb schema would buy nothing but an editor to maintain.
 alter table courses add column if not exists weekly_schedule text;
+
+-- Group size limit. Null means no limit, which is every course that existed
+-- before the classroom groups — a room seats 18 and an online course does not.
+-- Both 'pending' and 'active' count against it: a seat is claimed the moment
+-- somebody registers, and an abandoned pending row is for the admin to remove.
+alter table courses add column if not exists capacity smallint;

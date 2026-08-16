@@ -76,6 +76,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     lessons,
     showOnHomepage: data.showOnHomepage !== undefined ? data.showOnHomepage === true : undefined,
     weeklySchedule: data.weeklySchedule !== undefined ? data.weeklySchedule?.trim() || "" : undefined,
+    // "" (or anything unparseable) clears the limit rather than silently
+    // capping the class at NaN.
+    capacity:
+      data.capacity !== undefined
+        ? Number.isFinite(Number(data.capacity)) && Number(data.capacity) > 0
+          ? Math.floor(Number(data.capacity))
+          : null
+        : undefined,
   });
 
   if (!course) {

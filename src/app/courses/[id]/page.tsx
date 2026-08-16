@@ -5,7 +5,12 @@ import Footer from "@/components/Footer";
 import CourseDetail, { type RelatedCourse } from "@/components/program/CourseDetail";
 import SonginDetail from "@/components/program/SonginDetail";
 import JsonLd, { SITE_URL } from "@/components/JsonLd";
-import { findCourseById, listPublishedCourseSummaries, listYearlyPrograms } from "@/lib/db";
+import {
+  countRegistrationsForProgram,
+  findCourseById,
+  listPublishedCourseSummaries,
+  listYearlyPrograms,
+} from "@/lib/db";
 import { toIsoDate } from "@/lib/courseDate";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +31,11 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   if (!course || course.status !== "published") notFound();
 
   // Four, so dropping the current course still leaves three to show.
-  const [otherCourses, yearlyPrograms] = await Promise.all([
+  // The seat count is only read for a course that actually has a limit.
+  const [otherCourses, yearlyPrograms, seatsTaken] = await Promise.all([
     listPublishedCourseSummaries(4),
     listYearlyPrograms(),
+    course.capacity !== undefined ? countRegistrationsForProgram(course.id) : Promise.resolve(0),
   ]);
   const otherDbCourses = otherCourses.filter((c) => c.id !== course.id);
   const related: RelatedCourse[] = [
@@ -78,7 +85,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
         {/* `template` picks the layout; every course without one keeps the
             page it has always had. */}
         {course.template === "songon" ? (
-          <SonginDetail course={course} related={related} />
+          <SonginDetail course={course} related={related} seatsTaken={seatsTaken} />
         ) : (
           <CourseDetail course={course} related={related} />
         )}
