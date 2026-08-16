@@ -7,7 +7,6 @@ import type { RelatedCourse } from "./CourseDetail";
 import { parseWeeklySchedule } from "@/lib/weeklySchedule";
 import {
   IconCalendar,
-  IconCheckCircle,
   IconClock,
   IconLocation,
   IconPeopleHero,
@@ -251,10 +250,6 @@ export default function SonginDetail({ course, related }: { course: Course; rela
               <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
                 Бүртгүүлэх <span>→</span>
               </RegisterTriggerButton>
-            </div>
-            <div className="flex items-center justify-center gap-2 mt-5 text-ink-3">
-              <IconCheckCircle className="w-4 h-4 text-green" />
-              <span className="font-semibold text-[.85rem]">Бүртгэл баталгаажмагц багш тантай холбогдоно</span>
             </div>
           </div>
         </div>
