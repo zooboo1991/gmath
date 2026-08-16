@@ -100,3 +100,44 @@ export const courseAboutItems = [
     text: "Сургалтын фэйсбүүк групп үүсгэх ба группт сургалтын талаарх зүйлсээ чөлөөтэй ярилцдаг.",
   },
 ];
+
+/**
+ * The in-person "Сонгон бэлтгэл" classes, in words.
+ *
+ * These four classes share everything but their timetable and price, and the
+ * shared part is written here rather than in the page so the chatbot answers
+ * from the same sentences a parent reads on /courses/songon5. A parent asking
+ * the bot "хаана хичээллэдэг вэ", "хэдэн хүүхэдтэй групп вэ" used to get
+ * nothing: those facts only existed inside the page component.
+ *
+ * The timetable, price and remaining seats are NOT here — they come from the
+ * course row, so they stay true without an edit here.
+ */
+export const songonProgram = {
+  summary:
+    "Стандарт ангид сурдаг ч сонгоны ангийн түвшинд суралцах боломж олгох, Улсын математикийн аварга багш нарын хамтарсан танхимын сургалт.",
+  goal:
+    "Энгийн ангид суралцдаг хүүхдүүдэд сонгоны ангийн түвшний математикийн мэдлэгийг эзэмшүүлэх зорилготой. Сурагчийн одоогийн түвшнээс эхлэн суурь цоорхойг нөхөж, шат ахиулан гүнзгийрүүлнэ.",
+  content:
+    "Стандарт ангийн хичээл дээр үзэж буй агуулгыг бататгах + олимпиадын анхан шатны хичээлүүд.",
+  groupSize: 18,
+  frequency: "7 хоногт 3 удаа, хичээл тус бүр 2 цаг",
+  enrolment: "Улирал бүрээр төлбөрөө төлж, бүртгэлээ баталгаажуулна.",
+  location: "Чонон бүрт төв, 4 давхар, 403 тоот",
+  scheduleNote:
+    "Хуваарь нь ойролцоох сургуулиудын ээлжийн цагтай уялдуулан зохиогдсон: өглөө ээлжийн сурагчид үдээс хойш, өдөр ээлжийн сурагчид өглөө хичээллэнэ.",
+  teachers: [
+    {
+      slug: "batchimeg",
+      name: "Б.Батчимэг",
+      role: "Үндсэн багш",
+      text: "Алтан гадас одонт, Улсын математикийн олимпиадын аварга, багш нарын ур чадварын уралдааны тэргүүн байр эзэлж байсан, олон жилийн туршлагатай багш танхимын хичээлийг тогтмол удирдана.",
+    },
+    {
+      slug: "ganbat",
+      name: "Б.Ганбат",
+      role: "Олимпиадын багш",
+      text: "Олимпиадын анхан шатны хичээлүүдийг орно.",
+    },
+  ],
+};

@@ -645,6 +645,32 @@ export async function listPublishedCourseSummaries(limit?: number): Promise<Cour
   return data as CourseSummary[];
 }
 
+/**
+ * The classroom classes, with their remaining seats worked out.
+ *
+ * Only the chatbot needs this shape: it has to answer "аль өдөр хичээллэдэг
+ * вэ" and "суудал үлдсэн үү" in one breath, and the seat count is a live
+ * number rather than something written into the prompt by hand.
+ */
+export async function listSongonClasses(): Promise<(Course & { seatsLeft: number })[]> {
+  const { data, error } = await getSupabase()
+    .from("courses")
+    .select("*")
+    .eq("template", "songon")
+    .eq("status", "published")
+    .order("title");
+  if (error) throw error;
+
+  const classes = (data as CourseRow[]).map(courseFromRow);
+  const taken = await Promise.all(
+    classes.map((c) => (c.capacity === undefined ? Promise.resolve(0) : countRegistrationsForProgram(c.id)))
+  );
+  return classes.map((c, i) => ({
+    ...c,
+    seatsLeft: c.capacity === undefined ? Number.MAX_SAFE_INTEGER : Math.max(0, c.capacity - taken[i]),
+  }));
+}
+
 /** Homepage's "Сургалтууд" section — admin opts a course in via a checkbox on its edit page. */
 export async function listHomepageCourses(): Promise<CourseSummary[]> {
   const { data, error } = await getSupabase()

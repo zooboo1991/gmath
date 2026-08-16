@@ -4,7 +4,31 @@ import Reveal from "@/components/Reveal";
 import CourseCard from "@/components/CourseCard";
 import { RegisterTriggerButton } from "./ProgramRegister";
 import type { RelatedCourse } from "./CourseDetail";
+import { songonProgram } from "@/lib/siteContent";
 import { parseWeeklySchedule } from "@/lib/weeklySchedule";
+
+// Wording comes from siteContent.ts so the chatbot answers from the same
+// sentences; only the icons and colours are decided here.
+const highlights = [
+  {
+    icon: <IconPeopleHero className="w-6 h-6" />,
+    iconBg: "bg-blue-soft text-blue-strong",
+    title: "Цөөн хүүхэдтэй групп",
+    text: `Групп бүр дээд тал нь ${songonProgram.groupSize} сурагчтай тул багш хүүхэд бүрт хүрч ажиллана.`,
+  },
+  {
+    icon: <IconClock className="w-6 h-6" />,
+    iconBg: "bg-gold-soft text-gold-strong",
+    title: "Тогтмол давтамж",
+    text: `${songonProgram.frequency} үргэлжилнэ.`,
+  },
+  {
+    icon: <IconCalendar className="w-6 h-6" />,
+    iconBg: "bg-green-soft text-green",
+    title: "Улирал бүр элсэлт",
+    text: songonProgram.enrolment,
+  },
+];
 import {
   IconCalendar,
   IconClock,
@@ -26,44 +50,6 @@ import {
  * about a classroom course are different: which days, at what time, where, how
  * many children in the room, and who is standing in front of them.
  */
-
-const highlights = [
-  {
-    icon: <IconPeopleHero className="w-6 h-6" />,
-    iconBg: "bg-blue-soft text-blue-strong",
-    title: "Цөөн хүүхэдтэй групп",
-    text: "Групп бүр дээд тал нь 18 сурагчтай тул багш хүүхэд бүрт хүрч ажиллана.",
-  },
-  {
-    icon: <IconClock className="w-6 h-6" />,
-    iconBg: "bg-gold-soft text-gold-strong",
-    title: "Тогтмол давтамж",
-    text: "7 хоногт 3 удаа, хичээл тус бүр 2 цаг үргэлжилнэ.",
-  },
-  {
-    icon: <IconCalendar className="w-6 h-6" />,
-    iconBg: "bg-green-soft text-green",
-    title: "Улирал бүр элсэлт",
-    text: "Улирал бүрээр төлбөрөө төлж, бүртгэлээ баталгаажуулна.",
-  },
-];
-
-const teachers = [
-  {
-    slug: "batchimeg",
-    name: "Б.Батчимэг",
-    role: "Үндсэн багш",
-    text: "Алтан гадас одонт, Улсын математикийн олимпиадын аварга, багш нарын ур чадварын уралдааны тэргүүн байр эзэлж байсан, олон жилийн туршлагатай багш танхимын хичээлийг тогтмол удирдана.",
-  },
-  {
-    slug: "ganbat",
-    name: "Б.Ганбат",
-    role: "Олимпиадын багш",
-    text: "Олимпиадын анхан шатны хичээлүүдийг орно.",
-  },
-];
-
-const LOCATION = "Чонон бүрт төв, 4 давхар, 403 тоот";
 
 export default function SonginDetail({
   course,
@@ -105,8 +91,7 @@ export default function SonginDetail({
             {course.title}
           </h1>
           <p className="mt-4 text-navy-ink-2 text-[1.05rem] font-semibold max-w-[56ch]">
-            Стандарт ангид сурдаг ч, сонгоны ангийн түвшинд суралцах боломж. Улсын математикийн
-            аварга багш нарын хамтарсан танхимын сургалт.
+            {songonProgram.summary}
           </p>
 
           <div className="flex gap-[26px] mt-[26px] flex-wrap">
@@ -120,7 +105,7 @@ export default function SonginDetail({
             <div className="flex items-center gap-[10px]">
               <IconPeopleHero className="w-[22px] h-[22px] text-gold" />
               <div>
-                <b className="text-[1.3rem] font-extrabold block leading-none">18</b>
+                <b className="text-[1.3rem] font-extrabold block leading-none">{songonProgram.groupSize}</b>
                 <small className="text-navy-ink-2 font-bold text-[.78rem]">хүртэлх сурагч</small>
               </div>
             </div>
@@ -156,14 +141,9 @@ export default function SonginDetail({
             <h2 className="text-[clamp(1.6rem,3vw,2.1rem)] font-extrabold leading-[1.12] tracking-[-.02em] text-ink mt-4 text-balance">
               Стандарт ангиас сонгоны түвшин рүү
             </h2>
-            <p className="text-ink-2 font-medium mt-4 leading-[1.75]">
-              Энэхүү хөтөлбөр нь энгийн ангид суралцдаг хүүхдүүдэд сонгоны ангийн түвшний
-              математикийн мэдлэгийг эзэмшүүлэх зорилготой танхимын сургалт юм. Сурагчийн одоогийн
-              түвшнээс эхлэн суурь цоорхойг нөхөж, шат ахиулан гүнзгийрүүлнэ.
-            </p>
+            <p className="text-ink-2 font-medium mt-4 leading-[1.75]">{songonProgram.goal}</p>
             <p className="text-ink-3 font-semibold mt-3.5 leading-[1.7] text-[.95rem]">
-              <b className="text-ink-2">Хичээлийн агуулга:</b> стандарт ангийн хичээл дээр үзэж буй
-              агуулгыг бататгах + олимпиадын анхан шатны хичээлүүд.
+              <b className="text-ink-2">Хичээлийн агуулга:</b> {songonProgram.content}
             </p>
           </div>
 
@@ -215,15 +195,14 @@ export default function SonginDetail({
                 )}
 
                 <p className="text-ink-3 font-medium text-[.88rem] leading-[1.65] mt-4">
-                  Хуваарь нь ойролцоох сургуулиудын ээлжийн цагтай уялдуулан зохиогдсон: өглөө
-                  ээлжийн сурагчид үдээс хойш, өдөр ээлжийн сурагчид өглөө хичээллэнэ.
+                  {songonProgram.scheduleNote}
                 </p>
 
                 <div className="flex items-start gap-2.5 mt-5 bg-surface border border-line rounded-md px-4 py-3.5">
                   <IconLocation className="w-[18px] h-[18px] text-blue-strong shrink-0 mt-0.5" />
                   <div>
                     <b className="block font-extrabold text-ink text-[.92rem]">Байршил</b>
-                    <span className="text-ink-2 font-semibold text-[.9rem]">{LOCATION}</span>
+                    <span className="text-ink-2 font-semibold text-[.9rem]">{songonProgram.location}</span>
                   </div>
                 </div>
               </div>
@@ -233,7 +212,7 @@ export default function SonginDetail({
                   Багшлах бүрэлдэхүүн
                 </span>
                 <div className="flex flex-col gap-3.5 mt-5">
-                  {teachers.map((t) => (
+                  {songonProgram.teachers.map((t) => (
                     <div key={t.name} className="bg-surface border border-line rounded-md px-[18px] py-[18px]">
                       <div className="flex items-baseline justify-between gap-3 flex-wrap">
                         <Link
@@ -272,7 +251,7 @@ export default function SonginDetail({
             <p className="text-ink-3 font-semibold text-[.92rem] mt-3">
               {full
                 ? `Энэ ангийн ${capacity} суудал дүүрсэн тул шинээр бүртгэхээ түр зогсоолоо. Дараагийн улирлын элсэлтийг сайтаар зарлана.`
-                : `Төлбөрийг улирлаар төлнө. Групп ${capacity ?? 18} сурагчтай тул суудлын тоо хязгаарлагдмал — дүүрэхэд элсэлт хаагдана.`}
+                : `Төлбөрийг улирлаар төлнө. Групп ${capacity ?? songonProgram.groupSize} сурагчтай тул суудлын тоо хязгаарлагдмал — дүүрэхэд элсэлт хаагдана.`}
             </p>
             {showSeatsLeft && (
               <p className="text-gold-strong font-extrabold text-[.92rem] mt-2">

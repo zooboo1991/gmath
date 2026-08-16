@@ -1,8 +1,15 @@
 import type { ChatChannel } from "../db";
-import { listArticles, listPublishedCourseSummaries, listRegistrationsByUser, listYearlyPrograms } from "../db";
-import { courseAboutItems, siteAchievements, siteFaqs, siteFeatures } from "../siteContent";
+import {
+  listArticles,
+  listPublishedCourseSummaries,
+  listRegistrationsByUser,
+  listSongonClasses,
+  listYearlyPrograms,
+} from "../db";
+import { courseAboutItems, siteAchievements, siteFaqs, siteFeatures, songonProgram } from "../siteContent";
 import { SITE_URL } from "../siteUrl";
-import { courseHref } from "@/lib/courseHref";
+import { courseHref } from "../courseHref";
+import { parseWeeklySchedule } from "../weeklySchedule";
 
 const BASE_PROMPT = `Та бол gmath.mn сайтын туслах чатбот. gmath.mn нь Б.Ганбат багшийн олимпиадын математикийн онлайн сургалтын сайт бөгөөд 4–12-р ангийн сурагчид болон багш нарт зориулсан сургалт, түвшин тогтоох үнэлгээ, сертификатын үйлчилгээ үзүүлдэг.
 
@@ -94,10 +101,11 @@ export async function buildSystemPrompt({
   userId,
   channel = "website",
 }: { userId?: string; channel?: ChatChannel } = {}): Promise<string> {
-  const [courses, yearly, articles] = await Promise.all([
+  const [courses, yearly, articles, songon] = await Promise.all([
     listPublishedCourseSummaries(),
     listYearlyPrograms(),
     listArticles(),
+    listSongonClasses(),
   ]);
 
   const base = channel === "messenger" ? SITE_URL : "";
@@ -122,6 +130,44 @@ export async function buildSystemPrompt({
       ? `Одоо нээлттэй сургалтууд:\n${catalogue.join("\n")}`
       : "Одоогоор нээлттэй сургалт байхгүй байна."
   );
+
+  // The classroom classes need a section of their own: the questions a parent
+  // asks about them — which days, what time, where, is there still room — are
+  // answered by the timetable and the seat count, neither of which fits in the
+  // one-line catalogue entry above.
+  if (songon.length > 0) {
+    const p = songonProgram;
+    const rows = songon.map((c) => {
+      const days = parseWeeklySchedule(c.weeklySchedule)
+        .map((s) => `${s.day} ${s.time}`)
+        .join(", ");
+      // Spelled out, not "18/18": the first phrasing tried was read by the
+      // model as eighteen seats *taken*, and it told a parent the class was
+      // full when every seat was free.
+      const seats =
+        c.capacity === undefined
+          ? ""
+          : c.seatsLeft <= 0
+            ? ` Бүртгэл ДҮҮРСЭН (${c.capacity} суудал бүгд дүүрсэн) — шинээр бүртгэхгүй.`
+            : ` Нийт ${c.capacity} суудлаас ${c.seatsLeft} нь сул байна, бүртгэл нээлттэй.`;
+      return `- ${c.title}: ${days || "хуваарь тодорхойгүй"}. Төлбөр ${c.price}${c.period}.${seats} Хуудас: ${base}${courseHref(c)}`;
+    });
+    sections.push(
+      [
+        "Сонгон бэлтгэлийн танхимын ангиуд (5-8-р анги):",
+        p.summary,
+        `Зорилго: ${p.goal}`,
+        `Хичээлийн агуулга: ${p.content}`,
+        `Давтамж: ${p.frequency}. Групп бүр дээд тал нь ${p.groupSize} сурагчтай.`,
+        `Элсэлт: ${p.enrolment}`,
+        `Байршил: ${p.location}`,
+        p.scheduleNote,
+        `Багш нар: ${p.teachers.map((t) => `${t.name} (${t.role})`).join(", ")}.`,
+        "",
+        ...rows,
+      ].join("\n")
+    );
+  }
 
   // Titles + links only. Enough for "хүүхэд минь бодлого бодохдоо гацдаг" to
   // get pointed at the article that actually covers it, without pulling 36
