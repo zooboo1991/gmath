@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Нэвтрээгүй байна" }, { status: 401 });
   }
 
-  const { programId, payMethod } = await request.json();
+  const { programId, payMethod } = await request.json().catch(() => ({}));
 
   if (!programId || typeof programId !== "string") {
     return NextResponse.json({ ok: false, error: "Сургалтын мэдээлэл дутуу байна" }, { status: 400 });
@@ -54,8 +54,9 @@ export async function POST(request: Request) {
     }
     // The seat limit is enforced here, not only on the page: the page a
     // visitor is looking at may have been rendered before the last seat went.
+    // The caller's own seat is excluded — see countRegistrationsForProgram.
     if (course.capacity !== undefined) {
-      const taken = await countRegistrationsForProgram(course.id);
+      const taken = await countRegistrationsForProgram(course.id, { excludeUserId: user.id });
       if (taken >= course.capacity) {
         return NextResponse.json(
           { ok: false, error: "Энэ ангийн бүртгэл дүүрсэн байна." },
@@ -180,6 +181,11 @@ export async function POST(request: Request) {
     }
 
     const updated = await updateRegistration(registration.id, {
+      // The row being reused here may have been created by the bank-transfer
+      // option a moment earlier (same student, same course, so
+      // findRegistrationByUserAndProgram hands it back). It is now paying by
+      // QPay and every downstream check reads this column, so it has to say so.
+      pay_method: "qpay",
       qpay_invoice_id: start.invoiceId,
       qpay_qr_image: start.qrImage,
       qpay_short_url: start.shortUrl,

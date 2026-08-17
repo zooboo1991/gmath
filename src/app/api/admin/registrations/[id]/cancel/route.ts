@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
-import { deleteRegistration, findRegistrationById, settleRegistrationPayment } from "@/lib/db";
+import { cancelPendingRegistration, findRegistrationById, settleRegistrationPayment } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { getPaymentProvider } from "@/lib/payment";
 import { isFullAdmin } from "@/lib/session";
 
 /**
- * Admin-side counterpart to /api/enroll/[id]/cancel — clears out a
- * registration a student abandoned (closed the QR, payment never arrived)
- * instead of leaving it stuck in the "Баталгаажуулах" queue forever, with
- * no way to tell it apart from one genuinely awaiting a bank transfer.
+ * Admin-side counterpart to /api/enroll/[id]/cancel — takes a registration a
+ * student abandoned (closed the QR, payment never arrived) out of the
+ * "Баталгаажуулах" queue, where it would otherwise sit forever, indistinguishable
+ * from one genuinely awaiting a bank transfer.
+ *
+ * The row is marked cancelled, not deleted: what was cancelled, for whom and for
+ * how much stays readable in the admin list afterwards. It holds no seat and
+ * doesn't stop that student registering for the course again.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isFullAdmin())) {
@@ -20,6 +24,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!registration) {
     return NextResponse.json({ ok: false, error: "Бүртгэл олдсонгүй" }, { status: 404 });
   }
+  if (registration.status === "cancelled") {
+    return NextResponse.json({ ok: true, registration });
+  }
   if (registration.status !== "pending") {
     return NextResponse.json(
       { ok: false, error: "Энэ бүртгэл аль хэдийн баталгаажсан байна", paid: true },
@@ -30,7 +37,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     // Catch a payment that only just arrived — QPay's own record of a paid
     // invoice always wins over an admin cancel click, so the registration
-    // must never be deleted out from under it.
+    // must never be cancelled out from under it.
     const settled = await settleRegistrationPayment(id);
     const current = settled ?? registration;
     if (current.status !== "pending") {
@@ -43,7 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (current.qpayInvoiceId) {
       await getPaymentProvider().cancelPayment(current.qpayInvoiceId);
     }
-    await deleteRegistration(id);
+    const cancelled = await cancelPendingRegistration(id);
 
     await logAdminAction(request, {
       actionType: "registration.cancel_pending",
@@ -51,9 +58,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       details: { programId: registration.programId, programLabel: registration.programLabel, price: registration.price },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, registration: cancelled });
   } catch (err) {
     console.error("admin registration cancel failed", id, err);
+    // QPay refuses to void an invoice it has collected on. That is not a
+    // transient failure to retry — it means the money is in, and the honest
+    // answer is to say so rather than "try again".
+    if (err instanceof Error && err.message.includes("INVOICE_PAID")) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "QPay дээр төлбөр төлөгдсөн байна — цуцлах боломжгүй. «QPay-ээс шалгах» дарж баталгаажуулна уу.",
+          paid: true,
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ ok: false, error: "Цуцлахад алдаа гарлаа. Дахин оролдоно уу." }, { status: 502 });
   }
 }

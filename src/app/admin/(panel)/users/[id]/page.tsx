@@ -26,7 +26,8 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
   if (!user) notFound();
 
   const [registrations, loginLogs, chatConversations] = await Promise.all([
-    listRegistrationsByUser(id),
+    // The admin sees cancelled registrations too — that is the point of keeping them.
+    listRegistrationsByUser(id, { includeCancelled: true }),
     listLoginLogs(id),
     listChatConversationsByUser(id),
   ]);

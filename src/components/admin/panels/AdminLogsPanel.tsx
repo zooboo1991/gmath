@@ -13,6 +13,8 @@ const ACTION_LABELS: Record<string, string> = {
   "registration.manual_add": "Бүртгэл гараар нэмсэн",
   "registration.delete": "Бүртгэл хассан",
   "registration.approve": "Бүртгэл баталгаажуулсан",
+  "registration.qpay_check_paid": "QPay-ээс шалгаж баталгаажуулсан",
+  "registration.settle_manual": "Дансаар төлсөн гэж баталгаажуулсан",
   "registration.cancel_pending": "Хүлээгдэж буй бүртгэл цуцалсан",
   "registration.set_total_due": "Төлөх дүн тохируулсан",
   "registration.add_payment": "Төлбөр бүртгэсэн",

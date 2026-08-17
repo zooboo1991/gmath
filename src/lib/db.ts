@@ -33,7 +33,8 @@ function parseHostname(url: string): string | null {
 
 export type Role = "teacher" | "student";
 export type PayMethod = "qpay" | "bank" | "manual";
-export type RegistrationStatus = "pending" | "active";
+/** "cancelled" is a kept row, not a deleted one — see the schema comment on registrations_status_check. */
+export type RegistrationStatus = "pending" | "active" | "cancelled";
 export type CourseKind = "upcoming" | "vod";
 export type CourseStatus = "draft" | "published" | "archived";
 
@@ -573,6 +574,15 @@ export async function listLoginLogs(userId: string, limit = 50): Promise<LoginLo
   return (data as LoginLogRow[]).map(loginLogFromRow);
 }
 
+/**
+ * Changes a password and ends every session that was opened with the old one.
+ *
+ * Deleting the sessions is part of this operation, not the caller's job:
+ * somebody resets their password precisely when they think another person is
+ * in the account, and a reset that leaves the intruder signed in for another
+ * 30 days answers the wrong question. The caller issues a fresh session
+ * afterwards, so the device doing the reset stays signed in.
+ */
 export async function updateUserPassword(userId: string, newPassword: string): Promise<User | undefined> {
   const { hash, salt } = hashPassword(newPassword);
   const { data, error } = await getSupabase()
@@ -582,7 +592,12 @@ export async function updateUserPassword(userId: string, newPassword: string): P
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data ? userFromRow(data as UserRow) : undefined;
+  if (!data) return undefined;
+
+  const { error: sessionError } = await getSupabase().from("sessions").delete().eq("user_id", userId);
+  if (sessionError) throw sessionError;
+
+  return userFromRow(data as UserRow);
 }
 
 export async function updateUserProfile(
@@ -749,6 +764,12 @@ export async function updateCourse(
   if (input.weeklySchedule !== undefined) patch.weekly_schedule = input.weeklySchedule || null;
   if (input.capacity !== undefined) patch.capacity = input.capacity ?? null;
   if (input.slug !== undefined) patch.slug = input.slug || null;
+
+  // An empty patch is "nothing to change", not "no such course". PostgREST
+  // updates no rows for it and hands back nothing, which the caller used to
+  // read as a missing course and answer 404 — so a request that only carried
+  // article links was rejected, and the links were never written.
+  if (Object.keys(patch).length === 0) return findCourseById(id);
 
   const { data, error } = await getSupabase().from("courses").update(patch).eq("id", id).select("*").maybeSingle();
   if (error) throw error;
@@ -1254,6 +1275,7 @@ export async function linkPendingRegistrationsToUser(phone: string, userId: stri
     .from("registrations")
     .update({ user_id: userId, phone: null })
     .eq("phone", phone)
+    .neq("status", "cancelled")
     .is("user_id", null);
   if (error) throw error;
 }
@@ -1275,6 +1297,10 @@ export async function findRegistrationByUserAndProgram(
   const { data, error } = await getSupabase()
     .from("registrations")
     .select("*")
+    // A cancelled row is history, not something to resume — and it must not
+    // stand in the way of registering for the same course again. The unique
+    // indexes exclude cancelled rows for the same reason.
+    .neq("status", "cancelled")
     .eq("user_id", userId)
     .eq("program_id", programId)
     .maybeSingle();
@@ -1329,15 +1355,18 @@ async function notifyRegistrationActive(registration: Registration): Promise<voi
  * Re-checks a still-pending QPay registration and marks it active if QPay
  * confirms it settled. Safe to call repeatedly — from the callback, a
  * client poll, or a manual "Шалгах" click.
+ *
+ * The gate is the stored invoice id, deliberately NOT pay_method. A row can
+ * carry a live QPay invoice while pay_method still reads "bank" — the student
+ * opened the bank-transfer option first, then paid the QR — and gating on
+ * pay_method meant QPay's own callback for a PAID invoice was discarded in
+ * silence: money in, seat never granted, nothing in any queue to notice it.
+ * If QPay says an invoice we issued was paid, that settles the row and
+ * pay_method is corrected to match where the money actually came from.
  */
 export async function settleRegistrationPayment(id: string): Promise<Registration | undefined> {
   const registration = await findRegistrationById(id);
-  if (
-    !registration ||
-    registration.status !== "pending" ||
-    registration.payMethod !== "qpay" ||
-    !registration.qpayInvoiceId
-  ) {
+  if (!registration || registration.status !== "pending" || !registration.qpayInvoiceId) {
     return registration;
   }
   const result = await getPaymentProvider().checkPayment(registration.qpayInvoiceId);
@@ -1350,7 +1379,7 @@ export async function settleRegistrationPayment(id: string): Promise<Registratio
   // query here instead.
   const { data, error } = await getSupabase()
     .from("registrations")
-    .update({ status: "active", qpay_payment_id: result.reference })
+    .update({ status: "active", pay_method: "qpay", qpay_payment_id: result.reference })
     .eq("id", id)
     .eq("status", "pending")
     .select("*")
@@ -1360,6 +1389,27 @@ export async function settleRegistrationPayment(id: string): Promise<Registratio
   const updated = registrationFromRow(data as RegistrationRow);
   await notifyRegistrationActive(updated);
   return updated;
+}
+
+/**
+ * Marks a pending registration cancelled instead of deleting it, so the admin
+ * list still shows what was cancelled and for how much.
+ *
+ * Scoped to status="pending" like every other transition here: a payment that
+ * landed a moment ago must not be cancelled out from under itself. Returns the
+ * row as it now stands (undefined only if the id is gone).
+ */
+export async function cancelPendingRegistration(id: string): Promise<Registration | undefined> {
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .update({ status: "cancelled" })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return findRegistrationById(id);
+  return registrationFromRow(data as RegistrationRow);
 }
 
 export async function deleteRegistration(id: string): Promise<boolean> {
@@ -1382,6 +1432,38 @@ export async function setRegistrationTotalDue(id: string, totalDue: number): Pro
 // ---------------------------------------------------------------------------
 // Installment payments — see the schema comment on registration_payments.
 // ---------------------------------------------------------------------------
+
+/**
+ * Records money that reached the account outside QPay — almost always a bank
+ * transfer made by a parent who chose QPay on screen and then paid from their
+ * banking app anyway.
+ *
+ * It rewrites `pay_method` to "bank" rather than leaving "qpay" in place: the
+ * row has to say what actually happened, or the books claim a QPay payment
+ * that QPay has never heard of. The invoice id is kept for the audit trail.
+ *
+ * Scoped to status="pending" for the same reason approveRegistration is —
+ * a double-click must not notify the student twice.
+ */
+export async function settleRegistrationOutsideQpay(
+  id: string,
+  payment: { amount: number; paidAt: string }
+): Promise<Registration | undefined> {
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .update({ status: "active", pay_method: "bank" })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return findRegistrationById(id);
+
+  const registration = registrationFromRow(data as RegistrationRow);
+  await addRegistrationPayment({ registrationId: id, amount: payment.amount, paidAt: payment.paidAt });
+  await notifyRegistrationActive(registration);
+  return registration;
+}
 
 export type RegistrationPayment = {
   id: string;
@@ -1478,8 +1560,16 @@ type ProgramDetailsRow = {
   lessons: Lesson[] | null;
 };
 
-export async function listRegistrationsByUser(userId: string): Promise<RegistrationWithGroup[]> {
-  const { data, error } = await getSupabase().from("registrations").select("*").eq("user_id", userId);
+export async function listRegistrationsByUser(
+  userId: string,
+  // Cancelled rows are kept for the admin's records. To the student the
+  // registration is gone, which is what it looked like when cancelling deleted
+  // the row outright — so they are excluded unless a caller asks for them.
+  options: { includeCancelled?: boolean } = {}
+): Promise<RegistrationWithGroup[]> {
+  let rowQuery = getSupabase().from("registrations").select("*").eq("user_id", userId);
+  if (!options.includeCancelled) rowQuery = rowQuery.neq("status", "cancelled");
+  const { data, error } = await rowQuery;
   if (error) throw error;
   const registrations = (data as RegistrationRow[]).map(registrationFromRow);
 
@@ -1561,13 +1651,30 @@ export async function listAllRegistrations(): Promise<(Registration & { user?: P
  * seat is taken the moment somebody registers — waiting for a bank transfer to
  * clear should not let a nineteenth child in. An abandoned pending row is the
  * admin's to delete from the roster, which frees the seat again.
+ *
+ * `excludeUserId` answers a different question: not "how full is this class"
+ * but "may THIS student proceed". Their own held seat must not count against
+ * them, or a student who started a payment and came back to finish it is told
+ * the class is full — by their own booking.
  */
-export async function countRegistrationsForProgram(programId: string): Promise<number> {
-  const { count, error } = await getSupabase()
+export async function countRegistrationsForProgram(
+  programId: string,
+  options: { excludeUserId?: string } = {}
+): Promise<number> {
+  let query = getSupabase()
     .from("registrations")
     .select("id", { count: "exact", head: true })
     .eq("program_id", programId)
     .in("status", ["pending", "active"]);
+  // `user_id.neq.X` alone would also drop the rows where user_id IS NULL —
+  // in SQL, NULL <> 'x' is NULL, not true. Those are the registrations an
+  // admin added by phone number for a student with no account, and they hold
+  // a seat like any other.
+  if (options.excludeUserId) {
+    query = query.or(`user_id.is.null,user_id.neq.${options.excludeUserId}`);
+  }
+
+  const { count, error } = await query;
   if (error) throw error;
   return count ?? 0;
 }
@@ -1700,6 +1807,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   for (const row of rows) {
     const amount = parsePriceToNumber(row.price);
     const bucket = byCourse.get(row.program_label) ?? { active: 0, pending: 0 };
+
+    // Cancelled rows count towards nothing — they used to be deleted, and a
+    // plain `else` here would have quietly filed them under "pending".
+    if (row.status === "cancelled") continue;
 
     if (row.status === "active") {
       activeRegistrations += 1;
@@ -1863,8 +1974,11 @@ export async function getAnalyticsStatsForRange(fromDate: string, toDate: string
     .sort((a, b) => b.views - a.views)
     .slice(0, 6);
 
+  // A cancelled registration is not one this period produced — it read as one
+  // fewer here back when cancelling deleted the row, and it still should.
+  const liveRegRows = regRows.filter((r) => r.status !== "cancelled");
   let newRevenue = 0;
-  for (const r of regRows) {
+  for (const r of liveRegRows) {
     if (r.status === "active") newRevenue += parsePriceToNumber(r.price);
   }
 
@@ -1874,7 +1988,7 @@ export async function getAnalyticsStatsForRange(fromDate: string, toDate: string
     topPages,
     topReferrers,
     daily,
-    newRegistrations: regRows.length,
+    newRegistrations: liveRegRows.length,
     newRevenue,
     newUsers,
   };

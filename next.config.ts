@@ -19,6 +19,10 @@ const nextConfig: NextConfig = {
   // Nothing gains from advertising the framework in every response, and it
   // hands a scanner one free hint about what to try.
   poweredByHeader: false,
+  // Unset everywhere except the test runner, which builds into .next-test so
+  // `npm test` and a `npm run dev` already running in the same folder don't
+  // fight over one build directory.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

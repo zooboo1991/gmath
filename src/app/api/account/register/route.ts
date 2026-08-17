@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const data = await request.json();
+  const data = await request.json().catch(() => ({}));
   const errors: Record<string, string> = {};
 
   if (data.role !== "teacher" && data.role !== "student") errors.role = "Төрлөө сонгоно уу";

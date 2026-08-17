@@ -20,6 +20,13 @@ function StatusBadge({ status }: { status: RegistrationWithGroup["status"] }) {
       </span>
     );
   }
+  if (status === "cancelled") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[.78rem] font-extrabold text-ink-3 bg-bg-soft px-3 py-1 rounded-full">
+        Цуцалсан
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-1.5 text-[.78rem] font-extrabold text-gold-strong bg-gold-soft px-3 py-1 rounded-full">
       <IconClock className="w-3 h-3" /> Хүлээгдэж буй
@@ -78,6 +85,7 @@ export default function UserObjectPage({
 }) {
   const [tab, setTab] = useState<ObjectTab>("info");
   const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
+  const live = registrations.filter((r) => r.status !== "cancelled");
   const active = registrations.filter((r) => r.status === "active");
   const pending = registrations.filter((r) => r.status === "pending");
 
@@ -126,7 +134,7 @@ export default function UserObjectPage({
               w-full makes them wrap onto their own line instead of pushing the
               page into a horizontal scroll. */}
           <div className="grid grid-cols-3 gap-3 shrink-0 w-full nav:w-auto">
-            <KpiTile label="Сургалт" value={String(registrations.length)} />
+            <KpiTile label="Сургалт" value={String(live.length)} />
             <KpiTile label="Идэвхтэй" value={String(active.length)} tone="green" />
             <KpiTile label="Чат" value={String(chatConversations.length)} tone="blue" />
           </div>

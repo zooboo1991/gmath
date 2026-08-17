@@ -10,7 +10,7 @@ const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
 const GENERIC_MISMATCH_ERROR = "Утасны дугаар, и-мэйл хаяг таарахгүй байна";
 
 export async function POST(request: Request) {
-  const { phone, email, newPassword } = await request.json();
+  const { phone, email, newPassword } = await request.json().catch(() => ({}));
 
   if (!PHONE_RE.test(phone?.trim() ?? "")) {
     return NextResponse.json({ ok: false, error: "8 оронтой утасны дугаар оруулна уу" }, { status: 400 });

@@ -5,7 +5,7 @@ const PHONE_RE = /^[0-9]{8}$/;
 const CODE_RE = /^[0-9]{4}$/;
 
 export async function POST(request: Request) {
-  const { phone, purpose, code } = await request.json();
+  const { phone, purpose, code } = await request.json().catch(() => ({}));
 
   if (
     !PHONE_RE.test(phone?.trim() ?? "") ||

@@ -14,10 +14,27 @@
 const GUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 /**
+ * A Bunny Stream video zone: `vz-<hash>.b-cdn.net`, the host every asset link
+ * in the dashboard's "Video and asset links" list points at — HLS playlist,
+ * thumbnail, preview animation. They all carry the video's GUID in the first
+ * path segment.
+ *
+ * The `vz-` prefix is what keeps this narrow. A plain Bunny *storage* zone is
+ * also a `b-cdn.net` host, and a teacher pasting an mp4 from one of those means
+ * "play this file", not "this is a Stream video".
+ */
+const VIDEO_ZONE_RE = /\bvz-[a-z0-9-]+\.b-cdn\.net/i;
+
+/**
  * Pulls a video GUID out of whatever the teacher pasted: a bare GUID, a player
- * URL, or a whole `<iframe …>` block copied from the dashboard. Returns null
- * for anything that isn't a Bunny video — a Drive or YouTube link included,
- * which is how the caller decides whether to render the embedded player.
+ * URL, any of the asset links from the video's page, or a whole `<iframe …>`
+ * block copied from the dashboard. Returns null for anything that isn't a Bunny
+ * video — a Drive or YouTube link included, which is how the caller decides
+ * whether to render the embedded player.
+ *
+ * The asset links matter because they are what the dashboard offers first: a
+ * pasted thumbnail URL used to be filed as an external link, so the lesson
+ * opened a new tab onto a token-protected image and answered 403.
  */
 export function parseBunnyVideoId(value: string | undefined | null): string | null {
   if (!value) return null;
@@ -28,9 +45,9 @@ export function parseBunnyVideoId(value: string | undefined | null): string | nu
     return trimmed.toLowerCase();
   }
 
-  // Otherwise it must look like a Bunny player link before a GUID inside it
-  // means anything — a Drive URL can contain hex that resembles one.
-  if (!/mediadelivery\.net/i.test(trimmed)) return null;
+  // Otherwise it must look like a Bunny link before a GUID inside it means
+  // anything — a Drive URL can contain hex that resembles one.
+  if (!/mediadelivery\.net/i.test(trimmed) && !VIDEO_ZONE_RE.test(trimmed)) return null;
   const match = trimmed.match(GUID_RE);
   return match ? match[0].toLowerCase() : null;
 }

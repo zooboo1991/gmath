@@ -245,6 +245,7 @@ export default function CoursesPanel({
   const programStats = useMemo(() => {
     const map = new Map<string, { active: number; pending: number }>();
     for (const r of registrations) {
+      if (r.status === "cancelled") continue;
       const entry = map.get(r.programId) ?? { active: 0, pending: 0 };
       if (r.status === "active") entry.active += 1;
       else entry.pending += 1;

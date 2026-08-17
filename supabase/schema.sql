@@ -792,3 +792,29 @@ create table if not exists course_articles (
   primary key (program_id, article_id)
 );
 create index if not exists course_articles_program_idx on course_articles (program_id);
+
+-- ---------------------------------------------------------------------------
+-- Цуцалсан бүртгэл (устгахгүй)
+-- ---------------------------------------------------------------------------
+-- Cancelling a pending registration used to DELETE the row, which left no
+-- trace of what was cancelled, when, or for how much — the admin log held a
+-- copy but the registration itself was gone. A third status keeps the row and
+-- says what happened to it.
+--
+-- A cancelled row holds no seat (countRegistrationsForProgram counts only
+-- pending/active), never appears in the student's own list, and — via the two
+-- partial indexes below — does not block the same student from registering for
+-- that course again. Re-registration has to create a NEW row rather than
+-- revive this one: the QPay sender_invoice_no is derived from the row id and
+-- can never be reused once issued.
+alter table registrations drop constraint if exists registrations_status_check;
+alter table registrations add constraint registrations_status_check
+  check (status in ('pending', 'active', 'cancelled'));
+
+drop index if exists registrations_user_program_unique;
+create unique index if not exists registrations_user_program_unique
+  on registrations (user_id, program_id) where status <> 'cancelled';
+
+drop index if exists registrations_phone_program_unique;
+create unique index if not exists registrations_phone_program_unique
+  on registrations (phone, program_id) where user_id is null and status <> 'cancelled';

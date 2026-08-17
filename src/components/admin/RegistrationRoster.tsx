@@ -297,6 +297,10 @@ export default function RegistrationRoster({
                           <span className="inline-flex items-center gap-1.5 text-[.78rem] font-extrabold text-green bg-green-soft px-2.5 py-1 rounded-full">
                             <IconCheckCircle className="w-3 h-3" /> Идэвхтэй
                           </span>
+                        ) : r.status === "cancelled" ? (
+                          <span className="inline-flex items-center gap-1.5 text-[.78rem] font-extrabold text-ink-3 bg-bg-soft px-2.5 py-1 rounded-full">
+                            Цуцалсан
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 text-[.78rem] font-extrabold text-gold-strong bg-gold-soft px-2.5 py-1 rounded-full">
                             <IconClock className="w-3 h-3" /> Хүлээгдэж буй

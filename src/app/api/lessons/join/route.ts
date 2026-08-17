@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Нэвтэрнэ үү" }, { status: 401 });
   }
 
-  const { courseId, lessonIndex } = await request.json();
+  const { courseId, lessonIndex } = await request.json().catch(() => ({}));
   if (typeof courseId !== "string" || typeof lessonIndex !== "number") {
     return NextResponse.json({ ok: false, error: "Буруу хүсэлт" }, { status: 400 });
   }

@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // Same thing, for the build directory `npm test` uses.
+    ".next-test/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

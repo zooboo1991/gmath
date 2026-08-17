@@ -29,7 +29,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   // removed — a bare id is useless six months later.
   const registration = await findRegistrationById(id);
 
-  if (registration?.status === "pending" && registration.payMethod === "qpay" && registration.qpayInvoiceId) {
+  // Keyed on the stored invoice id, not pay_method — a row can read "bank" and
+  // still hold a live QPay invoice (see settleRegistrationPayment).
+  if (registration?.status === "pending" && registration.qpayInvoiceId) {
     const settled = await settleRegistrationPayment(id).catch(() => undefined);
     const current = settled ?? registration;
 

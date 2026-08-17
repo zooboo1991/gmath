@@ -1233,8 +1233,16 @@ export default function ProgramRegisterProvider({ children }: { children: React.
 
             {screen === "qpay-wait" && qpayQr && (
               <div className="text-center">
-                <p className="text-ink-2 font-medium mb-4">
+                <p className="text-ink-2 font-medium mb-2">
                   {program?.price} дүнгээ доорх QR-ийг банкны апп-аараа уншуулж төлнө үү.
+                </p>
+                {/* A parent who had already copied the transfer details did exactly
+                    this: opened the QR, then paid from their banking app by hand.
+                    QPay never hears about such a transfer, so the registration sat
+                    pending while the money was in the account. */}
+                <p className="text-[.82rem] font-semibold text-ink-3 mb-4">
+                  Гараар хийсэн дансны гүйлгээ энэ QR-т холбогдохгүй. Дансаар төлөх бол «Цуцлах»
+                  дараад «Дансаар шилжүүлэх»-ийг сонгоно уу.
                 </p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img

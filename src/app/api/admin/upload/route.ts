@@ -9,8 +9,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
 
-  const formData = await request.formData();
-  const file = formData.get("file");
+  // A body that isn't multipart makes formData() throw; "no file" is the
+  // honest answer to that, and it is the same 400 the next check gives.
+  const formData = await request.formData().catch(() => null);
+  const file = formData?.get("file");
   if (!(file instanceof File)) {
     return NextResponse.json({ ok: false, error: "Файл олдсонгүй" }, { status: 400 });
   }

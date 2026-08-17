@@ -5,7 +5,7 @@ import { requestOtp } from "@/lib/otp";
 const PHONE_RE = /^[0-9]{8}$/;
 
 export async function POST(request: Request) {
-  const { phone, email, purpose } = await request.json();
+  const { phone, email, purpose } = await request.json().catch(() => ({}));
 
   if (!PHONE_RE.test(phone?.trim() ?? "")) {
     return NextResponse.json({ ok: false, error: "8 оронтой утасны дугаар оруулна уу" }, { status: 400 });

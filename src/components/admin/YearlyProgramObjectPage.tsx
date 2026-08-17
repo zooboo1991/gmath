@@ -14,6 +14,7 @@ import LessonScheduleEditor from "./LessonScheduleEditor";
 import RegistrationRoster from "./RegistrationRoster";
 import { parseYouTubeId } from "@/lib/youtube";
 import ProgramArticlesEditor, { type ArticleOption } from "@/components/admin/ProgramArticlesEditor";
+import PendingRegistrationActions from "@/components/admin/PendingRegistrationActions";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 type SectionTab = "info" | "roster" | "confirm" | "report";
@@ -38,7 +39,6 @@ export default function YearlyProgramObjectPage({
   const [tab, setTab] = useState<SectionTab>("info");
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [payments, setPayments] = useState(initialPayments);
-  const [busyRegId, setBusyRegId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     tag: program.tag,
@@ -88,24 +88,19 @@ export default function YearlyProgramObjectPage({
     }
   };
 
-  const approve = async (id: string) => {
-    setBusyRegId(id);
-    try {
-      const res = await fetch(`/api/admin/registrations/${id}/approve`, { method: "POST" });
-      if (res.ok) {
-        setRegistrations((rs) => rs.map((r) => (r.id === id ? { ...r, status: "active" } : r)));
-      }
-    } finally {
-      setBusyRegId(null);
-    }
+  const patchRegistration = (id: string, patch: Partial<Registration>) => {
+    setRegistrations((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
 
+  // Cancelled rows stay in the roster (marked as such) but count towards
+  // nothing — they held a seat and a price only until they were cancelled.
+  const live = registrations.filter((r) => r.status !== "cancelled");
   const pending = registrations.filter((r) => r.status === "pending");
   const active = registrations.filter((r) => r.status === "active");
   const totalRevenue = active.reduce((sum, r) => sum + parsePriceToNumber(r.price), 0);
-  const qpayCount = registrations.filter((r) => r.payMethod === "qpay").length;
-  const bankCount = registrations.filter((r) => r.payMethod === "bank").length;
-  const manualCount = registrations.filter((r) => r.payMethod === "manual").length;
+  const qpayCount = live.filter((r) => r.payMethod === "qpay").length;
+  const bankCount = live.filter((r) => r.payMethod === "bank").length;
+  const manualCount = live.filter((r) => r.payMethod === "manual").length;
 
   return (
     <div className="min-h-screen bg-bg-soft">
@@ -150,7 +145,7 @@ export default function YearlyProgramObjectPage({
         <div className="wrap flex gap-1 overflow-x-auto">
           <AnchorTab label="Үндсэн мэдээлэл" active={tab === "info"} onClick={() => setTab("info")} />
           <AnchorTab
-            label={`Бүртгэл${registrations.length ? ` (${registrations.length})` : ""}`}
+            label={`Бүртгэл${live.length ? ` (${live.length})` : ""}`}
             active={tab === "roster"}
             onClick={() => setTab("roster")}
           />
@@ -299,7 +294,7 @@ export default function YearlyProgramObjectPage({
         )}
 
         {tab === "roster" && (
-          <Card title={`Бүртгүүлсэн сурагчид (${registrations.length})`}>
+          <Card title={`Бүртгүүлсэн сурагчид (${live.length})`}>
             <RegistrationRoster
               programId={program.id}
               registrations={registrations}
@@ -339,14 +334,10 @@ export default function YearlyProgramObjectPage({
                       </span>
                     </div>
                     {canEdit && (
-                      <button
-                        type="button"
-                        disabled={busyRegId === r.id}
-                        onClick={() => approve(r.id)}
-                        className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-white bg-gold-strong px-4 py-2 rounded-full disabled:opacity-50"
-                      >
-                        {busyRegId === r.id ? "…" : "Баталгаажуулах"}
-                      </button>
+                      <PendingRegistrationActions
+                        registration={r}
+                        onDone={(patch) => patchRegistration(r.id, patch)}
+                      />
                     )}
                   </div>
                 ))}
@@ -378,7 +369,7 @@ export default function YearlyProgramObjectPage({
         {tab === "report" && (
           <div className="flex flex-col gap-5">
             <div className="grid grid-cols-2 nav:grid-cols-4 gap-3.5">
-              <KpiTile label="Нийт бүртгэл" value={String(registrations.length)} />
+              <KpiTile label="Нийт бүртгэл" value={String(live.length)} />
               <KpiTile label="Идэвхтэй" value={String(active.length)} tone="green" />
               <KpiTile label="Хүлээгдэж буй" value={String(pending.length)} tone="gold" />
               <KpiTile label="Нийт орлого" value={formatMnt(totalRevenue)} tone="blue" />

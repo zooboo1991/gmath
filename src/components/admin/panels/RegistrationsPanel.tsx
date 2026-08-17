@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { PublicUser, Registration } from "@/lib/db";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
 import { payMethodLabel, programAdminHref } from "@/lib/registration";
+import PendingRegistrationActions from "@/components/admin/PendingRegistrationActions";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 
@@ -21,18 +22,8 @@ export default function RegistrationsPanel({
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const approve = async (id: string) => {
-    setBusyId(id);
-    try {
-      const res = await fetch(`/api/admin/registrations/${id}/approve`, { method: "POST" });
-      const json = await res.json();
-      if (res.ok) {
-        setRegistrations((rs) => rs.map((r) => (r.id === id ? { ...r, status: "active" } : r)));
-      }
-      void json;
-    } finally {
-      setBusyId(null);
-    }
+  const patchRegistration = (id: string, patch: Partial<Registration>) => {
+    setRegistrations((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
 
   // For a QPay checkout the student abandoned, or one that simply never got
@@ -40,13 +31,13 @@ export default function RegistrationsPanel({
   // and voids the QPay invoice so a stale QR can't move money later against
   // a registration that no longer exists on our side.
   const cancelRegistration = async (id: string) => {
-    if (!confirm("Энэ бүртгэлийг цуцлах уу? QPay-ийн нэхэмжлэл хүчингүй болж, бүртгэл устана.")) return;
+    if (!confirm("Энэ бүртгэлийг цуцлах уу? QPay-ийн нэхэмжлэл хүчингүй болж, бүртгэл «Цуцалсан» болно.")) return;
     setBusyId(id);
     try {
       const res = await fetch(`/api/admin/registrations/${id}/cancel`, { method: "POST" });
       const json = await res.json();
       if (res.ok) {
-        setRegistrations((rs) => rs.filter((r) => r.id !== id));
+        patchRegistration(id, { status: "cancelled" });
       } else if (json.paid) {
         // Lost the race with the student's own payment — reflect reality
         // instead of leaving a stale "pending" row in view.
@@ -93,6 +84,10 @@ export default function RegistrationsPanel({
             <span className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-green bg-green-soft px-3 py-1.5 rounded-full">
               <IconCheckCircle className="w-3.5 h-3.5" /> Идэвхтэй
             </span>
+          ) : r.status === "cancelled" ? (
+            <span className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-ink-3 bg-bg-soft px-3 py-1.5 rounded-full">
+              <IconClose className="w-3.5 h-3.5" /> Цуцалсан
+            </span>
           ) : !canEdit ? (
             <span className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-gold-strong bg-gold-soft px-3 py-1.5 rounded-full">
               <IconClock className="w-3.5 h-3.5" /> Хүлээгдэж буй
@@ -107,14 +102,10 @@ export default function RegistrationsPanel({
               >
                 <IconClose className="w-3.5 h-3.5" /> Цуцлах
               </button>
-              <button
-                type="button"
-                disabled={busyId === r.id}
-                onClick={() => approve(r.id)}
-                className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-white bg-gold-strong px-4 py-2 rounded-full disabled:opacity-50"
-              >
-                <IconClock className="w-3.5 h-3.5" /> {busyId === r.id ? "…" : "Баталгаажуулах"}
-              </button>
+              <PendingRegistrationActions
+                registration={r}
+                onDone={(patch) => patchRegistration(r.id, patch)}
+              />
             </div>
           )}
         </div>
