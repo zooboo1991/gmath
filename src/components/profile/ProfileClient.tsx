@@ -6,6 +6,7 @@ import FormField from "@/components/FormField";
 import SchoolAutocomplete from "@/components/SchoolAutocomplete";
 import PushSettings from "@/components/profile/PushSettings";
 import RecordingPlayer from "@/components/profile/RecordingPlayer";
+import LessonNoteButton from "@/components/profile/LessonNoteButton";
 import type { Certificate, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import {
   IconCheckCircle,
@@ -28,6 +29,7 @@ import {
   type CourseCategory,
 } from "@/lib/courseTag";
 import { getLessonStates, type LessonWithState } from "@/lib/lessonSchedule";
+import { formatMb } from "@/lib/imageResize";
 
 type Tab = "active" | "pending" | "certificates";
 type AudienceFilter = "all" | CourseAudience;
@@ -540,17 +542,39 @@ function LessonAction({
 
   if (!info) return null;
 
+  // The notes sit beside whatever else the lesson offers rather than replacing
+  // it: a lesson can have notes while its recording is still being uploaded,
+  // and a student who attended live wants the notes without the video at all.
+  const note = info.lesson.noteFile ? (
+    <LessonNoteButton
+      courseId={courseId}
+      lessonIndex={lessonIndex}
+      sizeLabel={info.lesson.noteSize ? formatMb(info.lesson.noteSize) : undefined}
+    />
+  ) : null;
+  const withNote = (action: React.ReactNode) =>
+    note ? (
+      <span className="flex items-center justify-end gap-2 flex-wrap shrink-0">
+        {action}
+        {note}
+      </span>
+    ) : (
+      action
+    );
+
   if (info.lesson.recordingLink) {
     // The link itself is no longer rendered: RecordingPlayer asks the server
     // for a signed, expiring URL and plays it here on the page.
-    return <RecordingPlayer courseId={courseId} lessonIndex={lessonIndex} topic={info.lesson.topic} />;
+    return withNote(
+      <RecordingPlayer courseId={courseId} lessonIndex={lessonIndex} topic={info.lesson.topic} />
+    );
   }
 
   if (info.state === "past") {
-    return <span className="shrink-0 font-bold text-[.78rem] text-ink-3">Бичлэг удахгүй</span>;
+    return withNote(<span className="shrink-0 font-bold text-[.78rem] text-ink-3">Бичлэг удахгүй</span>);
   }
 
-  if (!info.lesson.zoomLink) return null;
+  if (!info.lesson.zoomLink) return note;
 
   // The actual join link is resolved on click rather than rendered as a
   // plain href — a lesson with a tracked Zoom meeting needs a personal,

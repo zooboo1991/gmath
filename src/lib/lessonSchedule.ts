@@ -42,11 +42,16 @@ export function mongoliaLocalToUtc(isoDate: string, time: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+// A structural subset of `Lesson` (lib/db.ts) so this module stays free of the
+// server-only database import. Anything the profile reads off a lesson has to
+// be named here too, or it is invisible to the components below.
 type ScheduledLesson = {
   topic: string;
   schedule?: string;
   zoomLink?: string;
   recordingLink?: string;
+  noteFile?: string;
+  noteSize?: number;
 };
 
 /**

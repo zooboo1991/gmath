@@ -20,6 +20,7 @@ const ACTION_LABELS: Record<string, string> = {
   "registration.add_payment": "Төлбөр бүртгэсэн",
   "registration.delete_payment": "Төлбөр хассан",
   "lesson.zoom_meeting_create": "Zoom meeting үүсгэсэн",
+  "lesson.note_delete": "Хичээлийн тэмдэглэл хассан",
   "notification.send": "Мэдэгдэл илгээсэн",
   "setting.update": "Тохиргоо өөрчилсөн",
   "messenger.profile_update": "Messenger цэс шинэчилсэн",

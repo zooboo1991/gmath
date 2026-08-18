@@ -36,6 +36,12 @@
 - **Видео:** амьд хичээл Zoom (Server-to-Server OAuth, ирц бүртгэх webhook);
   бичлэг **Bunny Stream** (гарын үсэгтэй, хугацаатай embed) эсвэл гадаад
   Drive/YouTube холбоос. Танилцуулга бичлэг YouTube
+- **Файлууд: Supabase Storage.** Нийтийн bucket: `articles`, `problems`.
+  Хувийн: `solutions`, `graded-sheets`, `lesson-notes` — public URL байхгүй,
+  харах эрхийг route шалгаад хугацаатай гарын үсэгтэй холбоос үүсгэнэ.
+  Хичээлийн тэмдэглэл (PDF) нь браузер дээр багасгагдаж
+  (`src/lib/pdfShrink.ts`, pdfjs + pdf-lib), Vercel-ийн 4.5MB хязгаарыг
+  тойрч **signed upload URL**-ээр шууд Storage руу орно
 - **AI:** Anthropic SDK. Монгол хэлэнд Sonnet, хурдан ажилд Haiku
   (`src/lib/ai/`). DeepSeek нөөц провайдер байгаа
 - **SMS:** Skytel (OTP, мэдэгдэл). **Push:** web-push (VAPID)
@@ -126,3 +132,5 @@ Supabase дээр **тэр өөрөө** ажиллуулна. Vercel-ийн env 
 Шинэ SQL-ийг **хоёр проект дээр** ажиллуулах шаардлагатай: production, мөн
 `.env.test`-ийн тестийн проект. Тестийн санд ороогүй бол `npm test` нь
 `23514 …_check` (check constraint) маягийн алдаагаар унана — кодын алдаа биш.
+Шинэ Storage bucket мөн адил хоёр проект дээр байх ёстой (bucket-ыг
+service_role түлхүүрээр API-аар үүсгэж болно, SQL шаардлагагүй).

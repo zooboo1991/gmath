@@ -86,6 +86,15 @@ export type Lesson = {
   zoomLink?: string;
   /** Filled in after the lesson, and shown instead of the room once it ends. */
   recordingLink?: string;
+  /**
+   * Storage path of this lesson's notes PDF (the problems worked through in
+   * class), in the private `lesson-notes` bucket. A path rather than a URL for
+   * the same reason solutions are: the bucket has no public URL and a signed
+   * one is minted per view, for a student who is actually registered.
+   */
+  noteFile?: string;
+  /** Size of that PDF in bytes, so the student sees what they are about to open. */
+  noteSize?: number;
 };
 
 export type Course = {

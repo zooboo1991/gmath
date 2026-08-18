@@ -7,6 +7,8 @@ export const PROBLEMS_BUCKET = "problems";
 /** Private: a student's handwritten work, and the teacher's graded scan. */
 export const SOLUTIONS_BUCKET = "solutions";
 export const GRADED_SHEETS_BUCKET = "graded-sheets";
+/** Private: a lesson's notes PDF, for students registered on that course. */
+export const LESSON_NOTES_BUCKET = "lesson-notes";
 
 type ImageSignature = {
   mime: string;
@@ -125,4 +127,31 @@ export async function uploadCoverImage(file: File): Promise<string> {
 
   const { data } = getSupabase().storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
+}
+
+/**
+ * A one-shot URL the browser can PUT a file straight to.
+ *
+ * Lesson notes go up this way instead of through a route handler because a
+ * serverless request body is capped at 4.5 MB on Vercel, and a scanned set of
+ * notes is routinely larger — even after the client-side shrink. The path is
+ * generated here, never accepted from the caller, so an upload cannot be aimed
+ * at an existing object or at another bucket's key space.
+ */
+export async function createNoteUploadUrl(): Promise<{ path: string; signedUrl: string; token: string }> {
+  const path = `notes/${crypto.randomUUID()}.pdf`;
+  const { data, error } = await getSupabase().storage.from(LESSON_NOTES_BUCKET).createSignedUploadUrl(path);
+  if (error) throw error;
+  return { path, signedUrl: data.signedUrl, token: data.token };
+}
+
+/** Deletes one private object — used when a lesson's notes are replaced or removed. */
+export async function removeStorageObject(bucket: string, path: string): Promise<void> {
+  const { error } = await getSupabase().storage.from(bucket).remove([path]);
+  if (error) throw error;
+}
+
+/** The shape createNoteUploadUrl hands out. Anything else stored in a lesson is not a note we wrote. */
+export function isLessonNotePath(value: unknown): value is string {
+  return typeof value === "string" && /^notes\/[0-9a-f-]{36}\.pdf$/i.test(value);
 }

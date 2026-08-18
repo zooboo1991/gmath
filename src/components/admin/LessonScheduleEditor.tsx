@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import type { Lesson } from "@/lib/db";
-import { IconClose } from "@/components/icons";
+import { IconCheck, IconClose, IconDocument } from "@/components/icons";
 import { getWeekdayNameMn } from "@/lib/courseDate";
 import { buildScheduleString, parseScheduleString } from "@/lib/lessonSchedule";
 import { parseBunnyVideoId } from "@/lib/bunnyVideo";
+import { formatMb } from "@/lib/imageResize";
+import { isPdf, looksLikePdf, MAX_NOTE_BYTES, shrinkPdf } from "@/lib/pdfShrink";
+import { apiError, readJson } from "@/lib/fetchJson";
 
 type AttendanceRow = { lastName: string; firstName: string; phone: string; joinedAt: string; leftAt?: string };
 
@@ -38,6 +41,111 @@ export default function LessonScheduleEditor({
   const [zoomMeetingState, setZoomMeetingState] = useState<
     Record<number, { status: "loading" | "done" | "error"; joinUrl?: string; error?: string }>
   >({});
+
+  // Per-lesson upload state for the notes PDF: shrinking is slow enough on a
+  // 30 MB scan that "nothing is happening" would otherwise be the whole UX.
+  const [noteState, setNoteState] = useState<
+    Record<number, { status: "shrinking" | "uploading" | "error"; message?: string }>
+  >({});
+  const setNote = (index: number, value: { status: "shrinking" | "uploading" | "error"; message?: string } | null) =>
+    setNoteState((s) => {
+      const next = { ...s };
+      if (value) next[index] = value;
+      else delete next[index];
+      return next;
+    });
+
+  /**
+   * Shrink in the browser, then PUT straight to Supabase Storage.
+   *
+   * The upload deliberately does not go through a route handler: a serverless
+   * request body is capped at 4.5 MB on Vercel, which a scanned set of notes
+   * exceeds even after shrinking. The route only mints the signed URL.
+   */
+  const uploadNote = async (index: number, file: File) => {
+    if (!isPdf(file) || !(await looksLikePdf(file))) {
+      setNote(index, { status: "error", message: "Зөвхөн PDF файл оруулна уу" });
+      return;
+    }
+    if (file.size > MAX_NOTE_BYTES) {
+      setNote(index, { status: "error", message: `Файл хэт том байна (${formatMb(file.size)}). 50MB-ээс ихгүй.` });
+      return;
+    }
+
+    let toUpload = file;
+    let sizeNote = formatMb(file.size);
+    try {
+      setNote(index, { status: "shrinking", message: "Уншиж байна…" });
+      const result = await shrinkPdf(file, (page, total) =>
+        setNote(index, { status: "shrinking", message: `Багасгаж байна… ${page}/${total}` })
+      );
+      toUpload = result.file;
+      sizeNote = result.changed
+        ? `${formatMb(result.before)} → ${formatMb(result.after)}`
+        : formatMb(result.after);
+    } catch (err) {
+      // A PDF pdfjs cannot render is still a PDF a student can open — upload
+      // the original rather than refusing the teacher's file outright.
+      console.error("[lesson-note] shrink failed, uploading as-is", err);
+    }
+
+    try {
+      setNote(index, { status: "uploading", message: `Байршуулж байна… ${sizeNote}` });
+      const res = await fetch("/api/admin/lesson-note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ size: toUpload.size }),
+      });
+      const json = await readJson<{ path: string; signedUrl: string }>(res);
+      if (!res.ok || !json.signedUrl || !json.path) {
+        setNote(index, { status: "error", message: apiError(res, json, "Байршуулахад алдаа гарлаа") });
+        return;
+      }
+
+      const put = await fetch(json.signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "application/pdf" },
+        body: toUpload,
+      });
+      if (!put.ok) {
+        setNote(index, { status: "error", message: "Файл байршуулж чадсангүй. Дахин оролдоно уу." });
+        return;
+      }
+
+      const previous = lessons[index]?.noteFile;
+      updateRow(index, { noteFile: json.path, noteSize: toUpload.size });
+      setNote(index, null);
+      // The row now points at the new file, so the old one is unreachable.
+      if (previous) void fetch("/api/admin/lesson-note", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: previous }),
+      });
+    } catch {
+      setNote(index, { status: "error", message: "Сүлжээний алдаа гарлаа. Дахин оролдоно уу." });
+    }
+  };
+
+  const removeNote = async (index: number) => {
+    const path = lessons[index]?.noteFile;
+    if (!path) return;
+    if (!confirm("Хичээлийн тэмдэглэлийг хасах уу?")) return;
+    updateRow(index, { noteFile: undefined, noteSize: undefined });
+    await fetch("/api/admin/lesson-note", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    }).catch(() => undefined);
+  };
+
+  const openNote = async (index: number) => {
+    const path = lessons[index]?.noteFile;
+    if (!path) return;
+    const res = await fetch(`/api/admin/lesson-note?path=${encodeURIComponent(path)}`);
+    const json = await readJson<{ url: string }>(res);
+    if (res.ok && json.url) window.open(json.url, "_blank", "noreferrer");
+    else setNote(index, { status: "error", message: apiError(res, json, "Нээхэд алдаа гарлаа") });
+  };
 
   const createZoomMeeting = async (index: number, force = false) => {
     if (!id) return;
@@ -210,6 +318,59 @@ export default function LessonScheduleEditor({
                       </span>
                     )
                   ) : null}
+
+                  {/* The lesson's notes: the problems worked through in class,
+                      as one PDF. Uploaded per lesson rather than per course
+                      because that is how a student looks for them — beside the
+                      recording of the lesson they missed. */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {lesson.noteFile ? (
+                      <>
+                        <span className="inline-flex items-center gap-1.5 text-[.75rem] font-extrabold text-green">
+                          <IconCheck className="w-3 h-3" /> Тэмдэглэл
+                          {lesson.noteSize ? ` · ${formatMb(lesson.noteSize)}` : ""}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openNote(i)}
+                          className="text-[.75rem] font-extrabold text-blue-strong"
+                        >
+                          Харах
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeNote(i)}
+                          className="text-[.75rem] font-bold text-ink-3 hover:text-red-soft"
+                        >
+                          Хасах
+                        </button>
+                      </>
+                    ) : (
+                      <label className="inline-flex items-center gap-1.5 text-[.75rem] font-extrabold text-ink-2 bg-bg-soft px-2.5 py-1.5 rounded-full cursor-pointer">
+                        <IconDocument className="w-3 h-3" /> Тэмдэглэл (PDF)
+                        <input
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            // Cleared so picking the same file again re-runs.
+                            e.target.value = "";
+                            if (file) void uploadNote(i, file);
+                          }}
+                        />
+                      </label>
+                    )}
+                    {noteState[i] && (
+                      <span
+                        className={`text-[.75rem] font-semibold ${
+                          noteState[i].status === "error" ? "text-red-soft" : "text-ink-3"
+                        }`}
+                      >
+                        {noteState[i].message}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {id && isOnline && (
                   <div className="flex flex-col gap-1.5">

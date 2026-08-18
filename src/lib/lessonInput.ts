@@ -1,4 +1,6 @@
 import type { Lesson } from "./db";
+import { parseBunnyVideoId } from "./bunnyVideo";
+import { isLessonNotePath } from "./storage";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "./validate";
 
 /**
@@ -13,6 +15,8 @@ type LessonInput = {
   mode?: string;
   zoomLink?: string;
   recordingLink?: string;
+  noteFile?: string;
+  noteSize?: number;
 };
 
 export function normalizeLessons(input: unknown): Lesson[] | undefined {
@@ -26,6 +30,14 @@ export function normalizeLessons(input: unknown): Lesson[] | undefined {
       // a stale link a student could still be shown.
       zoomLink: l.mode === "inperson" ? undefined : l.zoomLink?.trim() || undefined,
       recordingLink: l.recordingLink?.trim() || undefined,
+      // Only ever a path this app minted (see createNoteUploadUrl). A hand-made
+      // request could otherwise name any object in the bucket — or a key that
+      // does not exist, leaving a "Тэмдэглэл" button that opens nothing.
+      noteFile: isLessonNotePath(l.noteFile) ? l.noteFile : undefined,
+      noteSize:
+        isLessonNotePath(l.noteFile) && typeof l.noteSize === "number" && l.noteSize > 0
+          ? Math.round(l.noteSize)
+          : undefined,
     }))
     .filter((l) => l.topic);
 }
@@ -42,7 +54,12 @@ export function validateLessons(input: unknown): string | null {
       [lesson.recordingLink, "Бичлэгийн холбоос"],
     ] as const) {
       if (isTooLong(value, MAX_LEN.courseZoomLink)) return `Хичээлийн ${label} хэт урт байна`;
-      if (typeof value === "string" && value.trim() && !isValidHttpUrl(value)) {
+      if (typeof value !== "string" || !value.trim()) continue;
+      // A Bunny video id is not a URL, and it is the value the Bunny dashboard
+      // labels "Video ID" — refusing it here contradicted the editor, which
+      // already tells the teacher such a value will play in-page.
+      if (label === "Бичлэгийн холбоос" && parseBunnyVideoId(value)) continue;
+      if (!isValidHttpUrl(value)) {
         return `Хичээлийн ${label} буруу байна (http:// эсвэл https:// -ээр эхэлнэ)`;
       }
     }
