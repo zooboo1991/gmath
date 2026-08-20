@@ -64,6 +64,30 @@ export default function ProfileClient({
   const [showEdit, setShowEdit] = useState(false);
   const [audience, setAudience] = useState<AudienceFilter>("all");
   const [category, setCategory] = useState<CategoryFilter>("all");
+  // The course a notification click asked for (?course=<programId>): its card
+  // is scrolled into view and, for a yearly programme, opened — otherwise the
+  // student lands on a page where the thing they tapped about is folded away.
+  // Read in an effect, not useSearchParams, so this stays a plain client
+  // detail with no Suspense contract on the page.
+  const [focusCourseId, setFocusCourseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const courseId = new URLSearchParams(window.location.search).get("course");
+    if (!courseId) return;
+    // Deferred a tick: setting state synchronously inside the mount effect
+    // re-renders mid-hydration, which the lint rightly refuses.
+    const timer = setTimeout(() => setFocusCourseId(courseId), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!focusCourseId) return;
+    // After the cards for it have rendered.
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(`course-${focusCourseId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusCourseId]);
 
   function clearFilters() {
     setAudience("all");
@@ -270,9 +294,17 @@ export default function ProfileClient({
             <div className="flex flex-col gap-4">
               {shown.map((r) =>
                 r.status === "active" && isYearly(r) ? (
-                  <YearlyProgramCard key={r.id} registration={r} />
+                  <YearlyProgramCard
+                    key={r.id}
+                    registration={r}
+                    initialExpanded={r.programId === focusCourseId}
+                  />
                 ) : (
-                  <div key={r.id} className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
+                  <div
+                    key={r.id}
+                    id={`course-${r.programId}`}
+                    className="bg-surface border border-line rounded-md shadow-xs px-6 py-5"
+                  >
                     <div className="flex items-center justify-between flex-wrap gap-3">
                       <div>
                         <b className="font-extrabold text-[1.05rem] block">{r.programLabel}</b>
@@ -356,15 +388,25 @@ function ActiveCourseDetails({ registration }: { registration: RegistrationWithG
  * inline) only appear once the student asks for them via "Дэлгэрэнгүй
  * харах". Always pinned first in the active list (see ProfileClient).
  */
-function YearlyProgramCard({ registration }: { registration: RegistrationWithGroup }) {
-  const [expanded, setExpanded] = useState(false);
+function YearlyProgramCard({
+  registration,
+  initialExpanded = false,
+}: {
+  registration: RegistrationWithGroup;
+  /** True when a notification deep link points at this programme. */
+  initialExpanded?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(initialExpanded);
   const now = useNow();
   const lessons = registration.lessons ?? [];
   const states = now ? getLessonStates(lessons, now) : null;
   const next = states?.find((s) => s.state === "upcoming" || s.state === "live");
 
   return (
-    <div className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
+    <div
+      id={`course-${registration.programId}`}
+      className="bg-surface border border-line rounded-md shadow-xs px-6 py-5"
+    >
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <span className="inline-flex items-center text-[.72rem] font-extrabold tracking-[.06em] uppercase text-gold-strong bg-gold-soft px-2.5 py-1 rounded-full mb-1.5">

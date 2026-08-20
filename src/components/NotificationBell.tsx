@@ -10,9 +10,20 @@ type NotificationItem = {
   title: string;
   body: string;
   imageUrl?: string;
+  /** Where clicking this item goes. Absent on plain announcements, which open the text modal instead. */
+  link?: string;
   createdAt: string;
   readAt?: string;
 };
+
+/**
+ * A join/Zoom link leaves the site (and /api/lessons/join redirects into the
+ * Zoom room), so it opens in a new tab and the page with the bell stays put.
+ * Ordinary site pages navigate in place like any other link.
+ */
+function isExternalLink(link: string): boolean {
+  return /^https?:\/\//i.test(link) || link.startsWith("/api/");
+}
 
 export default function NotificationBell() {
   const { sessionUser } = useProgramRegister();
@@ -135,31 +146,56 @@ export default function NotificationBell() {
             {items.length === 0 ? (
               <p className="text-ink-3 font-semibold text-[.85rem] px-4 py-4">Мэдэгдэл алга байна.</p>
             ) : (
-              items.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => {
-                    setSelected(n);
-                    setOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-3 border-b border-line last:border-0 hover:bg-bg-soft transition-colors"
-                >
+              items.map((n) => {
+                const content = (
                   <div className="flex items-start gap-3">
                     {n.imageUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={n.imageUrl} alt="" className="w-10 h-10 rounded-sm object-cover shrink-0" />
                     )}
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <b className="font-extrabold text-[.9rem] block">{n.title}</b>
                       <p className="text-ink-2 font-medium text-[.83rem] mt-0.5 line-clamp-2">{n.body}</p>
                       <span className="text-ink-3 font-semibold text-[.75rem] mt-1 block">
                         {new Date(n.createdAt).toLocaleDateString("mn-MN")}
                       </span>
                     </div>
+                    {n.link && <span className="text-blue-strong font-extrabold shrink-0 self-center">→</span>}
                   </div>
-                </button>
-              ))
+                );
+                const itemClass =
+                  "block w-full text-left px-4 py-3 border-b border-line last:border-0 hover:bg-bg-soft transition-colors";
+
+                // With a destination, the item IS the navigation — one tap and
+                // the student is on the lesson, article, or in the Zoom room,
+                // instead of reading a modal and finding the page by hand.
+                // A plain <a>, not <Link>: Next prefetches <Link> targets, and
+                // prefetching /api/lessons/join would register Zoom attendees
+                // for students who never clicked.
+                return n.link ? (
+                  <a
+                    key={n.id}
+                    href={n.link}
+                    {...(isExternalLink(n.link) ? { target: "_blank", rel: "noreferrer" } : {})}
+                    onClick={() => setOpen(false)}
+                    className={itemClass}
+                  >
+                    {content}
+                  </a>
+                ) : (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() => {
+                      setSelected(n);
+                      setOpen(false);
+                    }}
+                    className={itemClass}
+                  >
+                    {content}
+                  </button>
+                );
+              })
             )}
           </div>,
           document.body

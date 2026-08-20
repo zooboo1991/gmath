@@ -818,3 +818,10 @@ create unique index if not exists registrations_user_program_unique
 drop index if exists registrations_phone_program_unique;
 create unique index if not exists registrations_phone_program_unique
   on registrations (phone, program_id) where user_id is null and status <> 'cancelled';
+
+-- Мэдэгдэл дээр дарахад очих хаяг. Нэмэгдэхээс өмнө bell доторх мэдэгдэл
+-- зөвхөн текстээ модал цонхонд харуулдаг байсан — "Хичээлийн бичлэг орлоо"
+-- гэснийг уншаад сурагч профайл руу өөрөө явж, сургалтаа өөрөө хайдаг.
+-- Push мэдэгдэлд байсан pushUrl-ийг мөн энэ талбар орлоно: нэг мэдэгдэл
+-- хаана ч дарагдсан нэг л газар аваачна.
+alter table notifications add column if not exists link text;

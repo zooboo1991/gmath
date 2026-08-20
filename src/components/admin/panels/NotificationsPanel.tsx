@@ -45,6 +45,7 @@ export default function NotificationsPanel({
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [link, setLink] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
   const [targetType, setTargetType] = useState<NotificationTargetType>("all");
   const [targetCourseId, setTargetCourseId] = useState("");
@@ -125,6 +126,7 @@ export default function NotificationsPanel({
           title: title.trim(),
           body: body.trim(),
           imageUrl: imageUrl || undefined,
+          link: link.trim() || undefined,
           targetType,
           targetCourseId: targetType === "course" ? targetCourseId : undefined,
           userIds: targetType === "users" ? [...selectedUserIds] : undefined,
@@ -167,6 +169,14 @@ export default function NotificationsPanel({
             placeholder="Текст"
             rows={4}
             className={`${INPUT_CLASS} resize-y`}
+          />
+          {/* Optional destination: with it, tapping the notification (bell or
+              push) opens this page instead of a text popup. */}
+          <input
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="Холбоос (заавал биш) — ж: /courses/songon5"
+            className={INPUT_CLASS}
           />
 
           <div className="flex items-center gap-3 flex-wrap">

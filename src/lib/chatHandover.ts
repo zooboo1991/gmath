@@ -34,6 +34,6 @@ export async function notifyAdminsOfWaitingVisitor(input: {
     targetType: "users",
     userIds,
     channel: "site",
-    pushUrl: "/admin/chat",
+    link: "/admin/chat",
   });
 }

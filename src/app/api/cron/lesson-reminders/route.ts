@@ -57,7 +57,11 @@ export async function GET(request: Request) {
         targetType: "users",
         userIds,
         channel: "site",
-        pushUrl: c.lesson.zoomLink,
+        // Through the join flow rather than the shared room link: for a
+        // tracked meeting the student needs their personal registrant URL or
+        // their attendance is never attributed, and the GET below resolves
+        // that (or falls back to the plain link) and redirects.
+        link: `/api/lessons/join?courseId=${encodeURIComponent(c.programId)}&lessonIndex=${c.lessonIndex}`,
       });
       notified += 1;
       recipientTotal += userIds.length;

@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       body: `"${article.title}" нийтлэл нэмэгдлээ.`,
       targetType: "all",
       channel: "site",
-      pushUrl: `/articles/${article.id}`,
+      link: `/articles/${article.id}`,
     }).catch((err) => console.error("[articles] notification failed:", err));
   }
 

@@ -1344,6 +1344,9 @@ async function notifyRegistrationActive(registration: Registration): Promise<voi
     targetType: "users",
     userIds: [registration.userId],
     channel: "site",
+    // Straight to their own card for this course — the Facebook group and the
+    // schedule they were just promised live there.
+    link: `/profile?course=${encodeURIComponent(registration.programId)}`,
   });
 
   // A fixed, hardcoded Latin string rather than transliterated Cyrillic —
@@ -2016,6 +2019,8 @@ export type Notification = {
   title: string;
   body: string;
   imageUrl?: string;
+  /** Where clicking the notification lands. Unset = plain announcement. */
+  link?: string;
   targetType: NotificationTargetType;
   targetCourseId?: string;
   targetCourseLabel?: string;
@@ -2029,6 +2034,7 @@ type NotificationRow = {
   title: string;
   body: string;
   image_url: string | null;
+  link: string | null;
   target_type: NotificationTargetType;
   target_course_id: string | null;
   target_course_label: string | null;
@@ -2043,6 +2049,7 @@ function notificationFromRow(row: NotificationRow): Notification {
     title: row.title,
     body: row.body,
     imageUrl: row.image_url ?? undefined,
+    link: row.link ?? undefined,
     targetType: row.target_type,
     targetCourseId: row.target_course_id ?? undefined,
     targetCourseLabel: row.target_course_label ?? undefined,
@@ -2107,8 +2114,14 @@ export async function createNotification(input: {
   targetCourseLabel?: string;
   userIds?: string[];
   channel: NotificationChannel;
-  /** Where a push notification's click should land — defaults to the profile page's bell list. The lesson reminder is the one caller that points this at a Zoom link instead. */
-  pushUrl?: string;
+  /**
+   * Where clicking this notification lands — the bell item and the push
+   * notification both. A site-relative path ("/articles/…", "/profile?…") or
+   * an absolute URL. Unset means the bell item just shows its text and a push
+   * click opens the profile, which is the honest default for announcements
+   * that have no single destination.
+   */
+  link?: string;
 }): Promise<{ notification: Notification; smsFailures: number }> {
   const supabase = getSupabase();
   const recipients = await resolveNotificationRecipients({
@@ -2128,6 +2141,7 @@ export async function createNotification(input: {
       target_course_label: input.targetCourseLabel ?? null,
       channel: input.channel,
       recipient_count: recipients.length,
+      link: input.link ?? null,
     })
     .select("*")
     .single();
@@ -2158,7 +2172,7 @@ export async function createNotification(input: {
     await sendPushToUsers(recipients.map((r) => r.id), {
       title: input.title,
       body: input.body,
-      url: input.pushUrl ?? "/profile",
+      url: input.link ?? "/profile",
     }).catch((err) => console.error("[notifications] push send failed:", err));
   }
 
@@ -2200,6 +2214,9 @@ export async function notifyNewRecordings(
     targetType: "users",
     userIds,
     channel: "site",
+    // The profile opens scrolled to this course's card, where the new
+    // recording's "Бичлэг үзэх" button is.
+    link: `/profile?course=${encodeURIComponent(programId)}`,
   });
 }
 
@@ -2246,7 +2263,7 @@ export async function notifyNewCourseForPastStudents(course: Course): Promise<vo
     targetType: "users",
     userIds,
     channel: "site",
-    pushUrl: courseHref(course),
+    link: courseHref(course),
   });
 }
 

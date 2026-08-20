@@ -33,7 +33,7 @@ export async function GET(request: Request) {
         body: `"${article.title}" нийтлэл нэмэгдлээ.`,
         targetType: "all",
         channel: "site",
-        pushUrl: `/articles/${article.id}`,
+        link: `/articles/${article.id}`,
       });
       notified += 1;
     } catch (err) {

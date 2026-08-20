@@ -28,6 +28,7 @@ export async function POST(request: Request) {
   const targetCourseId = typeof data.targetCourseId === "string" ? data.targetCourseId.trim() : undefined;
   const userIds = Array.isArray(data.userIds) ? data.userIds.filter((id: unknown) => typeof id === "string") : undefined;
   const imageUrl = typeof data.imageUrl === "string" && data.imageUrl.trim() ? data.imageUrl.trim() : undefined;
+  const link = typeof data.link === "string" && data.link.trim() ? data.link.trim() : undefined;
 
   if (!title || !body) {
     return NextResponse.json({ ok: false, error: "Гарчиг, текстээ бөглөнө үү" }, { status: 400 });
@@ -40,6 +41,17 @@ export async function POST(request: Request) {
   }
   if (!CHANNELS.has(channel)) {
     return NextResponse.json({ ok: false, error: "Илгээх сувгаа сонгоно уу" }, { status: 400 });
+  }
+  // A site path or a full URL — anything else ("gmath.mn/x", "javascript:…")
+  // would render as a link that goes nowhere or worse.
+  if (link && !link.startsWith("/") && !/^https?:\/\//i.test(link)) {
+    return NextResponse.json(
+      { ok: false, error: "Холбоос '/'-ээр эсвэл https://-ээр эхлэх ёстой" },
+      { status: 400 }
+    );
+  }
+  if (link && link.length > 500) {
+    return NextResponse.json({ ok: false, error: "Холбоос хэт урт байна" }, { status: 400 });
   }
   if (targetType === "course" && !targetCourseId) {
     return NextResponse.json({ ok: false, error: "Сургалтаа сонгоно уу" }, { status: 400 });
@@ -74,6 +86,7 @@ export async function POST(request: Request) {
     targetCourseLabel,
     userIds: targetType === "users" ? userIds : undefined,
     channel,
+    link,
   });
 
   await logAdminAction(request, {
