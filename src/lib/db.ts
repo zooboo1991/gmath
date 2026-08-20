@@ -23,6 +23,19 @@ function isInvalidUuidError(err: unknown): boolean {
   return (err as { code?: string } | null)?.code === "22P02";
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Whether a value can possibly match a `uuid` column.
+ *
+ * Asking Postgres instead costs a failed statement: `where id = 'songon8'`
+ * raises 22P02, which the caller can catch but the database still logs as an
+ * error. Every visit to a slug-addressed course page did that twice.
+ */
+function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
 function parseHostname(url: string): string | null {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -712,9 +725,14 @@ export async function listHomepageCourses(): Promise<CourseSummary[]> {
  * route, the admin) are unaffected: a uuid never matches a slug.
  */
 export async function findCourseById(idOrSlug: string): Promise<Course | undefined> {
-  const { data, error } = await getSupabase().from("courses").select("*").eq("id", idOrSlug).maybeSingle();
-  if (error && !isInvalidUuidError(error)) throw error;
-  if (data) return courseFromRow(data as CourseRow);
+  // Only ask the uuid column about values that could be one. "songon8" never
+  // matches an id, and asking anyway made Postgres log an error for every
+  // single view of a slug-addressed course page.
+  if (isUuid(idOrSlug)) {
+    const { data, error } = await getSupabase().from("courses").select("*").eq("id", idOrSlug).maybeSingle();
+    if (error && !isInvalidUuidError(error)) throw error;
+    if (data) return courseFromRow(data as CourseRow);
+  }
 
   const bySlug = await getSupabase().from("courses").select("*").eq("slug", idOrSlug).maybeSingle();
   if (bySlug.error) throw bySlug.error;
@@ -1290,8 +1308,10 @@ export async function linkPendingRegistrationsToUser(phone: string, userId: stri
 }
 
 export async function findRegistrationById(id: string): Promise<Registration | undefined> {
+  if (!isUuid(id)) return undefined;
   const { data, error } = await getSupabase().from("registrations").select("*").eq("id", id).maybeSingle();
   if (error) {
+    // Kept as a backstop: the shape check above is what normally prevents it.
     if (isInvalidUuidError(error)) return undefined;
     throw error;
   }
@@ -1558,8 +1578,6 @@ export type RegistrationWithGroup = Registration & {
   zoomPasscode?: string;
   lessons?: Lesson[];
 };
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type ProgramDetailsRow = {
   id: string;
