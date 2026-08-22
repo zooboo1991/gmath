@@ -39,7 +39,16 @@ export default function LessonScheduleEditor({
   // Keyed by lesson index rather than lesson id, matching how lesson_meetings
   // itself is keyed — see the schema comment for the tradeoff.
   const [zoomMeetingState, setZoomMeetingState] = useState<
-    Record<number, { status: "loading" | "done" | "error"; joinUrl?: string; error?: string }>
+    Record<
+      number,
+      {
+        status: "loading" | "done" | "error";
+        joinUrl?: string;
+        error?: string;
+        /** What the server actually did, so "✓ Үүслээ" can stop being a guess. */
+        action?: "created" | "updated" | "recreated";
+      }
+    >
   >({});
 
   // Per-lesson upload state for the notes PDF: shrinking is slow enough on a
@@ -152,7 +161,7 @@ export default function LessonScheduleEditor({
     if (
       force &&
       !confirm(
-        "Zoom meeting-ийг дахин үүсгэх үү? Энэ нь тухайн meeting Zoom дээр устсан үед л хэрэгтэй. Өмнө нь холбоосоор орсон сурагчид дараагийн удаа \"Хичээлд орох\" дарахад автоматаар шинэ холбоос авна."
+        "Zoom meeting-ийг ШИНЭЭР үүсгэх үү? Цаг өөрчлөгдсөн бол үүний оронд «Zoom цагийг шинэчлэх» дарж болно — тэгвэл холбоос хэвээрээ үлдэнэ.\n\nШинээр үүсгэвэл хуучин холбоос хүчингүй болно. Сурагчид дараагийн удаа \"Хичээлд орох\" дарахад автоматаар шинэ холбоос авна. Meeting нь Zoom дээр устсан үед энэ хэрэгтэй."
       )
     )
       return;
@@ -161,14 +170,20 @@ export default function LessonScheduleEditor({
       const res = await fetch(`/api/admin/courses/${id}/lessons/${index}/zoom-meeting`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ force }),
+        // The schedule as this form currently shows it. The server compares it
+        // with the saved lesson and refuses if they differ, so a meeting can
+        // never be set to a time the admin only *thinks* they saved.
+        body: JSON.stringify({ force, schedule: lessons[index]?.schedule ?? "" }),
       });
       const json = await res.json();
       if (!res.ok) {
         setZoomMeetingState((s) => ({ ...s, [index]: { status: "error", error: json.error } }));
         return;
       }
-      setZoomMeetingState((s) => ({ ...s, [index]: { status: "done", joinUrl: json.meeting.joinUrl } }));
+      setZoomMeetingState((s) => ({
+        ...s,
+        [index]: { status: "done", joinUrl: json.meeting.joinUrl, action: json.action },
+      }));
       // The tracked meeting is what students actually join through (their
       // own registrant link) — this just keeps the plain field a visible,
       // copyable reference for the teacher, and the fallback link for any
@@ -382,8 +397,10 @@ export default function LessonScheduleEditor({
                         className="text-[.78rem] font-extrabold text-blue-strong bg-blue-soft px-3 py-1.5 rounded-full disabled:opacity-50"
                       >
                         {zoomMeetingState[i]?.status === "loading"
-                          ? "Үүсгэж байна…"
-                          : "Ирц бүртгэх Zoom meeting үүсгэх"}
+                          ? "Түр хүлээнэ үү…"
+                          : lesson.zoomLink
+                            ? "Zoom цагийг шинэчлэх"
+                            : "Ирц бүртгэх Zoom meeting үүсгэх"}
                       </button>
                       {lesson.zoomLink && (
                         <button
@@ -392,12 +409,16 @@ export default function LessonScheduleEditor({
                           onClick={() => createZoomMeeting(i, true)}
                           className="text-[.78rem] font-extrabold text-ink-2 bg-bg-soft px-3 py-1.5 rounded-full disabled:opacity-50"
                         >
-                          Дахин үүсгэх
+                          Шинээр үүсгэх
                         </button>
                       )}
                       {zoomMeetingState[i]?.status === "done" && (
                         <span className="text-[.78rem] font-bold text-green">
-                          ✓ Үүслээ — сурагч бүрд хувийн холбоос өгнө
+                          {zoomMeetingState[i]?.action === "updated"
+                            ? "✓ Zoom дээрх цаг шинэчлэгдлээ — холбоос хэвээрээ"
+                            : zoomMeetingState[i]?.action === "recreated"
+                              ? "✓ Шинэ meeting үүслээ — хуучин холбоос хүчингүй болов"
+                              : "✓ Үүслээ — сурагч бүрд хувийн холбоос өгнө"}
                         </span>
                       )}
                       {zoomMeetingState[i]?.status === "error" && (

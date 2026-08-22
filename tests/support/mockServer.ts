@@ -38,10 +38,26 @@ type MockInvoice = {
   failCheck: boolean;
 };
 
+/**
+ * A Zoom meeting as the mock remembers it. Kept as state rather than answered
+ * with a constant because rescheduling a lesson is supposed to edit the
+ * meeting in place — a test can only tell the difference if the mock has a
+ * "before" to change.
+ */
+export type MockZoomMeeting = {
+  id: string;
+  topic: string;
+  startTime: string | null;
+  duration: number | null;
+  timezone: string | null;
+};
+
 const calls: RecordedCall[] = [];
 const invoices = new Map<string, MockInvoice>();
 const senderInvoiceNos = new Set<string>();
 let invoiceCounter = 0;
+const zoomMeetings = new Map<string, MockZoomMeeting>();
+let zoomMeetingCounter = 0;
 
 function record(service: string, req: IncomingMessage, url: URL, body: unknown) {
   calls.push({
@@ -207,6 +223,10 @@ function handleControl(req: IncomingMessage, res: ServerResponse, url: URL, body
     return json(res, 200, { ok: true });
   }
 
+  if (url.pathname === "/__mock/zoom/meetings" && method === "GET") {
+    return json(res, 200, { meetings: [...zoomMeetings.values()] });
+  }
+
   if (url.pathname === "/__mock/qpay/invoices" && method === "GET") {
     return json(res, 200, { invoices: [...invoices.values()] });
   }
@@ -264,6 +284,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
       return text(res, 200, "SUCCESS");
 
     case "zoom": {
+      const method = req.method ?? "GET";
       if (url.pathname.startsWith("/oauth/token")) {
         return json(res, 200, { access_token: "mock-zoom-token", expires_in: 3600 });
       }
@@ -274,11 +295,46 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
           join_url: `https://zoom.us/w/mock?tk=${id}`,
         });
       }
-      if (url.pathname === "/v2/users/me/meetings") {
+      if (url.pathname === "/v2/users/me/meetings" && method === "POST") {
+        const input = (body ?? {}) as Record<string, unknown>;
+        zoomMeetingCounter += 1;
+        const id = String(99000000000 + zoomMeetingCounter);
+        zoomMeetings.set(id, {
+          id,
+          topic: String(input.topic ?? ""),
+          startTime: input.start_time ? String(input.start_time) : null,
+          duration: input.duration ? Number(input.duration) : null,
+          timezone: input.timezone ? String(input.timezone) : null,
+        });
         return json(res, 201, {
-          id: 99000000001,
-          join_url: "https://zoom.us/j/99000000001",
-          start_url: "https://zoom.us/s/99000000001",
+          id: Number(id),
+          join_url: `https://zoom.us/j/${id}`,
+          start_url: `https://zoom.us/s/${id}`,
+        });
+      }
+      // A meeting's own resource: PATCH edits it in place (which is how a
+      // rescheduled lesson keeps its join link), GET reads it back.
+      const meetingMatch = url.pathname.match(/^\/v2\/meetings\/([^/]+)$/);
+      if (meetingMatch) {
+        const meeting = zoomMeetings.get(meetingMatch[1]);
+        if (!meeting) return json(res, 404, { code: 3001, message: "Meeting does not exist" });
+        if (method === "PATCH") {
+          const input = (body ?? {}) as Record<string, unknown>;
+          if (input.topic !== undefined) meeting.topic = String(input.topic);
+          if (input.start_time !== undefined) meeting.startTime = String(input.start_time);
+          if (input.duration !== undefined) meeting.duration = Number(input.duration);
+          if (input.timezone !== undefined) meeting.timezone = String(input.timezone);
+          // Zoom answers a successful update with 204 and no body.
+          res.writeHead(204);
+          res.end();
+          return;
+        }
+        return json(res, 200, {
+          id: Number(meeting.id),
+          topic: meeting.topic,
+          start_time: meeting.startTime,
+          duration: meeting.duration,
+          timezone: meeting.timezone,
         });
       }
       return json(res, 200, {});

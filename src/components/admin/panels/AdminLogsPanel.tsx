@@ -20,6 +20,7 @@ const ACTION_LABELS: Record<string, string> = {
   "registration.add_payment": "Төлбөр бүртгэсэн",
   "registration.delete_payment": "Төлбөр хассан",
   "lesson.zoom_meeting_create": "Zoom meeting үүсгэсэн",
+  "lesson.zoom_meeting_update": "Zoom meeting-ийн цаг шинэчилсэн",
   "lesson.note_delete": "Хичээлийн тэмдэглэл хассан",
   "notification.send": "Мэдэгдэл илгээсэн",
   "setting.update": "Тохиргоо өөрчилсөн",
@@ -39,7 +40,7 @@ function logTargetHref(log: AdminLogEntry): string | undefined {
   if (log.actionType === "course.create" || log.actionType === "course.update" || log.actionType === "yearly_program.update") {
     return log.targetId ? programAdminHref(log.targetId) : undefined;
   }
-  if (log.actionType === "lesson.zoom_meeting_create") {
+  if (log.actionType.startsWith("lesson.zoom_meeting_")) {
     const courseId = log.targetId?.split("#")[0];
     return courseId ? programAdminHref(courseId) : undefined;
   }

@@ -118,6 +118,40 @@ export async function createMeeting(
   return { id: String(json.id), joinUrl: json.join_url, startUrl: json.start_url };
 }
 
+/**
+ * Moves an existing meeting to a new time (and topic), instead of making a new
+ * one for the same lesson.
+ *
+ * This is what a rescheduled lesson needs. Recreating would hand out a new
+ * join link and throw away every registrant, so students who already have
+ * their personal link would walk into an empty room; editing in place keeps
+ * the link, the registrants and the attendance history that references the
+ * meeting id.
+ *
+ * Zoom answers a successful update with 204 and no body.
+ */
+export async function updateMeeting(
+  meetingId: string,
+  input: { topic?: string; schedule?: { startTime: string; durationMinutes: number } }
+): Promise<void> {
+  const res = await zoomFetch(`/meetings/${meetingId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      ...(input.topic ? { topic: input.topic } : {}),
+      ...(input.schedule
+        ? {
+            start_time: input.schedule.startTime,
+            duration: input.schedule.durationMinutes,
+            timezone: "Asia/Ulaanbaatar",
+          }
+        : {}),
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Zoom meeting шинэчлэхэд алдаа гарлаа: ${res.status} ${await errorDetail(res)}`);
+  }
+}
+
 export type ZoomRegistrant = {
   registrantId: string;
   joinUrl: string;

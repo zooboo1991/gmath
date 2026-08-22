@@ -3,7 +3,7 @@ import { findCourseById, findYearlyProgramById, updateCourse, updateYearlyProgra
 import { logAdminAction } from "@/lib/adminLog";
 import { parseScheduleString } from "@/lib/lessonSchedule";
 import { isFullAdmin } from "@/lib/session";
-import { createMeeting } from "@/lib/zoom/client";
+import { createMeeting, updateMeeting } from "@/lib/zoom/client";
 import {
   createLessonMeeting,
   deleteRegistrantsForLessonMeeting,
@@ -64,10 +64,58 @@ export async function POST(
   // force=true is the admin's "meeting-ээ дахин үүсгэх" escape hatch — for
   // when the tracked meeting was deleted directly on Zoom's side (e.g. via
   // zoom.us), which this app has no way to detect on its own.
-  const body = await request.json().catch(() => ({}));
-  const force = (body as { force?: boolean })?.force === true;
+  const body = (await request.json().catch(() => ({}))) as { force?: boolean; schedule?: string };
+  const force = body?.force === true;
+
+  // The editor sends the schedule it is currently showing. Everything below
+  // reads the *saved* lesson, so an unsaved time change would quietly produce
+  // a meeting at the old hour — the admin's screen says 14:00 and Zoom says
+  // 17:30. Refusing is the only honest answer; the fix is one click away.
+  if (typeof body?.schedule === "string" && body.schedule.trim() !== (lesson.schedule ?? "").trim()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Хичээлийн цаг хадгалагдаагүй байна. Эхлээд «Хадгалах» дараад дахин оролдоно уу.",
+        unsaved: true,
+      },
+      { status: 409 }
+    );
+  }
 
   const existingRow = await findLessonMeeting(courseId, lessonIndex);
+
+  // A meeting already exists and the admin did not ask for a new one: they
+  // pressed this because something about the lesson changed — almost always
+  // its time. Move the existing meeting instead of silently handing back the
+  // old one, which is what this used to do while reporting success.
+  if (existingRow && !force) {
+    const schedule = zoomSchedule(lesson.schedule);
+    try {
+      await updateMeeting(existingRow.zoomMeetingId, {
+        topic: `${owner.title} — ${lesson.topic}`,
+        schedule,
+      });
+    } catch (err) {
+      console.error("zoom meeting update failed", courseId, lessonIndex, err);
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Zoom дээрх цагийг шинэчилж чадсангүй. Meeting нь Zoom дээр устсан бол «Дахин үүсгэх» дарна уу.",
+        },
+        { status: 502 }
+      );
+    }
+
+    await logAdminAction(request, {
+      actionType: "lesson.zoom_meeting_update",
+      targetId: `${courseId}#${lessonIndex}`,
+      details: { title: owner.title, topic: lesson.topic, schedule: lesson.schedule },
+    });
+
+    return NextResponse.json({ ok: true, meeting: existingRow, action: "updated" });
+  }
+
   let meeting = force ? undefined : existingRow;
   if (!meeting) {
     try {
@@ -123,5 +171,5 @@ export async function POST(
     details: { title: owner.title, topic: lesson.topic, force },
   });
 
-  return NextResponse.json({ ok: true, meeting });
+  return NextResponse.json({ ok: true, meeting, action: force ? "recreated" : "created" });
 }

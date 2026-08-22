@@ -6,7 +6,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { MOCK_BASE, NETWORK_JOURNAL } from "./env";
-import type { RecordedCall } from "./mockServer";
+import type { MockZoomMeeting, RecordedCall } from "./mockServer";
 
 export type MockInvoice = {
   invoiceId: string;
@@ -34,6 +34,16 @@ export async function mockCalls(service?: string): Promise<RecordedCall[]> {
   const query = service ? `?service=${encodeURIComponent(service)}` : "";
   const { calls } = await control<{ calls: RecordedCall[] }>(`/__mock/calls${query}`);
   return calls;
+}
+
+/** Every Zoom meeting the mock has been asked to create, with its current time. */
+export async function listMockZoomMeetings(): Promise<MockZoomMeeting[]> {
+  const { meetings } = await control<{ meetings: MockZoomMeeting[] }>("/__mock/zoom/meetings");
+  return meetings;
+}
+
+export async function findMockZoomMeeting(id: string): Promise<MockZoomMeeting | null> {
+  return (await listMockZoomMeetings()).find((m) => m.id === id) ?? null;
 }
 
 export async function listMockInvoices(): Promise<MockInvoice[]> {
