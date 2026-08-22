@@ -1,0 +1,51 @@
+# Push бүр дээр кодыг шалгана. Vercel ч мөн build хийдэг, харин энэ нь
+# deploy оролдохоос өмнө, push хийсэн даруйд улаан/ногооноо хэлнэ.
+#
+# Нууц утга ЗӨВХӨН энд шаардлагагүй байхаар зохиосон: `next build` нь
+# өгөгдлийн сангийн түлхүүргүйгээр амжилттай ажилладгийг шалгасан
+# (sitemap нь холбогдож чадахгүй бол статик хуудсууддаа буудаг —
+# src/app/sitemap.ts дэх try/catch, мөн lib/supabase.ts дэх lazy client).
+#
+# 480+ тест энд ажиллахгүй: 13 минут үргэлжилдэг, тусдаа Supabase проектын
+# service_role түлхүүр шаарддаг, бас бүгд нэг сан хуваалцдаг тул зэрэг
+# ажиллуулбал бие бием нь унагана. Тэднийг push хийхийн өмнө гараар
+# `npm test`-ээр ажиллуулсан хэвээр (CLAUDE.md-ийн "Ажлын урсгал" хэсэг).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Хэд хэдэн push дараалан хийвэл сүүлийнхийг л шалгана.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Тодорхой хувилбар биш LTS: төсөлд engines заагаагүй бөгөөд
+          # хөгжүүлэлт нь ямагт шинэ Node дээр явдаг.
+          node-version: lts/*
+          cache: npm
+
+      # ci (install биш): package-lock.json-той яг тааруулж, цэвэрлээд суулгана.
+      - run: npm ci
+
+      - name: Төрлийн шалгалт
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
