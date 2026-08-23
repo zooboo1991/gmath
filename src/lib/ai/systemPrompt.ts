@@ -10,6 +10,7 @@ import { courseAboutItems, siteAchievements, siteFaqs, siteFeatures, songonProgr
 import { SITE_URL } from "../siteUrl";
 import { courseHref } from "../courseHref";
 import { parseWeeklySchedule } from "../weeklySchedule";
+import { isAssessmentOpen } from "@/lib/assessment/db";
 
 const BASE_PROMPT = `Та бол gmath.mn сайтын туслах чатбот. gmath.mn нь Б.Ганбат багшийн олимпиадын математикийн онлайн сургалтын сайт бөгөөд 4–12-р ангийн сурагчид болон багш нарт зориулсан сургалт, түвшин тогтоох үнэлгээ, сертификатын үйлчилгээ үзүүлдэг.
 
@@ -68,11 +69,15 @@ function channelRules(channel: ChatChannel): string {
 }
 
 /** Site pages, relative for the widget and absolute for Messenger. */
-function sitePages(channel: ChatChannel): string {
+function sitePages(channel: ChatChannel, assessmentOpen: boolean): string {
   const base = channel === "messenger" ? SITE_URL : "";
   return `Сайтын хуудсууд:
 - ${base}/courses — бүх сургалтын жагсаалт
-- ${base}/assessment — түвшин тогтоох үнэлгээ (сурагчийн ангиллыг тодорхойлох)
+${
+  assessmentOpen
+    ? `- ${base}/assessment — түвшин тогтоох үнэлгээ (сурагчийн ангиллыг тодорхойлох)`
+    : "- (Түвшин тогтоох үнэлгээ ТҮР ХААЛТТАЙ байна. Асуувал: бодлогын сангаа шинэчилж байгаа, удахгүй нээнэ гэж хэлээрэй. Холбоос бүү өг.)"
+}
 - ${base}/certificate — багшийн сертификат шалгах
 - ${base}/articles — нийтлэлүүд
 - ${base}/teacher — Б.Ганбат багшийн танилцуулга
@@ -101,15 +106,17 @@ export async function buildSystemPrompt({
   userId,
   channel = "website",
 }: { userId?: string; channel?: ChatChannel } = {}): Promise<string> {
-  const [courses, yearly, articles, songon] = await Promise.all([
+  const [courses, yearly, articles, songon, assessmentOpen] = await Promise.all([
     listPublishedCourseSummaries(),
     listYearlyPrograms(),
     listArticles(),
     listSongonClasses(),
+    // Otherwise the bot cheerfully sends parents to a page that turns them away.
+    isAssessmentOpen().catch(() => true),
   ]);
 
   const base = channel === "messenger" ? SITE_URL : "";
-  const sections = [BASE_PROMPT, channelRules(channel), sitePages(channel), SITE_COPY];
+  const sections = [BASE_PROMPT, channelRules(channel), sitePages(channel, assessmentOpen), SITE_COPY];
 
   // `period` already carries its own leading slash ("/ сар"), so it's
   // concatenated rather than joined with another one.

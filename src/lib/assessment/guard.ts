@@ -1,4 +1,4 @@
-import { findAssessment } from "./db";
+import { findAssessment, isAssessmentOpen } from "./db";
 import { getSessionUser } from "../session";
 import type { Assessment, AssessmentStatus } from "./types";
 import type { User } from "../db";
@@ -15,7 +15,18 @@ export type GuardResult =
   | { ok: true; user: User; assessment: Assessment }
   | { ok: false; error: string; status: number };
 
+/** What every assessment endpoint answers while the test is switched off. */
+export const ASSESSMENT_CLOSED = {
+  ok: false as const,
+  error: "Түвшин тогтоох шалгалт түр хаалттай байна.",
+  status: 503,
+};
+
 export async function requireOwnAssessment(id: string): Promise<GuardResult> {
+  // Checked here rather than in each of the nine routes that call this: one
+  // gate is one thing to get right, and a route added later inherits it.
+  if (!(await isAssessmentOpen())) return ASSESSMENT_CLOSED;
+
   const user = await getSessionUser();
   if (!user) {
     return { ok: false, error: "Нэвтэрнэ үү", status: 401 };

@@ -3,9 +3,10 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
+import AssessmentClosed from "@/components/assessment/AssessmentClosed";
 import AssessmentResult from "@/components/assessment/AssessmentResult";
 import { SIGNED_URL_TTL_SECONDS } from "@/lib/assessment/config";
-import { findLevel, listAssessmentsByUser, listSolutions } from "@/lib/assessment/db";
+import { findLevel, isAssessmentOpen, listAssessmentsByUser, listSolutions } from "@/lib/assessment/db";
 import type { Assessment, Level, Solution } from "@/lib/assessment/types";
 import { findCourseById, type Course } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
@@ -19,6 +20,9 @@ export const metadata: Metadata = {
 
 export default async function ProfileAssessmentPage() {
   const user = await getSessionUser();
+  const open = await isAssessmentOpen();
+
+  if (!open && !user) return <AssessmentClosed />;
 
   if (!user) {
     return (
@@ -91,6 +95,7 @@ export default async function ProfileAssessmentPage() {
               course={course}
               solutions={solutions}
               gradedSheetUrl={gradedSheetUrl}
+              open={open}
             />
             <Link
               href="/profile"

@@ -40,14 +40,35 @@ export default function AssessmentResult({
   course,
   solutions,
   gradedSheetUrl,
+  open = true,
 }: {
   assessment: Assessment | null;
   level: Level | null;
   course: Course | null;
   solutions: Solution[];
   gradedSheetUrl: string | null;
+  /**
+   * False while the level test is switched off. A result already earned stays
+   * readable — it is the student's own — but nothing here may invite them into
+   * a test that would refuse them at the next click.
+   */
+  open?: boolean;
 }) {
   if (!assessment) {
+    if (!open) {
+      return (
+        <div className={`${CARD} text-center`}>
+          <span className="w-[54px] h-[54px] rounded-[16px] bg-bg-soft text-ink-3 grid place-items-center mx-auto mb-4">
+            <IconTarget className="w-6 h-6" />
+          </span>
+          <h2 className="text-[1.25rem] font-extrabold">Түвшин тогтоох түр хаалттай</h2>
+          <p className="text-ink-2 font-medium mt-2.5 max-w-[46ch] mx-auto">
+            Бодлогын санг шинэчилж байна. Бэлэн болмогц энд дахин нээгдэнэ.
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className={`${CARD} text-center`}>
         <span className="w-[54px] h-[54px] rounded-[16px] bg-blue-soft text-blue-strong grid place-items-center mx-auto mb-4">
@@ -77,7 +98,7 @@ export default function AssessmentResult({
         </span>
         <h2 className="text-[1.25rem] font-extrabold mt-3.5">{copy.title}</h2>
         <p className="text-ink-2 font-medium mt-2">{copy.text}</p>
-        {copy.cta && (
+        {copy.cta && open && (
           <Link
             href="/assessment"
             className="inline-flex items-center justify-center font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-3.5 mt-5 transition-transform hover:-translate-y-0.5"

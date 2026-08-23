@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { listArticles, listPublishedCourseSummaries, listYearlyPrograms } from "@/lib/db";
+import { isAssessmentOpen } from "@/lib/assessment/db";
 import { SITE_URL } from "@/lib/siteUrl";
 import { courseHref } from "@/lib/courseHref";
 
@@ -13,11 +14,16 @@ import { courseHref } from "@/lib/courseHref";
  * far better for crawlers than none.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  // Closed for maintenance, so not worth pointing a crawler at.
+  const assessmentOpen = await isAssessmentOpen().catch(() => true);
+
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE_URL, changeFrequency: "weekly", priority: 1 },
     { url: `${SITE_URL}/courses`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${SITE_URL}/articles`, changeFrequency: "weekly", priority: 0.8 },
-    { url: `${SITE_URL}/assessment`, changeFrequency: "monthly", priority: 0.7 },
+    ...(assessmentOpen
+      ? [{ url: `${SITE_URL}/assessment`, changeFrequency: "monthly" as const, priority: 0.7 }]
+      : []),
     { url: `${SITE_URL}/certificate`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/teacher`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/team`, changeFrequency: "monthly", priority: 0.5 },

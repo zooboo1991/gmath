@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { listQuizQuestions } from "@/lib/assessment/db";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+import { isAssessmentOpen } from "@/lib/assessment/db";
+import { ASSESSMENT_CLOSED } from "@/lib/assessment/guard";
 
 /**
  * Scores the free taster.
@@ -15,6 +17,12 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
  * and the paid assessment is where a record starts to matter.
  */
 export async function POST(request: Request) {
+  // The taster is the one assessment surface with no session behind it, so the
+  // closed check has to be here rather than in requireOwnAssessment.
+  if (!(await isAssessmentOpen())) {
+    return NextResponse.json({ ok: false, error: ASSESSMENT_CLOSED.error }, { status: ASSESSMENT_CLOSED.status });
+  }
+
   const { allowed } = await checkRateLimit(`samplescore:${getClientIp(request.headers)}`, 30, 60);
   if (!allowed) return NextResponse.json({ ok: false }, { status: 429 });
 

@@ -3,6 +3,8 @@ import { listQuizQuestions } from "@/lib/assessment/db";
 import { SAMPLE_QUESTIONS_PER_TEST } from "@/lib/assessment/config";
 import { toPublicQuizQuestion, type QuizTrack } from "@/lib/assessment/types";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+import { isAssessmentOpen } from "@/lib/assessment/db";
+import { ASSESSMENT_CLOSED } from "@/lib/assessment/guard";
 
 /**
  * The free taster's questions. No session, no payment — this is the thing a
@@ -13,6 +15,12 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
  * toPublicQuizQuestion drops correctIndex; the answer key never leaves here.
  */
 export async function GET(request: Request) {
+  // The taster is the one assessment surface with no session behind it, so the
+  // closed check has to be here rather than in requireOwnAssessment.
+  if (!(await isAssessmentOpen())) {
+    return NextResponse.json({ ok: false, error: ASSESSMENT_CLOSED.error }, { status: ASSESSMENT_CLOSED.status });
+  }
+
   const { allowed } = await checkRateLimit(`sample:${getClientIp(request.headers)}`, 30, 60);
   if (!allowed) return NextResponse.json({ ok: false }, { status: 429 });
 

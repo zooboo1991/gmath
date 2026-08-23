@@ -8,10 +8,13 @@ export default function AssessmentPanel({
   initialFee,
   initialQuizFee,
   initialSla,
+  initialOpen,
 }: {
   initialFee: string;
   initialQuizFee: string;
   initialSla: string;
+  /** Whether students can reach the level test at all right now. */
+  initialOpen: boolean;
 }) {
   const cards = [
     {
@@ -38,6 +41,8 @@ export default function AssessmentPanel({
 
   return (
     <div className="flex flex-col gap-5">
+      <OpenSwitch initialOpen={initialOpen} />
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <FeeCard
           title="Олимпиадын үнэлгээний төлбөр"
@@ -75,6 +80,77 @@ export default function AssessmentPanel({
           </Link>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The kill switch. Closing hides the test from students everywhere — the page,
+ * the profile button, the free taster and every endpoint behind them — which
+ * is what the problem bank being mid-rewrite requires.
+ */
+function OpenSwitch({ initialOpen }: { initialOpen: boolean }) {
+  const [open, setOpen] = useState(initialOpen);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const toggle = async () => {
+    const next = !open;
+    if (
+      !next &&
+      !confirm(
+        "Түвшин тогтоох шалгалтыг хаах уу? Сурагчид хуудсыг нь харахгүй, эхэлсэн тест ч үргэлжлэхгүй болно."
+      )
+    )
+      return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "assessment_enabled", value: next ? "on" : "off" }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Хадгалахад алдаа гарлаа");
+        return;
+      }
+      setOpen(next);
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className={`card-flat px-[22px] py-[20px] flex items-center justify-between gap-4 flex-wrap ${
+        open ? "" : "border-red-soft/40 bg-red-soft/5"
+      }`}
+    >
+      <div>
+        <b className="text-[1.02rem] font-extrabold block">
+          {open ? "Түвшин тогтоох нээлттэй" : "Түвшин тогтоох хаалттай"}
+        </b>
+        <p className="text-[.87rem] text-ink-2 font-medium mt-1.5 max-w-[62ch]">
+          {open
+            ? "Сурагчид /assessment хуудсаар орж тест өгч байна. Бодлогын сангаа шинэчлэх үед хаа."
+            : "Сурагчдад «Түр хаалттай» гэж харагдана. Үнэгүй жишээ тест, эхэлсэн тестүүд ч зогссон."}
+        </p>
+        {error && <span className="text-[.82rem] font-bold text-red-soft block mt-1.5">{error}</span>}
+      </div>
+      <button
+        type="button"
+        disabled={saving}
+        onClick={toggle}
+        className={`shrink-0 font-extrabold text-[.88rem] px-5 py-2.5 rounded-full disabled:opacity-50 ${
+          open ? "text-ink-2 bg-bg-soft" : "text-white bg-green"
+        }`}
+      >
+        {saving ? "…" : open ? "Хаах" : "Нээх"}
+      </button>
     </div>
   );
 }

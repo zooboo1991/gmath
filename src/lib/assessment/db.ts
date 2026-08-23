@@ -230,6 +230,22 @@ export async function setSetting(key: string, value: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Whether the level test is open to students at all.
+ *
+ * A kill switch rather than a code change, because the reason to close it is
+ * always temporary and always urgent: the problem bank is mid-rewrite and the
+ * test would hand children questions that are half-replaced. The admin flips
+ * it back the same day, without a deploy.
+ *
+ * Default is open — a missing row, or a database that cannot be read, must
+ * never silently take the feature away.
+ */
+export async function isAssessmentOpen(): Promise<boolean> {
+  const value = await getSetting("assessment_enabled").catch(() => undefined);
+  return value !== "off";
+}
+
 export async function getAssessmentFee(): Promise<string> {
   return (await getSetting("assessment_fee")) ?? DEFAULT_ASSESSMENT_FEE;
 }

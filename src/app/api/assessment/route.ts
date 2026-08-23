@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import { createAssessment, findOpenAssessment, getFeeForTrack } from "@/lib/assessment/db";
+import { createAssessment, findOpenAssessment, getFeeForTrack, isAssessmentOpen } from "@/lib/assessment/db";
+import { ASSESSMENT_CLOSED } from "@/lib/assessment/guard";
 import type { AssessmentTrack } from "@/lib/assessment/types";
 import { getSessionUser } from "@/lib/session";
 
 /** The assessment the student is part-way through, if any. */
 export async function GET() {
+  if (!(await isAssessmentOpen())) {
+    return NextResponse.json({ ok: false, error: ASSESSMENT_CLOSED.error }, { status: ASSESSMENT_CLOSED.status });
+  }
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: "Нэвтэрнэ үү" }, { status: 401 });
@@ -27,6 +31,9 @@ export async function GET() {
 const TRACKS: AssessmentTrack[] = ["regular", "advanced", "olympiad"];
 
 export async function POST(request: Request) {
+  if (!(await isAssessmentOpen())) {
+    return NextResponse.json({ ok: false, error: ASSESSMENT_CLOSED.error }, { status: ASSESSMENT_CLOSED.status });
+  }
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: "Нэвтэрнэ үү" }, { status: 401 });
