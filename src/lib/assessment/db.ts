@@ -11,6 +11,7 @@ import {
 } from "./config";
 import { estimateLevel } from "./levelEstimator";
 import { nextTargetDifficulty, pickNextProblem } from "./problemPicker";
+import { isProblemCategory } from "./types";
 import type {
   Assessment,
   AssessmentProblem,
@@ -23,6 +24,7 @@ import type {
   QuestionnaireInput,
   QuizAnswer,
   QuizQuestion,
+  ProblemCategory,
   QuizTrack,
   Solution,
 } from "./types";
@@ -55,6 +57,7 @@ type LevelRow = {
 
 type ProblemRow = {
   id: string;
+  category: string | null;
   level: number;
   difficulty: number | string;
   topic: string;
@@ -68,6 +71,8 @@ type ProblemRow = {
 type AssessmentRow = {
   id: string;
   user_id: string;
+  category: string | null;
+  graded_sheet_paths: string[] | null;
   status: AssessmentStatus;
   track: AssessmentTrack;
   quiz_grade: number | null;
@@ -141,6 +146,7 @@ function problemFromRow(row: ProblemRow): Problem {
     bodyLatex: row.body_latex ?? undefined,
     imageUrl: row.image_url ?? undefined,
     answerKey: row.answer_key ?? undefined,
+    category: isProblemCategory(row.category) ? row.category : undefined,
     active: row.active,
     createdAt: row.created_at,
   };
@@ -152,6 +158,7 @@ function assessmentFromRow(row: AssessmentRow): Assessment {
     userId: row.user_id,
     status: row.status,
     track: row.track,
+    category: isProblemCategory(row.category) ? row.category : undefined,
     quizGrade: row.quiz_grade ?? undefined,
     quizScore: row.quiz_score ?? undefined,
     quizTotal: row.quiz_total ?? undefined,
@@ -160,6 +167,7 @@ function assessmentFromRow(row: AssessmentRow): Assessment {
     finalLevel: row.final_level ?? undefined,
     teacherComment: row.teacher_comment ?? undefined,
     gradedSheetPath: row.graded_sheet_path ?? undefined,
+    gradedSheetPaths: row.graded_sheet_paths ?? [],
     paymentProvider: row.payment_provider,
     paymentRef: row.payment_ref ?? undefined,
     paymentInvoiceId: row.payment_invoice_id ?? undefined,
@@ -307,9 +315,12 @@ export async function updateLevel(
 // Problem bank
 // ---------------------------------------------------------------------------
 
-export async function listProblems(opts: { includeInactive?: boolean } = {}): Promise<Problem[]> {
+export async function listProblems(
+  opts: { includeInactive?: boolean; category?: ProblemCategory } = {}
+): Promise<Problem[]> {
   let query = getSupabase().from("problems").select("*").order("difficulty").order("created_at");
   if (!opts.includeInactive) query = query.eq("active", true);
+  if (opts.category) query = query.eq("category", opts.category);
   const { data, error } = await query;
   if (error) throw error;
   return (data as ProblemRow[]).map(problemFromRow);
@@ -324,6 +335,7 @@ export async function createProblem(input: ProblemInput): Promise<Problem> {
       level: input.level,
       difficulty: input.difficulty,
       topic: input.topic,
+      category: input.category ?? null,
       body_latex: input.bodyLatex || null,
       image_url: input.imageUrl || null,
       answer_key: input.answerKey ?? null,
@@ -343,6 +355,7 @@ export async function updateProblem(
   if (input.level !== undefined) patch.level = input.level;
   if (input.difficulty !== undefined) patch.difficulty = input.difficulty;
   if (input.topic !== undefined) patch.topic = input.topic;
+  if (input.category !== undefined) patch.category = input.category ?? null;
   if (input.bodyLatex !== undefined) patch.body_latex = input.bodyLatex || null;
   if (input.imageUrl !== undefined) patch.image_url = input.imageUrl || null;
   if (input.answerKey !== undefined) patch.answer_key = input.answerKey || null;
@@ -403,11 +416,18 @@ export async function createAssessment(
   userId: string,
   amount: string,
   track: AssessmentTrack,
-  quizGrade?: number
+  quizGrade?: number,
+  category?: ProblemCategory
 ): Promise<Assessment> {
   const { data, error } = await getSupabase()
     .from("assessments")
-    .insert({ user_id: userId, amount, track, quiz_grade: quizGrade ?? null })
+    .insert({
+      user_id: userId,
+      amount,
+      track,
+      quiz_grade: quizGrade ?? null,
+      category: category ?? null,
+    })
     .select("*")
     .single();
   if (error) throw error;
@@ -593,7 +613,10 @@ export async function getPickingState(assessment: Assessment): Promise<PickingSt
 export async function getNextProblem(assessment: Assessment): Promise<Problem | null> {
   const state = await getPickingState(assessment);
   if (state.finished) return null;
-  const candidates = await listProblems();
+  // Only this child's bank. An assessment started before the split has no
+  // category and still sees everything, which is what those already in
+  // progress were promised.
+  const candidates = await listProblems({ category: assessment.category });
   return pickNextProblem(
     candidates,
     state.targetDifficulty,

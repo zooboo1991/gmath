@@ -56,9 +56,22 @@ export async function buildGradingDetail(id: string) {
       topic: allProblems.find((p) => p.id === s.problemId)?.topic ?? "",
     }));
 
-  const gradedSheetUrl = assessment.gradedSheetPath
-    ? await createSignedUrl(GRADED_SHEETS_BUCKET, assessment.gradedSheetPath, SIGNED_URL_TTL_SECONDS)
-    : null;
+  // The verdict's pages, plus the single pre-split scan for assessments graded
+  // before it could hold more than one.
+  const sheetPaths = [
+    ...assessment.gradedSheetPaths,
+    ...(assessment.gradedSheetPath && !assessment.gradedSheetPaths.includes(assessment.gradedSheetPath)
+      ? [assessment.gradedSheetPath]
+      : []),
+  ];
+  const gradedSheets = (
+    await Promise.all(
+      sheetPaths.map(async (path) => {
+        const url = await createSignedUrl(GRADED_SHEETS_BUCKET, path, SIGNED_URL_TTL_SECONDS);
+        return url ? { path, url } : null;
+      })
+    )
+  ).filter((s): s is { path: string; url: string } => s !== null);
 
   return {
     assessment,
@@ -66,7 +79,7 @@ export async function buildGradingDetail(id: string) {
     questionnaire: questionnaire ?? null,
     items,
     skipped,
-    gradedSheetUrl,
+    gradedSheets,
   };
 }
 

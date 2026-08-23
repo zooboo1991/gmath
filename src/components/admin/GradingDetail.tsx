@@ -18,7 +18,7 @@ const ACTION_LABEL: Record<string, string> = {
 export default function GradingDetail({ detail, levels }: { detail: Detail; levels: Level[] }) {
   const router = useRouter();
   const [items, setItems] = useState(detail.items);
-  const [sheetUrl, setSheetUrl] = useState(detail.gradedSheetUrl);
+  const [sheets, setSheets] = useState(detail.gradedSheets);
   const [teacherComment, setTeacherComment] = useState(detail.assessment.teacherComment ?? "");
   const [finalLevel, setFinalLevel] = useState(
     String(detail.assessment.finalLevel ?? detail.assessment.estimatedLevel ?? "")
@@ -58,23 +58,46 @@ export default function GradingDetail({ detail, levels }: { detail: Detail; leve
     }
   };
 
-  const uploadSheet = async (file: File) => {
+  /** Uploaded one at a time so a half-finished batch still keeps what landed. */
+  const uploadSheets = async (files: File[]) => {
     setUploading(true);
     setError(null);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      const res = await fetch(`/api/admin/grading/${id}/sheet`, { method: "POST", body });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Байршуулахад алдаа гарлаа");
-        return;
+      for (const file of files) {
+        const body = new FormData();
+        body.append("file", file);
+        const res = await fetch(`/api/admin/grading/${id}/sheet`, { method: "POST", body });
+        const json = await res.json();
+        if (!res.ok) {
+          setError(json.error ?? "Байршуулахад алдаа гарлаа");
+          return;
+        }
+        setSheets((current) => [...current, { path: json.path, url: json.url }]);
       }
-      setSheetUrl(json.url);
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const removeSheet = async (path: string) => {
+    if (!confirm("Энэ зургийг хасах уу?")) return;
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/grading/${id}/sheet`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        setError(json.error ?? "Хасахад алдаа гарлаа");
+        return;
+      }
+      setSheets((current) => current.filter((s) => s.path !== path));
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     }
   };
 
@@ -146,6 +169,12 @@ export default function GradingDetail({ detail, levels }: { detail: Detail; leve
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[.9rem]">
             {[
               ["Анги", q?.grade || detail.user?.grade || "—"],
+              [
+                "Бодлогын ангилал",
+                detail.assessment.category
+                  ? `${detail.assessment.category} (${detail.assessment.category === "C" ? "5-6" : "7-8"} анги)`
+                  : "—",
+              ],
               ["Нас", q?.age ? String(q.age) : "—"],
               ["Сургууль", detail.user?.school ?? "—"],
               ["Утас", detail.user?.phone ?? "—"],
@@ -223,24 +252,47 @@ export default function GradingDetail({ detail, levels }: { detail: Detail; leve
 
           <div className="mb-4">
             <span className="text-[.8rem] font-extrabold text-ink-3 block mb-2">
-              Засаж скан хийсэн хуудас (заавал биш)
+              Засаж скан хийсэн хуудсууд (заавал биш)
             </span>
-            {sheetUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={sheetUrl} alt="" className="max-w-[300px] rounded-sm border border-line mb-2.5" />
+            {sheets.length > 0 && (
+              <div className="flex gap-2.5 flex-wrap mb-2.5">
+                {sheets.map((sheet) => (
+                  <div key={sheet.path} className="relative">
+                    <a href={sheet.url} target="_blank" rel="noreferrer">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={sheet.url}
+                        alt=""
+                        className="w-[130px] h-[130px] object-cover rounded-sm border border-line hover:border-blue transition-colors"
+                      />
+                    </a>
+                    {!done && (
+                      <button
+                        type="button"
+                        onClick={() => removeSheet(sheet.path)}
+                        aria-label="Зураг хасах"
+                        className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-surface border border-line text-ink-3 hover:text-red-soft grid place-items-center shadow-xs"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
             {!done && (
               <label className="inline-flex items-center gap-2 text-[.85rem] font-extrabold text-blue-strong bg-blue-soft px-4 py-2.5 rounded-full cursor-pointer">
-                {uploading ? "Байршуулж байна…" : sheetUrl ? "Скан солих" : "Скан оруулах"}
+                {uploading ? "Байршуулж байна…" : sheets.length > 0 ? "Зураг нэмэх" : "Зураг оруулах"}
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   className="hidden"
                   disabled={uploading}
                   onChange={(e) => {
-                    const f = e.target.files?.[0];
+                    const files = [...(e.target.files ?? [])];
                     e.target.value = "";
-                    if (f) uploadSheet(f);
+                    if (files.length > 0) void uploadSheets(files);
                   }}
                 />
               </label>

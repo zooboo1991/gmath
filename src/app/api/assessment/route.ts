@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAssessment, findOpenAssessment, getFeeForTrack, isAssessmentOpen } from "@/lib/assessment/db";
 import { ASSESSMENT_CLOSED } from "@/lib/assessment/guard";
-import type { AssessmentTrack } from "@/lib/assessment/types";
+import {
+  categoryForGrade,
+  isProblemCategory,
+  type AssessmentTrack,
+  type ProblemCategory,
+} from "@/lib/assessment/types";
 import { getSessionUser } from "@/lib/session";
 
 /** The assessment the student is part-way through, if any. */
@@ -52,6 +57,25 @@ export async function POST(request: Request) {
     quizGrade = grade;
   }
 
+  // The olympiad bank is split by category: C is 5th-6th grade, D is 7th-8th.
+  // Taken from the profile, because that is the answer the family already
+  // gave; only when the grade falls outside 5-8 (or is missing) does the
+  // student get asked, and then it must come with the request.
+  let category: ProblemCategory | undefined;
+  if (track === "olympiad") {
+    category = categoryForGrade(Number(user.grade)) ?? (isProblemCategory(data?.category) ? data.category : undefined);
+    if (!category) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Ангиллаа сонгоно уу (C — 5-6 анги, D — 7-8 анги).",
+          needsCategory: true,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   // Resuming beats starting over: a second tab, or a refresh mid-flow, must
   // not leave the student with two half-finished assessments (and two fees).
   const existing = await findOpenAssessment(user.id);
@@ -60,6 +84,6 @@ export async function POST(request: Request) {
   }
 
   const fee = await getFeeForTrack(track);
-  const assessment = await createAssessment(user.id, fee, track, quizGrade);
+  const assessment = await createAssessment(user.id, fee, track, quizGrade, category);
   return NextResponse.json({ ok: true, assessment, resumed: false });
 }

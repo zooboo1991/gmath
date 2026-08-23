@@ -39,14 +39,14 @@ export default function AssessmentResult({
   level,
   course,
   solutions,
-  gradedSheetUrl,
+  gradedSheetUrls,
   open = true,
 }: {
   assessment: Assessment | null;
   level: Level | null;
   course: Course | null;
   solutions: Solution[];
-  gradedSheetUrl: string | null;
+  gradedSheetUrls: string[];
   /**
    * False while the level test is switched off. A result already earned stays
    * readable — it is the student's own — but nothing here may invite them into
@@ -180,17 +180,23 @@ export default function AssessmentResult({
         </div>
       )}
 
-      {gradedSheetUrl && (
+      {gradedSheetUrls.length > 0 && (
         <div className={CARD}>
-          <h2 className="text-[1.05rem] font-extrabold mb-3">Засаж өгсөн хуудас</h2>
-          <a href={gradedSheetUrl} target="_blank" rel="noreferrer">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={gradedSheetUrl}
-              alt="Багшийн засварласан хуудас"
-              className="max-w-full rounded-sm border border-line hover:border-blue transition-colors"
-            />
-          </a>
+          <h2 className="text-[1.05rem] font-extrabold mb-3">
+            Багшийн засварласан хуудас{gradedSheetUrls.length > 1 ? ` (${gradedSheetUrls.length})` : ""}
+          </h2>
+          <div className="flex flex-col gap-3">
+            {gradedSheetUrls.map((url) => (
+              <a key={url} href={url} target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt="Багшийн засварласан хуудас"
+                  className="max-w-full rounded-sm border border-line hover:border-blue transition-colors"
+                />
+              </a>
+            ))}
+          </div>
           <p className="text-[.8rem] text-ink-3 font-medium mt-2">Томруулж харах бол зураг дээр дарна уу.</p>
         </div>
       )}

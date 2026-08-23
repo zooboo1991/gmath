@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import MathText from "@/components/assessment/MathText";
 import { IconClose } from "@/components/icons";
-import type { Problem } from "@/lib/assessment/types";
+import { PROBLEM_CATEGORIES, type Problem, type ProblemCategory } from "@/lib/assessment/types";
 import { apiError, readJson } from "@/lib/fetchJson";
 import { downscaleImage, formatMb, MAX_UPLOAD_BYTES } from "@/lib/imageResize";
 import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
 
 const emptyForm = {
+  category: "C" as ProblemCategory,
   level: 1,
   difficulty: 1,
   topic: "",
@@ -24,6 +25,7 @@ type FormState = typeof emptyForm;
 
 function toForm(problem: Problem): FormState {
   return {
+    category: problem.category ?? ("C" as ProblemCategory),
     level: problem.level,
     difficulty: problem.difficulty,
     topic: problem.topic,
@@ -44,6 +46,7 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [levelFilter, setLevelFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [search, setSearch] = useState("");
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -162,10 +165,16 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
     const q = search.trim().toLowerCase();
     return problems.filter((p) => {
       if (levelFilter !== "all" && String(p.level) !== levelFilter) return false;
+      // "—" is the pile of problems entered before the bank was split: they
+      // reach no student until the teacher files them into C or D.
+      if (categoryFilter === "none" && p.category) return false;
+      if (categoryFilter !== "all" && categoryFilter !== "none" && p.category !== categoryFilter) return false;
       if (!q) return true;
       return `${p.topic} ${p.bodyLatex ?? ""}`.toLowerCase().includes(q);
     });
-  }, [problems, levelFilter, search]);
+  }, [problems, levelFilter, categoryFilter, search]);
+
+  const uncategorised = problems.filter((p) => p.active && !p.category).length;
 
   const activeCount = problems.filter((p) => p.active).length;
 
@@ -211,6 +220,20 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[.8rem] font-extrabold text-ink-3">Ангилал</span>
+                <select
+                  value={form.category}
+                  onChange={(e) => setField("category", e.target.value as ProblemCategory)}
+                  className={INPUT_CLASS}
+                >
+                  {PROBLEM_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c} ангилал {c === "C" ? "(5-6 анги)" : "(7-8 анги)"}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="flex flex-col gap-1.5">
                 <span className="text-[.8rem] font-extrabold text-ink-3">Түвшин (1-10)</span>
                 <select
@@ -349,6 +372,18 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
           </div>
         )}
 
+        {uncategorised > 0 && (
+          <div className="bg-red-soft/8 border border-red-soft/30 rounded-md px-[18px] py-3.5 mb-4">
+            <b className="text-[.9rem] font-extrabold text-ink block">
+              {uncategorised} бодлого ангилалгүй байна
+            </b>
+            <p className="text-[.85rem] text-ink-2 font-medium mt-1">
+              Сурагчид зөвхөн өөрийн ангиллын бодлогыг хардаг тул ангилалгүй бодлого хэнд ч
+              харагдахгүй. Засаад C эсвэл D-г нь сонгоно уу.
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
           <h2 className="text-[1.1rem] font-extrabold">
             Бодлогууд ({filtered.length}
@@ -356,6 +391,16 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
             <span className="text-ink-3 font-bold text-[.85rem] ml-2">{activeCount} идэвхтэй</span>
           </h2>
           <div className="flex gap-2.5 flex-wrap">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className={`${INPUT_CLASS} max-w-[190px]`}
+            >
+              <option value="all">Бүх ангилал</option>
+              <option value="C">C ангилал (5-6 анги)</option>
+              <option value="D">D ангилал (7-8 анги)</option>
+              <option value="none">Ангилалгүй</option>
+            </select>
             <select
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
@@ -395,6 +440,15 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
               >
                 <div className="flex items-start justify-between gap-3 flex-wrap mb-2">
                   <div className="flex items-center gap-2 flex-wrap">
+                    {p.category ? (
+                      <span className="text-[.72rem] font-extrabold text-gold-strong bg-gold-soft px-2.5 py-1 rounded-full">
+                        {p.category} ангилал
+                      </span>
+                    ) : (
+                      <span className="text-[.72rem] font-extrabold text-red-soft bg-red-soft/12 px-2.5 py-1 rounded-full">
+                        Ангилалгүй
+                      </span>
+                    )}
                     <span className="text-[.72rem] font-extrabold text-blue-strong bg-blue-soft px-2.5 py-1 rounded-full">
                       {p.level}-р түвшин
                     </span>

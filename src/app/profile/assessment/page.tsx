@@ -63,7 +63,7 @@ export default async function ProfileAssessmentPage() {
   let level: Level | null = null;
   let course: Course | null = null;
   let solutions: Solution[] = [];
-  let gradedSheetUrl: string | null = null;
+  let gradedSheetUrls: string[] = [];
 
   if (assessment?.status === "completed") {
     [level, solutions] = await Promise.all([
@@ -73,13 +73,17 @@ export default async function ProfileAssessmentPage() {
     if (level?.recommendedCourseId) {
       course = (await findCourseById(level.recommendedCourseId)) ?? null;
     }
-    if (assessment.gradedSheetPath) {
-      gradedSheetUrl = await createSignedUrl(
-        GRADED_SHEETS_BUCKET,
-        assessment.gradedSheetPath,
-        SIGNED_URL_TTL_SECONDS
-      );
-    }
+    // The verdict's pages, plus the single scan of assessments graded before
+    // it could hold more than one.
+    const paths = [
+      ...assessment.gradedSheetPaths,
+      ...(assessment.gradedSheetPath && !assessment.gradedSheetPaths.includes(assessment.gradedSheetPath)
+        ? [assessment.gradedSheetPath]
+        : []),
+    ];
+    gradedSheetUrls = (
+      await Promise.all(paths.map((p) => createSignedUrl(GRADED_SHEETS_BUCKET, p, SIGNED_URL_TTL_SECONDS)))
+    ).filter((url): url is string => Boolean(url));
   }
 
   return (
@@ -94,7 +98,7 @@ export default async function ProfileAssessmentPage() {
               level={level}
               course={course}
               solutions={solutions}
-              gradedSheetUrl={gradedSheetUrl}
+              gradedSheetUrls={gradedSheetUrls}
               open={open}
             />
             <Link

@@ -45,8 +45,34 @@ export type Level = {
  * statement plus its figure). At least one of the two is always present —
  * enforced by the problems_has_content constraint.
  */
+/**
+ * Which problem bank a problem belongs to, and which one a child is assessed
+ * from. C is 5th-6th grade, D is 7th-8th — the year-long programme the child
+ * is preparing for, not a difficulty rating (the 1-10 level does that, inside
+ * a category).
+ */
+export const PROBLEM_CATEGORIES = ["C", "D"] as const;
+export type ProblemCategory = (typeof PROBLEM_CATEGORIES)[number];
+
+export function isProblemCategory(value: unknown): value is ProblemCategory {
+  return value === "C" || value === "D";
+}
+
+/**
+ * The category a child of this grade is assessed in. Returns undefined outside
+ * 5-8, where the site has no answer and the student is asked to choose rather
+ * than being quietly filed into the wrong bank.
+ */
+export function categoryForGrade(grade: number | undefined): ProblemCategory | undefined {
+  if (grade === 5 || grade === 6) return "C";
+  if (grade === 7 || grade === 8) return "D";
+  return undefined;
+}
+
 export type Problem = {
   id: string;
+  /** Unset on problems entered before the bank was split by category. */
+  category?: ProblemCategory;
   level: number;
   difficulty: number;
   topic: string;
@@ -65,6 +91,7 @@ export type PublicProblem = Omit<Problem, "answerKey" | "active" | "createdAt">;
 export function toPublicProblem(problem: Problem): PublicProblem {
   return {
     id: problem.id,
+    category: problem.category,
     level: problem.level,
     difficulty: problem.difficulty,
     topic: problem.topic,
@@ -78,6 +105,8 @@ export type Assessment = {
   userId: string;
   status: AssessmentStatus;
   track: AssessmentTrack;
+  /** Olympiad track only — the problem bank this child is being assessed from. */
+  category?: ProblemCategory;
   /** Quiz tracks only — the grade the student picked, which chose the question set. */
   quizGrade?: number;
   quizScore?: number;
@@ -87,7 +116,10 @@ export type Assessment = {
   estimatedLevel?: number;
   finalLevel?: number;
   teacherComment?: string;
+  /** The single scan uploaded before the verdict took several images. Read-only now. */
   gradedSheetPath?: string;
+  /** The teacher's marked-up pages, newest last. */
+  gradedSheetPaths: string[];
   paymentProvider: string;
   paymentRef?: string;
   /** Set once a QPay invoice exists for this assessment; undefined for the stub provider. */

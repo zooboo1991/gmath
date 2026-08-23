@@ -1,5 +1,6 @@
 import { isTooLong, MAX_LEN } from "../validate";
 import type { ProblemInput } from "./db";
+import { isProblemCategory } from "./types";
 
 /**
  * Validates a problem the admin typed. Returns a Mongolian message, or the
@@ -15,6 +16,14 @@ export function validateProblemInput(
   const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
   const value: Partial<ProblemInput> = {};
 
+  if (!partial || has("category")) {
+    // Required on create: a problem with no category reaches no student, and
+    // silently filing new ones into that pile is how the bank quietly empties.
+    if (!isProblemCategory(data.category)) {
+      return { error: "Ангилал сонгоно уу (C — 5-6 анги, D — 7-8 анги)" };
+    }
+    value.category = data.category;
+  }
   if (!partial || has("level")) {
     const level = Number(data.level);
     if (!Number.isInteger(level) || level < 1 || level > 10) return { error: "Түвшин 1-10 хооронд байна" };

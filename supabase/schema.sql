@@ -825,3 +825,30 @@ create unique index if not exists registrations_phone_program_unique
 -- Push мэдэгдэлд байсан pushUrl-ийг мөн энэ талбар орлоно: нэг мэдэгдэл
 -- хаана ч дарагдсан нэг л газар аваачна.
 alter table notifications add column if not exists link text;
+
+-- ---------------------------------------------------------------------------
+-- Олимпиадын үнэлгээ: C/D ангилал ба багшийн олон зураг
+-- ---------------------------------------------------------------------------
+-- The olympiad problem bank is now kept per category — C is 5th-6th grade and
+-- D is 7th-8th, matching the year-long programme a child is preparing for. A
+-- child is served problems from their own category only, so the difficulty
+-- ladder inside a category means the same thing for everyone on it.
+--
+-- Nullable rather than not-null: the problems already in the bank predate the
+-- split and the teacher re-files them by hand. A problem with no category is
+-- shown to nobody once an assessment carries one (see getNextProblem).
+alter table problems add column if not exists category text
+  check (category is null or category in ('C', 'D'));
+create index if not exists problems_category_idx on problems (category) where active;
+
+-- Which bank this child is being assessed from. Derived from their grade when
+-- the assessment starts and frozen there: a child who has a birthday, or whose
+-- profile grade is corrected mid-assessment, must not suddenly be graded
+-- against a different set of problems than the ones they were shown.
+alter table assessments add column if not exists category text
+  check (category is null or category in ('C', 'D'));
+
+-- The teacher's verdict can carry several marked-up pages, not one. The old
+-- single-image column stays: assessments graded before this change still hold
+-- their scan there, and the result page falls back to it.
+alter table assessments add column if not exists graded_sheet_paths text[] not null default '{}';
