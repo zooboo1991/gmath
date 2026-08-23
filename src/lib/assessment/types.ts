@@ -108,6 +108,8 @@ export type Assessment = {
   track: AssessmentTrack;
   /** Olympiad track only — the problem bank this child is being assessed from. */
   category?: ProblemCategory;
+  /** The exam this child sat. Unset on assessments taken before exams existed. */
+  examId?: string;
   /** Quiz tracks only — the grade the student picked, which chose the question set. */
   quizGrade?: number;
   quizScore?: number;

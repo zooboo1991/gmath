@@ -7,7 +7,6 @@ import MathText from "@/components/assessment/MathText";
 import FormField from "@/components/FormField";
 import { useProgramRegister } from "@/components/program/ProgramRegister";
 import { TRACK_LABELS, type Assessment, type AssessmentTrack, type PublicQuizQuestion } from "@/lib/assessment/types";
-import type { PublicProblem } from "@/lib/assessment/types";
 
 type Step =
   | "loading"
@@ -16,7 +15,7 @@ type Step =
   | "payment"
   | "qpay-wait"
   | "questionnaire"
-  | "problems"
+  | "solve"
   | "quiz"
   | "quiz-result"
   | "submitted";
@@ -38,39 +37,18 @@ export default function AssessmentFlow() {
   const [busy, setBusy] = useState(false);
   const [qpayQr, setQpayQr] = useState<{ qrImage: string; shortUrl: string } | null>(null);
 
-  // Problem-picking state
-  const [problem, setProblem] = useState<PublicProblem | null>(null);
-  const [chosen, setChosen] = useState(0);
-  const [needed, setNeeded] = useState(5);
-
   const stepForStatus = (a: Assessment | null): Step => {
     if (!a) return "track";
     const isQuiz = a.track === "regular" || a.track === "advanced";
     if (a.status === "awaiting_payment") return "payment";
     if (a.status === "paid") return isQuiz ? "quiz" : "questionnaire";
-    if (a.status === "questionnaire_done") return "problems";
+    // The exam's problems were written onto the assessment when the
+    // questionnaire was submitted, so there is nothing to pick — the child
+    // goes to the page where they solve and upload.
+    if (a.status === "questionnaire_done") return "solve";
     if (a.status === "completed" && isQuiz) return "quiz-result";
     return "submitted";
   };
-
-  const loadNextProblem = useCallback(
-    async (id: string) => {
-      const res = await fetch(`/api/assessment/${id}/next-problem`);
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Бодлого ачаалахад алдаа гарлаа");
-        return;
-      }
-      setChosen(json.chosen);
-      setNeeded(json.needed);
-      if (json.finished) {
-        router.push(`/assessment/${id}/solve`);
-        return;
-      }
-      setProblem(json.problem);
-    },
-    [router]
-  );
 
   // Load any assessment already in progress, so a refresh resumes rather
   // than silently starting (and charging for) a second one. Fetching the
@@ -89,8 +67,8 @@ export default function AssessmentFlow() {
         setFees(json.fees ?? null);
         const next = stepForStatus(json.assessment);
         setStep(next);
-        if (next === "problems" && json.assessment) {
-          await loadNextProblem(json.assessment.id);
+        if (next === "solve" && json.assessment) {
+          router.push(`/assessment/${json.assessment.id}/solve`);
         }
       } catch {
         if (!cancelled) setError("Сүлжээний алдаа гарлаа. Хуудсаа шинэчилнэ үү.");
@@ -99,7 +77,7 @@ export default function AssessmentFlow() {
     return () => {
       cancelled = true;
     };
-  }, [sessionLoaded, sessionUser, loadNextProblem]);
+  }, [sessionLoaded, sessionUser, router]);
 
   const pay = async () => {
     setBusy(true);
@@ -196,34 +174,6 @@ export default function AssessmentFlow() {
     };
   }, [step, assessment]);
 
-  const answer = async (action: "too_easy" | "dont_know" | "solving") => {
-    if (!assessment || !problem) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/assessment/${assessment.id}/problem-action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ problemId: problem.id, action }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Алдаа гарлаа");
-        return;
-      }
-      setChosen(json.chosen);
-      if (json.finished) {
-        router.push(`/assessment/${assessment.id}/solve`);
-        return;
-      }
-      setProblem(json.problem);
-    } catch {
-      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   if (!sessionLoaded) {
     return <div className={`${CARD} text-center text-ink-3 font-semibold`}>Ачаалж байна…</div>;
   }
@@ -302,16 +252,15 @@ export default function AssessmentFlow() {
       {step === "questionnaire" && assessment && (
         <QuestionnaireStep
           assessmentId={assessment.id}
-          onDone={async (a) => {
+          onDone={(a) => {
             setAssessment(a);
-            setStep("problems");
-            await loadNextProblem(a.id);
+            router.push(`/assessment/${a.id}/solve`);
           }}
         />
       )}
 
-      {step === "problems" && (
-        <ProblemStep problem={problem} chosen={chosen} needed={needed} busy={busy} onAnswer={answer} />
+      {step === "solve" && (
+        <div className={`${CARD} text-center text-ink-3 font-semibold`}>Шалгалт руу шилжиж байна…</div>
       )}
 
       {step === "quiz" && assessment && (
@@ -636,89 +585,6 @@ function QuestionnaireStep({
       >
         {busy ? "Хадгалж байна…" : "Бодлого руу шилжих →"}
       </button>
-    </div>
-  );
-}
-
-function ProblemStep({
-  problem,
-  chosen,
-  needed,
-  busy,
-  onAnswer,
-}: {
-  problem: PublicProblem | null;
-  chosen: number;
-  needed: number;
-  busy: boolean;
-  onAnswer: (a: "too_easy" | "dont_know" | "solving") => void;
-}) {
-  if (!problem) {
-    return <div className={`${CARD} text-center text-ink-3 font-semibold`}>Бодлого ачаалж байна…</div>;
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-        <span className="text-[.85rem] font-extrabold text-ink-3">
-          Сонгосон: {chosen} / {needed}
-        </span>
-        <div className="flex gap-1.5">
-          {Array.from({ length: needed }, (_, i) => (
-            <span
-              key={i}
-              className={`w-7 h-1.5 rounded-full ${i < chosen ? "bg-blue" : "bg-line-2"}`}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className={CARD}>
-        {problem.topic && (
-          <span className="inline-block text-[.72rem] font-extrabold text-blue-strong bg-blue-soft px-2.5 py-1 rounded-full mb-3">
-            {problem.topic}
-          </span>
-        )}
-
-        {problem.bodyLatex && <MathText source={problem.bodyLatex} className="text-[1.05rem] overflow-x-auto" />}
-        {problem.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={problem.imageUrl} alt="" className="mt-3 max-w-full rounded-sm border border-line" />
-        )}
-      </div>
-
-      <p className="text-center text-ink-3 font-semibold text-[.88rem] mt-5 mb-3">
-        Энэ бодлого танд ямар байна?
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onAnswer("too_easy")}
-          className="btn-ring font-extrabold rounded-full bg-surface text-ink px-5 py-4 transition-colors disabled:opacity-50"
-        >
-          Амархан
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onAnswer("dont_know")}
-          className="btn-ring font-extrabold rounded-full bg-surface text-ink px-5 py-4 transition-colors disabled:opacity-50"
-        >
-          Мэдэхгүй
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onAnswer("solving")}
-          className="font-extrabold rounded-full bg-blue text-white shadow-blue px-5 py-4 transition-transform hover:-translate-y-0.5 disabled:opacity-50"
-        >
-          Бодъё
-        </button>
-      </div>
-      <p className="text-center text-ink-3 font-medium text-[.82rem] mt-3">
-        &ldquo;Амархан&rdquo; сонгоход илүү хүнд, &ldquo;Мэдэхгүй&rdquo; сонгоход хөнгөн бодлого гарна.
-      </p>
     </div>
   );
 }

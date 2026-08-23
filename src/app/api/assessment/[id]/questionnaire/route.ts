@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { saveQuestionnaire } from "@/lib/assessment/db";
+import { attachProblems, saveQuestionnaire } from "@/lib/assessment/db";
+import { listExamProblems } from "@/lib/assessment/exams";
 import { requireOwnAssessment, requireStatus } from "@/lib/assessment/guard";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 
@@ -39,6 +40,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     hasPrepared: data.hasPrepared === true,
     achievements,
   });
+
+  // The exam's problems become this child's paper, in the teacher's order.
+  if (guard.assessment.examId) {
+    const problems = await listExamProblems(guard.assessment.examId);
+    await attachProblems(id, problems.map((p) => p.id));
+  }
 
   return NextResponse.json({ ok: true, estimatedLevel });
 }

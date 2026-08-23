@@ -4,16 +4,6 @@
  * getAssessmentFee() in ./db.
  */
 
-/** How many problems the student picks "Бодъё" on before moving to upload. */
-export const PROBLEMS_TO_SOLVE = 5;
-
-/**
- * Hard stop on how many problems we put in front of one student. Without it,
- * a student who keeps pressing "Амархан"/"Мэдэхгүй" could walk the whole
- * problem bank.
- */
-export const MAX_PROBLEMS_SHOWN = 25;
-
 /** Used when app_settings has no assessment_fee row yet. */
 export const DEFAULT_ASSESSMENT_FEE = "20,000₮";
 
@@ -29,8 +19,12 @@ export const SAMPLE_QUESTIONS_PER_TEST = 5;
 /** Used when app_settings has no assessment_sla row yet. */
 export const DEFAULT_ASSESSMENT_SLA = "1-2 хоног";
 
-/** Upload limits for the handwritten solution photos. */
-export const MAX_SOLUTION_IMAGES_PER_PROBLEM = 3;
+/**
+ * Upload limits for the handwritten solution photos. Ten rather than three: a
+ * single olympiad problem's working runs to several pages, and the cap is here
+ * to stop a runaway upload loop, not to ration a child's paper.
+ */
+export const MAX_SOLUTION_IMAGES_PER_PROBLEM = 10;
 export const MAX_SOLUTION_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /** Signed-URL lifetime for private solution/graded-sheet images, in seconds. */

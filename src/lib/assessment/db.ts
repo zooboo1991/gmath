@@ -5,12 +5,9 @@ import {
   DEFAULT_ASSESSMENT_FEE,
   DEFAULT_ASSESSMENT_SLA,
   DEFAULT_QUIZ_FEE,
-  MAX_PROBLEMS_SHOWN,
-  PROBLEMS_TO_SOLVE,
   QUIZ_QUESTIONS_PER_TEST,
 } from "./config";
 import { estimateLevel } from "./levelEstimator";
-import { nextTargetDifficulty, pickNextProblem } from "./problemPicker";
 import { isProblemCategory } from "./types";
 import type {
   Assessment,
@@ -55,7 +52,7 @@ type LevelRow = {
   recommended_course_id: string | null;
 };
 
-type ProblemRow = {
+export type ProblemRow = {
   id: string;
   category: string | null;
   level: number;
@@ -71,6 +68,7 @@ type ProblemRow = {
 type AssessmentRow = {
   id: string;
   user_id: string;
+  exam_id: string | null;
   category: string | null;
   graded_sheet_paths: string[] | null;
   status: AssessmentStatus;
@@ -136,7 +134,7 @@ function levelFromRow(row: LevelRow): Level {
   };
 }
 
-function problemFromRow(row: ProblemRow): Problem {
+export function problemFromRow(row: ProblemRow): Problem {
   return {
     id: row.id,
     level: row.level,
@@ -159,6 +157,7 @@ function assessmentFromRow(row: AssessmentRow): Assessment {
     status: row.status,
     track: row.track,
     category: isProblemCategory(row.category) ? row.category : undefined,
+    examId: row.exam_id ?? undefined,
     quizGrade: row.quiz_grade ?? undefined,
     quizScore: row.quiz_score ?? undefined,
     quizTotal: row.quiz_total ?? undefined,
@@ -413,7 +412,8 @@ export async function createAssessment(
   amount: string,
   track: AssessmentTrack,
   quizGrade?: number,
-  category?: ProblemCategory
+  category?: ProblemCategory,
+  examId?: string
 ): Promise<Assessment> {
   const { data, error } = await getSupabase()
     .from("assessments")
@@ -423,6 +423,7 @@ export async function createAssessment(
       track,
       quiz_grade: quizGrade ?? null,
       category: category ?? null,
+      exam_id: examId ?? null,
     })
     .select("*")
     .single();
@@ -556,8 +557,35 @@ export async function saveQuestionnaire(
     estimated_level: estimatedLevel,
     status: "questionnaire_done",
   });
-
   return { questionnaire: questionnaireFromRow(data as QuestionnaireRow), estimatedLevel };
+}
+
+/**
+ * Writes the exam's roll onto the assessment as ordinary "solving" rows, so
+ * everything downstream — the solve page, the uploads, the grading queue —
+ * works exactly as it did when the child picked the problems themselves.
+ *
+ * Idempotent: re-submitting the questionnaire is allowed (a student may go
+ * back and correct an answer) and must not hand them the paper twice. Lives
+ * here rather than inside saveQuestionnaire so this module keeps no import of
+ * the exams module, which already imports this one.
+ */
+export async function attachProblems(assessmentId: string, problemIds: string[]): Promise<void> {
+  if (problemIds.length === 0) return;
+  const existing = await listAssessmentProblems(assessmentId);
+  if (existing.length > 0) return;
+
+  const { error } = await getSupabase()
+    .from("assessment_problems")
+    .insert(
+      problemIds.map((problemId, index) => ({
+        assessment_id: assessmentId,
+        problem_id: problemId,
+        action: "solving",
+        shown_order: index,
+      }))
+    );
+  if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------
@@ -575,13 +603,10 @@ export async function listAssessmentProblems(assessmentId: string): Promise<Asse
 }
 
 export type PickingState = {
-  /** Problems the student has committed to solving. */
+  /** The problems this child must solve — the exam's roll. */
   chosen: AssessmentProblem[];
-  /** Everything shown so far, whatever the answer. */
+  /** Every row on the assessment. Identical to `chosen` since the teacher composes the paper. */
   shown: AssessmentProblem[];
-  targetDifficulty: number;
-  /** True once enough problems are chosen (or the bank ran dry). */
-  finished: boolean;
 };
 
 /**
@@ -590,54 +615,19 @@ export type PickingState = {
  * tuning in problemPicker.ts — change the step size and old assessments
  * re-derive consistently.
  */
+/**
+ * The problems this child has to solve — the exam's roll, written onto the
+ * assessment by attachProblems.
+ *
+ * Once an adaptive walk, hence the name and the "shown"/"chosen" split: every
+ * row is now action="solving" because the teacher chose them. Kept as one
+ * function because the solve page, the upload endpoint and the submit check
+ * all ask the same question of it.
+ */
 export async function getPickingState(assessment: Assessment): Promise<PickingState> {
   const shown = await listAssessmentProblems(assessment.id);
-  let target = assessment.estimatedLevel ?? 1;
-  for (const entry of shown) {
-    target = nextTargetDifficulty(target, entry.action);
-  }
   const chosen = shown.filter((s) => s.action === "solving");
-  return {
-    chosen,
-    shown,
-    targetDifficulty: target,
-    finished: chosen.length >= PROBLEMS_TO_SOLVE || shown.length >= MAX_PROBLEMS_SHOWN,
-  };
-}
-
-/** Null when the student is done, or the bank has nothing new to offer. */
-export async function getNextProblem(assessment: Assessment): Promise<Problem | null> {
-  const state = await getPickingState(assessment);
-  if (state.finished) return null;
-  // Only this child's bank. An assessment started before the split has no
-  // category and still sees everything, which is what those already in
-  // progress were promised.
-  const candidates = await listProblems({ category: assessment.category });
-  return pickNextProblem(
-    candidates,
-    state.targetDifficulty,
-    state.shown.map((s) => s.problemId)
-  );
-}
-
-export async function recordProblemAction(
-  assessmentId: string,
-  problemId: string,
-  action: ProblemAction,
-  shownOrder: number
-): Promise<AssessmentProblem> {
-  const { data, error } = await getSupabase()
-    .from("assessment_problems")
-    .insert({
-      assessment_id: assessmentId,
-      problem_id: problemId,
-      action,
-      shown_order: shownOrder,
-    })
-    .select("*")
-    .single();
-  if (error) throw error;
-  return assessmentProblemFromRow(data as AssessmentProblemRow);
+  return { chosen, shown };
 }
 
 // ---------------------------------------------------------------------------

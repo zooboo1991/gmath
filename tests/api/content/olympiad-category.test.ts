@@ -46,6 +46,25 @@ async function createProblem(category: "C" | "D" | null, difficulty: number, top
   return id;
 }
 
+/**
+ * An open exam for this category, so an assessment can be started at all —
+ * every olympiad assessment now hangs off one.
+ */
+async function openExamFor(category: "C" | "D") {
+  const problemId = await createProblem(category, 3, `${category}-${randomUUID().slice(0, 8)}`);
+  const { data, error } = await testDb()
+    .from("exams")
+    .insert({ title: `Тест ${category}`, category, fee: "20,000₮", status: "open" })
+    .select("id")
+    .single();
+  if (error) throw new Error(`openExamFor failed: ${error.message}`);
+  const examId = (data as { id: string }).id;
+  track("exams", examId);
+  const link = await testDb().from("exam_problems").insert({ exam_id: examId, problem_id: problemId, position: 0 });
+  if (link.error) throw new Error(link.error.message);
+  return examId;
+}
+
 /** The olympiad flow up to the point problems start being served. */
 async function startOlympiad(grade: string) {
   const user = await createTestUser({ grade });
@@ -57,17 +76,11 @@ async function startOlympiad(grade: string) {
   return { user, client, started };
 }
 
-/** Walks the assessment to `questionnaire_done`, which is when problems are shown. */
-async function reachPickingPhase(assessmentId: string) {
-  const { error } = await testDb()
-    .from("assessments")
-    .update({ status: "questionnaire_done" })
-    .eq("id", assessmentId);
-  if (error) throw new Error(error.message);
-}
-
 describe("which bank a child is assessed from", () => {
   it("puts a 5th grader on C and a 7th grader on D", async () => {
+    await openExamFor("C");
+    await openExamFor("D");
+
     const fifth = await startOlympiad("5");
     expect(fifth.started.status, fifth.started.text).toBe(200);
     expect(fifth.started.body.assessment?.category).toBe("C");
@@ -77,6 +90,8 @@ describe("which bank a child is assessed from", () => {
   });
 
   it("asks a child outside 5-8 to choose instead of guessing", async () => {
+    await openExamFor("D");
+
     const { client, started } = await startOlympiad("11");
 
     expect(started.status).toBe(400);
@@ -91,67 +106,25 @@ describe("which bank a child is assessed from", () => {
     expect(chosen.body.assessment?.category).toBe("D");
   });
 
-  it("serves only that category's problems", async () => {
-    const run = randomUUID().slice(0, 8);
-    // Spread across the difficulty ladder so the picker has somewhere to go
-    // whichever answer the walk below gives.
-    for (const d of [2, 4, 6, 8]) {
-      await createProblem("C", d, `C-${run}-${d}`);
-      await createProblem("D", d, `D-${run}-${d}`);
-      await createProblem(null, d, `none-${run}-${d}`);
-    }
-
-    const { client, started } = await startOlympiad("6");
-    const assessmentId = started.body.assessment!.id;
-    await reachPickingPhase(assessmentId);
-
-    const servedIds: string[] = [];
-    for (let i = 0; i < 12; i += 1) {
-      const res = await client.get<{ problem: { id: string } | null }>(
-        `/api/assessment/${assessmentId}/next-problem`
-      );
-      expect(res.status).toBe(200);
-      if (!res.body.problem) break;
-      servedIds.push(res.body.problem.id);
-      await client.post(`/api/assessment/${assessmentId}/problem-action`, {
-        problemId: res.body.problem.id,
-        action: "too_easy",
-      });
-    }
-
-    expect(servedIds.length).toBeGreaterThan(0);
-    // Checked against the rows themselves rather than topic strings: the bank
-    // is shared with other tests, and what matters is the category of every
-    // problem this child was actually shown.
-    const { data } = await testDb().from("problems").select("id, category").in("id", servedIds);
-    const categories = (data as { id: string; category: string | null }[]).map((p) => p.category);
-    expect(categories.length).toBe(servedIds.length);
-    expect(categories.every((c) => c === "C")).toBe(true);
-  });
-
   it("keeps the category even after the child's grade is corrected", async () => {
-    const run = randomUUID().slice(0, 8);
-    await createProblem("C", 3, `C-${run}`);
-    await createProblem("D", 3, `D-${run}`);
+    const cExam = await openExamFor("C");
+    await openExamFor("D");
 
-    const { user, client, started } = await startOlympiad("5");
+    const { user, started } = await startOlympiad("5");
     const assessmentId = started.body.assessment!.id;
     expect(started.body.assessment?.category).toBe("C");
 
-    // The parent fixes the grade mid-assessment.
+    // The parent fixes the grade mid-assessment. The paper was already decided.
     await testDb().from("users").update({ grade: "8" }).eq("id", user.id);
-    await reachPickingPhase(assessmentId);
 
-    const res = await client.get<{ problem: { id: string } | null }>(
-      `/api/assessment/${assessmentId}/next-problem`
-    );
-    expect(res.body.problem).not.toBeNull();
     const { data } = await testDb()
-      .from("problems")
-      .select("category")
-      .eq("id", res.body.problem!.id)
+      .from("assessments")
+      .select("category, exam_id")
+      .eq("id", assessmentId)
       .single();
-    expect((data as { category: string }).category).toBe("C");
+    const row = data as { category: string; exam_id: string };
+    expect(row.category).toBe("C");
+    expect(row.exam_id).toBe(cExam);
   });
 });
 

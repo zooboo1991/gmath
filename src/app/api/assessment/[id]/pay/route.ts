@@ -19,6 +19,20 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: false, error: "Төлбөр аль хэдийн төлөгдсөн байна" }, { status: 409 });
   }
 
+  // Free for this child: the teacher put them on the exam's list, so the
+  // amount was written as zero when the assessment was created. There is
+  // nothing to charge and no invoice to make. The amount comes from the
+  // server (exam fee or the free list), never from the client, so trusting
+  // it here hands nobody a free assessment.
+  if (parsePriceToNumber(guard.assessment.amount ?? "") <= 0) {
+    const paid = await updateAssessment(id, {
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      payment_provider: "free",
+    });
+    return NextResponse.json({ ok: true, assessment: paid, paid: true, free: true });
+  }
+
   const provider = getPaymentProvider();
   // The stub must not quietly hand out free assessments in production —
   // that is exactly the hole the course-enrollment QPay path used to have.

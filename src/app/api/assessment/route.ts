@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAssessment, findOpenAssessment, getFeeForTrack, isAssessmentOpen } from "@/lib/assessment/db";
+import { findOpenExam, isFreeForUser } from "@/lib/assessment/exams";
 import { ASSESSMENT_CLOSED } from "@/lib/assessment/guard";
 import {
   categoryForGrade,
@@ -81,6 +82,28 @@ export async function POST(request: Request) {
   const existing = await findOpenAssessment(user.id);
   if (existing) {
     return NextResponse.json({ ok: true, assessment: existing, resumed: true });
+  }
+
+  // Olympiad: the child sits the exam the teacher has open for their category,
+  // at that exam's price — or free, if the teacher put them on its list.
+  if (track === "olympiad" && category) {
+    const exam = await findOpenExam(category);
+    if (!exam) {
+      return NextResponse.json(
+        { ok: false, error: "Одоогоор нээлттэй шалгалт алга байна. Дараа дахин оролдоно уу." },
+        { status: 409 }
+      );
+    }
+    const free = await isFreeForUser(exam.id, user.id);
+    const assessment = await createAssessment(
+      user.id,
+      free ? "0₮" : exam.fee,
+      track,
+      quizGrade,
+      category,
+      exam.id
+    );
+    return NextResponse.json({ ok: true, assessment, resumed: false, exam, free });
   }
 
   const fee = await getFeeForTrack(track);

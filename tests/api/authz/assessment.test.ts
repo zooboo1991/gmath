@@ -38,13 +38,6 @@ const ROUTES: { name: string; method: "GET" | "POST"; path: (id: string) => stri
     path: (id) => `/api/assessment/${id}/questionnaire`,
     body: { age: 12 },
   },
-  { name: "next problem", method: "GET", path: (id) => `/api/assessment/${id}/next-problem` },
-  {
-    name: "problem action",
-    method: "POST",
-    path: (id) => `/api/assessment/${id}/problem-action`,
-    body: { problemId: randomUUID(), action: "solve" },
-  },
   { name: "pay", method: "POST", path: (id) => `/api/assessment/${id}/pay` },
   { name: "pay check", method: "POST", path: (id) => `/api/assessment/${id}/pay/check` },
 ];

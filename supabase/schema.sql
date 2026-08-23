@@ -859,3 +859,46 @@ alter table assessments add column if not exists graded_sheet_paths text[] not n
 -- буцаах боломжтой.
 alter table problems alter column level drop not null;
 alter table problems alter column difficulty drop not null;
+
+-- ---------------------------------------------------------------------------
+-- Шалгалт (багшийн зохиосон бодлогын багц)
+-- ---------------------------------------------------------------------------
+-- The teacher composes an exam: a title, a category, a price, and the problems
+-- in the order children will meet them. This replaces the adaptive walk that
+-- used to choose problems by difficulty — with a fixed set, two children's
+-- results are comparable, which a per-child ladder could never promise.
+create table if not exists exams (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  category text not null check (category in ('C', 'D')),
+  -- Text like the course prices ("20,000₮"), for the same reason: it is shown
+  -- to a parent exactly as typed.
+  fee text not null default '0₮',
+  -- draft: still being built. open: children of this category can take it.
+  -- closed: finished, kept for the results that reference it.
+  status text not null default 'draft' check (status in ('draft', 'open', 'closed')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists exams_open_idx on exams (category, created_at desc) where status = 'open';
+
+-- `on delete restrict` on the problem: a problem that a child has already been
+-- examined on must not vanish from under the result. Archiving it is the way.
+create table if not exists exam_problems (
+  exam_id uuid not null references exams(id) on delete cascade,
+  problem_id uuid not null references problems(id) on delete restrict,
+  position smallint not null default 0,
+  primary key (exam_id, problem_id)
+);
+create index if not exists exam_problems_exam_idx on exam_problems (exam_id, position);
+
+-- Children who take this exam without paying — a scholarship list, kept per
+-- exam rather than on the user, because it is a decision about one exam.
+create table if not exists exam_free_users (
+  exam_id uuid not null references exams(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  primary key (exam_id, user_id)
+);
+
+-- Which exam a child sat. Null for the assessments taken before exams existed.
+alter table assessments add column if not exists exam_id uuid references exams(id) on delete set null;
