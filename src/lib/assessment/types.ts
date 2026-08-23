@@ -73,8 +73,9 @@ export type Problem = {
   id: string;
   /** Unset on problems entered before the bank was split by category. */
   category?: ProblemCategory;
-  level: number;
-  difficulty: number;
+  /** Both unset on problems entered after the difficulty ladder was removed. */
+  level?: number;
+  difficulty?: number;
   topic: string;
   /** Mongolian prose with `$...$` / `$$...$$` math, rendered via KaTeX. */
   bodyLatex?: string;

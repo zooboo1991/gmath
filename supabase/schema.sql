@@ -852,3 +852,10 @@ alter table assessments add column if not exists category text
 -- single-image column stays: assessments graded before this change still hold
 -- their scan there, and the result page falls back to it.
 alter table assessments add column if not exists graded_sheet_paths text[] not null default '{}';
+
+-- Түвшин, хүндрэл шаардахаа болив: бодлогыг багш өөрөө шалгалт руу сонгож
+-- оруулдаг болсон тул автоматаар хүндрэлээр өгсөх шат хэрэггүй болсон.
+-- Багана нь устгагдаагүй — өмнөх бодлогуудын утга үлдэж, шаардлагатай бол
+-- буцаах боломжтой.
+alter table problems alter column level drop not null;
+alter table problems alter column difficulty drop not null;

@@ -12,8 +12,6 @@ import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
 const emptyForm = {
   category: "C" as ProblemCategory,
-  level: 1,
-  difficulty: 1,
   topic: "",
   bodyLatex: "",
   imageUrl: "",
@@ -26,8 +24,6 @@ type FormState = typeof emptyForm;
 function toForm(problem: Problem): FormState {
   return {
     category: problem.category ?? ("C" as ProblemCategory),
-    level: problem.level,
-    difficulty: problem.difficulty,
     topic: problem.topic,
     bodyLatex: problem.bodyLatex ?? "",
     imageUrl: problem.imageUrl ?? "",
@@ -45,7 +41,6 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [levelFilter, setLevelFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -164,7 +159,6 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return problems.filter((p) => {
-      if (levelFilter !== "all" && String(p.level) !== levelFilter) return false;
       // "—" is the pile of problems entered before the bank was split: they
       // reach no student until the teacher files them into C or D.
       if (categoryFilter === "none" && p.category) return false;
@@ -172,7 +166,7 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
       if (!q) return true;
       return `${p.topic} ${p.bodyLatex ?? ""}`.toLowerCase().includes(q);
     });
-  }, [problems, levelFilter, categoryFilter, search]);
+  }, [problems, categoryFilter, search]);
 
   const uncategorised = problems.filter((p) => p.active && !p.category).length;
 
@@ -233,32 +227,6 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
                     </option>
                   ))}
                 </select>
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[.8rem] font-extrabold text-ink-3">Түвшин (1-10)</span>
-                <select
-                  value={form.level}
-                  onChange={(e) => setField("level", Number(e.target.value))}
-                  className={INPUT_CLASS}
-                >
-                  {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>
-                      {n}-р түвшин
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[.8rem] font-extrabold text-ink-3">Хүндрэл (1-10)</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  step={0.5}
-                  value={form.difficulty}
-                  onChange={(e) => setField("difficulty", Number(e.target.value))}
-                  className={INPUT_CLASS}
-                />
               </label>
               <label className="flex flex-col gap-1.5">
                 <span className="text-[.8rem] font-extrabold text-ink-3">Сэдэв</span>
@@ -401,18 +369,6 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
               <option value="D">D ангилал (7-8 анги)</option>
               <option value="none">Ангилалгүй</option>
             </select>
-            <select
-              value={levelFilter}
-              onChange={(e) => setLevelFilter(e.target.value)}
-              className={`${INPUT_CLASS} max-w-[160px]`}
-            >
-              <option value="all">Бүх түвшин</option>
-              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={String(n)}>
-                  {n}-р түвшин
-                </option>
-              ))}
-            </select>
             <input
               type="text"
               placeholder="Сэдэв, эхээр хайх"
@@ -449,12 +405,6 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
                         Ангилалгүй
                       </span>
                     )}
-                    <span className="text-[.72rem] font-extrabold text-blue-strong bg-blue-soft px-2.5 py-1 rounded-full">
-                      {p.level}-р түвшин
-                    </span>
-                    <span className="text-[.72rem] font-extrabold text-ink-2 bg-surface-2 px-2.5 py-1 rounded-full">
-                      Хүндрэл {p.difficulty}
-                    </span>
                     {p.topic && (
                       <span className="text-[.8rem] font-bold text-ink-3">{p.topic}</span>
                     )}

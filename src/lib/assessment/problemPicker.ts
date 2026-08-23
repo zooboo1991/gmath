@@ -38,8 +38,15 @@ export function pickNextProblem(
 
   for (const problem of candidates) {
     if (!problem.active || seen.has(problem.id)) continue;
+    // Problems entered after the difficulty ladder was dropped have no place
+    // on it. This whole adaptive path is being replaced by exams the teacher
+    // composes by hand; until it goes, such problems are simply not picked.
+    if (problem.difficulty === undefined) continue;
     const distance = Math.abs(problem.difficulty - target);
-    if (distance < bestDistance || (distance === bestDistance && best && problem.difficulty < best.difficulty)) {
+    if (
+      distance < bestDistance ||
+      (distance === bestDistance && best?.difficulty !== undefined && problem.difficulty < best.difficulty)
+    ) {
       best = problem;
       bestDistance = distance;
     }

@@ -318,7 +318,7 @@ export async function updateLevel(
 export async function listProblems(
   opts: { includeInactive?: boolean; category?: ProblemCategory } = {}
 ): Promise<Problem[]> {
-  let query = getSupabase().from("problems").select("*").order("difficulty").order("created_at");
+  let query = getSupabase().from("problems").select("*").order("created_at");
   if (!opts.includeInactive) query = query.eq("active", true);
   if (opts.category) query = query.eq("category", opts.category);
   const { data, error } = await query;
@@ -332,8 +332,6 @@ export async function createProblem(input: ProblemInput): Promise<Problem> {
   const { data, error } = await getSupabase()
     .from("problems")
     .insert({
-      level: input.level,
-      difficulty: input.difficulty,
       topic: input.topic,
       category: input.category ?? null,
       body_latex: input.bodyLatex || null,
@@ -352,8 +350,6 @@ export async function updateProblem(
   input: Partial<ProblemInput>
 ): Promise<Problem | undefined> {
   const patch: Record<string, unknown> = {};
-  if (input.level !== undefined) patch.level = input.level;
-  if (input.difficulty !== undefined) patch.difficulty = input.difficulty;
   if (input.topic !== undefined) patch.topic = input.topic;
   if (input.category !== undefined) patch.category = input.category ?? null;
   if (input.bodyLatex !== undefined) patch.body_latex = input.bodyLatex || null;

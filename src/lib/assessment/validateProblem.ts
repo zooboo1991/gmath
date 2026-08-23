@@ -24,19 +24,9 @@ export function validateProblemInput(
     }
     value.category = data.category;
   }
-  if (!partial || has("level")) {
-    const level = Number(data.level);
-    if (!Number.isInteger(level) || level < 1 || level > 10) return { error: "Түвшин 1-10 хооронд байна" };
-    value.level = level;
-  }
-  if (!partial || has("difficulty")) {
-    const difficulty = Number(data.difficulty);
-    if (!Number.isFinite(difficulty) || difficulty < 1 || difficulty > 10) {
-      return { error: "Хүндрэл 1-10 хооронд байна" };
-    }
-    // numeric(3,1) in Postgres — round here so the DB never rejects the write.
-    value.difficulty = Math.round(difficulty * 10) / 10;
-  }
+  // Level and difficulty are gone from the form: the teacher composes an exam
+  // by choosing problems, so nothing needs a difficulty ladder to walk. The
+  // columns still exist (nullable) and older problems keep their values.
   if (!partial || has("topic")) {
     const topic = str(data.topic);
     if (isTooLong(topic, MAX_LEN.problemTopic)) return { error: "Сэдэв хэт урт байна" };
