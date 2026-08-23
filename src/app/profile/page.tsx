@@ -6,6 +6,8 @@ import PageHero from "@/components/PageHero";
 import ProfileClient from "@/components/profile/ProfileClient";
 import { listCertificatesByPhone, listRegistrationsByUser, toPublicUser } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
+import { findFreeInvitedExam } from "@/lib/assessment/exams";
+import { categoryForGrade } from "@/lib/assessment/types";
 
 export const dynamic = "force-dynamic";
 
@@ -45,18 +47,28 @@ export default async function ProfilePage() {
     );
   }
 
-  const [registrations, certificates] = await Promise.all([
+  const [registrations, certificates, freeExam] = await Promise.all([
     listRegistrationsByUser(user.id),
     // certificates is a newer table — a site that hasn't run the latest
     // schema.sql yet shouldn't have its whole profile page go down over it.
     listCertificatesByPhone(user.phone).catch(() => []),
+    // An exam this child's class was invited to sit free. Shown here because
+    // the profile is where they already come to find their courses, and
+    // because it is offered even while the assessment is closed to everyone
+    // else — nobody would think to go looking at /assessment for it.
+    findFreeInvitedExam(user.id, categoryForGrade(Number(user.grade))).catch(() => undefined),
   ]);
 
   return (
     <>
       <Navbar />
       <main>
-        <ProfileClient user={toPublicUser(user)} registrations={registrations} certificates={certificates} />
+        <ProfileClient
+          user={toPublicUser(user)}
+          registrations={registrations}
+          certificates={certificates}
+          freeExam={freeExam ? { id: freeExam.id, title: freeExam.title } : null}
+        />
       </main>
       <Footer />
     </>

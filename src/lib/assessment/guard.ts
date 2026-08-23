@@ -1,4 +1,6 @@
 import { findAssessment, isAssessmentOpen } from "./db";
+import { findFreeInvitedExam } from "./exams";
+import { categoryForGrade } from "./types";
 import { getSessionUser } from "../session";
 import type { Assessment, AssessmentStatus } from "./types";
 import type { User } from "../db";
@@ -22,15 +24,29 @@ export const ASSESSMENT_CLOSED = {
   status: 503,
 };
 
-export async function requireOwnAssessment(id: string): Promise<GuardResult> {
-  // Checked here rather than in each of the nine routes that call this: one
-  // gate is one thing to get right, and a route added later inherits it.
-  if (!(await isAssessmentOpen())) return ASSESSMENT_CLOSED;
+/**
+ * May this child use the assessment at all right now?
+ *
+ * Open to everyone, or — while the switch is off — open to a child the teacher
+ * invited: one with an active registration on a course named on an open exam.
+ * The switch shuts the door to the public while the problem bank is rebuilt;
+ * a class that was deliberately invited is not the public, and the exam
+ * waiting for them is the one that is ready.
+ */
+export async function canUseAssessment(user: User): Promise<boolean> {
+  if (await isAssessmentOpen()) return true;
+  const invited = await findFreeInvitedExam(user.id, categoryForGrade(Number(user.grade)));
+  return Boolean(invited);
+}
 
+export async function requireOwnAssessment(id: string): Promise<GuardResult> {
   const user = await getSessionUser();
   if (!user) {
     return { ok: false, error: "Нэвтэрнэ үү", status: 401 };
   }
+  // Checked here rather than in each of the nine routes that call this: one
+  // gate is one thing to get right, and a route added later inherits it.
+  if (!(await canUseAssessment(user))) return ASSESSMENT_CLOSED;
 
   const assessment = await findAssessment(id);
   // Someone else's assessment is reported as missing rather than forbidden,

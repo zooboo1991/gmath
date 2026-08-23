@@ -1,5 +1,5 @@
 import { getSupabase } from "../supabase";
-import { publicUserFromJoin, type PublicUser } from "../db";
+import { listCourses, listYearlyPrograms } from "../db";
 import { problemFromRow, type ProblemRow } from "./db";
 import type { Problem, ProblemCategory } from "./types";
 
@@ -27,7 +27,8 @@ export type Exam = {
 
 export type ExamDetail = Exam & {
   problems: Problem[];
-  freeUsers: PublicUser[];
+  /** Courses whose registered students sit this exam for free. */
+  freeCourses: { programId: string; label: string }[];
 };
 
 type ExamRow = {
@@ -90,8 +91,8 @@ export async function findExam(id: string): Promise<Exam | undefined> {
 export async function findExamDetail(id: string): Promise<ExamDetail | undefined> {
   const exam = await findExam(id);
   if (!exam) return undefined;
-  const [problems, freeUsers] = await Promise.all([listExamProblems(id), listExamFreeUsers(id)]);
-  return { ...exam, problems, freeUsers };
+  const [problems, freeCourses] = await Promise.all([listExamProblems(id), listExamFreeCourses(id)]);
+  return { ...exam, problems, freeCourses };
 }
 
 /** In the teacher's chosen order — that is the order a child sees them in. */
@@ -111,15 +112,38 @@ export async function listExamProblems(examId: string): Promise<Problem[]> {
     .map(problemFromRow);
 }
 
-export async function listExamFreeUsers(examId: string): Promise<PublicUser[]> {
+/** The courses whose students sit this exam free, with a readable label each. */
+export async function listExamFreeCourses(examId: string): Promise<{ programId: string; label: string }[]> {
   const { data, error } = await getSupabase()
-    .from("exam_free_users")
-    .select("users(*)")
+    .from("exam_free_courses")
+    .select("program_id")
     .eq("exam_id", examId);
   if (error) throw error;
-  return (data as unknown as { users: unknown }[])
-    .map((r) => publicUserFromJoin(r.users))
-    .filter((u): u is PublicUser => Boolean(u));
+
+  const programIds = (data as { program_id: string }[]).map((r) => r.program_id);
+  if (programIds.length === 0) return [];
+
+  // Labels come from whichever table owns the id — the same opaque-id split
+  // used everywhere a programme can be a course or a yearly programme.
+  const [courses, yearly] = await Promise.all([listCourses(), listYearlyPrograms()]);
+  return programIds.map((programId) => {
+    const course = courses.find((c) => c.id === programId);
+    if (course) return { programId, label: `${course.title} (${course.tag})` };
+    const program = yearly.find((p) => p.id === programId);
+    return { programId, label: program?.label ?? programId };
+  });
+}
+
+export async function setExamFreeCourses(examId: string, programIds: string[]): Promise<void> {
+  const supabase = getSupabase();
+  const { error: clearError } = await supabase.from("exam_free_courses").delete().eq("exam_id", examId);
+  if (clearError) throw clearError;
+  if (programIds.length === 0) return;
+
+  const { error } = await supabase
+    .from("exam_free_courses")
+    .insert(programIds.map((programId) => ({ exam_id: examId, program_id: programId })));
+  if (error) throw error;
 }
 
 export async function createExam(input: {
@@ -169,18 +193,6 @@ export async function setExamProblems(examId: string, problemIds: string[]): Pro
   if (error) throw error;
 }
 
-export async function setExamFreeUsers(examId: string, userIds: string[]): Promise<void> {
-  const supabase = getSupabase();
-  const { error: clearError } = await supabase.from("exam_free_users").delete().eq("exam_id", examId);
-  if (clearError) throw clearError;
-  if (userIds.length === 0) return;
-
-  const { error } = await supabase
-    .from("exam_free_users")
-    .insert(userIds.map((userId) => ({ exam_id: examId, user_id: userId })));
-  if (error) throw error;
-}
-
 export async function deleteExam(id: string): Promise<void> {
   const { error } = await getSupabase().from("exams").delete().eq("id", id);
   if (error) throw error;
@@ -203,14 +215,48 @@ export async function findOpenExam(category: ProblemCategory): Promise<Exam | un
   return data ? examFromRow(data as ExamRow) : undefined;
 }
 
-/** Whether this child sits this exam without paying. */
+/**
+ * Whether this child sits this exam without paying: are they an active student
+ * on any of the courses the teacher named?
+ *
+ * Read live rather than copied onto a list, so a child who enrols tomorrow is
+ * included tomorrow, and one whose registration is cancelled stops being.
+ */
 export async function isFreeForUser(examId: string, userId: string): Promise<boolean> {
-  const { data, error } = await getSupabase()
-    .from("exam_free_users")
-    .select("user_id")
-    .eq("exam_id", examId)
-    .eq("user_id", userId)
-    .maybeSingle();
+  const supabase = getSupabase();
+  const { data: courseRows, error } = await supabase
+    .from("exam_free_courses")
+    .select("program_id")
+    .eq("exam_id", examId);
   if (error) throw error;
-  return Boolean(data);
+  const programIds = (courseRows as { program_id: string }[]).map((r) => r.program_id);
+  if (programIds.length === 0) return false;
+
+  const { data, error: regError } = await supabase
+    .from("registrations")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .in("program_id", programIds)
+    .limit(1);
+  if (regError) throw regError;
+  return (data ?? []).length > 0;
+}
+
+/**
+ * The exam this child may sit free right now, if any.
+ *
+ * This is the one thing that reaches past the "түвшин тогтоох хаалттай"
+ * switch: the switch closes the door to the public while the problem bank is
+ * being rebuilt, but a class the teacher deliberately invited is not the
+ * public, and their exam is the one that is ready.
+ */
+export async function findFreeInvitedExam(
+  userId: string,
+  category: ProblemCategory | undefined
+): Promise<Exam | undefined> {
+  if (!category) return undefined;
+  const exam = await findOpenExam(category);
+  if (!exam) return undefined;
+  return (await isFreeForUser(exam.id, userId)) ? exam : undefined;
 }

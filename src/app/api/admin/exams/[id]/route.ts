@@ -4,7 +4,7 @@ import {
   findExam,
   findExamDetail,
   listExamProblems,
-  setExamFreeUsers,
+  setExamFreeCourses,
   setExamProblems,
   updateExam,
 } from "@/lib/assessment/exams";
@@ -78,8 +78,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (Array.isArray(data.problemIds)) {
     await setExamProblems(id, data.problemIds.filter((p: unknown): p is string => typeof p === "string"));
   }
-  if (Array.isArray(data.freeUserIds)) {
-    await setExamFreeUsers(id, data.freeUserIds.filter((u: unknown): u is string => typeof u === "string"));
+  if (Array.isArray(data.freeCourseIds)) {
+    await setExamFreeCourses(
+      id,
+      data.freeCourseIds.filter((c: unknown): c is string => typeof c === "string")
+    );
   }
   if (Object.keys(patch).length > 0) await updateExam(id, patch);
 

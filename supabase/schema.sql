@@ -892,13 +892,22 @@ create table if not exists exam_problems (
 );
 create index if not exists exam_problems_exam_idx on exam_problems (exam_id, position);
 
--- Children who take this exam without paying — a scholarship list, kept per
--- exam rather than on the user, because it is a decision about one exam.
-create table if not exists exam_free_users (
+-- Who sits this exam without paying, named by COURSE rather than by child:
+-- "everyone on the C-ангилал course". The teacher already thinks in classes,
+-- and a list of names goes stale the moment somebody new enrols — this does
+-- not, because it is evaluated against the registrations as they stand.
+--
+-- program_id is plain text like registrations.program_id: a course uuid or a
+-- yearly programme's "program-c".
+create table if not exists exam_free_courses (
   exam_id uuid not null references exams(id) on delete cascade,
-  user_id uuid not null references users(id) on delete cascade,
-  primary key (exam_id, user_id)
+  program_id text not null,
+  primary key (exam_id, program_id)
 );
+create index if not exists exam_free_courses_program_idx on exam_free_courses (program_id);
+
+-- Replaced by the per-course list above.
+drop table if exists exam_free_users;
 
 -- Which exam a child sat. Null for the assessments taken before exams existed.
 alter table assessments add column if not exists exam_id uuid references exams(id) on delete set null;

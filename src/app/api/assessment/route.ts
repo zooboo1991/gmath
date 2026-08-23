@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createAssessment, findOpenAssessment, getFeeForTrack, isAssessmentOpen } from "@/lib/assessment/db";
+import { createAssessment, findOpenAssessment, getFeeForTrack } from "@/lib/assessment/db";
 import { findOpenExam, isFreeForUser } from "@/lib/assessment/exams";
-import { ASSESSMENT_CLOSED } from "@/lib/assessment/guard";
+import { ASSESSMENT_CLOSED, canUseAssessment } from "@/lib/assessment/guard";
 import {
   categoryForGrade,
   isProblemCategory,
@@ -12,12 +12,12 @@ import { getSessionUser } from "@/lib/session";
 
 /** The assessment the student is part-way through, if any. */
 export async function GET() {
-  if (!(await isAssessmentOpen())) {
-    return NextResponse.json({ ok: false, error: ASSESSMENT_CLOSED.error }, { status: ASSESSMENT_CLOSED.status });
-  }
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: "Нэвтэрнэ үү" }, { status: 401 });
+  }
+  if (!(await canUseAssessment(user))) {
+    return NextResponse.json({ ok: false, error: ASSESSMENT_CLOSED.error }, { status: ASSESSMENT_CLOSED.status });
   }
   const assessment = await findOpenAssessment(user.id);
   // The fee shown up front is the open assessment's own track, or the price
@@ -37,12 +37,12 @@ export async function GET() {
 const TRACKS: AssessmentTrack[] = ["regular", "advanced", "olympiad"];
 
 export async function POST(request: Request) {
-  if (!(await isAssessmentOpen())) {
-    return NextResponse.json({ ok: false, error: ASSESSMENT_CLOSED.error }, { status: ASSESSMENT_CLOSED.status });
-  }
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: "Нэвтэрнэ үү" }, { status: 401 });
+  }
+  if (!(await canUseAssessment(user))) {
+    return NextResponse.json({ ok: false, error: ASSESSMENT_CLOSED.error }, { status: ASSESSMENT_CLOSED.status });
   }
 
   const data = await request.json().catch(() => ({}));

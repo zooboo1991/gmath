@@ -8,7 +8,6 @@ import { INPUT_CLASS } from "@/components/admin/panels/shared";
 import { apiError, readJson } from "@/lib/fetchJson";
 import { PROBLEM_CATEGORIES, type Problem, type ProblemCategory } from "@/lib/assessment/types";
 import type { ExamDetail } from "@/lib/assessment/exams";
-import type { PublicUser } from "@/lib/db";
 
 /**
  * Composing one exam: its name and price, the problems on it, and the children
@@ -19,17 +18,23 @@ import type { PublicUser } from "@/lib/db";
  * chosen but the price still wrong — is exactly what should not be possible to
  * publish by accident.
  */
-export default function ExamEditor({ exam, bank }: { exam: ExamDetail; bank: Problem[] }) {
+export default function ExamEditor({
+  exam,
+  bank,
+  courses,
+}: {
+  exam: ExamDetail;
+  bank: Problem[];
+  /** Everything a student can be registered on — courses and yearly programmes. */
+  courses: { id: string; label: string }[];
+}) {
   const router = useRouter();
   const [title, setTitle] = useState(exam.title);
   const [category, setCategory] = useState<ProblemCategory>(exam.category);
   const [fee, setFee] = useState(exam.fee);
   const [status, setStatus] = useState(exam.status);
   const [chosen, setChosen] = useState<string[]>(exam.problems.map((p) => p.id));
-  const [freeUsers, setFreeUsers] = useState<PublicUser[]>(exam.freeUsers);
-  const [userSearch, setUserSearch] = useState("");
-  const [foundUsers, setFoundUsers] = useState<PublicUser[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [freeCourses, setFreeCourses] = useState<string[]>(exam.freeCourses.map((c) => c.programId));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,27 +65,8 @@ export default function ExamEditor({ exam, bank }: { exam: ExamDetail; bank: Pro
       return copy;
     });
 
-  const searchUsers = async (query: string) => {
-    setUserSearch(query);
-    if (query.trim().length < 2) {
-      setFoundUsers([]);
-      return;
-    }
-    setSearching(true);
-    try {
-      const res = await fetch(`/api/admin/users/lookup?q=${encodeURIComponent(query.trim())}`);
-      const json = await readJson<{ users: PublicUser[] }>(res);
-      setFoundUsers(json.users ?? []);
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const addFreeUser = (user: PublicUser) => {
-    setFreeUsers((current) => (current.some((u) => u.id === user.id) ? current : [...current, user]));
-    setUserSearch("");
-    setFoundUsers([]);
-  };
+  const toggleFreeCourse = (id: string) =>
+    setFreeCourses((current) => (current.includes(id) ? current.filter((c) => c !== id) : [...current, id]));
 
   const save = async (nextStatus = status) => {
     setSaving(true);
@@ -96,7 +82,7 @@ export default function ExamEditor({ exam, bank }: { exam: ExamDetail; bank: Pro
           fee,
           status: nextStatus,
           problemIds: chosen,
-          freeUserIds: freeUsers.map((u) => u.id),
+          freeCourseIds: freeCourses,
         }),
       });
       const json = await readJson<{ exam: ExamDetail }>(res);
@@ -314,55 +300,28 @@ export default function ExamEditor({ exam, bank }: { exam: ExamDetail; bank: Pro
 
       <div className="card-flat px-[22px] py-[20px] mt-5">
         <b className="text-[1.02rem] font-extrabold block mb-1">
-          Үнэгүй хамрагдах сурагчид ({freeUsers.length})
+          Үнэгүй хамрагдах сургалтууд ({freeCourses.length})
         </b>
         <p className="text-[.84rem] text-ink-3 font-semibold mb-3">
-          Эдгээр сурагчид төлбөргүй орно. Бусад нь {fee} төлнө.
+          Сонгосон сургалтад <b className="text-ink-2">идэвхтэй бүртгэлтэй</b> бүх сурагч энэ
+          шалгалтыг үнэгүй өгнө — маргааш нэгдсэн сурагч ч мөн адил. Бусад нь {fee} төлнө.
+          Түвшин тогтоох хаалттай байсан ч эдгээр сурагчид орж чадна.
         </p>
-
-        <input
-          value={userSearch}
-          onChange={(e) => searchUsers(e.target.value)}
-          placeholder="Нэр, утасны дугаараар хайх"
-          className={`${INPUT_CLASS} max-w-[420px]`}
-        />
-        {searching && <span className="text-[.82rem] text-ink-3 font-semibold ml-2">хайж байна…</span>}
-        {foundUsers.length > 0 && (
-          <div className="mt-2 max-w-[420px] border border-line-2 rounded-xs max-h-[220px] overflow-y-auto">
-            {foundUsers.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => addFreeUser(u)}
-                className="w-full text-left px-3 py-2 border-b border-line last:border-0 hover:bg-bg-soft text-[.87rem] font-semibold"
-              >
-                {u.lastName} {u.firstName} · {u.phone}
-                {u.grade ? ` · ${u.grade}-р анги` : ""}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {freeUsers.length > 0 && (
-          <div className="flex gap-2 flex-wrap mt-3">
-            {freeUsers.map((u) => (
-              <span
-                key={u.id}
-                className="inline-flex items-center gap-2 text-[.85rem] font-bold bg-bg-soft px-3 py-1.5 rounded-full"
-              >
-                {u.lastName} {u.firstName}
-                <button
-                  type="button"
-                  onClick={() => setFreeUsers((c) => c.filter((x) => x.id !== u.id))}
-                  aria-label="Хасах"
-                  className="text-ink-3 hover:text-red-soft"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="max-h-[280px] overflow-y-auto flex flex-col gap-1.5">
+          {courses.map((c) => (
+            <label
+              key={c.id}
+              className="flex items-center gap-2.5 px-3 py-2 border border-line rounded-sm hover:bg-bg-soft cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={freeCourses.includes(c.id)}
+                onChange={() => toggleFreeCourse(c.id)}
+              />
+              <span className="text-[.88rem] font-semibold">{c.label}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
       <button

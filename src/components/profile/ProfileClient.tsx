@@ -54,10 +54,13 @@ export default function ProfileClient({
   user: initialUser,
   registrations,
   certificates,
+  freeExam = null,
 }: {
   user: PublicUser;
   registrations: RegistrationWithGroup[];
   certificates: Certificate[];
+  /** Set when this child's class was invited to sit an exam for free. */
+  freeExam?: { id: string; title: string } | null;
 }) {
   const [user, setUser] = useState(initialUser);
   const [tab, setTab] = useState<Tab>("active");
@@ -156,6 +159,14 @@ export default function ProfileClient({
                 </div>
               </div>
               <div className="flex gap-2.5 flex-wrap shrink-0">
+                {freeExam && (
+                  <Link
+                    href="/assessment"
+                    className="inline-flex items-center gap-2 font-extrabold text-[.9rem] rounded-full bg-gold text-gold-ink shadow-gold px-5 py-3 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+                  >
+                    <IconTarget className="w-4 h-4" /> Үнэлгээ өгөх · Үнэгүй
+                  </Link>
+                )}
                 <Link
                   href="/profile/assessment"
                   className="inline-flex items-center gap-2 font-extrabold text-[.9rem] rounded-full bg-blue-soft text-blue-strong px-5 py-3 transition-transform hover:-translate-y-0.5"

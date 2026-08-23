@@ -12,7 +12,7 @@
  * nothing to do with them.
  */
 
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { adminClient, anonClient, signedInClient } from "../../support/client";
 import { cleanupTracked, testDb } from "../../support/db";
@@ -26,6 +26,14 @@ async function setSwitch(value: "on" | "off") {
 }
 
 afterEach(async () => {
+  await setSwitch("on");
+});
+
+beforeAll(async () => {
+  // The switch is shared state in a shared database, and a run interrupted
+  // mid-test leaves it wherever it was — which then fails every later test
+  // for a reason that has nothing to do with them. Start from a known state
+  // rather than trusting the last run to have cleaned up after itself.
   await setSwitch("on");
 });
 

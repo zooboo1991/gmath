@@ -8,11 +8,27 @@
  * exam's — zero for the children the teacher put on its free list.
  */
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { adminClient, anonClient, signedInClient, TestClient } from "../../support/client";
 import { cleanupTracked, testDb, track } from "../../support/db";
-import { createTestUser } from "../../support/factories";
+import { createTestCourse, createTestRegistration, createTestUser } from "../../support/factories";
+
+/** Switches the site-wide "түвшин тогтоох" gate. */
+async function setAssessmentSwitch(value: "on" | "off") {
+  const { error } = await testDb()
+    .from("app_settings")
+    .upsert({ key: "assessment_enabled", value, updated_at: new Date().toISOString() }, { onConflict: "key" });
+  if (error) throw new Error(error.message);
+}
+
+beforeAll(async () => {
+  // The switch is shared state in a shared database, and a run interrupted
+  // mid-test leaves it wherever it was — which then fails every later test
+  // for a reason that has nothing to do with them. Start from a known state
+  // rather than trusting the last run to have cleaned up after itself.
+  await setAssessmentSwitch("on");
+});
 
 afterAll(async () => {
   await cleanupTracked();
@@ -33,7 +49,7 @@ async function createProblem(category: "C" | "D", topic: string) {
 /** An open exam with `count` problems, built through the real admin endpoints. */
 async function createExam(
   admin: TestClient,
-  options: { category?: "C" | "D"; fee?: string; count?: number; open?: boolean; freeUserIds?: string[] } = {}
+  options: { category?: "C" | "D"; fee?: string; count?: number; open?: boolean; freeCourseIds?: string[] } = {}
 ) {
   const category = options.category ?? "C";
   const run = randomUUID().slice(0, 8);
@@ -53,7 +69,7 @@ async function createExam(
 
   const saved = await admin.put(`/api/admin/exams/${examId}`, {
     problemIds,
-    freeUserIds: options.freeUserIds ?? [],
+    freeCourseIds: options.freeCourseIds ?? [],
     ...(options.open === false ? {} : { status: "open" }),
   });
   if (saved.status !== 200) throw new Error(`exam save failed: ${saved.text}`);
@@ -129,10 +145,12 @@ describe("a child sitting an exam", () => {
     expect(started.body.free).toBe(false);
   });
 
-  it("pays nothing when the teacher put them on the free list", async () => {
+  it("pays nothing when their course is on the exam's free list", async () => {
     const admin = await adminClient("full");
+    const course = await createTestCourse();
     const user = await createTestUser({ grade: "5" });
-    await createExam(admin, { category: "C", fee: "35,000₮", freeUserIds: [user.id] });
+    await createTestRegistration({ userId: user.id, programId: course.id, status: "active" });
+    await createExam(admin, { category: "C", fee: "35,000₮", freeCourseIds: [course.id] });
 
     const client = await signedInClient(user.phone, user.password);
     const started = await client.post<{ assessment: { id: string; amount: string }; free: boolean }>(
@@ -234,5 +252,129 @@ describe("composing an exam", () => {
     ]) {
       expect((await admin.post("/api/admin/exams", body)).status, JSON.stringify(body)).toBe(400);
     }
+  });
+});
+
+describe("free by course, not by name", () => {
+  it("charges a child whose course is not on the list", async () => {
+    const admin = await adminClient("full");
+    const listed = await createTestCourse();
+    const other = await createTestCourse();
+    const user = await createTestUser({ grade: "5" });
+    await createTestRegistration({ userId: user.id, programId: other.id, status: "active" });
+    await createExam(admin, { category: "C", fee: "35,000₮", freeCourseIds: [listed.id] });
+
+    const client = await signedInClient(user.phone, user.password);
+    const started = await client.post<{ free: boolean; assessment: { amount: string } }>("/api/assessment", {
+      track: "olympiad",
+    });
+
+    expect(started.body.free).toBe(false);
+    expect(started.body.assessment.amount).toBe("35,000₮");
+  });
+
+  it("charges a child whose registration is still pending", async () => {
+    const admin = await adminClient("full");
+    const course = await createTestCourse();
+    const user = await createTestUser({ grade: "6" });
+    // Enrolled but not paid: not yet a student of that course.
+    await createTestRegistration({ userId: user.id, programId: course.id, status: "pending" });
+    await createExam(admin, { category: "C", fee: "35,000₮", freeCourseIds: [course.id] });
+
+    const client = await signedInClient(user.phone, user.password);
+    const started = await client.post<{ free: boolean }>("/api/assessment", { track: "olympiad" });
+
+    expect(started.body.free).toBe(false);
+  });
+
+  it("includes a child who enrols after the exam was set up", async () => {
+    const admin = await adminClient("full");
+    const course = await createTestCourse();
+    await createExam(admin, { category: "D", fee: "35,000₮", freeCourseIds: [course.id] });
+
+    // The list names a course, not people, so this child counts from the
+    // moment their registration goes active.
+    const user = await createTestUser({ grade: "7" });
+    await createTestRegistration({ userId: user.id, programId: course.id, status: "active" });
+
+    const client = await signedInClient(user.phone, user.password);
+    const started = await client.post<{ free: boolean }>("/api/assessment", { track: "olympiad" });
+
+    expect(started.body.free).toBe(true);
+  });
+});
+
+describe("an invited class while the assessment is closed", () => {
+  afterEach(async () => {
+    await setAssessmentSwitch("on");
+  });
+
+  it("lets the invited child in, and keeps everyone else out", async () => {
+    const admin = await adminClient("full");
+    const course = await createTestCourse();
+    const invited = await createTestUser({ grade: "5" });
+    await createTestRegistration({ userId: invited.id, programId: course.id, status: "active" });
+    await createExam(admin, { category: "C", fee: "35,000₮", freeCourseIds: [course.id] });
+
+    const outsider = await createTestUser({ grade: "5" });
+
+    await setAssessmentSwitch("off");
+
+    const invitedClient = await signedInClient(invited.phone, invited.password);
+    const started = await invitedClient.post<{ free: boolean }>("/api/assessment", { track: "olympiad" });
+    expect(started.status, started.text).toBe(200);
+    expect(started.body.free).toBe(true);
+
+    const outsiderClient = await signedInClient(outsider.phone, outsider.password);
+    expect((await outsiderClient.post("/api/assessment", { track: "olympiad" })).status).toBe(503);
+    expect((await outsiderClient.get("/api/assessment")).status).toBe(503);
+  });
+
+  it("lets the invited child carry on with an assessment already started", async () => {
+    const admin = await adminClient("full");
+    const course = await createTestCourse();
+    const user = await createTestUser({ grade: "7" });
+    await createTestRegistration({ userId: user.id, programId: course.id, status: "active" });
+    await createExam(admin, { category: "D", freeCourseIds: [course.id] });
+
+    const client = await signedInClient(user.phone, user.password);
+    const started = await client.post<{ assessment: { id: string } }>("/api/assessment", {
+      track: "olympiad",
+    });
+    const assessmentId = started.body.assessment.id;
+
+    await setAssessmentSwitch("off");
+
+    // Every per-assessment endpoint goes through the same guard.
+    expect((await client.get(`/api/assessment/${assessmentId}/solutions`)).status).toBe(200);
+  });
+
+  it("shows the invited child a button on their profile", async () => {
+    const admin = await adminClient("full");
+    const course = await createTestCourse();
+    const invited = await createTestUser({ grade: "6" });
+    await createTestRegistration({ userId: invited.id, programId: course.id, status: "active" });
+    await createExam(admin, { category: "C", freeCourseIds: [course.id] });
+    await setAssessmentSwitch("off");
+
+    const client = await signedInClient(invited.phone, invited.password);
+    const page = await client.get("/profile");
+
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("Үнэлгээ өгөх");
+  });
+
+  it("shows no such button to a child who was not invited", async () => {
+    const admin = await adminClient("full");
+    const course = await createTestCourse();
+    await createExam(admin, { category: "C", freeCourseIds: [course.id] });
+    const outsider = await createTestUser({ grade: "6" });
+    await setAssessmentSwitch("off");
+
+    const client = await signedInClient(outsider.phone, outsider.password);
+    const page = await client.get("/profile");
+
+    expect(page.status).toBe(200);
+    expect(page.text).not.toContain("Үнэлгээ өгөх");
   });
 });

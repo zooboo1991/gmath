@@ -7,6 +7,8 @@ import AssessmentClosed from "@/components/assessment/AssessmentClosed";
 import AssessmentIntro from "@/components/assessment/AssessmentIntro";
 import SampleTest from "@/components/assessment/SampleTest";
 import { DEFAULT_ASSESSMENT_FEE, DEFAULT_ASSESSMENT_SLA, DEFAULT_QUIZ_FEE } from "@/lib/assessment/config";
+import { canUseAssessment } from "@/lib/assessment/guard";
+import { getSessionUser } from "@/lib/session";
 import {
   getAssessmentFee,
   getAssessmentSla,
@@ -25,7 +27,9 @@ export const metadata: Metadata = {
 };
 
 export default async function AssessmentPage() {
-  if (!(await isAssessmentOpen())) return <AssessmentClosed />;
+  // Closed to the public, but not to a class the teacher invited to a free exam.
+  const user = await getSessionUser();
+  if (!(user ? await canUseAssessment(user) : await isAssessmentOpen())) return <AssessmentClosed />;
 
   // Prices and the turnaround promise are read here rather than through the
   // session-gated API, so a visitor who has not signed in still sees them.
