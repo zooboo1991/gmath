@@ -164,7 +164,7 @@ export default function ProfileClient({
                     href="/assessment"
                     className="inline-flex items-center gap-2 font-extrabold text-[.9rem] rounded-full bg-gold text-gold-ink shadow-gold px-5 py-3 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
                   >
-                    <IconTarget className="w-4 h-4" /> Үнэлгээ өгөх · Үнэгүй
+                    <IconTarget className="w-4 h-4" /> Түвшин тогтоох · Үнэгүй
                   </Link>
                 )}
                 <Link

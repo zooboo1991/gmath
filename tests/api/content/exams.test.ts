@@ -361,7 +361,7 @@ describe("an invited class while the assessment is closed", () => {
     const page = await client.get("/profile");
 
     expect(page.status).toBe(200);
-    expect(page.text).toContain("Үнэлгээ өгөх");
+    expect(page.text).toContain("Түвшин тогтоох · Үнэгүй");
   });
 
   it("shows no such button to a child who was not invited", async () => {
@@ -375,6 +375,6 @@ describe("an invited class while the assessment is closed", () => {
     const page = await client.get("/profile");
 
     expect(page.status).toBe(200);
-    expect(page.text).not.toContain("Үнэлгээ өгөх");
+    expect(page.text).not.toContain("Түвшин тогтоох · Үнэгүй");
   });
 });
