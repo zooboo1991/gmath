@@ -13,6 +13,17 @@ import { courseHref } from "@/lib/courseHref";
  * get served rather than the whole sitemap 500ing, since a partial sitemap is
  * far better for crawlers than none.
  */
+/**
+ * Rendered per request, not baked at build time.
+ *
+ * Without this Next prerenders the sitemap once and it then describes the site
+ * as it was on the day of the last deploy: articles published since are
+ * missing, and — the reason this was noticed — a level test switched off in
+ * the admin was still being advertised to crawlers. `next dev` renders
+ * everything dynamically, so this difference is invisible in the test suite.
+ */
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Closed for maintenance, so not worth pointing a crawler at.
   const assessmentOpen = await isAssessmentOpen().catch(() => true);

@@ -89,6 +89,13 @@ describe("while the test is closed", () => {
     expect(res.text).not.toContain("Түр хаалттай байна");
   });
 
+  /**
+   * Weaker than it looks, and worth knowing why: the test server is `next dev`,
+   * which renders every route dynamically. Production prerenders what it can,
+   * and this assertion passed here while the deployed sitemap still advertised
+   * the closed test — until sitemap.ts was marked force-dynamic. A green run
+   * here is not by itself proof that the built site behaves the same.
+   */
   it("drops /assessment from the sitemap", async () => {
     await setSwitch("off");
     const closed = await anonClient().get("/sitemap.xml");
