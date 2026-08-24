@@ -29,7 +29,8 @@
 - **Auth: өөрийн бичсэн** — Supabase Auth, NextAuth аль нь ч биш.
   `sessions` хүснэгт + HMAC-аар гарын үсэг зурсан cookie (`src/lib/session.ts`),
   нууц үг scrypt + хэрэглэгч тус бүрийн salt (`src/lib/password.ts`).
-  Нэг аккаунт дээд тал нь 2 төхөөрөмж (`MAX_SESSIONS_PER_USER`)
+  Нэг аккаунт нэг л төхөөрөмж (`MAX_SESSIONS_PER_USER = 1`) — шинээр
+  нэвтэрмэгц өмнөх төхөөрөмж гарна
 - **Стиль: Tailwind v4** — `src/app/globals.css` дэх `@theme` дотор өнгө,
   сүүдэр, breakpoint. Тусдаа `tailwind.config` файл байхгүй
 - **Төлбөр: QPay v2** (`src/lib/qpay/`), нэхэмжлэх үүсгэх + callback webhook

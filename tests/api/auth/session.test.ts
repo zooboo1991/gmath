@@ -6,7 +6,7 @@
  *
  *   - a cookie that wasn't signed by this server does not authenticate,
  *     however plausible its contents (including a genuine session id)
- *   - an account is limited to MAX_SESSIONS_PER_USER devices, and the login
+ *   - an account holds MAX_SESSIONS_PER_USER session, and the login
  *     that goes over the limit really does invalidate the oldest one
  */
 
@@ -117,38 +117,31 @@ describe("cookie signature", () => {
   });
 });
 
-describe("device limit (MAX_SESSIONS_PER_USER = 2)", () => {
-  it("keeps two devices and logs out the oldest on the third login", async () => {
+describe("device limit (MAX_SESSIONS_PER_USER = 1)", () => {
+  it("signs the previous device out as soon as the next one signs in", async () => {
     const user = await createTestUser();
 
     const phone = await signedInClient(user.phone, user.password);
-    const laptop = await signedInClient(user.phone, user.password);
-    expect(await countSessionsFor(user.id)).toBe(2);
     expect(await currentUserId(phone)).toBe(user.id);
-    expect(await currentUserId(laptop)).toBe(user.id);
 
-    const thirdDevice = await signedInClient(user.phone, user.password);
+    const laptop = await signedInClient(user.phone, user.password);
 
-    // Exactly the cap afterwards — not three rows, not one.
-    expect(await countSessionsFor(user.id)).toBe(2);
-    // The oldest login is the one that stops resolving.
+    // One row, and it belongs to the device that signed in last.
+    expect(await countSessionsFor(user.id)).toBe(1);
     expect(await currentUserId(phone)).toBeNull();
     expect(await currentUserId(laptop)).toBe(user.id);
-    expect(await currentUserId(thirdDevice)).toBe(user.id);
   });
 
-  it("still holds the line at two after many logins", async () => {
+  it("still holds the line at one after many logins", async () => {
     const user = await createTestUser();
     const clients: TestClient[] = [];
     for (let i = 0; i < 5; i += 1) {
       clients.push(await signedInClient(user.phone, user.password));
     }
 
-    expect(await countSessionsFor(user.id)).toBe(2);
+    expect(await countSessionsFor(user.id)).toBe(1);
     const stillIn = await Promise.all(clients.map((c) => currentUserId(c)));
-    expect(stillIn.filter((id) => id === user.id)).toHaveLength(2);
-    // And it is the two most recent ones.
-    expect(stillIn.slice(0, 3)).toEqual([null, null, null]);
+    expect(stillIn).toEqual([null, null, null, null, user.id]);
   });
 
   it("counts each account's devices separately", async () => {
@@ -157,11 +150,11 @@ describe("device limit (MAX_SESSIONS_PER_USER = 2)", () => {
 
     await signedInClient(one.phone, one.password);
     await signedInClient(one.phone, one.password);
-    await signedInClient(one.phone, one.password);
     const twoClient = await signedInClient(two.phone, two.password);
 
-    expect(await countSessionsFor(one.id)).toBe(2);
+    expect(await countSessionsFor(one.id)).toBe(1);
     expect(await countSessionsFor(two.id)).toBe(1);
+    // One account's logins never touch another's session.
     expect(await currentUserId(twoClient)).toBe(two.id);
   });
 });

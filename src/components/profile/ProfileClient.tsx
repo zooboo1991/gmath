@@ -494,6 +494,13 @@ function YearlyProgramCard({
   const lessons = registration.lessons ?? [];
   const states = now ? getLessonStates(lessons, now) : null;
   const next = states?.find((s) => s.state === "upcoming" || s.state === "live");
+  // A lesson that is on right now has to be reachable from the closed card.
+  // Folded away behind "Дэлгэрэнгүй харах", it left students asking for the
+  // link in chat while the class was already running.
+  const liveIndex = states?.findIndex((st) => st.state === "live") ?? -1;
+  const liveLesson = liveIndex >= 0 ? states?.[liveIndex] : undefined;
+  // Only the room belongs up here — notes and recordings stay in the schedule.
+  const live = liveLesson?.lesson.zoomLink && !liveLesson.lesson.recordingLink ? liveLesson : undefined;
 
   return (
     <div
@@ -506,19 +513,31 @@ function YearlyProgramCard({
             1 жилийн хөтөлбөр
           </span>
           <b className="font-extrabold text-[1.05rem] block">{registration.programLabel}</b>
-          <span className="text-ink-3 font-semibold text-[.85rem]">
-            {next
-              ? `Дараагийн хичээл: ${next.dateLabel}${next.timeLabel ? ` · ${next.timeLabel}` : ""}`
-              : "Хуваарь тун удахгүй"}
-          </span>
+          {live ? (
+            <span className="inline-flex items-center gap-1.5 text-[.85rem] font-extrabold text-green">
+              <span className="w-2 h-2 rounded-full bg-green" /> Хичээл яг одоо болж байна
+              {live.timeLabel ? ` · ${live.timeLabel}` : ""}
+            </span>
+          ) : (
+            <span className="text-ink-3 font-semibold text-[.85rem]">
+              {next
+                ? `Дараагийн хичээл: ${next.dateLabel}${next.timeLabel ? ` · ${next.timeLabel}` : ""}`
+                : "Хуваарь тун удахгүй"}
+            </span>
+          )}
         </div>
-        <button
-          type="button"
-          onClick={() => setExpanded((e) => !e)}
-          className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft rounded-full px-4 py-2.5"
-        >
-          {expanded ? "Хаах" : "Дэлгэрэнгүй харах"}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          {live && (
+            <LessonAction info={live} courseId={registration.programId} lessonIndex={liveIndex} />
+          )}
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft rounded-full px-4 py-2.5"
+          >
+            {expanded ? "Хаах" : "Дэлгэрэнгүй харах"}
+          </button>
+        </div>
       </div>
       {expanded && (
         <div className="mt-4 pt-4 border-t border-line">
@@ -673,7 +692,7 @@ function LessonAction({
   lessonIndex: number;
 }) {
   const [joining, setJoining] = useState(false);
-  const [joinError, setJoinError] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   if (!info) return null;
 
@@ -717,7 +736,12 @@ function LessonAction({
   // server can hand out and only once, on demand.
   const join = async () => {
     setJoining(true);
-    setJoinError(false);
+    setJoinError(null);
+    // Claimed inside the tap itself. Safari on a phone refuses window.open
+    // once the gesture that triggered it has expired — which is exactly what
+    // happens while the fetch below runs, and why the button used to look
+    // like it did nothing at all on an iPhone.
+    const room = window.open("", "_blank");
     try {
       const res = await fetch("/api/lessons/join", {
         method: "POST",
@@ -726,12 +750,20 @@ function LessonAction({
       });
       const json = await res.json();
       if (!res.ok || !json.joinUrl) {
-        setJoinError(true);
+        room?.close();
+        setJoinError(json.error ?? "Алдаа гарлаа, дахин дарна уу");
         return;
       }
-      window.open(json.joinUrl, "_blank", "noreferrer");
+      if (room) {
+        room.location.href = json.joinUrl;
+      } else {
+        // The browser refused the new tab anyway — go there in this one
+        // rather than leaving the student staring at an unchanged page.
+        window.location.href = json.joinUrl;
+      }
     } catch {
-      setJoinError(true);
+      room?.close();
+      setJoinError("Сүлжээний алдаа. Дахин дарна уу");
     } finally {
       setJoining(false);
     }
@@ -751,7 +783,7 @@ function LessonAction({
         <IconVideoCamera className="w-4 h-4" /> {joining ? "Түр хүлээнэ үү…" : "Хичээлд орох"}
         {!joining && isLive ? " →" : ""}
       </button>
-      {joinError && <span className="text-[.75rem] font-bold text-red-soft">Алдаа гарлаа, дахин дарна уу</span>}
+      {joinError && <span className="text-[.75rem] font-bold text-red-soft text-right">{joinError}</span>}
     </span>
   );
 }

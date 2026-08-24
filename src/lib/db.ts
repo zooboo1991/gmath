@@ -505,18 +505,24 @@ export async function verifyUserPassword(phone: string, password: string): Promi
 }
 
 /**
- * How many devices one account may stay signed in on at once. Two, so a
- * parent's phone and the child's computer can both hold a session — a third
- * login evicts the oldest.
+ * How many devices one account may stay signed in on at once.
+ *
+ * One. Signing in anywhere signs the previous device out, which is both the
+ * rule families understand ("нэг данс — нэг төхөөрөмж") and the one that
+ * cannot strand anybody: with a cap of two, a phone's browser and the
+ * installed app counted as two devices, so a parent signing in silently
+ * knocked the child out and neither could tell why.
  */
-export const MAX_SESSIONS_PER_USER = 2;
+export const MAX_SESSIONS_PER_USER = 1;
 
 /**
  * Caps concurrent sessions at MAX_SESSIONS_PER_USER: the newest
  * MAX_SESSIONS_PER_USER - 1 rows are kept, everything older is deleted, and
  * then this login's row is inserted — so the total after a login is exactly
- * the cap. An evicted session id stops resolving (see findSessionUserId), which
- * is what logs that device out the next time it's checked.
+ * the cap. At the current cap of one that means every earlier device is
+ * signed out the moment a new login succeeds. An evicted session id stops
+ * resolving (see findSessionUserId), which is what logs that device out the
+ * next time it's checked.
  *
  * Eviction happens by age of *login*, not of last use: `sessions` has no
  * last-seen column, and adding one would mean a write on every page view.
