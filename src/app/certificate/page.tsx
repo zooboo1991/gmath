@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import FormField from "@/components/FormField";
-import { findCertificateByNumber } from "@/lib/db";
+import { findCertificateByNumber, logCertificateEvent } from "@/lib/db";
 import { formatCourseDate } from "@/lib/courseDate";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
@@ -34,6 +34,8 @@ export default async function CertificatePage({
       // certificates is a newer table — before the migration runs this
       // throws, and a visitor searching shouldn't see a 500 for it.
       certificate = (await findCertificateByNumber(query).catch(() => undefined)) ?? null;
+      // Only a hit counts: a mistyped number says nothing about a certificate.
+      if (certificate) await logCertificateEvent(certificate.id, "verify");
     }
   }
 

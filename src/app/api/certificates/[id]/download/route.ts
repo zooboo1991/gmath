@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listCertificatesByPhone } from "@/lib/db";
+import { listCertificatesByPhone, logCertificateEvent } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { renderCertificatePdf } from "@/lib/certificateRender";
 
@@ -21,6 +21,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   const pdfBytes = await renderCertificatePdf(certificate);
+  await logCertificateEvent(certificate.id, "download");
   return new NextResponse(Buffer.from(pdfBytes), {
     headers: {
       "Content-Type": "application/pdf",

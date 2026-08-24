@@ -940,3 +940,18 @@ create table if not exists admin_users (
 
 -- Who did it, at last. Null for anything done with the environment password.
 alter table admin_logs add column if not exists actor_name text;
+
+-- Certificate usage: who downloaded theirs, and how often a number was looked
+-- up on the public "сертификат шалгах" page.
+--
+-- Rows rather than counters on `certificates`: an insert has no read-modify-
+-- write race, and keeping the timestamps means "when was this last checked"
+-- can be answered later without another migration.
+create table if not exists certificate_events (
+  id uuid primary key default gen_random_uuid(),
+  certificate_id uuid not null references certificates(id) on delete cascade,
+  kind text not null check (kind in ('download', 'verify')),
+  created_at timestamptz not null default now()
+);
+create index if not exists certificate_events_lookup_idx
+  on certificate_events (certificate_id, kind);

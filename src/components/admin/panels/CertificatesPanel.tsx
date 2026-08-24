@@ -3,7 +3,7 @@
 import { apiError, readJson } from "@/lib/fetchJson";
 import { formatMb, MAX_UPLOAD_BYTES } from "@/lib/imageResize";
 import { useMemo, useRef, useState } from "react";
-import type { Certificate } from "@/lib/db";
+import type { Certificate, CertificateUsage } from "@/lib/db";
 import { formatCourseDate } from "@/lib/courseDate";
 import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
@@ -18,7 +18,14 @@ const emptyCertForm = {
 };
 
 
-export default function CertificatesPanel({ initialCertificates }: { initialCertificates: Certificate[] }) {
+export default function CertificatesPanel({
+  initialCertificates,
+  usage = {},
+}: {
+  initialCertificates: Certificate[];
+  /** Downloads and public lookups per certificate id. */
+  usage?: Record<string, CertificateUsage>;
+}) {
   // Owned here now that the tab is a standalone route — the old dashboard
   // parent used to hold this state and pass the setter down.
   const [certificates, setCertificates] = useState(initialCertificates);
@@ -328,6 +335,8 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
                 <th className="px-4 py-3">Ангилал</th>
                 <th className="px-4 py-3">Курс</th>
                 <th className="px-4 py-3">Огноо</th>
+                <th className="px-4 py-3 text-center">Татсан</th>
+                <th className="px-4 py-3 text-center">Шалгасан</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -343,6 +352,12 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{c.course}</td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">
                     {formatCourseDate(c.issuedDate)}
+                  </td>
+                  <td className="px-4 py-3 text-center font-extrabold text-[.88rem] tabular-nums">
+                    <UsageCount value={usage[c.id]?.downloads ?? 0} />
+                  </td>
+                  <td className="px-4 py-3 text-center font-extrabold text-[.88rem] tabular-nums">
+                    <UsageCount value={usage[c.id]?.verifies ?? 0} />
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <button
@@ -370,6 +385,13 @@ export default function CertificatesPanel({ initialCertificates }: { initialCert
     </div>
   );
 }
+
+/** A zero reads as "nobody has, yet" rather than as a number worth scanning. */
+function UsageCount({ value }: { value: number }) {
+  if (value === 0) return <span className="text-ink-3 font-bold">—</span>;
+  return <span>{value}</span>;
+}
+
 
 /**
  * Hub for the level-assessment feature: the fee (stored in app_settings so it

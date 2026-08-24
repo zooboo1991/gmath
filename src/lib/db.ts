@@ -1246,6 +1246,40 @@ export async function updateCertificate(
   return data ? certificateFromRow(data as CertificateRow) : undefined;
 }
 
+/** How often one certificate has been downloaded by its owner and looked up publicly. */
+export type CertificateUsage = { downloads: number; verifies: number };
+
+/**
+ * Records a download or a public lookup.
+ *
+ * Never allowed to break the thing it is measuring: a failed insert (the table
+ * missing before the migration runs, say) must not stop a student getting
+ * their certificate.
+ */
+export async function logCertificateEvent(
+  certificateId: string,
+  kind: "download" | "verify"
+): Promise<void> {
+  try {
+    await getSupabase().from("certificate_events").insert({ certificate_id: certificateId, kind });
+  } catch {
+    // Counting is not worth an error page.
+  }
+}
+
+/** Usage for every certificate, keyed by id — one query for the whole table. */
+export async function getCertificateUsage(): Promise<Record<string, CertificateUsage>> {
+  const { data, error } = await getSupabase().from("certificate_events").select("certificate_id, kind");
+  if (error) throw error;
+  const usage: Record<string, CertificateUsage> = {};
+  for (const row of data as { certificate_id: string; kind: string }[]) {
+    const entry = (usage[row.certificate_id] ??= { downloads: 0, verifies: 0 });
+    if (row.kind === "download") entry.downloads += 1;
+    else entry.verifies += 1;
+  }
+  return usage;
+}
+
 export async function deleteCertificate(id: string): Promise<boolean> {
   const { error, count } = await getSupabase().from("certificates").delete({ count: "exact" }).eq("id", id);
   if (error) throw error;
