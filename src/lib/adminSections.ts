@@ -26,15 +26,25 @@ export type AdminSection =
   | (typeof VIEWER_SECTIONS)[number]
   | "articles"
   | "certificates"
+  /** Setting the assessment up: the problem bank, exams, levels, fees. */
   | "assessment"
+  /** Marking what students submitted. Split from the above so a teacher gets
+   *  the queue without the fee settings and the problem bank. */
+  | "grading"
   | "notifications"
   | "chat"
   | "logs"
   | "staff"
   | "courseEditor";
 
-/** A teacher's sections: their classes, and the work waiting to be marked. */
-export const TEACHER_SECTIONS = ["dashboard", "courses", "courseEditor", "assessment"] as const;
+/**
+ * A teacher's sections: their classes, and the work waiting to be marked.
+ *
+ * Not the dashboard — its first tile is total revenue. Not courseEditor —
+ * that is the "create a course" form, which they cannot save anyway. Both
+ * would have rendered pages full of things they may not use.
+ */
+export const TEACHER_SECTIONS = ["courses", "grading"] as const;
 
 export function canView(role: AdminRole, section: AdminSection): boolean {
   if (role === "full") return true;

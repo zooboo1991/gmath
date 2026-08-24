@@ -43,7 +43,10 @@ export default function AssessmentFlow() {
     if (!a) return "track";
     const isQuiz = a.track === "regular" || a.track === "advanced";
     if (a.status === "awaiting_payment") return "payment";
-    if (a.status === "paid") return isQuiz ? "quiz" : "questionnaire";
+    // An exam's paper is laid out on payment, so an exam assessment is never
+    // waiting on a form — including one that was started before this changed
+    // and has been sitting at "paid" ever since.
+    if (a.status === "paid") return isQuiz ? "quiz" : a.examId ? "solve" : "questionnaire";
     // The exam's problems were written onto the assessment when the
     // questionnaire was submitted, so there is nothing to pick — the child
     // goes to the page where they solve and upload.

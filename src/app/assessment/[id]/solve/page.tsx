@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import AssessmentClosed from "@/components/assessment/AssessmentClosed";
 import SolutionUploader from "@/components/assessment/SolutionUploader";
+import { openExamPaper } from "@/lib/assessment/exams";
 import { canUseAssessment, requireOwnAssessment } from "@/lib/assessment/guard";
 import { getSessionUser } from "@/lib/session";
 
@@ -28,6 +29,13 @@ export default async function SolvePage({ params }: { params: Promise<{ id: stri
   if (!(await canUseAssessment(user))) return <AssessmentClosed />;
   const guard = await requireOwnAssessment(id);
   if (!guard.ok) notFound();
+
+  // Paid, but the paper was never laid out: an assessment started before the
+  // questionnaire step was removed, or a payment that settled through a path
+  // that did not open it. Idempotent, so arriving here twice is harmless.
+  if (guard.assessment.status === "paid" && guard.assessment.examId) {
+    await openExamPaper(id);
+  }
 
   return (
     <>

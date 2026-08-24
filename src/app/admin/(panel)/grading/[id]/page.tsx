@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function GradingDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdminSection("assessment");
+  await requireAdminSection("grading");
   if (!(await isAdmin())) {
     redirect("/admin/login");
   }

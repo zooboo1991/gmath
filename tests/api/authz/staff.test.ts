@@ -171,6 +171,35 @@ describe("what a teacher's account may not do", () => {
   });
 });
 
+describe("what a teacher's admin looks like", () => {
+  it("lands on the courses page, not the dashboard's revenue", async () => {
+    const teacher = await makeTeacher();
+
+    const res = await teacher.get("/admin");
+
+    // A redirect, and specifically not back to /admin — that would loop.
+    expect([302, 307, 308]).toContain(res.status);
+    expect(res.headers.get("location")).toContain("/admin/courses");
+  });
+
+  it("is kept out of the pages it has no use for", async () => {
+    const teacher = await makeTeacher();
+    for (const path of ["/admin/problems", "/admin/exams", "/admin/assessment", "/admin/staff", "/admin/logs"]) {
+      const res = await teacher.get(path);
+      expect([302, 307, 308], path).toContain(res.status);
+      expect(res.headers.get("location"), path).toContain("/admin/courses");
+    }
+  });
+
+  it("can open the grading queue and a course", async () => {
+    const teacher = await makeTeacher();
+    const course = await createTestCourse();
+
+    expect((await teacher.get("/admin/grading")).status).toBe(200);
+    expect((await teacher.get(`/admin/courses/${course.id}`)).status).toBe(200);
+  });
+});
+
 describe("the accounts themselves", () => {
   it("refuses a login for a deactivated account", async () => {
     const owner = await adminClient("full");

@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import DashboardPanel from "@/components/admin/panels/DashboardPanel";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { getDashboardStats } from "@/lib/db";
+import { canView } from "@/lib/adminSections";
+import { TEACHER_LANDING } from "@/lib/adminAccess";
+import { getAdminRole } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +37,14 @@ export default async function AdminHomePage({
   const { tab } = await searchParams;
   if (tab && TAB_ROUTES.has(tab)) {
     redirect(`/admin/${tab}`);
+  }
+
+  // The dashboard leads with total revenue, which a teacher's account has no
+  // business seeing — so it is not one of their sections, and /admin sends
+  // them to the page they actually came for.
+  const role = await getAdminRole();
+  if (role && !canView(role, "dashboard")) {
+    redirect(TEACHER_LANDING);
   }
 
   const stats = await getDashboardStats();

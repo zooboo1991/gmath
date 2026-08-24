@@ -11,10 +11,15 @@ import { getAdminActor, getAdminRole, type AdminActor } from "./session";
  * signed-out visitor goes to the login form; a viewer who reaches a section
  * they lack goes back to the dashboard rather than seeing an error page.
  */
+/** Where a teacher starts: the dashboard is not theirs to see. */
+export const TEACHER_LANDING = "/admin/courses";
+
 export async function requireAdminSection(section: AdminSection): Promise<AdminRole> {
   const role = await getAdminRole();
   if (!role) redirect("/admin/login");
-  if (!canView(role, section)) redirect("/admin");
+  // Sending a teacher to /admin would bounce them straight back here, since
+  // the dashboard is not one of their sections either.
+  if (!canView(role, section)) redirect(canView(role, "dashboard") ? "/admin" : TEACHER_LANDING);
   return role;
 }
 
