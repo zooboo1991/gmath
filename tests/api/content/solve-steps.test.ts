@@ -216,6 +216,39 @@ describe("the paper, step by step", () => {
     expect(page.text).toContain("Бодож чадсангүй");
   });
 
+  it("will not close marking while a handed-in problem has no score", async () => {
+    const admin = await adminClient("full");
+    const { client, assessmentId, problemIds } = await readyToSolve();
+
+    for (const problemId of problemIds) await uploadPhoto(client, assessmentId, problemId);
+    await client.post(`/api/assessment/${assessmentId}/submit`);
+
+    const tooEarly = await admin.put<{ error: string }>(
+      `/api/admin/grading/${assessmentId}/complete`,
+      { teacherComment: "Дүгнэлт" }
+    );
+    expect(tooEarly.status).toBe(400);
+    expect(tooEarly.body.error).toContain("оноо тавиагүй");
+
+    // Zero counts as a score — the point is that nothing is left blank.
+    const { data: rows } = await testDb()
+      .from("solutions")
+      .select("id")
+      .eq("assessment_id", assessmentId);
+    for (const row of rows as { id: string }[]) {
+      await admin.put(`/api/admin/grading/${assessmentId}/score`, {
+        solutionId: row.id,
+        graderScore: "0",
+        graderComment: "",
+      });
+    }
+
+    const now = await admin.put(`/api/admin/grading/${assessmentId}/complete`, {
+      teacherComment: "Дүгнэлт",
+    });
+    expect(now.status, now.text).toBe(200);
+  });
+
   it("refuses a problem that is not on this child's paper", async () => {
     const { client, assessmentId } = await readyToSolve();
     const other = await readyToSolve();

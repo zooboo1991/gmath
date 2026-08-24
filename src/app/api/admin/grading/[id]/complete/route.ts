@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findAssessment, findLevel, updateAssessment } from "@/lib/assessment/db";
+import { findAssessment, findLevel, listSolutions, updateAssessment } from "@/lib/assessment/db";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 import { REFUSED, requireCapability } from "@/lib/adminAccess";
 
@@ -33,6 +33,22 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
   if (isTooLong(teacherComment, MAX_LEN.articleExcerpt)) {
     return NextResponse.json({ ok: false, error: "Дүгнэлт хэт урт байна" }, { status: 400 });
+  }
+
+  // Every photographed solution has to carry a score — a wrong answer is 0,
+  // not a blank. Enforced here as well as in the form, so marking cannot be
+  // closed by a stale tab or a second click that skipped the check.
+  const unscored = (await listSolutions(id)).filter(
+    (solution) => solution.imagePaths.length > 0 && solution.graderScore === undefined
+  );
+  if (unscored.length > 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `${unscored.length} бодлогод оноо тавиагүй байна. Буруу бодсон бол 0 оноо өгнө үү.`,
+      },
+      { status: 400 }
+    );
   }
 
   const updated = await updateAssessment(id, {

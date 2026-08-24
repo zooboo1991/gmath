@@ -41,6 +41,10 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
   // save on. They used to be lost without a word.
   const [marks, setMarks] = useState<Record<string, Mark>>(() => initialMarks(detail.items));
   const [savedMarks, setSavedMarks] = useState<Record<string, Mark>>(() => initialMarks(detail.items));
+  // Turned on by a refused "Дуусгах": until then an unscored card looks
+  // ordinary, because nothing is wrong with it while the teacher is still
+  // working through the paper.
+  const [showMissing, setShowMissing] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -86,6 +90,18 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
     setSavingId(null);
     if (ok) setSavedId(solutionId);
   };
+
+  /**
+   * Work the child handed in that carries no score yet. Every photographed
+   * solution has to be marked — a wrong answer is 0, not a blank — otherwise
+   * the family reads "Оноо тавиагүй" on their own paper.
+   */
+  const missing = items.filter(
+    (item) =>
+      item.solution &&
+      item.imageUrls.length > 0 &&
+      !(marks[item.solution.id]?.score ?? "").trim()
+  );
 
   /** Cards holding something the server has not been told about yet. */
   const unsaved = Object.keys(marks).filter((solutionId) => {
@@ -138,6 +154,20 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
   };
 
   const complete = async () => {
+    if (missing.length > 0) {
+      setShowMissing(true);
+      setError(
+        `${missing.length} бодлогод оноо тавиагүй байна. Буруу бодсон бол 0 оноо өгнө үү.`
+      );
+      const first = missing[0].solution?.id;
+      if (first) {
+        document.getElementById(`solution-${first}`)?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+      return;
+    }
     if (!confirm("Үнэлгээг дуусгах уу? Дараа нь оноо засах боломжгүй болно.")) return;
     setCompleting(true);
     setError(null);
@@ -253,6 +283,7 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
             done={done}
             mark={(item.solution && marks[item.solution.id]) ?? EMPTY_MARK}
             dirty={Boolean(item.solution && unsaved.includes(item.solution.id))}
+            missingScore={showMissing && missing.some((m) => m.solution?.id === item.solution?.id)}
             saving={savingId === item.solution?.id}
             saved={savedId === item.solution?.id}
             onChange={(mark) =>
@@ -336,6 +367,12 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
             </p>
           ) : (
             <>
+              {showMissing && missing.length > 0 && (
+                <p className="text-red-soft bg-[oklch(0.97_0.03_25)] font-extrabold text-[.85rem] rounded-md px-4 py-3 mb-3">
+                  {missing.length} бодлого үнэлэгдээгүй байна (улаанаар тэмдэглэв). Бодолт оруулсан
+                  бодлого бүрд оноо өгөх шаардлагатай — буруу бол 0.
+                </p>
+              )}
               {unsaved.length > 0 && (
                 <p className="text-gold-strong bg-gold-soft font-extrabold text-[.85rem] rounded-md px-4 py-3 mb-3">
                   {unsaved.length} бодлогын оноо хадгалагдаагүй байна. «Дуусгах» дарахад тэдгээр нь
@@ -364,6 +401,7 @@ function SolutionCard({
   done,
   mark,
   dirty,
+  missingScore,
   saving,
   saved,
   onChange,
@@ -375,6 +413,8 @@ function SolutionCard({
   mark: Mark;
   /** Typed here but not yet on the server. */
   dirty: boolean;
+  /** Handed-in work with no score, after "Дуусгах" was refused over it. */
+  missingScore: boolean;
   saving: boolean;
   saved: boolean;
   onChange: (mark: Mark) => void;
@@ -383,7 +423,10 @@ function SolutionCard({
   const { score, comment } = mark;
 
   return (
-    <div className={CARD}>
+    <div
+      id={item.solution ? `solution-${item.solution.id}` : undefined}
+      className={missingScore ? `${CARD} border-red-soft border-2` : CARD}
+    >
       <div className="flex items-center gap-2.5 mb-3 flex-wrap">
         <span className="text-[.72rem] font-extrabold text-blue-strong bg-blue-soft px-2.5 py-1 rounded-full">
           {index + 1}-р бодлого
@@ -440,7 +483,11 @@ function SolutionCard({
       {item.solution && (
         <div className="mt-4 pt-4 border-t border-line grid grid-cols-1 sm:grid-cols-[120px_1fr_auto] gap-2.5 items-end">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[.8rem] font-extrabold text-ink-3">Оноо (0-10)</span>
+            <span
+              className={`text-[.8rem] font-extrabold ${missingScore ? "text-red-soft" : "text-ink-3"}`}
+            >
+              {missingScore ? "Оноо оруулна уу" : "Оноо (0-10)"}
+            </span>
             <input
               type="number"
               min={0}
@@ -449,7 +496,9 @@ function SolutionCard({
               value={score}
               onChange={(e) => onChange({ ...mark, score: e.target.value })}
               disabled={done}
-              className={`${INPUT_CLASS} disabled:opacity-60`}
+              className={`${INPUT_CLASS} disabled:opacity-60 ${
+                missingScore ? "border-red-soft" : ""
+              }`}
             />
           </label>
           <label className="flex flex-col gap-1.5">
