@@ -145,6 +145,37 @@ describe("the paper, step by step", () => {
     expect(res.status).toBe(409);
   });
 
+  it("does not hand out a second paper for an exam already sat", async () => {
+    const { client, assessmentId, problemIds } = await readyToSolve();
+
+    for (const problemId of problemIds) await uploadPhoto(client, assessmentId, problemId);
+    const submitted = await client.post(`/api/assessment/${assessmentId}/submit`);
+    expect(submitted.status, submitted.text).toBe(200);
+
+    // The profile card and the start page both go through here. Pressing
+    // "start" again must return the sat exam, not open a fresh one.
+    const { data: exam } = await testDb()
+      .from("assessments")
+      .select("exam_id")
+      .eq("id", assessmentId)
+      .single();
+    const examId = (exam as { exam_id: string }).exam_id;
+
+    const again = await client.post<{ assessment: { id: string }; resumed: boolean }>(
+      "/api/assessment",
+      { track: "olympiad", examId }
+    );
+    expect(again.status, again.text).toBe(200);
+    expect(again.body.assessment.id).toBe(assessmentId);
+    expect(again.body.resumed).toBe(true);
+
+    const fetched = await client.get<{ assessment: { id: string; status: string } | null }>(
+      `/api/assessment?exam=${examId}`
+    );
+    expect(fetched.body.assessment?.id).toBe(assessmentId);
+    expect(fetched.body.assessment?.status).toBe("problems_submitted");
+  });
+
   it("refuses a problem that is not on this child's paper", async () => {
     const { client, assessmentId } = await readyToSolve();
     const other = await readyToSolve();

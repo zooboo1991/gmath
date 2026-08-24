@@ -420,6 +420,19 @@ export async function findOpenAssessment(
   return open.find((a) => a.examId === examId);
 }
 
+/**
+ * This child's sitting of one particular exam, whatever state it is in.
+ *
+ * `findOpenAssessment` deliberately ignores finished work; this does not,
+ * because an exam that has been handed in must not be startable a second time.
+ */
+export async function findAssessmentForExam(
+  userId: string,
+  examId: string
+): Promise<Assessment | undefined> {
+  return (await listAssessmentsByUser(userId)).find((a) => a.examId === examId);
+}
+
 export async function createAssessment(
   userId: string,
   amount: string,

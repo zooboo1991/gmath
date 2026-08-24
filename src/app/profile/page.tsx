@@ -6,6 +6,7 @@ import PageHero from "@/components/PageHero";
 import ProfileClient from "@/components/profile/ProfileClient";
 import { listCertificatesByPhone, listRegistrationsByUser, toPublicUser } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
+import { listAssessmentsByUser } from "@/lib/assessment/db";
 import { listFreeInvitedExams } from "@/lib/assessment/exams";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +47,7 @@ export default async function ProfilePage() {
     );
   }
 
-  const [registrations, certificates, freeExams] = await Promise.all([
+  const [registrations, certificates, freeExams, myAssessments] = await Promise.all([
     listRegistrationsByUser(user.id),
     // certificates is a newer table — a site that hasn't run the latest
     // schema.sql yet shouldn't have its whole profile page go down over it.
@@ -56,6 +57,9 @@ export default async function ProfilePage() {
     // because it is offered even while the assessment is closed to everyone
     // else — nobody would think to go looking at /assessment for it.
     listFreeInvitedExams(user.id).catch(() => []),
+    // What they have already done about those invitations — an exam handed in
+    // must not keep advertising itself as something still to sit.
+    listAssessmentsByUser(user.id).catch(() => []),
   ]);
 
   return (
@@ -66,11 +70,16 @@ export default async function ProfilePage() {
           user={toPublicUser(user)}
           registrations={registrations}
           certificates={certificates}
-          freeExams={freeExams.map((e) => ({
-            id: e.id,
-            title: e.title,
-            programId: e.viaProgramId,
-          }))}
+          freeExams={freeExams.map((e) => {
+            const mine = myAssessments.find((a) => a.examId === e.id);
+            return {
+              id: e.id,
+              title: e.title,
+              programId: e.viaProgramId,
+              assessmentId: mine?.id ?? null,
+              status: mine?.status ?? null,
+            };
+          })}
         />
       </main>
       <Footer />

@@ -206,7 +206,9 @@ describe("a child sitting an exam", () => {
       .select("status, payment_invoice_id")
       .eq("id", started.body.assessment.id)
       .single();
-    expect((data as { status: string }).status).toBe("paid");
+    // Paying lays the exam's paper out at once, so the child lands on the
+    // first problem rather than on a "paid" screen with nothing to do.
+    expect((data as { status: string }).status).toBe("questionnaire_done");
     expect((data as { payment_invoice_id: string | null }).payment_invoice_id).toBeNull();
   });
 

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { createAssessment, findOpenAssessment, getFeeForTrack } from "@/lib/assessment/db";
+import {
+  createAssessment,
+  findAssessmentForExam,
+  findOpenAssessment,
+  getFeeForTrack,
+} from "@/lib/assessment/db";
 import { findOpenExam, isFreeForUser, listFreeInvitedExams } from "@/lib/assessment/exams";
 import { ASSESSMENT_CLOSED, canUseAssessment } from "@/lib/assessment/guard";
 import {
@@ -24,7 +29,11 @@ export async function GET(request: Request) {
   // page would resume whichever assessment happened to be open — the wrong
   // exam, for a child invited to two.
   const wantedExam = new URL(request.url).searchParams.get("exam") ?? undefined;
-  const assessment = await findOpenAssessment(user.id, wantedExam);
+  // A finished sitting still has to be reported, otherwise the page offers a
+  // child their own graded exam as something new to start.
+  const assessment =
+    (await findOpenAssessment(user.id, wantedExam)) ??
+    (wantedExam ? await findAssessmentForExam(user.id, wantedExam) : undefined);
   // The fee shown up front is the open assessment's own track, or the price
   // list for the track picker when nothing is in progress.
   const [assessmentFee, quizFee, invitedExams] = await Promise.all([
@@ -117,6 +126,13 @@ export async function POST(request: Request) {
         { status: 409 }
       );
     }
+    // One sitting per exam. `findOpenAssessment` above lets a completed one
+    // through, and creating a second would give the same child two papers.
+    const already = await findAssessmentForExam(user.id, exam.id);
+    if (already) {
+      return NextResponse.json({ ok: true, assessment: already, resumed: true });
+    }
+
     const free = await isFreeForUser(exam.id, user.id);
     const assessment = await createAssessment(
       user.id,
