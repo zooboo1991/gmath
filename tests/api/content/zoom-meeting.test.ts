@@ -193,4 +193,48 @@ describe("what the route refuses", () => {
 
     expect(res.status).toBe(404);
   });
+
+  /**
+   * The trap that actually caught a teacher: they added lesson rows, pressed
+   * "Ирц бүртгэх Zoom meeting үүсгэх" straight away, and got "Хичээл
+   * олдсонгүй" — true, but it says nothing about the one thing that fixes it.
+   * The editor sends the row's schedule, so the server can tell an unsaved
+   * lesson from a nonexistent one.
+   */
+  it("tells the teacher to save first when the lesson is only on their screen", async () => {
+    const course = await createTestCourse({ lessons: [] });
+    const admin = await adminClient("full");
+
+    const res = await admin.post<{ error: string; unsaved?: boolean }>(
+      `/api/admin/courses/${course.id}/lessons/0/zoom-meeting`,
+      { schedule: AT_1400 }
+    );
+
+    expect(res.status).toBe(409);
+    expect(res.body.unsaved).toBe(true);
+    expect(res.body.error).toContain("Хадгалах");
+  });
+
+  it("still creates the meeting once that lesson has been saved", async () => {
+    const course = await createTestCourse({ lessons: [] });
+    const admin = await adminClient("full");
+
+    // The teacher presses Хадгалах: the lesson reaches the database.
+    const { data } = await testDb().from("courses").select("id").eq("id", course.id).single();
+    expect(data).toBeTruthy();
+    const saved = await testDb()
+      .from("courses")
+      .update({ lessons: [{ topic: "Хичээл №1", mode: "online", schedule: AT_1400 }] })
+      .eq("id", course.id);
+    expect(saved.error).toBeNull();
+
+    const res = await admin.post<MeetingResponse>(
+      `/api/admin/courses/${course.id}/lessons/0/zoom-meeting`,
+      { schedule: AT_1400 }
+    );
+    await trackMeetingRow(course.id);
+
+    expect(res.status, res.text).toBe(200);
+    expect(res.body.action).toBe("created");
+  });
 });

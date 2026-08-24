@@ -51,6 +51,23 @@ export async function POST(
   const course = yearlyProgram ? undefined : await findCourseById(courseId);
   const owner = yearlyProgram ?? course;
   const lesson = owner?.lessons?.[lessonIndex];
+
+  // The editor sends the schedule of the row the teacher pressed the button
+  // on. Read before the "not found" check below, because a row that exists on
+  // screen but not in the database is not a missing lesson — it is an unsaved
+  // one, and "Хичээл олдсонгүй" leaves the teacher with nothing to act on.
+  const body = (await request.json().catch(() => ({}))) as { force?: boolean; schedule?: string };
+
+  if (owner && !lesson && typeof body?.schedule === "string") {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Энэ хичээл хараахан хадгалагдаагүй байна. Эхлээд «Хадгалах» дарна уу.",
+        unsaved: true,
+      },
+      { status: 409 }
+    );
+  }
   if (!owner || !lesson) {
     return NextResponse.json({ ok: false, error: "Хичээл олдсонгүй" }, { status: 404 });
   }
@@ -64,7 +81,6 @@ export async function POST(
   // force=true is the admin's "meeting-ээ дахин үүсгэх" escape hatch — for
   // when the tracked meeting was deleted directly on Zoom's side (e.g. via
   // zoom.us), which this app has no way to detect on its own.
-  const body = (await request.json().catch(() => ({}))) as { force?: boolean; schedule?: string };
   const force = body?.force === true;
 
   // The editor sends the schedule it is currently showing. Everything below
