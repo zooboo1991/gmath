@@ -402,9 +402,22 @@ export async function listAssessmentsByUser(userId: string): Promise<Assessment[
 }
 
 /** The one the student is still working through, if any. */
-export async function findOpenAssessment(userId: string): Promise<Assessment | undefined> {
+/**
+ * The assessment this child is part-way through.
+ *
+ * Scoped to one exam when asked, because a child invited to both the C and the
+ * D programme is invited to both exams. Without the scope, pressing "start" on
+ * the D card resumed their unfinished C paper — the same child, a different
+ * exam, and no way to tell them apart.
+ */
+export async function findOpenAssessment(
+  userId: string,
+  examId?: string
+): Promise<Assessment | undefined> {
   const all = await listAssessmentsByUser(userId);
-  return all.find((a) => a.status !== "completed");
+  const open = all.filter((a) => a.status !== "completed");
+  if (!examId) return open[0];
+  return open.find((a) => a.examId === examId);
 }
 
 export async function createAssessment(

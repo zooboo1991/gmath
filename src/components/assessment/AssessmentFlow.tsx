@@ -64,17 +64,15 @@ export default function AssessmentFlow() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/assessment");
+        // The card the child pressed decides which exam this page is about.
+        const wanted = new URLSearchParams(window.location.search).get("exam");
+        const res = await fetch(wanted ? `/api/assessment?exam=${encodeURIComponent(wanted)}` : "/api/assessment");
         const json = await res.json();
         if (cancelled || !res.ok) return;
         setAssessment(json.assessment);
         setFee(json.fee);
         setFees(json.fees ?? null);
         setInvitedExams(json.invitedExams ?? []);
-        // ?exam=<id> comes from the course card the child pressed. With two
-        // invitations (both the C and the D programme) it is the only thing
-        // that says which one they meant.
-        const wanted = new URLSearchParams(window.location.search).get("exam");
         setExamId(
           wanted && (json.invitedExams ?? []).some((e: { id: string }) => e.id === wanted)
             ? wanted

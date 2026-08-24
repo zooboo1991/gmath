@@ -420,6 +420,45 @@ describe("who the invitation reaches", () => {
     expect(started.body.assessment.amount).toBe("0₮");
   });
 
+  it("keeps the two exams apart: starting D does not resume the open C", async () => {
+    const admin = await adminClient("full");
+    const cCourse = await createTestCourse();
+    const dCourse = await createTestCourse();
+    const user = await createTestUser({ grade: "6-р анги" });
+    await createTestRegistration({ userId: user.id, programId: cCourse.id, status: "active" });
+    await createTestRegistration({ userId: user.id, programId: dCourse.id, status: "active" });
+    const { examId: cExam } = await createExam(admin, { category: "C", freeCourseIds: [cCourse.id] });
+    const { examId: dExam } = await createExam(admin, { category: "D", freeCourseIds: [dCourse.id] });
+
+    const client = await signedInClient(user.phone, user.password);
+
+    // They start the C exam and leave it unfinished.
+    const cStart = await client.post<{ assessment: { id: string; examId?: string } }>(
+      "/api/assessment",
+      { track: "olympiad", examId: cExam }
+    );
+    expect(cStart.body.assessment.examId).toBe(cExam);
+
+    // Then they press the D card. This used to hand back the C paper.
+    const dStart = await client.post<{ assessment: { id: string; examId?: string } }>(
+      "/api/assessment",
+      { track: "olympiad", examId: dExam }
+    );
+    expect(dStart.status, dStart.text).toBe(200);
+    expect(dStart.body.assessment.examId).toBe(dExam);
+    expect(dStart.body.assessment.id).not.toBe(cStart.body.assessment.id);
+
+    // And the page for each resumes its own.
+    const cResume = await client.get<{ assessment: { id: string } | null }>(
+      `/api/assessment?exam=${cExam}`
+    );
+    expect(cResume.body.assessment?.id).toBe(cStart.body.assessment.id);
+    const dResume = await client.get<{ assessment: { id: string } | null }>(
+      `/api/assessment?exam=${dExam}`
+    );
+    expect(dResume.body.assessment?.id).toBe(dStart.body.assessment.id);
+  });
+
   it("shows the offer on the course card that carries it", async () => {
     const admin = await adminClient("full");
     const course = await createTestCourse({ title: "C ангилал сургалт" });

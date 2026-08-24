@@ -12,7 +12,7 @@ import {
 import { getSessionUser } from "@/lib/session";
 
 /** The assessment the student is part-way through, if any. */
-export async function GET() {
+export async function GET(request: Request) {
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: "Нэвтэрнэ үү" }, { status: 401 });
@@ -20,7 +20,11 @@ export async function GET() {
   if (!(await canUseAssessment(user))) {
     return NextResponse.json({ ok: false, error: ASSESSMENT_CLOSED.error }, { status: ASSESSMENT_CLOSED.status });
   }
-  const assessment = await findOpenAssessment(user.id);
+  // ?exam=<id> comes from the course card the child pressed. Without it the
+  // page would resume whichever assessment happened to be open — the wrong
+  // exam, for a child invited to two.
+  const wantedExam = new URL(request.url).searchParams.get("exam") ?? undefined;
+  const assessment = await findOpenAssessment(user.id, wantedExam);
   // The fee shown up front is the open assessment's own track, or the price
   // list for the track picker when nothing is in progress.
   const [assessmentFee, quizFee, invitedExams] = await Promise.all([
@@ -98,7 +102,7 @@ export async function POST(request: Request) {
 
   // Resuming beats starting over: a second tab, or a refresh mid-flow, must
   // not leave the student with two half-finished assessments (and two fees).
-  const existing = await findOpenAssessment(user.id);
+  const existing = await findOpenAssessment(user.id, invitedExam?.id);
   if (existing) {
     return NextResponse.json({ ok: true, assessment: existing, resumed: true });
   }
