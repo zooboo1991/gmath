@@ -117,6 +117,41 @@ describe("a child sitting an exam", () => {
     expect(rows.every((r) => r.action === "solving")).toBe(true);
   });
 
+  it("puts an invited child straight onto the problems, with no form in the way", async () => {
+    const admin = await adminClient("full");
+    const course = await createTestCourse();
+    const user = await createTestUser({ grade: "6-р анги" });
+    await createTestRegistration({ userId: user.id, programId: course.id, status: "active" });
+    const { problemIds } = await createExam(admin, { category: "C", count: 3, freeCourseIds: [course.id] });
+
+    const client = await signedInClient(user.phone, user.password);
+    const started = await client.post<{ assessment: { id: string } }>("/api/assessment", {
+      track: "olympiad",
+    });
+    const assessmentId = started.body.assessment.id;
+
+    // The one button the child presses.
+    const paid = await client.post<{ paid: boolean; assessment: { status: string } }>(
+      `/api/assessment/${assessmentId}/pay`
+    );
+
+    expect(paid.status, paid.text).toBe(200);
+    expect(paid.body.paid).toBe(true);
+    // Ready to solve immediately — no questionnaire step in between.
+    expect(paid.body.assessment.status).toBe("questionnaire_done");
+
+    const { data } = await testDb()
+      .from("assessment_problems")
+      .select("problem_id")
+      .eq("assessment_id", assessmentId)
+      .order("shown_order");
+    expect((data as { problem_id: string }[]).map((r) => r.problem_id)).toEqual(problemIds);
+
+    // And the solve page's own endpoint serves them.
+    const solutions = await client.get<{ chosen: unknown[] }>(`/api/assessment/${assessmentId}/solutions`);
+    expect(solutions.status).toBe(200);
+  });
+
   it("does not lay the paper out twice when the questionnaire is re-submitted", async () => {
     const admin = await adminClient("full");
     await createExam(admin, { category: "D", count: 2 });

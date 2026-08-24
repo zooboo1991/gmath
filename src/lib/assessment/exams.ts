@@ -1,6 +1,6 @@
 import { getSupabase } from "../supabase";
 import { listCourses, listYearlyPrograms } from "../db";
-import { problemFromRow, type ProblemRow } from "./db";
+import { attachProblems, findAssessment, problemFromRow, updateAssessment, type ProblemRow } from "./db";
 import type { Problem, ProblemCategory } from "./types";
 
 /**
@@ -303,3 +303,28 @@ export async function findFreeInvitedExam(userId: string): Promise<InvitedExam |
   return (await listFreeInvitedExams(userId))[0];
 }
 
+
+
+/**
+ * Lays the exam's paper on a freshly paid assessment and marks it ready to
+ * solve, so the child goes from "start" straight to the first problem.
+ *
+ * The questionnaire used to sit here. It fed the adaptive engine's starting
+ * difficulty, and that engine is gone — the teacher chose the problems. What
+ * was left was a form standing between a child and the exam they came for.
+ *
+ * The status stays `questionnaire_done` because that is what every route
+ * downstream checks for "may be solved now"; renaming it would be a migration
+ * for a word.
+ */
+export async function openExamPaper(assessmentId: string): Promise<void> {
+  const assessment = await findAssessment(assessmentId);
+  if (!assessment?.examId) return;
+  if (assessment.status !== "paid") return;
+
+  const problems = await listExamProblems(assessment.examId);
+  if (problems.length === 0) return;
+
+  await attachProblems(assessmentId, problems.map((p) => p.id));
+  await updateAssessment(assessmentId, { status: "questionnaire_done" });
+}

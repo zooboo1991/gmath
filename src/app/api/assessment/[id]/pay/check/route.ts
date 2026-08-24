@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { settleAssessmentPayment } from "@/lib/assessment/db";
+import { findAssessment, settleAssessmentPayment } from "@/lib/assessment/db";
+import { openExamPaper } from "@/lib/assessment/exams";
 import { requireOwnAssessment } from "@/lib/assessment/guard";
 
 /**
@@ -21,7 +22,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   try {
     const settled = await settleAssessmentPayment(id);
-    const current = settled ?? guard.assessment;
+    // Same as the free path in ../pay: once the fee is in, the paper is laid
+    // out and the child is ready to solve.
+    if (settled?.status === "paid") await openExamPaper(id);
+    const current = (settled ? await findAssessment(id) : undefined) ?? settled ?? guard.assessment;
     return NextResponse.json({ ok: true, assessment: current, paid: current.status !== "awaiting_payment" });
   } catch (err) {
     console.error("assessment payment check failed", id, err);

@@ -8,6 +8,7 @@ import AssessmentIntro from "@/components/assessment/AssessmentIntro";
 import SampleTest from "@/components/assessment/SampleTest";
 import { DEFAULT_ASSESSMENT_FEE, DEFAULT_ASSESSMENT_SLA, DEFAULT_QUIZ_FEE } from "@/lib/assessment/config";
 import { canUseAssessment } from "@/lib/assessment/guard";
+import { listFreeInvitedExams } from "@/lib/assessment/exams";
 import { getSessionUser } from "@/lib/session";
 import {
   getAssessmentFee,
@@ -30,6 +31,11 @@ export default async function AssessmentPage() {
   // Closed to the public, but not to a class the teacher invited to a free exam.
   const user = await getSessionUser();
   if (!(user ? await canUseAssessment(user) : await isAssessmentOpen())) return <AssessmentClosed />;
+
+  // An invited child came here to sit one particular exam. The explainer below
+  // is written for a parent deciding whether to buy one — three kinds, three
+  // prices, how payment works — and every line of it is noise to them.
+  const invited = user ? (await listFreeInvitedExams(user.id).catch(() => [])).length > 0 : false;
 
   // Prices and the turnaround promise are read here rather than through the
   // session-gated API, so a visitor who has not signed in still sees them.
@@ -56,8 +62,8 @@ export default async function AssessmentPage() {
                 always visible — that is the whole point of this page for
                 somebody who has not decided yet. */}
             <AssessmentFlow />
-            {sampleGrades.length > 0 && <SampleTest grades={sampleGrades} />}
-            <AssessmentIntro quizFee={quizFee} olympiadFee={olympiadFee} sla={sla} />
+            {!invited && sampleGrades.length > 0 && <SampleTest grades={sampleGrades} />}
+            {!invited && <AssessmentIntro quizFee={quizFee} olympiadFee={olympiadFee} sla={sla} />}
           </div>
         </section>
       </main>

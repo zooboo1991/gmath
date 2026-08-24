@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { settleAssessmentPayment, updateAssessment } from "@/lib/assessment/db";
+import { findAssessment, settleAssessmentPayment, updateAssessment } from "@/lib/assessment/db";
+import { openExamPaper } from "@/lib/assessment/exams";
 import { requireOwnAssessment, requireStatus } from "@/lib/assessment/guard";
 import { getPaymentProvider, stubPaymentsEnabled } from "@/lib/payment";
 import { parsePriceToNumber } from "@/lib/price";
@@ -30,7 +31,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       paid_at: new Date().toISOString(),
       payment_provider: "free",
     });
-    return NextResponse.json({ ok: true, assessment: paid, paid: true, free: true });
+    // Straight to the problems: an invited child pressed one button and is
+    // meant to be solving, not filling in a form.
+    await openExamPaper(id);
+    return NextResponse.json({
+      ok: true,
+      assessment: (await findAssessment(id)) ?? paid,
+      paid: true,
+      free: true,
+    });
   }
 
   const provider = getPaymentProvider();

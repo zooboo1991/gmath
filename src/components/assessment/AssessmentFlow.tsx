@@ -91,6 +91,24 @@ export default function AssessmentFlow() {
     };
   }, [sessionLoaded, sessionUser, router]);
 
+  /**
+   * Where an assessment should be after it changed hands. "solve" is a page,
+   * not a step in this component: an exam's paper is laid out the moment the
+   * fee settles, so the child leaves for the first problem rather than being
+   * shown anything else.
+   */
+  const goTo = useCallback(
+    (next: Assessment) => {
+      const step = stepForStatus(next);
+      if (step === "solve") {
+        router.push(`/assessment/${next.id}/solve`);
+        return;
+      }
+      setStep(step);
+    },
+    [router]
+  );
+
   const pay = async () => {
     setBusy(true);
     setError(null);
@@ -120,7 +138,7 @@ export default function AssessmentFlow() {
       }
       setAssessment(paid.assessment);
       if (paid.paid) {
-        setStep(stepForStatus(paid.assessment));
+        goTo(paid.assessment);
       } else {
         setQpayQr({ qrImage: paid.qrImage, shortUrl: paid.shortUrl });
         setStep("qpay-wait");
@@ -145,7 +163,7 @@ export default function AssessmentFlow() {
       }
       setAssessment(json.assessment);
       if (json.paid) {
-        setStep(stepForStatus(json.assessment));
+        goTo(json.assessment);
         return true;
       }
       return false;
@@ -155,7 +173,7 @@ export default function AssessmentFlow() {
     } finally {
       setBusy(false);
     }
-  }, [assessment]);
+  }, [assessment, goTo]);
 
   // Light client-side polling while the QR is on screen, so most students
   // never have to press "Шалгах" themselves. This is not the server-side
@@ -234,7 +252,7 @@ export default function AssessmentFlow() {
           busy={busy}
           onStart={() => {
             setPickedTrack("olympiad");
-            setStep("payment");
+            void pay();
           }}
         />
       )}
