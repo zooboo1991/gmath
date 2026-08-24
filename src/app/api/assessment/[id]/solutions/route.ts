@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { getPickingState, listProblems, listSolutions, upsertSolution } from "@/lib/assessment/db";
+import {
+  getPickingState,
+  listProblems,
+  listSolutions,
+  setProblemSkipped,
+  upsertSolution,
+} from "@/lib/assessment/db";
 import {
   MAX_SOLUTION_IMAGES_PER_PROBLEM,
   MAX_SOLUTION_IMAGE_BYTES,
@@ -26,23 +32,29 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     listSolutions(id),
   ]);
 
-  const chosen = await Promise.all(
-    state.chosen.map(async (entry) => {
-      const problem = allProblems.find((p) => p.id === entry.problemId);
-      const solution = solutions.find((s) => s.problemId === entry.problemId);
-      const urls = await Promise.all(
-        (solution?.imagePaths ?? []).map((path) =>
-          createSignedUrl(SOLUTIONS_BUCKET, path, SIGNED_URL_TTL_SECONDS)
-        )
-      );
-      return {
-        problem: problem ? toPublicProblem(problem) : null,
-        imageUrls: urls.filter((u): u is string => Boolean(u)),
-      };
-    })
-  );
+  // Every problem on the paper, in order, with what the child has done to it.
+  // `chosen` keeps its old shape for the submit check; the stepper reads
+  // `steps`, which includes the ones marked "бодож чадсангүй" so it can show
+  // them as done rather than silently dropping a step.
+  const describe = async (entry: { problemId: string; action: string }) => {
+    const problem = allProblems.find((p) => p.id === entry.problemId);
+    const solution = solutions.find((s) => s.problemId === entry.problemId);
+    const urls = await Promise.all(
+      (solution?.imagePaths ?? []).map((path) =>
+        createSignedUrl(SOLUTIONS_BUCKET, path, SIGNED_URL_TTL_SECONDS)
+      )
+    );
+    return {
+      problem: problem ? toPublicProblem(problem) : null,
+      imageUrls: urls.filter((u): u is string => Boolean(u)),
+      skipped: entry.action === "dont_know",
+    };
+  };
 
-  return NextResponse.json({ ok: true, status: guard.assessment.status, chosen });
+  const steps = await Promise.all(state.shown.map(describe));
+  const chosen = steps.filter((s) => !s.skipped);
+
+  return NextResponse.json({ ok: true, status: guard.assessment.status, steps, chosen });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -60,11 +72,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const formData = await request.formData();
   const problemId = String(formData.get("problemId") ?? "");
 
-  // Uploading against a problem they answered "Амархан" to (or never saw)
-  // would put work in front of a grader that was never assigned.
+  // Uploading against a problem that was never put in front of them would
+  // give a grader work that was never assigned.
   const state = await getPickingState(guard.assessment);
-  if (!state.chosen.some((c) => c.problemId === problemId)) {
-    return NextResponse.json({ ok: false, error: "Энэ бодлогыг та сонгоогүй байна" }, { status: 400 });
+  const entry = state.shown.find((c) => c.problemId === problemId);
+  if (!entry) {
+    return NextResponse.json({ ok: false, error: "Энэ бодлого таных биш байна" }, { status: 400 });
   }
 
   const files = formData.getAll("files").filter((f): f is File => f instanceof File);
@@ -92,6 +105,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
     const paths = [...existingPaths, ...uploaded];
     await upsertSolution(id, problemId, paths);
+    // A photo overrides an earlier "бодож чадсангүй": they came back to it.
+    if (entry.action === "dont_know") {
+      await setProblemSkipped(id, problemId, false);
+    }
 
     const urls = await Promise.all(
       paths.map((path) => createSignedUrl(SOLUTIONS_BUCKET, path, SIGNED_URL_TTL_SECONDS))
@@ -100,7 +117,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch (err) {
     if (err instanceof Error && err.message === "unsupported_image_type") {
       return NextResponse.json(
-        { ok: false, error: "Зөвхөн PNG, JPG, GIF, WEBP форматын зураг оруулна уу" },
+        {
+          ok: false,
+          // Almost always an iPhone HEIC that the browser could not convert.
+          error:
+            "Зургийн формат тохирохгүй байна. iPhone бол Тохиргоо → Камер → Формат → «Хамгийн нийцтэй» болгоод дахин зураг аваарай.",
+        },
         { status: 400 }
       );
     }

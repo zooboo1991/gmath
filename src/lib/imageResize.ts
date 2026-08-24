@@ -19,11 +19,15 @@ const MAX_DIMENSION = 1600;
 const QUALITY = 0.85;
 /** Below this, re-encoding costs quality for no real gain. */
 const SKIP_BELOW_BYTES = 1_000_000;
+/** What the upload routes will store — anything else has to be re-encoded, whatever its size. */
+const SERVABLE = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 export async function downscaleImage(file: File): Promise<File> {
   // A GIF would come back as a single flattened frame, which is worse than big.
   if (!file.type.startsWith("image/") || file.type === "image/gif") return file;
-  if (file.size <= SKIP_BELOW_BYTES) return file;
+  // A small HEIC off an iPhone would otherwise sail past the size check and be
+  // refused by the server. Safari can decode it, so convert it here instead.
+  if (file.size <= SKIP_BELOW_BYTES && SERVABLE.includes(file.type)) return file;
 
   try {
     const bitmap = await createImageBitmap(file);
@@ -45,7 +49,10 @@ export async function downscaleImage(file: File): Promise<File> {
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/jpeg", QUALITY)
     );
-    if (!blob || blob.size >= file.size) return file;
+    // Keeping the original because it is smaller only makes sense if the
+    // server would take it — a HEIC beats its own JPEG on size every time.
+    if (!blob) return file;
+    if (blob.size >= file.size && SERVABLE.includes(file.type)) return file;
 
     const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
     return new File([blob], name, { type: "image/jpeg" });

@@ -583,6 +583,25 @@ export async function saveQuestionnaire(
  * here rather than inside saveQuestionnaire so this module keeps no import of
  * the exams module, which already imports this one.
  */
+/**
+ * Marks one problem on the paper as given up on, or takes that back.
+ *
+ * Stored in the action column the adaptive engine used to write: "dont_know"
+ * meant the same thing then, and reusing it keeps the paper in one table.
+ */
+export async function setProblemSkipped(
+  assessmentId: string,
+  problemId: string,
+  skipped: boolean
+): Promise<void> {
+  const { error } = await getSupabase()
+    .from("assessment_problems")
+    .update({ action: skipped ? "dont_know" : "solving" })
+    .eq("assessment_id", assessmentId)
+    .eq("problem_id", problemId);
+  if (error) throw error;
+}
+
 export async function attachProblems(assessmentId: string, problemIds: string[]): Promise<void> {
   if (problemIds.length === 0) return;
   const existing = await listAssessmentProblems(assessmentId);
