@@ -1775,6 +1775,21 @@ export type DashboardStats = {
   revenue: number;
   /** Value still waiting on an admin to confirm payment. */
   pendingRevenue: number;
+  /** The money, as the roster counts it: due, in, and still out. */
+  money: {
+    /** Everything a live registration is expected to pay — the agreed amount where one was set, the course price otherwise. */
+    totalDue: number;
+    /** Installments recorded by hand, plus QPay payments the gateway settled. */
+    paid: number;
+    /** totalDue − paid. */
+    outstanding: number;
+    /** Of the outstanding: seats not yet confirmed. */
+    pendingSeats: number;
+    /** Of the outstanding: confirmed students still paying in installments. */
+    installmentBalance: number;
+    /** Confirmed registrations with neither an agreed amount nor a QPay settlement — counted as unpaid, and worth setting an amount on. */
+    unsetAmountCount: number;
+  };
   qpayCount: number;
   bankCount: number;
   /** Busiest courses by confirmed registrations. */
@@ -1813,22 +1828,46 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   const { data, error } = await getSupabase()
     .from("registrations")
-    .select("user_id, program_label, price, pay_method, status, users(role)");
+    .select("id, user_id, program_label, price, total_due, pay_method, status, users(role)");
   if (error) throw error;
 
   // A registration belongs to exactly one user, but the client types an
   // embedded relation as an array, so accept either shape.
   type JoinedUser = { role: Role } | { role: Role }[] | null;
   const rows = data as unknown as {
+    id: string;
     user_id: string;
     program_label: string;
     price: string;
+    total_due: number | null;
     pay_method: PayMethod;
     status: RegistrationStatus;
     users: JoinedUser;
   }[];
   const roleOf = (users: JoinedUser): Role | undefined =>
     (Array.isArray(users) ? users[0] : users)?.role;
+
+  // What has actually been received, per registration. Cancelled rows are
+  // excluded below, so their payments never reach any total.
+  const payments = await listPaymentsForRegistrations(
+    rows.filter((r) => r.status !== "cancelled").map((r) => r.id)
+  );
+  const paidByRegistration = new Map<string, number>();
+  for (const payment of payments) {
+    paidByRegistration.set(
+      payment.registrationId,
+      (paidByRegistration.get(payment.registrationId) ?? 0) + payment.amount
+    );
+  }
+
+  const money = {
+    totalDue: 0,
+    paid: 0,
+    outstanding: 0,
+    pendingSeats: 0,
+    installmentBalance: 0,
+    unsetAmountCount: 0,
+  };
 
   const activeStudentIds = new Set<string>();
   const activeTeacherIds = new Set<string>();
@@ -1863,6 +1902,25 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     byCourse.set(row.program_label, bucket);
     if (row.pay_method === "qpay") qpayCount += 1;
     else bankCount += 1;
+
+    // The agreed amount where the admin set one; the course price otherwise.
+    const due = row.total_due ?? amount;
+    // A QPay registration with no installment plan was settled in full by the
+    // gateway — that money is in, even though no payment row was typed for it.
+    const settledByGateway =
+      row.total_due === null && row.status === "active" && row.pay_method === "qpay";
+    const received = settledByGateway ? due : (paidByRegistration.get(row.id) ?? 0);
+
+    money.totalDue += due;
+    money.paid += Math.min(received, due);
+    const owed = Math.max(0, due - received);
+    money.outstanding += owed;
+    if (row.status === "active") {
+      money.installmentBalance += owed;
+      if (row.total_due === null && !settledByGateway) money.unsetAmountCount += 1;
+    } else {
+      money.pendingSeats += owed;
+    }
   }
 
   const topCourses = [...byCourse.entries()]
@@ -1885,6 +1943,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     pendingRegistrations,
     revenue,
     pendingRevenue,
+    money,
     qpayCount,
     bankCount,
     topCourses,

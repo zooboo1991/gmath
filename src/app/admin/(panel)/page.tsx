@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import DashboardPanel from "@/components/admin/panels/DashboardPanel";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { getDashboardStats } from "@/lib/db";
+import { getOperationsSnapshot } from "@/lib/adminDashboard";
 import { canView } from "@/lib/adminSections";
 import { TEACHER_LANDING } from "@/lib/adminAccess";
 import { getAdminRole } from "@/lib/session";
@@ -47,12 +48,12 @@ export default async function AdminHomePage({
     redirect(TEACHER_LANDING);
   }
 
-  const stats = await getDashboardStats();
+  const [stats, operations] = await Promise.all([getDashboardStats(), getOperationsSnapshot()]);
 
   return (
     <div className="px-6 lg:px-10 py-8">
       <AdminPageHeader title="Хяналтын самбар" />
-      <DashboardPanel stats={stats} />
+      <DashboardPanel stats={stats} operations={operations} />
     </div>
   );
 }
