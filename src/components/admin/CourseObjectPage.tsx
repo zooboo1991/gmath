@@ -387,17 +387,25 @@ export default function CourseObjectPage({
           <AnchorTab label="Үндсэн мэдээлэл" active={tab === "info"} onClick={() => setTab("info")} />
           {isEditing && (
             <>
+              {/* The roster stays: a teacher needs to know who is in the room.
+                  Confirming payments and the revenue report do not — those
+                  tabs would open on buttons that refuse them and on money
+                  that is not theirs to see. */}
               <AnchorTab
                 label={`Бүртгэл${live.length ? ` (${live.length})` : ""}`}
                 active={tab === "roster"}
                 onClick={() => setTab("roster")}
               />
-              <AnchorTab
-                label={`Баталгаажуулалт${pending.length ? ` (${pending.length})` : ""}`}
-                active={tab === "confirm"}
-                onClick={() => setTab("confirm")}
-              />
-              <AnchorTab label="Тайлан" active={tab === "report"} onClick={() => setTab("report")} />
+              {canEdit && (
+                <>
+                  <AnchorTab
+                    label={`Баталгаажуулалт${pending.length ? ` (${pending.length})` : ""}`}
+                    active={tab === "confirm"}
+                    onClick={() => setTab("confirm")}
+                  />
+                  <AnchorTab label="Тайлан" active={tab === "report"} onClick={() => setTab("report")} />
+                </>
+              )}
             </>
           )}
         </div>

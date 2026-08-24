@@ -180,12 +180,18 @@ export default function YearlyProgramObjectPage({
             active={tab === "roster"}
             onClick={() => setTab("roster")}
           />
-          <AnchorTab
-            label={`Баталгаажуулалт${pending.length ? ` (${pending.length})` : ""}`}
-            active={tab === "confirm"}
-            onClick={() => setTab("confirm")}
-          />
-          <AnchorTab label="Тайлан" active={tab === "report"} onClick={() => setTab("report")} />
+          {/* Money stays with the owner: confirming payments and the revenue
+              report are hidden from an account that may not act on either. */}
+          {canEdit && (
+            <>
+              <AnchorTab
+                label={`Баталгаажуулалт${pending.length ? ` (${pending.length})` : ""}`}
+                active={tab === "confirm"}
+                onClick={() => setTab("confirm")}
+              />
+              <AnchorTab label="Тайлан" active={tab === "report"} onClick={() => setTab("report")} />
+            </>
+          )}
         </div>
       </header>
 
@@ -351,7 +357,9 @@ export default function YearlyProgramObjectPage({
               programId={program.id}
               registrations={registrations}
               onChange={setRegistrations}
-              trackPayments
+              // Balances and payment history are money: the owner's column,
+              // not the teacher's, even though both read the same roster.
+              trackPayments={canEdit}
               payments={payments}
               onPaymentsChange={setPayments}
               canEdit={canEdit}
