@@ -78,7 +78,7 @@ export default function SolutionUploader({ assessmentId }: { assessmentId: strin
   const patchStep = (patch: Partial<Step>) =>
     setSteps((current) => current?.map((s, i) => (i === index ? { ...s, ...patch } : s)) ?? current);
 
-  const upload = async (files: FileList) => {
+  const upload = async (files: File[]) => {
     if (!step.problem) return;
     setBusy(true);
     setError(null);
@@ -87,7 +87,7 @@ export default function SolutionUploader({ assessmentId }: { assessmentId: strin
       body.append("problemId", step.problem.id);
       // Shrink on the phone first: a camera photo is several MB and the
       // request body is capped well below that.
-      for (const file of Array.from(files)) body.append("files", await downscaleImage(file));
+      for (const file of files) body.append("files", await downscaleImage(file));
 
       const res = await fetch(`/api/assessment/${assessmentId}/solutions`, { method: "POST", body });
       const json = await readJson<{ imageUrls: string[] }>(res);
@@ -249,9 +249,12 @@ export default function SolutionUploader({ assessmentId }: { assessmentId: strin
               className="hidden"
               disabled={busy || step.imageUrls.length >= MAX_SOLUTION_IMAGES_PER_PROBLEM}
               onChange={(e) => {
-                const files = e.target.files;
+                // Copy the files out first: clearing the input empties the
+                // live FileList, so reading it afterwards finds nothing.
+                const picked = [...(e.target.files ?? [])];
+                // Cleared so picking the same photo again re-runs.
                 e.target.value = "";
-                if (files && files.length > 0) void upload(files);
+                if (picked.length > 0) void upload(picked);
               }}
             />
           </label>
