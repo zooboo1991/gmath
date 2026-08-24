@@ -75,6 +75,8 @@ export default function CourseObjectPage({
   articleOptions,
   initialArticleIds,
   canEdit,
+  canEditLessons = false,
+  canManageRegistrations = false,
 }: {
   course: Course | null;
   initialKind?: CourseKind;
@@ -87,7 +89,12 @@ export default function CourseObjectPage({
    * newly added input can't accidentally become editable) and the roster,
    * payments and report tabs keep all their figures.
    */
+  /** The course's own fields: title, price, status. Owner only. */
   canEdit: boolean;
+  /** Lesson rows, recordings, notes, attendance, Zoom meetings. Teachers too. */
+  canEditLessons?: boolean;
+  /** Confirming and cancelling registrations. Owner only — this is money. */
+  canManageRegistrations?: boolean;
 }) {
   const router = useRouter();
   const isEditing = course !== null;
@@ -253,6 +260,36 @@ export default function CourseObjectPage({
       }
     } finally {
       setArchiving(false);
+    }
+  };
+
+  /**
+   * A teacher's save: the lesson schedule alone, through the endpoint that
+   * accepts nothing else. The course PUT would refuse them anyway — this is
+   * the door they are meant to use.
+   */
+  const saveLessons = async () => {
+    if (!course) return;
+    setError(null);
+    setSavedMessage(null);
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/courses/${course.id}/lessons`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lessons: form.lessons }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Хадгалахад алдаа гарлаа");
+        return;
+      }
+      setSavedMessage("Хадгалагдлаа");
+      router.refresh();
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -565,12 +602,33 @@ export default function CourseObjectPage({
               </label>
             </Card>
 
+          </fieldset>
+        )}
+
+        {/* Outside the fieldset above, which is disabled for anyone who may not
+            edit the course itself. A teacher may not touch the price and may
+            absolutely touch the timetable. */}
+        {tab === "info" && (
+          <fieldset
+            disabled={!canEditLessons}
+            className="flex flex-col gap-5 min-w-0 border-0 p-0 m-0 mt-5"
+          >
             <LessonScheduleEditor
               lessons={form.lessons}
               onChange={(lessons) => setForm((f) => ({ ...f, lessons }))}
               id={course?.id}
               courseZoomLink={form.zoomLink}
             />
+            {!canEdit && canEditLessons && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={saveLessons}
+                className="self-start font-extrabold text-[.9rem] rounded-full bg-blue text-white shadow-blue px-6 py-3 disabled:opacity-50"
+              >
+                {saving ? "Хадгалж байна…" : "Хичээлийн хуваарь хадгалах"}
+              </button>
+            )}
           </fieldset>
         )}
 
@@ -611,7 +669,7 @@ export default function CourseObjectPage({
                         {payMethodLabel(r.payMethod)} · {r.price}
                       </span>
                     </div>
-                    {canEdit && (
+                    {canManageRegistrations && (
                       <PendingRegistrationActions
                         registration={r}
                         onDone={(patch) => patchRegistration(r.id, patch)}

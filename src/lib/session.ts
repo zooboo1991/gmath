@@ -112,15 +112,48 @@ export async function clearSessionUser() {
   store.delete(SESSION_COOKIE);
 }
 
-export async function getAdminRole(): Promise<AdminRole | null> {
+/**
+ * Who is signed in to the admin, if anybody.
+ *
+ * Three cookie shapes, all signed:
+ *   "admin-ok"                    — from before roles existed; reads as full
+ *   "admin-ok:full" | ":viewer"   — the environment passwords
+ *   "admin-ok:<role>:<uuid>:<name>" — a named account from admin_users
+ *
+ * The name rides in the cookie rather than being looked up per request: the
+ * audit log wants it on every write, and a signed cookie is already trusted
+ * for the role, which is the far more dangerous half.
+ */
+export type AdminActor = {
+  role: AdminRole;
+  /** Set only for a named account. Absent means the environment password. */
+  id?: string;
+  name?: string;
+};
+
+const ROLES: AdminRole[] = ["full", "viewer", "teacher"];
+
+function isRole(value: string): value is AdminRole {
+  return (ROLES as string[]).includes(value);
+}
+
+export async function getAdminActor(): Promise<AdminActor | null> {
   const store = await cookies();
   const raw = store.get(ADMIN_COOKIE)?.value;
   if (!raw) return null;
   const value = unsign(raw);
-  if (value === ADMIN_MARKER) return "full";
-  if (value === `${ADMIN_MARKER}:full`) return "full";
-  if (value === `${ADMIN_MARKER}:viewer`) return "viewer";
-  return null;
+  if (!value) return null;
+  if (value === ADMIN_MARKER) return { role: "full" };
+
+  const [marker, role, id, ...nameParts] = value.split(":");
+  if (marker !== ADMIN_MARKER || !role || !isRole(role)) return null;
+  if (!id) return { role };
+  // A name may contain anything, colons included, so it is the remainder.
+  return { role, id, name: nameParts.join(":") || undefined };
+}
+
+export async function getAdminRole(): Promise<AdminRole | null> {
+  return (await getAdminActor())?.role ?? null;
 }
 
 /** Signed in as either admin. Use for pages and read-only endpoints. */
@@ -137,9 +170,12 @@ export async function isFullAdmin(): Promise<boolean> {
   return (await getAdminRole()) === "full";
 }
 
-export async function setAdminSession(role: AdminRole) {
+export async function setAdminSession(role: AdminRole, account?: { id: string; name: string }) {
   const store = await cookies();
-  store.set(ADMIN_COOKIE, sign(`${ADMIN_MARKER}:${role}`), {
+  const value = account
+    ? `${ADMIN_MARKER}:${role}:${account.id}:${account.name}`
+    : `${ADMIN_MARKER}:${role}`;
+  store.set(ADMIN_COOKIE, sign(value), {
     httpOnly: true,
     secure: SECURE_COOKIE,
     sameSite: "lax",

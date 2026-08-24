@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import CourseObjectPage from "@/components/admin/CourseObjectPage";
 import { findCourseById, listArticleIdsForProgram, listArticles, listRegistrationsByProgram } from "@/lib/db";
 import { requireAdminSection } from "@/lib/adminAccess";
+import { can } from "@/lib/adminSections";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,9 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
       initialRegistrations={registrations}
       articleOptions={articles.map((a) => ({ id: a.id, title: a.title, createdAt: a.createdAt }))}
       initialArticleIds={articleIds}
-      canEdit={role === "full"}
+      canEdit={can(role, "courseInfo")}
+      canEditLessons={can(role, "lessons")}
+      canManageRegistrations={can(role, "registrations")}
     />
   );
 }

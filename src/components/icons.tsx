@@ -340,3 +340,13 @@ export function IconLogout(props: IconProps) {
     </svg>
   );
 }
+
+/** A key — the admin accounts page. */
+export function IconKey(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>
+      <circle cx="8.5" cy="8.5" r="4.5" strokeLinecap="round" />
+      <path d="M11.8 11.8L20 20M16.5 16.5l2-2M14 14l2-2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

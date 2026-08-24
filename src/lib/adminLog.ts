@@ -1,13 +1,15 @@
 import { getSupabase } from "./supabase";
 import { getClientIp } from "./rateLimit";
+import { getAdminActor } from "./session";
 
 /**
- * Records what a shared admin login did, not who did it — there's only one
- * ADMIN_PASSWORD and one generic session cookie (see lib/session.ts), no
- * per-admin identity to attach. `ip` is the closest available forensic
- * signal. Mirrors the conventions in lib/db.ts: row type, `xFromRow`
- * mapper, throw on read errors — but never on write, since a broken logger
- * must not be able to break the admin action it's recording.
+ * Records what an admin action did, and — since named accounts exist — who did
+ * it. `actorName` is absent for anything done with the environment password,
+ * which has no name to record; `ip` remains the only signal in that case.
+ *
+ * Mirrors the conventions in lib/db.ts: row type, `xFromRow` mapper, throw on
+ * read errors — but never on write, since a broken logger must not be able to
+ * break the admin action it is recording.
  */
 
 export type AdminLogEntry = {
@@ -15,6 +17,8 @@ export type AdminLogEntry = {
   actionType: string;
   targetId?: string;
   details?: Record<string, unknown>;
+  /** The named account that did it. Absent for the environment password. */
+  actorName?: string;
   ip?: string;
   createdAt: string;
 };
@@ -24,6 +28,7 @@ type AdminLogRow = {
   action_type: string;
   target_id: string | null;
   details: Record<string, unknown> | null;
+  actor_name: string | null;
   ip: string | null;
   created_at: string;
 };
@@ -34,6 +39,7 @@ function adminLogFromRow(row: AdminLogRow): AdminLogEntry {
     actionType: row.action_type,
     targetId: row.target_id ?? undefined,
     details: row.details ?? undefined,
+    actorName: row.actor_name ?? undefined,
     ip: row.ip ?? undefined,
     createdAt: row.created_at,
   };
@@ -55,6 +61,9 @@ export async function logAdminAction(
         action_type: input.actionType,
         target_id: input.targetId ?? null,
         details: input.details ?? null,
+        // Read from the session rather than passed in by every caller: there
+        // are forty call sites and one of them would eventually forget.
+        actor_name: (await getAdminActor())?.name ?? null,
         ip: getClientIp(request.headers),
       });
     if (error) console.error("[adminLog] insert failed:", error);

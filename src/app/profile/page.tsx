@@ -7,7 +7,6 @@ import ProfileClient from "@/components/profile/ProfileClient";
 import { listCertificatesByPhone, listRegistrationsByUser, toPublicUser } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { findFreeInvitedExam } from "@/lib/assessment/exams";
-import { categoryForGrade } from "@/lib/assessment/types";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +55,7 @@ export default async function ProfilePage() {
     // the profile is where they already come to find their courses, and
     // because it is offered even while the assessment is closed to everyone
     // else — nobody would think to go looking at /assessment for it.
-    findFreeInvitedExam(user.id, categoryForGrade(Number(user.grade))).catch(() => undefined),
+    findFreeInvitedExam(user.id).catch(() => undefined),
   ]);
 
   return (
@@ -67,7 +66,11 @@ export default async function ProfilePage() {
           user={toPublicUser(user)}
           registrations={registrations}
           certificates={certificates}
-          freeExam={freeExam ? { id: freeExam.id, title: freeExam.title } : null}
+          freeExam={
+            freeExam
+              ? { id: freeExam.id, title: freeExam.title, programId: freeExam.viaProgramId }
+              : null
+          }
         />
       </main>
       <Footer />

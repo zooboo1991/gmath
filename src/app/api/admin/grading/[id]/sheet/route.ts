@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { REFUSED, requireCapability } from "@/lib/adminAccess";
 import { findAssessment, updateAssessment } from "@/lib/assessment/db";
 import { SIGNED_URL_TTL_SECONDS } from "@/lib/assessment/config";
-import { isFullAdmin } from "@/lib/session";
 import {
   createSignedUrl,
   GRADED_SHEETS_BUCKET,
@@ -22,8 +22,8 @@ const MAX_SHEETS = 20;
  * before this still hold their one scan there and the student still sees it.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("grading")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const { id } = await params;
   const assessment = await findAssessment(id);
@@ -67,8 +67,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
 /** Removes one page — a mis-scanned photo should not be stuck on the verdict. */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("grading")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const { id } = await params;
   const assessment = await findAssessment(id);

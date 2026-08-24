@@ -304,6 +304,64 @@ describe("free by course, not by name", () => {
   });
 });
 
+describe("who the invitation reaches", () => {
+  it("reaches a child whose grade is stored as text", async () => {
+    const admin = await adminClient("full");
+    const course = await createTestCourse();
+    // What the profile form actually stores: "6-р анги", not 6. Reading it as
+    // a number gave NaN, and every invited class came up empty.
+    const user = await createTestUser({ grade: "6-р анги" });
+    await createTestRegistration({ userId: user.id, programId: course.id, status: "active" });
+    await createExam(admin, { category: "C", fee: "40,000₮", freeCourseIds: [course.id] });
+
+    const client = await signedInClient(user.phone, user.password);
+    const started = await client.post<{ free: boolean; assessment: { amount: string } }>(
+      "/api/assessment",
+      { track: "olympiad" }
+    );
+
+    expect(started.status, started.text).toBe(200);
+    expect(started.body.free).toBe(true);
+    expect(started.body.assessment.amount).toBe("0₮");
+  });
+
+  it("reaches a child whose grade is outside the category's band", async () => {
+    const admin = await adminClient("full");
+    const course = await createTestCourse();
+    // A fourth grader on the C programme, placed there on ability. The
+    // teacher invited the course; the child's school year does not overrule
+    // that.
+    const user = await createTestUser({ grade: "4-р анги" });
+    await createTestRegistration({ userId: user.id, programId: course.id, status: "active" });
+    const { examId } = await createExam(admin, { category: "C", freeCourseIds: [course.id] });
+
+    const client = await signedInClient(user.phone, user.password);
+    const started = await client.post<{ free: boolean; assessment: { examId?: string } }>(
+      "/api/assessment",
+      { track: "olympiad" }
+    );
+
+    expect(started.status, started.text).toBe(200);
+    expect(started.body.free).toBe(true);
+    expect(started.body.assessment.examId).toBe(examId);
+  });
+
+  it("shows the offer on the course card that carries it", async () => {
+    const admin = await adminClient("full");
+    const course = await createTestCourse({ title: "C ангилал сургалт" });
+    const user = await createTestUser({ grade: "9-р анги" });
+    await createTestRegistration({ userId: user.id, programId: course.id, status: "active" });
+    await createExam(admin, { category: "C", freeCourseIds: [course.id] });
+
+    const client = await signedInClient(user.phone, user.password);
+    const page = await client.get("/profile");
+
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("Түвшин тогтоох");
+    expect(page.text).toContain("төлбөргүй өгнө");
+  });
+});
+
 describe("an invited class while the assessment is closed", () => {
   afterEach(async () => {
     await setAssessmentSwitch("on");
@@ -361,7 +419,8 @@ describe("an invited class while the assessment is closed", () => {
     const page = await client.get("/profile");
 
     expect(page.status).toBe(200);
-    expect(page.text).toContain("Түвшин тогтоох · Үнэгүй");
+    // The offer lives on the course card that carries it, not in the header.
+    expect(page.text).toContain("төлбөргүй өгнө");
   });
 
   it("shows no such button to a child who was not invited", async () => {
@@ -375,6 +434,6 @@ describe("an invited class while the assessment is closed", () => {
     const page = await client.get("/profile");
 
     expect(page.status).toBe(200);
-    expect(page.text).not.toContain("Түвшин тогтоох · Үнэгүй");
+    expect(page.text).not.toContain("төлбөргүй өгнө");
   });
 });

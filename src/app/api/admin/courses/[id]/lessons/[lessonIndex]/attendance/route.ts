@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { isFullAdmin } from "@/lib/session";
 import { findLessonMeeting, listAttendanceForLessonWithNames } from "@/lib/zoom/db";
+import { REFUSED, requireCapability } from "@/lib/adminAccess";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string; lessonIndex: string }> }) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("lessons")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const { id: courseId, lessonIndex: lessonIndexRaw } = await params;
   const lessonIndex = Number(lessonIndexRaw);

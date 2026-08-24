@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveAdminLogin, setAdminSession } from "@/lib/session";
+import { verifyAdminLogin } from "@/lib/adminUsers";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
@@ -17,13 +18,26 @@ export async function POST(request: Request) {
 
   const { username, password } = await request.json();
 
-  // One message for both a wrong name and a wrong password: naming which half
-  // failed would tell an attacker which usernames exist.
-  const role = resolveAdminLogin(typeof username === "string" ? username : "", password ?? "");
-  if (!role) {
-    return NextResponse.json({ ok: false, error: "Нэвтрэх нэр эсвэл нууц үг буруу байна" }, { status: 401 });
+  const name = typeof username === "string" ? username : "";
+  const pass = typeof password === "string" ? password : "";
+
+  // The environment password first: it is the owner's key and needs no
+  // database, so it keeps working even if admin_users is unreachable.
+  const envRole = resolveAdminLogin(name, pass);
+  if (envRole) {
+    await setAdminSession(envRole);
+    return NextResponse.json({ ok: true, role: envRole });
   }
 
-  await setAdminSession(role);
-  return NextResponse.json({ ok: true, role });
+  // Then the named accounts — teachers, and anyone else given a way in.
+  const account = await verifyAdminLogin(name, pass).catch(() => null);
+  if (account) {
+    await setAdminSession(account.role, { id: account.id, name: account.name });
+    return NextResponse.json({ ok: true, role: account.role, name: account.name });
+  }
+
+  // One message for every failure — a wrong name, a wrong password, a
+  // deactivated account. Naming which half failed would tell an attacker
+  // which usernames exist.
+  return NextResponse.json({ ok: false, error: "Нэвтрэх нэр эсвэл нууц үг буруу байна" }, { status: 401 });
 }

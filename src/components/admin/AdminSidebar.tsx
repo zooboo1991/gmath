@@ -14,6 +14,7 @@ import {
   IconClock,
   IconDocument,
   IconGrid,
+  IconKey,
   IconLogout,
   IconMedal,
   IconMonitor,
@@ -41,6 +42,7 @@ const MENU: { href: string; label: string; icon: (p: IconProps) => React.ReactNo
   { href: "/admin/notifications", label: "Мэдэгдэл", icon: IconBell, section: "notifications" },
   { href: "/admin/chat", label: "Чат", icon: IconChat, section: "chat" },
   { href: "/admin/logs", label: "Түүх", icon: IconClock, section: "logs" },
+  { href: "/admin/staff", label: "Эрх", icon: IconKey, section: "staff" },
 ];
 
 const STORAGE_KEY = "gmath_admin_sidebar_collapsed";

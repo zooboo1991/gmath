@@ -911,3 +911,32 @@ drop table if exists exam_free_users;
 
 -- Which exam a child sat. Null for the assessments taken before exams existed.
 alter table assessments add column if not exists exam_id uuid references exams(id) on delete set null;
+
+-- ---------------------------------------------------------------------------
+-- Админ/багшийн аккаунтууд
+-- ---------------------------------------------------------------------------
+-- Until now "admin" was one shared password in the environment, which is why
+-- admin_logs records what happened but not who did it. Teachers need their own
+-- way in — to take attendance and to mark work — so admins become rows.
+--
+-- Deliberately separate from `users`: a student session is long-lived and
+-- allowed on two devices, while an admin session is short and single-purpose.
+-- Merging them would mean a stolen student cookie reaches the grading queue.
+--
+-- The environment password keeps working as the owner's way in, so a mistake
+-- in this table can never lock the teacher out of his own admin.
+create table if not exists admin_users (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  -- Lowercased on write; the login form is case-insensitive on it.
+  username text not null unique,
+  password_hash text not null,
+  password_salt text not null,
+  role text not null check (role in ('full', 'viewer', 'teacher')),
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  last_login_at timestamptz
+);
+
+-- Who did it, at last. Null for anything done with the environment password.
+alter table admin_logs add column if not exists actor_name text;

@@ -59,8 +59,12 @@ export default function ProfileClient({
   user: PublicUser;
   registrations: RegistrationWithGroup[];
   certificates: Certificate[];
-  /** Set when this child's class was invited to sit an exam for free. */
-  freeExam?: { id: string; title: string } | null;
+  /**
+   * Set when this child's class was invited to sit an exam for free.
+   * `programId` names the course that invited them, so the offer can be shown
+   * on that course's own card rather than floating at the top of the page.
+   */
+  freeExam?: { id: string; title: string; programId: string } | null;
 }) {
   const [user, setUser] = useState(initialUser);
   const [tab, setTab] = useState<Tab>("active");
@@ -159,14 +163,6 @@ export default function ProfileClient({
                 </div>
               </div>
               <div className="flex gap-2.5 flex-wrap shrink-0">
-                {freeExam && (
-                  <Link
-                    href="/assessment"
-                    className="inline-flex items-center gap-2 font-extrabold text-[.9rem] rounded-full bg-gold text-gold-ink shadow-gold px-5 py-3 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
-                  >
-                    <IconTarget className="w-4 h-4" /> Түвшин тогтоох · Үнэгүй
-                  </Link>
-                )}
                 <Link
                   href="/profile/assessment"
                   className="inline-flex items-center gap-2 font-extrabold text-[.9rem] rounded-full bg-blue-soft text-blue-strong px-5 py-3 transition-transform hover:-translate-y-0.5"
@@ -308,7 +304,8 @@ export default function ProfileClient({
                   <YearlyProgramCard
                     key={r.id}
                     registration={r}
-                    initialExpanded={r.programId === focusCourseId}
+                    initialExpanded={r.programId === focusCourseId || freeExam?.programId === r.programId}
+                    freeExam={freeExam?.programId === r.programId ? freeExam : null}
                   />
                 ) : (
                   <div
@@ -340,7 +337,10 @@ export default function ProfileClient({
 
                     {r.status === "active" ? (
                       <div className="mt-4 pt-4 border-t border-line">
-                        <ActiveCourseDetails registration={r} />
+                        <ActiveCourseDetails
+                          registration={r}
+                          freeExam={freeExam?.programId === r.programId ? freeExam : null}
+                        />
                       </div>
                     ) : (
                       <p className="mt-3 text-[.88rem] text-ink-3 font-semibold">
@@ -371,9 +371,34 @@ export default function ProfileClient({
 }
 
 /** The Facebook-group link + full lesson schedule shown for any active registration — shared by the plain course card and the yearly program's expanded view. */
-function ActiveCourseDetails({ registration }: { registration: RegistrationWithGroup }) {
+function ActiveCourseDetails({
+  registration,
+  freeExam,
+}: {
+  registration: RegistrationWithGroup;
+  /** The exam this course's students were invited to sit free, if any. */
+  freeExam?: { id: string; title: string } | null;
+}) {
   return (
     <div className="flex flex-col gap-3">
+      {freeExam && (
+        <div className="bg-gold-soft border border-gold/30 rounded-sm px-4 py-3.5">
+          <span className="inline-flex items-center gap-1.5 text-[.72rem] font-extrabold tracking-[.06em] uppercase text-gold-strong">
+            <IconTarget className="w-3.5 h-3.5" /> Үнэгүй
+          </span>
+          <b className="block font-extrabold text-[.95rem] mt-1">{freeExam.title}</b>
+          <p className="text-ink-2 font-medium text-[.85rem] mt-1 leading-[1.6]">
+            Энэ сургалтын сурагчид түвшин тогтоох шалгалтыг төлбөргүй өгнө. Бодлогоо бодоод
+            бодолтынхоо зургийг хавсаргана.
+          </p>
+          <Link
+            href="/assessment"
+            className="inline-flex items-center justify-center gap-2 font-extrabold text-[.88rem] rounded-full bg-gold text-gold-ink shadow-gold px-5 py-2.5 mt-3 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+          >
+            Түвшин тогтоох →
+          </Link>
+        </div>
+      )}
       {registration.facebookGroup ? (
         <a
           href={registration.facebookGroup}
@@ -402,10 +427,12 @@ function ActiveCourseDetails({ registration }: { registration: RegistrationWithG
 function YearlyProgramCard({
   registration,
   initialExpanded = false,
+  freeExam = null,
 }: {
   registration: RegistrationWithGroup;
-  /** True when a notification deep link points at this programme. */
+  /** True when a notification deep link points at this programme, or a free exam is waiting. */
   initialExpanded?: boolean;
+  freeExam?: { id: string; title: string } | null;
 }) {
   const [expanded, setExpanded] = useState(initialExpanded);
   const now = useNow();
@@ -440,7 +467,7 @@ function YearlyProgramCard({
       </div>
       {expanded && (
         <div className="mt-4 pt-4 border-t border-line">
-          <ActiveCourseDetails registration={registration} />
+          <ActiveCourseDetails registration={registration} freeExam={freeExam} />
         </div>
       )}
     </div>

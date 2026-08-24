@@ -1,6 +1,5 @@
 import { findAssessment, isAssessmentOpen } from "./db";
 import { findFreeInvitedExam } from "./exams";
-import { categoryForGrade } from "./types";
 import { getSessionUser } from "../session";
 import type { Assessment, AssessmentStatus } from "./types";
 import type { User } from "../db";
@@ -35,8 +34,7 @@ export const ASSESSMENT_CLOSED = {
  */
 export async function canUseAssessment(user: User): Promise<boolean> {
   if (await isAssessmentOpen()) return true;
-  const invited = await findFreeInvitedExam(user.id, categoryForGrade(Number(user.grade)));
-  return Boolean(invited);
+  return Boolean(await findFreeInvitedExam(user.id));
 }
 
 export async function requireOwnAssessment(id: string): Promise<GuardResult> {

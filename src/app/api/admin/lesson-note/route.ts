@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { REFUSED, requireCapability } from "@/lib/adminAccess";
 import { logAdminAction } from "@/lib/adminLog";
 import {
   createNoteUploadUrl,
@@ -7,7 +8,6 @@ import {
   LESSON_NOTES_BUCKET,
   removeStorageObject,
 } from "@/lib/storage";
-import { isFullAdmin } from "@/lib/session";
 
 /** 50 MB. Well past any set of lesson notes; a mis-picked video should be refused, not uploaded. */
 const MAX_NOTE_BYTES = 50 * 1024 * 1024;
@@ -25,8 +25,8 @@ const ADMIN_VIEW_TTL_SECONDS = 60 * 60;
  * course/programme PUT.
  */
 export async function POST(request: Request) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("lessons")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const data = await request.json().catch(() => ({}));
   const size = Number(data.size);
@@ -54,8 +54,8 @@ export async function POST(request: Request) {
 
 /** A signed URL so the teacher can check the upload before a student does. */
 export async function GET(request: Request) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("lessons")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const path = new URL(request.url).searchParams.get("path");
   if (!isLessonNotePath(path)) {
@@ -74,8 +74,8 @@ export async function GET(request: Request) {
  * sit in the bucket forever with nothing pointing at it.
  */
 export async function DELETE(request: Request) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("lessons")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const data = await request.json().catch(() => ({}));
   if (!isLessonNotePath(data.path)) {

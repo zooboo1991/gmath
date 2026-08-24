@@ -69,6 +69,21 @@ export function categoryForGrade(grade: number | undefined): ProblemCategory | u
   return undefined;
 }
 
+/**
+ * The grade as a number, out of whatever a parent typed.
+ *
+ * `users.grade` is free text and in practice reads "6-р анги" — Number() on
+ * that is NaN, which silently made every child gradeless and, for a while,
+ * left every invited class without their exam.
+ */
+export function parseGrade(grade: string | number | undefined | null): number | undefined {
+  if (typeof grade === "number") return Number.isFinite(grade) ? grade : undefined;
+  const match = String(grade ?? "").match(/\d{1,2}/);
+  if (!match) return undefined;
+  const value = Number(match[0]);
+  return value >= 1 && value <= 12 ? value : undefined;
+}
+
 export type Problem = {
   id: string;
   /** Unset on problems entered before the bank was split by category. */

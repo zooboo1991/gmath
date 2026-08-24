@@ -147,6 +147,31 @@ export async function signedInClient(phone: string, password: string): Promise<T
 }
 
 /** Signs in as one of the two admin accounts from .env.test. */
+/**
+ * Signs in as a named account from admin_users — the way a teacher gets in.
+ * The account is created through the owner's own endpoint, so the test
+ * exercises the same path the admin UI uses.
+ */
+export async function staffClient(
+  owner: TestClient,
+  input: { name: string; username: string; password: string; role: "full" | "viewer" | "teacher" }
+): Promise<{ client: TestClient; id: string }> {
+  const created = await owner.post<{ ok: boolean; staff?: { id: string } }>("/api/admin/staff", input);
+  if (created.status !== 200 || !created.body.staff) {
+    throw new Error(`staff create failed: ${created.status} ${created.text}`);
+  }
+
+  const client = new TestClient();
+  const res = await client.post<{ ok: boolean; role?: string }>("/api/admin/login", {
+    username: input.username,
+    password: input.password,
+  });
+  if (res.status !== 200 || res.body?.role !== input.role) {
+    throw new Error(`staff login failed for ${input.username}: ${res.status} ${res.text}`);
+  }
+  return { client, id: created.body.staff.id };
+}
+
 export async function adminClient(role: "full" | "viewer"): Promise<TestClient> {
   const client = new TestClient();
   const username =

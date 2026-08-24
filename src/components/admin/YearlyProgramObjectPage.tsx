@@ -26,6 +26,8 @@ export default function YearlyProgramObjectPage({
   articleOptions,
   initialArticleIds,
   canEdit,
+  canEditLessons = false,
+  canManageRegistrations = false,
 }: {
   program: YearlyProgram;
   initialRegistrations: RegistrationWithUser[];
@@ -34,6 +36,10 @@ export default function YearlyProgramObjectPage({
   initialArticleIds: string[];
   /** False for the read-only admin — see CourseObjectPage for the reasoning. */
   canEdit: boolean;
+  /** Lesson rows, recordings, notes, attendance. Teachers too. */
+  canEditLessons?: boolean;
+  /** Confirming and cancelling registrations — money, so owner only. */
+  canManageRegistrations?: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<SectionTab>("info");
@@ -73,6 +79,31 @@ export default function YearlyProgramObjectPage({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Хадгалахад алдаа гарлаа");
+        return;
+      }
+      setSavedMessage("Хадгалагдлаа");
+      router.refresh();
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** A teacher's save: the timetable only, through the lessons-only endpoint. */
+  const saveLessons = async () => {
+    setError(null);
+    setSavedMessage(null);
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/courses/${program.id}/lessons`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lessons: form.lessons }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -284,12 +315,33 @@ export default function YearlyProgramObjectPage({
               Энэ хуваарь нийтэд харагдахгүй — зөвхөн бүртгүүлж баталгаажсан сурагчдад профайл хуудсандаа
               харагдана. Сар бүрийн хичээлийг нэг мөрөөр оруулна уу.
             </p>
+          </fieldset>
+        )}
+
+        {/* Outside the disabled fieldset above — see CourseObjectPage: a
+            teacher edits the timetable while the programme's own fields stay
+            locked. */}
+        {tab === "info" && (
+          <fieldset
+            disabled={!canEditLessons}
+            className="flex flex-col gap-5 min-w-0 border-0 p-0 m-0 mt-5"
+          >
             <LessonScheduleEditor
               lessons={form.lessons}
               onChange={(lessons) => setForm((f) => ({ ...f, lessons }))}
               id={program.id}
               courseZoomLink={form.zoomLink}
             />
+            {!canEdit && canEditLessons && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={saveLessons}
+                className="self-start font-extrabold text-[.9rem] rounded-full bg-blue text-white shadow-blue px-6 py-3 disabled:opacity-50"
+              >
+                {saving ? "Хадгалж байна…" : "Хичээлийн хуваарь хадгалах"}
+              </button>
+            )}
           </fieldset>
         )}
 
@@ -333,7 +385,7 @@ export default function YearlyProgramObjectPage({
                         {payMethodLabel(r.payMethod)} · {r.price}
                       </span>
                     </div>
-                    {canEdit && (
+                    {canManageRegistrations && (
                       <PendingRegistrationActions
                         registration={r}
                         onDone={(patch) => patchRegistration(r.id, patch)}

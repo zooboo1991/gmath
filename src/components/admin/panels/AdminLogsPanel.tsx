@@ -25,6 +25,10 @@ const ACTION_LABELS: Record<string, string> = {
   "notification.send": "Мэдэгдэл илгээсэн",
   "setting.update": "Тохиргоо өөрчилсөн",
   "messenger.profile_update": "Messenger цэс шинэчилсэн",
+  "staff.create": "Эрх бүхий аккаунт үүсгэсэн",
+  "staff.update": "Аккаунтын эрх/нууц үг өөрчилсөн",
+  "staff.delete": "Аккаунт устгасан",
+  "lesson.schedule_update": "Хичээлийн хуваарь хадгалсан",
   "exam.create": "Шалгалт үүсгэсэн",
   "exam.update": "Шалгалт засварласан",
   "exam.delete": "Шалгалт устгасан",
@@ -84,8 +88,8 @@ export default function AdminLogsPanel() {
         </h3>
         <p className="text-ink-3 font-semibold text-[.85rem] mt-1">
           Үнэ өөрчлөх, бүртгэл нэмэх/хасах, Zoom үүсгэх, мэдэгдэл илгээх зэрэг мэдрэмтгий үйлдлүүд
-          энд бүртгэгдэнэ. Админ эрх нэг л нууц үгтэй тул &quot;хэн&quot; гэдгийг биш &quot;юу
-          хийсэн бэ&quot;-г л харуулна.
+          энд бүртгэгдэнэ. Нэртэй аккаунтаар хийсэн үйлдэл дээр хэн болох нь харагдана; Vercel-ийн
+          нууц үгээр орсон бол нэр байхгүй тул IP л үлдэнэ.
         </p>
       </div>
 
@@ -119,7 +123,10 @@ export default function AdminLogsPanel() {
                   </span>
                 )}
               </div>
-              <span className="text-ink-3 font-semibold text-[.78rem] shrink-0">
+              <span className="text-ink-3 font-semibold text-[.78rem] shrink-0 text-right">
+                {log.actorName && (
+                  <b className="text-ink-2 font-extrabold block">{log.actorName}</b>
+                )}
                 {new Date(log.createdAt).toLocaleString("mn-MN")}
                 {log.ip && ` · ${log.ip}`}
               </span>

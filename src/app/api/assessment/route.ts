@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { createAssessment, findOpenAssessment, getFeeForTrack } from "@/lib/assessment/db";
-import { findOpenExam, isFreeForUser } from "@/lib/assessment/exams";
+import { findFreeInvitedExam, findOpenExam, isFreeForUser } from "@/lib/assessment/exams";
 import { ASSESSMENT_CLOSED, canUseAssessment } from "@/lib/assessment/guard";
 import {
   categoryForGrade,
   isProblemCategory,
+  parseGrade,
   type AssessmentTrack,
   type ProblemCategory,
 } from "@/lib/assessment/types";
@@ -58,13 +59,22 @@ export async function POST(request: Request) {
     quizGrade = grade;
   }
 
-  // The olympiad bank is split by category: C is 5th-6th grade, D is 7th-8th.
+  // An invitation outranks everything below: the teacher named this child's
+  // course on an exam, so that exam is theirs whatever their school year says.
+  // A C-programme class holds a fourth grader and a ninth grader, both placed
+  // there on ability, and both are meant to sit it.
+  const invitedExam = track === "olympiad" ? await findFreeInvitedExam(user.id) : undefined;
+
+  // Otherwise the bank is split by category: C is 5th-6th grade, D is 7th-8th.
   // Taken from the profile, because that is the answer the family already
   // gave; only when the grade falls outside 5-8 (or is missing) does the
   // student get asked, and then it must come with the request.
   let category: ProblemCategory | undefined;
   if (track === "olympiad") {
-    category = categoryForGrade(Number(user.grade)) ?? (isProblemCategory(data?.category) ? data.category : undefined);
+    category =
+      invitedExam?.category ??
+      categoryForGrade(parseGrade(user.grade)) ??
+      (isProblemCategory(data?.category) ? data.category : undefined);
     if (!category) {
       return NextResponse.json(
         {
@@ -87,7 +97,7 @@ export async function POST(request: Request) {
   // Olympiad: the child sits the exam the teacher has open for their category,
   // at that exam's price — or free, if the teacher put them on its list.
   if (track === "olympiad" && category) {
-    const exam = await findOpenExam(category);
+    const exam = invitedExam ?? (await findOpenExam(category));
     if (!exam) {
       return NextResponse.json(
         { ok: false, error: "Одоогоор нээлттэй шалгалт алга байна. Дараа дахин оролдоно уу." },

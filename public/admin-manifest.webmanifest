@@ -1,0 +1,18 @@
+{
+  "name": "Ганбат багш — Багшийн хэсэг",
+  "short_name": "Багшийн хэсэг",
+  "description": "Ирц бүртгэх, үнэлгээ оруулах, хичээлийн бичлэг нэмэх.",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "background_color": "#fdfdfd",
+  "theme_color": "#0b3d78",
+  "lang": "mn",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

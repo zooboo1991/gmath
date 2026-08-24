@@ -1,13 +1,18 @@
 /**
- * Admin roles and what each may see. Deliberately free of any server-only
- * import (no next/headers, no db) so the sidebar — a client component — can
- * use canView() without dragging the session/database layer into the browser
- * bundle. The enforcement half lives in lib/adminAccess.ts.
+ * Admin roles: what each may see, and what each may change.
  *
- *   full   — everything (the original single admin)
- *   viewer — read-only, and only the sections listed below
+ * Deliberately free of any server-only import (no next/headers, no db) so the
+ * sidebar — a client component — can use canView() without dragging the
+ * session/database layer into the browser bundle. The enforcement half lives
+ * in lib/adminAccess.ts and in each route handler.
+ *
+ *   full    — everything (the owner)
+ *   viewer  — read-only, and only the sections listed below
+ *   teacher — takes attendance, marks work, adds recordings and notes.
+ *             Never money: no payments, no confirming registrations, no
+ *             editing a course's price or whether it is published.
  */
-export type AdminRole = "full" | "viewer";
+export type AdminRole = "full" | "viewer" | "teacher";
 
 export const VIEWER_SECTIONS = [
   "dashboard",
@@ -25,9 +30,44 @@ export type AdminSection =
   | "notifications"
   | "chat"
   | "logs"
+  | "staff"
   | "courseEditor";
+
+/** A teacher's sections: their classes, and the work waiting to be marked. */
+export const TEACHER_SECTIONS = ["dashboard", "courses", "courseEditor", "assessment"] as const;
 
 export function canView(role: AdminRole, section: AdminSection): boolean {
   if (role === "full") return true;
+  if (role === "teacher") return (TEACHER_SECTIONS as readonly string[]).includes(section);
   return (VIEWER_SECTIONS as readonly string[]).includes(section);
+}
+
+/**
+ * What a role may change. Sections answer "which page"; these answer "which
+ * button on it", which is the question a teacher's account actually raises —
+ * they need the course page for attendance and recordings while the price and
+ * the registration queue on that same page stay out of reach.
+ */
+export type AdminCapability =
+  /** Lesson rows: topic, schedule, Zoom link, recording, notes, attendance. */
+  | "lessons"
+  /** A course's own fields: title, price, status, Facebook group, capacity. */
+  | "courseInfo"
+  /** Approving, cancelling, adding payments — anything about money or seats. */
+  | "registrations"
+  /** The grading queue: scores, comments, marked scans, final level. */
+  | "grading"
+  /** The problem bank, exams, levels, fees. */
+  | "assessmentSetup"
+  /** Articles, notifications, certificates, chat, settings, staff accounts. */
+  | "siteAdmin";
+
+const CAPABILITIES: Record<AdminRole, readonly AdminCapability[]> = {
+  full: ["lessons", "courseInfo", "registrations", "grading", "assessmentSetup", "siteAdmin"],
+  teacher: ["lessons", "grading"],
+  viewer: [],
+};
+
+export function can(role: AdminRole, capability: AdminCapability): boolean {
+  return CAPABILITIES[role].includes(capability);
 }

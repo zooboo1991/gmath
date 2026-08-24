@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { REFUSED, requireCapability } from "@/lib/adminAccess";
 import { findCourseById, findYearlyProgramById, updateCourse, updateYearlyProgram, type Lesson } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { parseScheduleString } from "@/lib/lessonSchedule";
-import { isFullAdmin } from "@/lib/session";
 import { createMeeting, updateMeeting } from "@/lib/zoom/client";
 import {
   createLessonMeeting,
@@ -34,8 +34,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string; lessonIndex: string }> }
 ) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("lessons")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const { id: courseId, lessonIndex: lessonIndexRaw } = await params;
   const lessonIndex = Number(lessonIndexRaw);

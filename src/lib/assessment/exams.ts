@@ -246,17 +246,48 @@ export async function isFreeForUser(examId: string, userId: string): Promise<boo
 /**
  * The exam this child may sit free right now, if any.
  *
- * This is the one thing that reaches past the "түвшин тогтоох хаалттай"
+ * Found through their courses, not their school year. The teacher invites a
+ * class — "everyone on the C programme" — and that class contains a fourth
+ * grader and a ninth grader who were placed there on ability. Deciding the
+ * category from `users.grade` excluded exactly those children from the exam
+ * their own teacher had just invited them to.
+ *
+ * This is also the one thing that reaches past the "түвшин тогтоох хаалттай"
  * switch: the switch closes the door to the public while the problem bank is
- * being rebuilt, but a class the teacher deliberately invited is not the
- * public, and their exam is the one that is ready.
+ * being rebuilt, but an invited class is not the public.
  */
-export async function findFreeInvitedExam(
-  userId: string,
-  category: ProblemCategory | undefined
-): Promise<Exam | undefined> {
-  if (!category) return undefined;
-  const exam = await findOpenExam(category);
-  if (!exam) return undefined;
-  return (await isFreeForUser(exam.id, userId)) ? exam : undefined;
+export async function findFreeInvitedExam(userId: string): Promise<
+  (Exam & { viaProgramId: string }) | undefined
+> {
+  const supabase = getSupabase();
+  const { data: regRows, error } = await supabase
+    .from("registrations")
+    .select("program_id")
+    .eq("user_id", userId)
+    .eq("status", "active");
+  if (error) throw error;
+  const programIds = [...new Set((regRows as { program_id: string }[]).map((r) => r.program_id))];
+  if (programIds.length === 0) return undefined;
+
+  const { data: freeRows, error: freeError } = await supabase
+    .from("exam_free_courses")
+    .select("exam_id, program_id")
+    .in("program_id", programIds);
+  if (freeError) throw freeError;
+  const invited = (freeRows ?? []) as { exam_id: string; program_id: string }[];
+  if (invited.length === 0) return undefined;
+
+  const { data: examRows, error: examError } = await supabase
+    .from("exams")
+    .select("*")
+    .eq("status", "open")
+    .in("id", invited.map((r) => r.exam_id))
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (examError) throw examError;
+  const row = (examRows ?? [])[0] as ExamRow | undefined;
+  if (!row) return undefined;
+
+  const via = invited.find((r) => r.exam_id === row.id);
+  return { ...examFromRow(row), viaProgramId: via?.program_id ?? programIds[0] };
 }

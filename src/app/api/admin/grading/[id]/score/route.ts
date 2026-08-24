@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { findAssessment, gradeSolution, listSolutions, updateAssessment } from "@/lib/assessment/db";
-import { isFullAdmin } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
+import { REFUSED, requireCapability } from "@/lib/adminAccess";
 
 /** A grader scoring one problem's solution. */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("grading")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const { id } = await params;
   const assessment = await findAssessment(id);

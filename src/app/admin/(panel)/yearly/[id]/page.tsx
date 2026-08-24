@@ -9,6 +9,7 @@ import {
   listRegistrationsByProgram,
 } from "@/lib/db";
 import { requireAdminSection } from "@/lib/adminAccess";
+import { can } from "@/lib/adminSections";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,9 @@ export default async function EditYearlyProgramPage({ params }: { params: Promis
       initialPayments={payments}
       articleOptions={articles.map((a) => ({ id: a.id, title: a.title, createdAt: a.createdAt }))}
       initialArticleIds={articleIds}
-      canEdit={role === "full"}
+      canEdit={can(role, "courseInfo")}
+      canEditLessons={can(role, "lessons")}
+      canManageRegistrations={can(role, "registrations")}
     />
   );
 }
