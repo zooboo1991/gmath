@@ -3,7 +3,7 @@ import { findAssessment, findLevel, updateAssessment } from "@/lib/assessment/db
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 import { REFUSED, requireCapability } from "@/lib/adminAccess";
 
-/** The teacher's final call: a written verdict plus the level. */
+/** The teacher's final call: the written verdict that closes the marking. */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await requireCapability("grading")).ok) {
     return NextResponse.json(REFUSED, { status: 401 });
@@ -15,15 +15,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const data = await request.json();
+  // The numbered level is off the form for now — the scale is not settled, and
+  // a teacher was being made to pick one to finish marking. What the family
+  // reads is the written verdict and the per-problem scores. A level sent by
+  // an older client is still honoured, so nothing already graded loses it.
   const finalLevel = Number(data.finalLevel);
-  if (!Number.isInteger(finalLevel) || finalLevel < 1 || finalLevel > 10) {
-    return NextResponse.json({ ok: false, error: "Түвшинг 1-10 хооронд сонгоно уу" }, { status: 400 });
-  }
-  // The level row carries the description the student will read, so it has
-  // to exist before we point them at it.
-  if (!(await findLevel(finalLevel))) {
-    return NextResponse.json({ ok: false, error: "Түвшин олдсонгүй" }, { status: 400 });
-  }
+  const level =
+    Number.isInteger(finalLevel) && finalLevel >= 1 && finalLevel <= 10
+      ? (await findLevel(finalLevel))
+        ? finalLevel
+        : undefined
+      : undefined;
 
   const teacherComment = typeof data.teacherComment === "string" ? data.teacherComment.trim() : "";
   if (!teacherComment) {
@@ -34,7 +36,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const updated = await updateAssessment(id, {
-    final_level: finalLevel,
+    ...(level === undefined ? {} : { final_level: level }),
     teacher_comment: teacherComment,
     status: "completed",
   });

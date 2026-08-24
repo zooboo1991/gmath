@@ -176,6 +176,46 @@ describe("the paper, step by step", () => {
     expect(fetched.body.assessment?.status).toBe("problems_submitted");
   });
 
+  it("shows the child the teacher's note and score on each problem", async () => {
+    const admin = await adminClient("full");
+    const { client, assessmentId, problemIds } = await readyToSolve();
+
+    await uploadPhoto(client, assessmentId, problemIds[0]);
+    await client.post(`/api/assessment/${assessmentId}/skip`, { problemId: problemIds[1] });
+    await client.post(`/api/assessment/${assessmentId}/submit`);
+
+    const { data: solution } = await testDb()
+      .from("solutions")
+      .select("id")
+      .eq("assessment_id", assessmentId)
+      .eq("problem_id", problemIds[0])
+      .single();
+
+    const scored = await admin.put(`/api/admin/grading/${assessmentId}/score`, {
+      solutionId: (solution as { id: string }).id,
+      graderScore: "7",
+      graderComment: "Тэгшитгэлээ зөв зохиосон, тооцоололд алдаа гарсан.",
+    });
+    expect(scored.status, scored.text).toBe(200);
+
+    // No level is sent — the scale is off the form, and marking must still
+    // be finishable without one.
+    const completed = await admin.put(`/api/admin/grading/${assessmentId}/complete`, {
+      teacherComment: "Сайн ажиллалаа. Геометр дээр илүү дасгал хий.",
+    });
+    expect(completed.status, completed.text).toBe(200);
+
+    const page = await client.get(`/profile/assessment?a=${assessmentId}`);
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("Тэгшитгэлээ зөв зохиосон");
+    expect(page.text).toContain("Геометр дээр илүү дасгал хий");
+    // React splits adjacent text nodes with a comment marker in server HTML,
+    // so the score and its unit are not literally next to each other.
+    expect(page.text).toMatch(/7(<!-- -->)?\s*оноо/);
+    expect(page.text).toContain("Бодлого бүрийн үнэлгээ");
+    expect(page.text).toContain("Бодож чадсангүй");
+  });
+
   it("refuses a problem that is not on this child's paper", async () => {
     const { client, assessmentId } = await readyToSolve();
     const other = await readyToSolve();

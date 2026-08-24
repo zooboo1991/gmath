@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import MathText from "@/components/assessment/MathText";
 import type { GradingDetail as Detail } from "@/lib/assessment/gradingDetail";
-import type { Level } from "@/lib/assessment/types";
 import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
 const CARD = "bg-surface border border-line rounded-md shadow-xs px-[20px] py-[18px]";
@@ -15,14 +14,11 @@ const ACTION_LABEL: Record<string, string> = {
   dont_know: "Мэдэхгүй",
 };
 
-export default function GradingDetail({ detail, levels }: { detail: Detail; levels: Level[] }) {
+export default function GradingDetail({ detail }: { detail: Detail }) {
   const router = useRouter();
   const [items, setItems] = useState(detail.items);
   const [sheets, setSheets] = useState(detail.gradedSheets);
   const [teacherComment, setTeacherComment] = useState(detail.assessment.teacherComment ?? "");
-  const [finalLevel, setFinalLevel] = useState(
-    String(detail.assessment.finalLevel ?? detail.assessment.estimatedLevel ?? "")
-  );
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -109,7 +105,7 @@ export default function GradingDetail({ detail, levels }: { detail: Detail; leve
       const res = await fetch(`/api/admin/grading/${id}/complete`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teacherComment, finalLevel }),
+        body: JSON.stringify({ teacherComment }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -149,7 +145,7 @@ export default function GradingDetail({ detail, levels }: { detail: Detail; leve
           )}
           {done ? (
             <span className="text-[.75rem] font-extrabold text-green bg-green-soft px-3 py-1.5 rounded-full shrink-0">
-              Түвшин {detail.assessment.finalLevel}
+              Дууссан
             </span>
           ) : (
             <span className="w-[70px]" />
@@ -180,7 +176,6 @@ export default function GradingDetail({ detail, levels }: { detail: Detail; leve
               ["Утас", detail.user?.phone ?? "—"],
               ["Олимпиадад бэлтгэсэн", q?.hasPrepared ? "Тийм" : "Үгүй"],
               ["Олимпиадад оролцсон", q?.hasCompeted ? "Тийм" : "Үгүй"],
-              ["Тооцоолсон түвшин", detail.assessment.estimatedLevel ? String(detail.assessment.estimatedLevel) : "—"],
             ].map(([label, value]) => (
               <div key={label} className="flex justify-between gap-3 py-1 border-b border-line last:border-0">
                 <span className="font-bold text-ink-3">{label}</span>
@@ -231,23 +226,6 @@ export default function GradingDetail({ detail, levels }: { detail: Detail; leve
               placeholder="Хүчтэй тал, сул тал, юун дээр анхаарах вэ…"
               className={`${INPUT_CLASS} resize-y disabled:opacity-60`}
             />
-          </label>
-
-          <label className="flex flex-col gap-1.5 mb-3.5">
-            <span className="text-[.8rem] font-extrabold text-ink-3">Эцсийн түвшин</span>
-            <select
-              value={finalLevel}
-              onChange={(e) => setFinalLevel(e.target.value)}
-              disabled={done}
-              className={`${INPUT_CLASS} disabled:opacity-60`}
-            >
-              <option value="">— Түвшин сонгоно уу —</option>
-              {levels.map((l) => (
-                <option key={l.id} value={String(l.id)}>
-                  {l.id} — {l.name}
-                </option>
-              ))}
-            </select>
           </label>
 
           <div className="mb-4">

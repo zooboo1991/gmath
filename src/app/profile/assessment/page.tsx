@@ -5,20 +5,22 @@ import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import AssessmentClosed from "@/components/assessment/AssessmentClosed";
 import AssessmentResult from "@/components/assessment/AssessmentResult";
-import { SIGNED_URL_TTL_SECONDS } from "@/lib/assessment/config";
-import { findLevel, isAssessmentOpen, listAssessmentsByUser, listSolutions } from "@/lib/assessment/db";
-import type { Assessment, Level, Solution } from "@/lib/assessment/types";
-import { findCourseById, type Course } from "@/lib/db";
+import { isAssessmentOpen, listAssessmentsByUser } from "@/lib/assessment/db";
+import { buildAssessmentReport, type AssessmentReport } from "@/lib/assessment/report";
+import type { Assessment } from "@/lib/assessment/types";
 import { getSessionUser } from "@/lib/session";
-import { createSignedUrl, GRADED_SHEETS_BUCKET } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Миний түвшин",
+  title: "Багшийн дүгнэлт",
 };
 
-export default async function ProfileAssessmentPage() {
+export default async function ProfileAssessmentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ a?: string }>;
+}) {
   const user = await getSessionUser();
   const open = await isAssessmentOpen();
 
@@ -29,13 +31,13 @@ export default async function ProfileAssessmentPage() {
       <>
         <Navbar />
         <main>
-          <PageHero eyebrow="Түвшин тогтоох" title="Миний түвшин" />
+          <PageHero eyebrow="Түвшин тогтоох" title="Багшийн дүгнэлт" />
           <section className="section-pad">
             <div className="wrap max-w-[700px] mx-auto">
               <div className="text-center bg-surface border border-line rounded-lg shadow-sm px-8 py-14">
                 <h2 className="text-[1.3rem] font-extrabold">Та нэвтрээгүй байна</h2>
                 <p className="text-ink-2 mt-2.5 font-medium">
-                  Түвшингийн үр дүнгээ харахын тулд бүртгэлээрээ нэвтэрнэ үү.
+                  Багшийн дүгнэлтээ харахын тулд бүртгэлээрээ нэвтэрнэ үү.
                 </p>
                 <Link
                   href="/assessment"
@@ -56,51 +58,31 @@ export default async function ProfileAssessmentPage() {
   // that hasn't run the latest schema.sql should see the empty state, not a
   // crash.
   const assessments = await listAssessmentsByUser(user.id).catch(() => [] as Assessment[]);
-  // Newest first from the query; the finished one is what a parent wants to
-  // see, falling back to whatever is still in progress.
-  const assessment = assessments.find((a) => a.status === "completed") ?? assessments[0] ?? null;
+  // ?a=<id> comes from the course card they pressed — a child sitting both the
+  // C and the D exam has two of these, and they must not be shown each other's
+  // marks. Without it: the finished one, falling back to whatever is running.
+  const { a: wanted } = await searchParams;
+  const assessment =
+    (wanted ? assessments.find((x) => x.id === wanted) : undefined) ??
+    assessments.find((x) => x.status === "completed") ??
+    assessments[0] ??
+    null;
 
-  let level: Level | null = null;
-  let course: Course | null = null;
-  let solutions: Solution[] = [];
-  let gradedSheetUrls: string[] = [];
-
-  if (assessment?.status === "completed") {
-    [level, solutions] = await Promise.all([
-      assessment.finalLevel ? findLevel(assessment.finalLevel).then((l) => l ?? null) : Promise.resolve(null),
-      listSolutions(assessment.id).catch(() => []),
-    ]);
-    if (level?.recommendedCourseId) {
-      course = (await findCourseById(level.recommendedCourseId)) ?? null;
-    }
-    // The verdict's pages, plus the single scan of assessments graded before
-    // it could hold more than one.
-    const paths = [
-      ...assessment.gradedSheetPaths,
-      ...(assessment.gradedSheetPath && !assessment.gradedSheetPaths.includes(assessment.gradedSheetPath)
-        ? [assessment.gradedSheetPath]
-        : []),
-    ];
-    gradedSheetUrls = (
-      await Promise.all(paths.map((p) => createSignedUrl(GRADED_SHEETS_BUCKET, p, SIGNED_URL_TTL_SECONDS)))
-    ).filter((url): url is string => Boolean(url));
-  }
+  // The marked paper — problem by problem, with the teacher's notes. Read for
+  // work that has left the child's hands; before that there is nothing to show.
+  const report: AssessmentReport | null =
+    assessment && assessment.status !== "awaiting_payment" && assessment.status !== "paid"
+      ? await buildAssessmentReport(assessment).catch(() => null)
+      : null;
 
   return (
     <>
       <Navbar />
       <main>
-        <PageHero eyebrow="Түвшин тогтоох" title="Миний түвшин" />
+        <PageHero eyebrow="Түвшин тогтоох" title="Багшийн дүгнэлт" />
         <section className="section-pad">
           <div className="wrap max-w-[700px] mx-auto">
-            <AssessmentResult
-              assessment={assessment}
-              level={level}
-              course={course}
-              solutions={solutions}
-              gradedSheetUrls={gradedSheetUrls}
-              open={open}
-            />
+            <AssessmentResult assessment={assessment} report={report} open={open} />
             <Link
               href="/profile"
               className="inline-flex items-center gap-2 font-extrabold text-[.92rem] text-blue-strong mt-7"

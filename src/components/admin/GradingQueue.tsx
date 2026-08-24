@@ -80,14 +80,9 @@ export default function GradingQueue({
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                      {a.estimatedLevel && (
-                        <span className="text-[.72rem] font-extrabold text-ink-2 bg-surface-2 px-2.5 py-1 rounded-full">
-                          Тооцоолсон {a.estimatedLevel}
-                        </span>
-                      )}
                       {a.status === "completed" ? (
                         <span className="text-[.72rem] font-extrabold text-green bg-green-soft px-2.5 py-1 rounded-full">
-                          Түвшин {a.finalLevel}
+                          Шалгаж дууссан
                         </span>
                       ) : a.status === "grading" ? (
                         <span className="text-[.72rem] font-extrabold text-blue-strong bg-blue-soft px-2.5 py-1 rounded-full">

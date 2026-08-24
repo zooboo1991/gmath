@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import GradingDetail from "@/components/admin/GradingDetail";
-import { listLevels } from "@/lib/assessment/db";
 import { buildGradingDetail } from "@/lib/assessment/gradingDetail";
 import { isAdmin } from "@/lib/session";
 import { requireAdminSection } from "@/lib/adminAccess";
@@ -19,8 +18,8 @@ export default async function GradingDetailPage({ params }: { params: Promise<{ 
   }
   const { id } = await params;
 
-  const [detail, levels] = await Promise.all([buildGradingDetail(id), listLevels()]);
+  const detail = await buildGradingDetail(id);
   if (!detail) notFound();
 
-  return <GradingDetail detail={detail} levels={levels} />;
+  return <GradingDetail detail={detail} />;
 }
