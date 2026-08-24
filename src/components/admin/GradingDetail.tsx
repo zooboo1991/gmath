@@ -9,6 +9,23 @@ import { INPUT_CLASS } from "@/components/admin/panels/shared";
 
 const CARD = "bg-surface border border-line rounded-md shadow-xs px-[20px] py-[18px]";
 
+/** One card's marking, as it stands in the form. */
+type Mark = { score: string; comment: string };
+
+const EMPTY_MARK: Mark = { score: "", comment: "" };
+
+function initialMarks(items: Detail["items"]): Record<string, Mark> {
+  const marks: Record<string, Mark> = {};
+  for (const item of items) {
+    if (!item.solution) continue;
+    marks[item.solution.id] = {
+      score: item.solution.graderScore === undefined ? "" : String(item.solution.graderScore),
+      comment: item.solution.graderComment ?? "",
+    };
+  }
+  return marks;
+}
+
 const ACTION_LABEL: Record<string, string> = {
   too_easy: "Амархан",
   dont_know: "Мэдэхгүй",
@@ -19,6 +36,11 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
   const [items, setItems] = useState(detail.items);
   const [sheets, setSheets] = useState(detail.gradedSheets);
   const [teacherComment, setTeacherComment] = useState(detail.assessment.teacherComment ?? "");
+  // Every card's score and note live here rather than inside the card, so
+  // "Дуусгах" can write out anything the teacher typed but did not press
+  // save on. They used to be lost without a word.
+  const [marks, setMarks] = useState<Record<string, Mark>>(() => initialMarks(detail.items));
+  const [savedMarks, setSavedMarks] = useState<Record<string, Mark>>(() => initialMarks(detail.items));
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -28,31 +50,49 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
   const done = detail.assessment.status === "completed";
   const id = detail.assessment.id;
 
-  const saveScore = async (solutionId: string, graderScore: string, graderComment: string) => {
-    setSavingId(solutionId);
-    setError(null);
-    setSavedId(null);
+  /** Writes one card out. Returns false so callers can stop on the first failure. */
+  const persistMark = async (solutionId: string, mark: Mark): Promise<boolean> => {
     try {
       const res = await fetch(`/api/admin/grading/${id}/score`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ solutionId, graderScore, graderComment }),
+        body: JSON.stringify({
+          solutionId,
+          graderScore: mark.score,
+          graderComment: mark.comment,
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
         setError(json.error ?? "Хадгалахад алдаа гарлаа");
-        return;
+        return false;
       }
       setItems((is) =>
         is.map((it) => (it.solution?.id === solutionId ? { ...it, solution: json.solution } : it))
       );
-      setSavedId(solutionId);
+      setSavedMarks((current) => ({ ...current, [solutionId]: mark }));
+      return true;
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
-    } finally {
-      setSavingId(null);
+      return false;
     }
   };
+
+  const saveScore = async (solutionId: string) => {
+    setSavingId(solutionId);
+    setError(null);
+    setSavedId(null);
+    const ok = await persistMark(solutionId, marks[solutionId] ?? EMPTY_MARK);
+    setSavingId(null);
+    if (ok) setSavedId(solutionId);
+  };
+
+  /** Cards holding something the server has not been told about yet. */
+  const unsaved = Object.keys(marks).filter((solutionId) => {
+    const saved = savedMarks[solutionId] ?? EMPTY_MARK;
+    const now = marks[solutionId] ?? EMPTY_MARK;
+    return now.score !== saved.score || now.comment !== saved.comment;
+  });
 
   /** Uploaded one at a time so a half-finished batch still keeps what landed. */
   const uploadSheets = async (files: File[]) => {
@@ -102,6 +142,13 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
     setCompleting(true);
     setError(null);
     try {
+      // Anything typed into a card but not saved goes out first — finishing
+      // must never be the step that throws a teacher's marking away.
+      for (const solutionId of unsaved) {
+        if (!(await persistMark(solutionId, marks[solutionId] ?? EMPTY_MARK))) {
+          return;
+        }
+      }
       const res = await fetch(`/api/admin/grading/${id}/complete`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -204,8 +251,14 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
             index={i}
             item={item}
             done={done}
+            mark={(item.solution && marks[item.solution.id]) ?? EMPTY_MARK}
+            dirty={Boolean(item.solution && unsaved.includes(item.solution.id))}
             saving={savingId === item.solution?.id}
             saved={savedId === item.solution?.id}
+            onChange={(mark) =>
+              item.solution &&
+              setMarks((current) => ({ ...current, [item.solution!.id]: mark }))
+            }
             onSave={saveScore}
           />
         ))}
@@ -282,14 +335,22 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
               Энэ үнэлгээ дууссан. Сурагч үр дүнгээ профайл дээрээ харж байна.
             </p>
           ) : (
-            <button
-              type="button"
-              disabled={completing}
-              onClick={complete}
-              className="w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-6 py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50"
-            >
-              {completing ? "Хадгалж байна…" : "Үнэлгээг дуусгаж сурагчид илгээх"}
-            </button>
+            <>
+              {unsaved.length > 0 && (
+                <p className="text-gold-strong bg-gold-soft font-extrabold text-[.85rem] rounded-md px-4 py-3 mb-3">
+                  {unsaved.length} бодлогын оноо хадгалагдаагүй байна. «Дуусгах» дарахад тэдгээр нь
+                  хамт хадгалагдана.
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={completing}
+                onClick={complete}
+                className="w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-6 py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50"
+              >
+                {completing ? "Хадгалж байна…" : "Үнэлгээг дуусгаж сурагчид илгээх"}
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -301,21 +362,25 @@ function SolutionCard({
   index,
   item,
   done,
+  mark,
+  dirty,
   saving,
   saved,
+  onChange,
   onSave,
 }: {
   index: number;
   item: Detail["items"][number];
   done: boolean;
+  mark: Mark;
+  /** Typed here but not yet on the server. */
+  dirty: boolean;
   saving: boolean;
   saved: boolean;
-  onSave: (solutionId: string, score: string, comment: string) => void;
+  onChange: (mark: Mark) => void;
+  onSave: (solutionId: string) => void;
 }) {
-  const [score, setScore] = useState(
-    item.solution?.graderScore === undefined ? "" : String(item.solution.graderScore)
-  );
-  const [comment, setComment] = useState(item.solution?.graderComment ?? "");
+  const { score, comment } = mark;
 
   return (
     <div className={CARD}>
@@ -382,7 +447,7 @@ function SolutionCard({
               max={10}
               step={0.5}
               value={score}
-              onChange={(e) => setScore(e.target.value)}
+              onChange={(e) => onChange({ ...mark, score: e.target.value })}
               disabled={done}
               className={`${INPUT_CLASS} disabled:opacity-60`}
             />
@@ -392,7 +457,7 @@ function SolutionCard({
             <input
               type="text"
               value={comment}
-              onChange={(e) => setComment(e.target.value)}
+              onChange={(e) => onChange({ ...mark, comment: e.target.value })}
               disabled={done}
               placeholder="Алдаа хаана гарсан бэ"
               className={`${INPUT_CLASS} disabled:opacity-60`}
@@ -402,10 +467,12 @@ function SolutionCard({
             <button
               type="button"
               disabled={saving}
-              onClick={() => onSave(item.solution!.id, score, comment)}
-              className="text-[.85rem] font-extrabold text-white bg-blue px-4 py-2.5 rounded-full disabled:opacity-50 whitespace-nowrap"
+              onClick={() => onSave(item.solution!.id)}
+              className={`text-[.85rem] font-extrabold px-4 py-2.5 rounded-full disabled:opacity-50 whitespace-nowrap ${
+                dirty ? "text-white bg-gold-strong" : "text-white bg-blue"
+              }`}
             >
-              {saving ? "…" : saved ? "Хадгаллаа" : "Хадгалах"}
+              {saving ? "…" : saved && !dirty ? "Хадгаллаа" : "Хадгалах"}
             </button>
           )}
         </div>
