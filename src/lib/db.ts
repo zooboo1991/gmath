@@ -2,6 +2,7 @@ import { getPaymentProvider } from "./payment";
 import { getSupabase } from "./supabase";
 import { hashPassword, verifyPassword as verifyPasswordHash } from "./password";
 import { parsePriceToNumber } from "./price";
+import { nextCertificateNumbers } from "./certificateNumber";
 import { transliterate } from "./mnTransliterate";
 import { sendPushToUsers } from "./push";
 import { sendSms } from "./sms/skytel";
@@ -1185,22 +1186,23 @@ export type CertificateImportRow = Omit<Certificate, "id" | "createdAt">;
  * Upserts by certificate_number, so re-uploading a spreadsheet with a
  * corrected row fixes it in place instead of creating a duplicate.
  */
+function certificateToRow(r: CertificateImportRow) {
+  return {
+    certificate_number: r.certificateNumber,
+    last_name: r.lastName,
+    first_name: r.firstName,
+    phone: r.phone,
+    category: r.category,
+    course: r.course,
+    issued_date: r.issuedDate,
+  };
+}
+
 export async function upsertCertificates(rows: CertificateImportRow[]): Promise<number> {
   if (rows.length === 0) return 0;
   const { error, count } = await getSupabase()
     .from("certificates")
-    .upsert(
-      rows.map((r) => ({
-        certificate_number: r.certificateNumber,
-        last_name: r.lastName,
-        first_name: r.firstName,
-        phone: r.phone,
-        category: r.category,
-        course: r.course,
-        issued_date: r.issuedDate,
-      })),
-      { onConflict: "certificate_number", count: "exact" }
-    );
+    .upsert(rows.map(certificateToRow), { onConflict: "certificate_number", count: "exact" });
   if (error) throw error;
   return count ?? rows.length;
 }
@@ -1244,6 +1246,72 @@ export async function updateCertificate(
     .maybeSingle();
   if (error) throw error;
   return data ? certificateFromRow(data as CertificateRow) : undefined;
+}
+
+/**
+ * Issues a certificate to everyone confirmed on a course.
+ *
+ * Run by hand from the course page once the course is over, rather than on a
+ * date: only the teacher knows a course actually finished, and a certificate
+ * issued by mistake is awkward to take back.
+ *
+ * Students and teachers are numbered in separate runs (S… and T…) because
+ * that is how the numbers were kept before this existed. Anyone who already
+ * holds a certificate for this course is skipped, so pressing the button
+ * twice does not issue a second one.
+ */
+export async function issueCertificatesForProgram(input: {
+  programId: string;
+  /** Written onto a student's certificate — usually the programme's class. */
+  studentCategory: string;
+  /** Written onto a teacher's certificate. */
+  teacherCategory: string;
+  /** The course as it should read on the certificate ("I", "II"). */
+  course: string;
+  issuedDate: string;
+}): Promise<{ created: Certificate[]; skipped: number }> {
+  const registrations = (await listRegistrationsByProgram(input.programId)).filter(
+    (r) => r.status === "active" && r.user
+  );
+
+  // Every number in use, so a new run continues after the last one; and every
+  // certificate for this course, so nobody is handed a second.
+  const all = await listCertificates();
+  const takenForCourse = new Set(
+    all.filter((c) => c.course === input.course).map((c) => c.phone)
+  );
+
+  const pending = registrations.filter((r) => !takenForCourse.has(r.user!.phone));
+  const skipped = registrations.length - pending.length;
+  if (pending.length === 0) return { created: [], skipped };
+
+  const numbers = all.map((c) => c.certificateNumber);
+  const rows: CertificateImportRow[] = [];
+  for (const holder of ["teacher", "student"] as const) {
+    const group = pending.filter((r) =>
+      holder === "teacher" ? r.user!.role === "teacher" : r.user!.role !== "teacher"
+    );
+    if (group.length === 0) continue;
+    const issued = nextCertificateNumbers(numbers, holder, input.issuedDate, group.length);
+    group.forEach((registration, i) => {
+      rows.push({
+        certificateNumber: issued[i],
+        lastName: registration.user!.lastName,
+        firstName: registration.user!.firstName,
+        phone: registration.user!.phone,
+        category: holder === "teacher" ? input.teacherCategory : input.studentCategory,
+        course: input.course,
+        issuedDate: input.issuedDate,
+      });
+    });
+  }
+
+  const { data, error } = await getSupabase()
+    .from("certificates")
+    .insert(rows.map(certificateToRow))
+    .select("*");
+  if (error) throw error;
+  return { created: (data as CertificateRow[]).map(certificateFromRow), skipped };
 }
 
 /** How often one certificate has been downloaded by its owner and looked up publicly. */

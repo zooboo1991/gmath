@@ -12,6 +12,7 @@ import AdminField from "./AdminField";
 import { AnchorTab, Card, KpiTile } from "./AdminObjectPageParts";
 import LessonScheduleEditor from "./LessonScheduleEditor";
 import RegistrationRoster from "./RegistrationRoster";
+import IssueCertificatesCard from "./IssueCertificatesCard";
 import { parseYouTubeId } from "@/lib/youtube";
 import ProgramArticlesEditor, { type ArticleOption } from "@/components/admin/ProgramArticlesEditor";
 import PendingRegistrationActions from "@/components/admin/PendingRegistrationActions";
@@ -365,6 +366,16 @@ export default function YearlyProgramObjectPage({
               canEdit={canEdit}
             />
           </Card>
+        )}
+
+        {tab === "roster" && canEdit && (
+          <div className="mt-5">
+            <IssueCertificatesCard
+              programId={program.id}
+              defaultStudentCategory={program.tag}
+              activeCount={active.length}
+            />
+          </div>
         )}
 
         {tab === "confirm" && (

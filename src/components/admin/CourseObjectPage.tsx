@@ -21,6 +21,7 @@ import { downscaleImage, formatMb, MAX_UPLOAD_BYTES } from "@/lib/imageResize";
 import { AnchorTab, Card, KpiTile } from "./AdminObjectPageParts";
 import LessonScheduleEditor from "./LessonScheduleEditor";
 import RegistrationRoster from "./RegistrationRoster";
+import IssueCertificatesCard from "./IssueCertificatesCard";
 import ProgramArticlesEditor, { type ArticleOption } from "@/components/admin/ProgramArticlesEditor";
 import PendingRegistrationActions from "@/components/admin/PendingRegistrationActions";
 
@@ -649,6 +650,16 @@ export default function CourseObjectPage({
               canEdit={canEdit}
             />
           </Card>
+        )}
+
+        {tab === "roster" && isEditing && canEdit && (
+          <div className="mt-5">
+            <IssueCertificatesCard
+              programId={course.id}
+              defaultStudentCategory={course.tag}
+              activeCount={active.length}
+            />
+          </div>
         )}
 
         {tab === "confirm" && isEditing && (
