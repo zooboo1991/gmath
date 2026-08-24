@@ -6,7 +6,7 @@ import PageHero from "@/components/PageHero";
 import ProfileClient from "@/components/profile/ProfileClient";
 import { listCertificatesByPhone, listRegistrationsByUser, toPublicUser } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
-import { findFreeInvitedExam } from "@/lib/assessment/exams";
+import { listFreeInvitedExams } from "@/lib/assessment/exams";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +46,7 @@ export default async function ProfilePage() {
     );
   }
 
-  const [registrations, certificates, freeExam] = await Promise.all([
+  const [registrations, certificates, freeExams] = await Promise.all([
     listRegistrationsByUser(user.id),
     // certificates is a newer table — a site that hasn't run the latest
     // schema.sql yet shouldn't have its whole profile page go down over it.
@@ -55,7 +55,7 @@ export default async function ProfilePage() {
     // the profile is where they already come to find their courses, and
     // because it is offered even while the assessment is closed to everyone
     // else — nobody would think to go looking at /assessment for it.
-    findFreeInvitedExam(user.id).catch(() => undefined),
+    listFreeInvitedExams(user.id).catch(() => []),
   ]);
 
   return (
@@ -66,11 +66,11 @@ export default async function ProfilePage() {
           user={toPublicUser(user)}
           registrations={registrations}
           certificates={certificates}
-          freeExam={
-            freeExam
-              ? { id: freeExam.id, title: freeExam.title, programId: freeExam.viaProgramId }
-              : null
-          }
+          freeExams={freeExams.map((e) => ({
+            id: e.id,
+            title: e.title,
+            programId: e.viaProgramId,
+          }))}
         />
       </main>
       <Footer />

@@ -30,6 +30,8 @@ export default function AssessmentFlow() {
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [fee, setFee] = useState("");
   const [fees, setFees] = useState<{ olympiad: string; quiz: string } | null>(null);
+  const [invitedExams, setInvitedExams] = useState<{ id: string; title: string }[]>([]);
+  const [examId, setExamId] = useState<string | null>(null);
   // The picker's choices, before an assessment row exists to carry them.
   const [pickedTrack, setPickedTrack] = useState<AssessmentTrack | null>(null);
   const [pickedGrade, setPickedGrade] = useState<number | null>(null);
@@ -65,6 +67,16 @@ export default function AssessmentFlow() {
         setAssessment(json.assessment);
         setFee(json.fee);
         setFees(json.fees ?? null);
+        setInvitedExams(json.invitedExams ?? []);
+        // ?exam=<id> comes from the course card the child pressed. With two
+        // invitations (both the C and the D programme) it is the only thing
+        // that says which one they meant.
+        const wanted = new URLSearchParams(window.location.search).get("exam");
+        setExamId(
+          wanted && (json.invitedExams ?? []).some((e: { id: string }) => e.id === wanted)
+            ? wanted
+            : ((json.invitedExams ?? [])[0]?.id ?? null)
+        );
         const next = stepForStatus(json.assessment);
         setStep(next);
         if (next === "solve" && json.assessment) {
@@ -87,7 +99,11 @@ export default function AssessmentFlow() {
       const createRes = await fetch("/api/assessment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ track: pickedTrack ?? "olympiad", grade: pickedGrade ?? undefined }),
+        body: JSON.stringify({
+          track: pickedTrack ?? "olympiad",
+          grade: pickedGrade ?? undefined,
+          examId: examId ?? undefined,
+        }),
       });
       const created = await createRes.json();
       if (!createRes.ok) {
@@ -209,7 +225,21 @@ export default function AssessmentFlow() {
         <div className={`${CARD} text-center text-ink-3 font-semibold`}>Ачаалж байна…</div>
       )}
 
-      {step === "track" && (
+      {/* Invited: their class was named on an exam, so there is exactly one
+          thing for them to do here. Showing the three-way picker (and three
+          prices) would be asking a question that has already been answered. */}
+      {step === "track" && invitedExams.length > 0 && (
+        <InvitedStep
+          title={(invitedExams.find((e) => e.id === examId) ?? invitedExams[0]).title}
+          busy={busy}
+          onStart={() => {
+            setPickedTrack("olympiad");
+            setStep("payment");
+          }}
+        />
+      )}
+
+      {step === "track" && invitedExams.length === 0 && (
         <TrackStep
           fees={fees}
           onPick={(t) => {
@@ -277,6 +307,41 @@ export default function AssessmentFlow() {
 
       {step === "submitted" && <SubmittedStep />}
     </>
+  );
+}
+
+/**
+ * The whole of the flow for a child whose class was invited: the exam's name,
+ * that it costs them nothing, and one button into it.
+ */
+function InvitedStep({
+  title,
+  busy,
+  onStart,
+}: {
+  title: string;
+  busy: boolean;
+  onStart: () => void;
+}) {
+  return (
+    <div className={`${CARD} text-center`}>
+      <span className="inline-flex items-center gap-1.5 text-[.72rem] font-extrabold tracking-[.06em] uppercase text-gold-strong bg-gold-soft px-3 py-1.5 rounded-full">
+        Үнэгүй
+      </span>
+      <h2 className="text-[1.3rem] font-extrabold mt-3.5">{title}</h2>
+      <p className="text-ink-2 font-medium mt-2.5 max-w-[48ch] mx-auto leading-[1.7]">
+        Багш бодлогуудаа сонгож бэлдсэн. Нэг нэгээр нь харж бодоод, бодолтынхоо зургийг
+        хавсаргаарай. Дуусмагц багш шалгаж, түвшнийг тань тогтооно.
+      </p>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onStart}
+        className="w-full sm:w-auto font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[30px] py-4 mt-6 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50"
+      >
+        {busy ? "Түр хүлээнэ үү…" : "Шалгалт эхлүүлэх →"}
+      </button>
+    </div>
   );
 }
 

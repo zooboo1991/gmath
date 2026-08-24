@@ -54,17 +54,17 @@ export default function ProfileClient({
   user: initialUser,
   registrations,
   certificates,
-  freeExam = null,
+  freeExams = [],
 }: {
   user: PublicUser;
   registrations: RegistrationWithGroup[];
   certificates: Certificate[];
   /**
-   * Set when this child's class was invited to sit an exam for free.
-   * `programId` names the course that invited them, so the offer can be shown
-   * on that course's own card rather than floating at the top of the page.
+   * The exams this child's classes were invited to sit free — one per course.
+   * A child on both the C and the D programme has two, and each belongs on its
+   * own card rather than floating at the top of the page.
    */
-  freeExam?: { id: string; title: string; programId: string } | null;
+  freeExams?: { id: string; title: string; programId: string }[];
 }) {
   const [user, setUser] = useState(initialUser);
   const [tab, setTab] = useState<Tab>("active");
@@ -304,8 +304,11 @@ export default function ProfileClient({
                   <YearlyProgramCard
                     key={r.id}
                     registration={r}
-                    initialExpanded={r.programId === focusCourseId || freeExam?.programId === r.programId}
-                    freeExam={freeExam?.programId === r.programId ? freeExam : null}
+                    initialExpanded={
+                      r.programId === focusCourseId ||
+                      freeExams.some((e) => e.programId === r.programId)
+                    }
+                    freeExam={freeExams.find((e) => e.programId === r.programId) ?? null}
                   />
                 ) : (
                   <div
@@ -339,7 +342,7 @@ export default function ProfileClient({
                       <div className="mt-4 pt-4 border-t border-line">
                         <ActiveCourseDetails
                           registration={r}
-                          freeExam={freeExam?.programId === r.programId ? freeExam : null}
+                          freeExam={freeExams.find((e) => e.programId === r.programId) ?? null}
                         />
                       </div>
                     ) : (
@@ -392,7 +395,7 @@ function ActiveCourseDetails({
             бодолтынхоо зургийг хавсаргана.
           </p>
           <Link
-            href="/assessment"
+            href={`/assessment?exam=${freeExam.id}`}
             className="inline-flex items-center justify-center gap-2 font-extrabold text-[.88rem] rounded-full bg-gold text-gold-ink shadow-gold px-5 py-2.5 mt-3 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
           >
             Түвшин тогтоох →

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAssessment, findOpenAssessment, getFeeForTrack } from "@/lib/assessment/db";
-import { findFreeInvitedExam, findOpenExam, isFreeForUser } from "@/lib/assessment/exams";
+import { findOpenExam, isFreeForUser, listFreeInvitedExams } from "@/lib/assessment/exams";
 import { ASSESSMENT_CLOSED, canUseAssessment } from "@/lib/assessment/guard";
 import {
   categoryForGrade,
@@ -23,15 +23,20 @@ export async function GET() {
   const assessment = await findOpenAssessment(user.id);
   // The fee shown up front is the open assessment's own track, or the price
   // list for the track picker when nothing is in progress.
-  const [assessmentFee, quizFee] = await Promise.all([
+  const [assessmentFee, quizFee, invitedExams] = await Promise.all([
     getFeeForTrack("olympiad"),
     getFeeForTrack("regular"),
+    listFreeInvitedExams(user.id).catch(() => []),
   ]);
   return NextResponse.json({
     ok: true,
     assessment: assessment ?? null,
     fee: assessment?.track === "regular" || assessment?.track === "advanced" ? quizFee : assessmentFee,
     fees: { olympiad: assessmentFee, quiz: quizFee },
+    // A child whose class was invited has an exam waiting, so the page can
+    // take them to it instead of asking which of three kinds they want. Two
+    // programmes means two invitations, and the page picks by ?exam=.
+    invitedExams: invitedExams.map((e) => ({ id: e.id, title: e.title })),
   });
 }
 
@@ -63,7 +68,11 @@ export async function POST(request: Request) {
   // course on an exam, so that exam is theirs whatever their school year says.
   // A C-programme class holds a fourth grader and a ninth grader, both placed
   // there on ability, and both are meant to sit it.
-  const invitedExam = track === "olympiad" ? await findFreeInvitedExam(user.id) : undefined;
+  const invitations = track === "olympiad" ? await listFreeInvitedExams(user.id) : [];
+  // The exam the child pressed on, when they were invited to more than one.
+  const invitedExam =
+    (typeof data?.examId === "string" ? invitations.find((e) => e.id === data.examId) : undefined) ??
+    invitations[0];
 
   // Otherwise the bank is split by category: C is 5th-6th grade, D is 7th-8th.
   // Taken from the profile, because that is the answer the family already

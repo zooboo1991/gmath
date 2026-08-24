@@ -346,6 +346,45 @@ describe("who the invitation reaches", () => {
     expect(started.body.assessment.examId).toBe(examId);
   });
 
+  it("offers both exams to a child on both programmes, one per card", async () => {
+    const admin = await adminClient("full");
+    const cCourse = await createTestCourse({ title: "C хөтөлбөр" });
+    const dCourse = await createTestCourse({ title: "D хөтөлбөр" });
+    const user = await createTestUser({ grade: "6-р анги" });
+    await createTestRegistration({ userId: user.id, programId: cCourse.id, status: "active" });
+    await createTestRegistration({ userId: user.id, programId: dCourse.id, status: "active" });
+    const { examId: cExam } = await createExam(admin, { category: "C", freeCourseIds: [cCourse.id] });
+    const { examId: dExam } = await createExam(admin, { category: "D", freeCourseIds: [dCourse.id] });
+
+    const client = await signedInClient(user.phone, user.password);
+    const res = await client.get<{ invitedExams: { id: string }[] }>("/api/assessment");
+
+    expect(res.status).toBe(200);
+    const ids = res.body.invitedExams.map((e) => e.id).sort();
+    expect(ids).toEqual([cExam, dExam].sort());
+  });
+
+  it("starts the exam the child pressed on, not just the first one", async () => {
+    const admin = await adminClient("full");
+    const cCourse = await createTestCourse();
+    const dCourse = await createTestCourse();
+    const user = await createTestUser({ grade: "6-р анги" });
+    await createTestRegistration({ userId: user.id, programId: cCourse.id, status: "active" });
+    await createTestRegistration({ userId: user.id, programId: dCourse.id, status: "active" });
+    await createExam(admin, { category: "C", freeCourseIds: [cCourse.id] });
+    const { examId: dExam } = await createExam(admin, { category: "D", freeCourseIds: [dCourse.id] });
+
+    const client = await signedInClient(user.phone, user.password);
+    const started = await client.post<{ assessment: { examId?: string; amount: string } }>(
+      "/api/assessment",
+      { track: "olympiad", examId: dExam }
+    );
+
+    expect(started.status, started.text).toBe(200);
+    expect(started.body.assessment.examId).toBe(dExam);
+    expect(started.body.assessment.amount).toBe("0₮");
+  });
+
   it("shows the offer on the course card that carries it", async () => {
     const admin = await adminClient("full");
     const course = await createTestCourse({ title: "C ангилал сургалт" });

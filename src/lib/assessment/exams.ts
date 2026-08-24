@@ -256,9 +256,16 @@ export async function isFreeForUser(examId: string, userId: string): Promise<boo
  * switch: the switch closes the door to the public while the problem bank is
  * being rebuilt, but an invited class is not the public.
  */
-export async function findFreeInvitedExam(userId: string): Promise<
-  (Exam & { viaProgramId: string }) | undefined
-> {
+export type InvitedExam = Exam & { viaProgramId: string };
+
+/**
+ * Every exam this child may sit free, one per course that invited them.
+ *
+ * A child can be on both the C and the D programme — placed on ability, not
+ * on school year — and the teacher opened an exam for each. Returning one
+ * showed the offer on one card and left the other looking like a mistake.
+ */
+export async function listFreeInvitedExams(userId: string): Promise<InvitedExam[]> {
   const supabase = getSupabase();
   const { data: regRows, error } = await supabase
     .from("registrations")
@@ -267,7 +274,7 @@ export async function findFreeInvitedExam(userId: string): Promise<
     .eq("status", "active");
   if (error) throw error;
   const programIds = [...new Set((regRows as { program_id: string }[]).map((r) => r.program_id))];
-  if (programIds.length === 0) return undefined;
+  if (programIds.length === 0) return [];
 
   const { data: freeRows, error: freeError } = await supabase
     .from("exam_free_courses")
@@ -275,19 +282,24 @@ export async function findFreeInvitedExam(userId: string): Promise<
     .in("program_id", programIds);
   if (freeError) throw freeError;
   const invited = (freeRows ?? []) as { exam_id: string; program_id: string }[];
-  if (invited.length === 0) return undefined;
+  if (invited.length === 0) return [];
 
   const { data: examRows, error: examError } = await supabase
     .from("exams")
     .select("*")
     .eq("status", "open")
-    .in("id", invited.map((r) => r.exam_id))
-    .order("created_at", { ascending: false })
-    .limit(1);
+    .in("id", [...new Set(invited.map((r) => r.exam_id))])
+    .order("created_at", { ascending: false });
   if (examError) throw examError;
-  const row = (examRows ?? [])[0] as ExamRow | undefined;
-  if (!row) return undefined;
 
-  const via = invited.find((r) => r.exam_id === row.id);
-  return { ...examFromRow(row), viaProgramId: via?.program_id ?? programIds[0] };
+  return (examRows as ExamRow[]).map((row) => ({
+    ...examFromRow(row),
+    viaProgramId: invited.find((r) => r.exam_id === row.id)?.program_id ?? programIds[0],
+  }));
 }
+
+/** The first of them — for the paths that only need to know "is there one". */
+export async function findFreeInvitedExam(userId: string): Promise<InvitedExam | undefined> {
+  return (await listFreeInvitedExams(userId))[0];
+}
+
