@@ -174,13 +174,13 @@ export default function WaitlistCard({
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="text-[.8rem] font-extrabold text-ink-3">
-              Ямар цагт хичээллэвэл тохиромжтой вэ?
+              Та манай сургалтыг ямар анги хичээллүүлэхийг хүсэж байна вэ?
             </span>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
-              placeholder="Жишээ: ажлын өдрийн орой 19:00-оос хойш, эсвэл амралтын өдрийн өглөө"
+              placeholder="Жишээ: 6-р ангийн бүлэг, ажлын өдрийн орой 19:00-оос хойш"
               className="w-full bg-bg-soft border border-line rounded-sm px-4 py-3 font-semibold text-[.95rem] resize-y"
             />
           </label>
