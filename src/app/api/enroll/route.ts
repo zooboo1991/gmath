@@ -217,6 +217,12 @@ export async function POST(request: Request) {
         paid: false,
         qrImage: current.qpayQrImage,
         shortUrl: current.qpayShortUrl,
+        // What this QR will collect — half under a split plan. The screen
+        // showing it must not quote the full price.
+        amountDue:
+          current.totalDue !== undefined && current.installmentDueDate
+            ? splitHalves(current.totalDue).now
+            : fullAmount,
       });
     }
 
@@ -228,11 +234,14 @@ export async function POST(request: Request) {
     const audienceLabel = getCourseAudience(courseTag) === "teacher" ? "Багш" : "Сурагч";
     const description = `${user.phone} ${categoryLabel} ${audienceLabel}`;
 
-    const start = await provider.createPayment({
-      // Half for a split plan — the invoice is the money actually being taken.
-      amountMnt: registration.totalDue !== undefined && registration.installmentDueDate
+    // Half for a split plan — the invoice is the money actually being taken.
+    const invoicedAmount =
+      registration.totalDue !== undefined && registration.installmentDueDate
         ? splitHalves(registration.totalDue).now
-        : amountNow,
+        : amountNow;
+
+    const start = await provider.createPayment({
+      amountMnt: invoicedAmount,
       description,
       // QPay caps sender_invoice_no at 45 chars — see the matching comment in
       // assessment/[id]/pay/route.ts.
@@ -264,6 +273,7 @@ export async function POST(request: Request) {
       paid: false,
       qrImage: start.qrImage,
       shortUrl: start.shortUrl,
+      amountDue: invoicedAmount,
     });
   } catch (err) {
     console.error("enroll payment failed", registration.id, err);

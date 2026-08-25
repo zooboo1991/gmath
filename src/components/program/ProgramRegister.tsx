@@ -191,7 +191,13 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [registrationStatus, setRegistrationStatus] = useState<"active" | "pending" | null>(null);
   const [facebookGroup, setFacebookGroup] = useState<string | null>(null);
-  const [qpayQr, setQpayQr] = useState<{ registrationId: string; qrImage: string; shortUrl: string } | null>(null);
+  const [qpayQr, setQpayQr] = useState<{
+    registrationId: string;
+    qrImage: string;
+    shortUrl: string;
+    /** What this QR collects — half of the fee under the 50/50 plan. */
+    amountDue: number;
+  } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const copyToClipboard = (key: string, value: string) => {
@@ -529,7 +535,14 @@ export default function ProgramRegisterProvider({ children }: { children: React.
       }
       // QPay invoice created but not yet paid — show the real QR and start
       // checking for it.
-      setQpayQr({ registrationId: json.registration.id, qrImage: json.qrImage, shortUrl: json.shortUrl });
+      setQpayQr({
+        registrationId: json.registration.id,
+        qrImage: json.qrImage,
+        shortUrl: json.shortUrl,
+        // Told by the server rather than worked out here: a resumed invoice
+        // was created under whatever plan was chosen at the time.
+        amountDue: typeof json.amountDue === "number" ? json.amountDue : amountNow,
+      });
       setScreen("qpay-wait");
     } catch {
       setSubmitError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
@@ -1338,8 +1351,19 @@ export default function ProgramRegisterProvider({ children }: { children: React.
             {screen === "qpay-wait" && qpayQr && (
               <div className="text-center">
                 <p className="text-ink-2 font-medium mb-2">
-                  {program?.price} дүнгээ доорх QR-ийг банкны апп-аараа уншуулж төлнө үү.
+                  {formatMnt(qpayQr.amountDue)} дүнгээ доорх QR-ийг банкны апп-аараа уншуулж төлнө
+                  үү.
                 </p>
+                {/* Half of a fee looks like a mistake unless the screen says
+                    it is half, and when the rest is expected. */}
+                {qpayQr.amountDue < fullAmount && (
+                  <p className="text-ink-3 font-semibold text-[.85rem] mb-2">
+                    Энэ нь нийт {program?.price}-ийн 50%. Үлдэх{" "}
+                    {formatMnt(fullAmount - qpayQr.amountDue)}-ийг
+                    {nextPaymentDate ? ` ${nextPaymentDate.replaceAll("-", ".")}-нд` : " сонгосон өдөр"}{" "}
+                    төлнө.
+                  </p>
+                )}
                 {/* A parent who had already copied the transfer details did exactly
                     this: opened the QR, then paid from their banking app by hand.
                     QPay never hears about such a transfer, so the registration sat

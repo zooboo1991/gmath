@@ -27,6 +27,7 @@ type EnrollResponse = {
   error?: string;
   registration?: { id: string; status: string };
   amountDue?: number;
+  qrImage?: string;
 };
 
 /** A date the picker would allow: inside the window, before the deadline. */
@@ -61,9 +62,11 @@ describe("splitting a classroom group's fee", () => {
     expect(res.status, res.text).toBe(200);
     const id = res.body.registration!.id;
 
-    // The invoice is for what the screen said: half.
+    // The invoice is for what the screen said: half — and the screen is told
+    // the same number, rather than quoting the course price back at the payer.
     const invoice = await findMockInvoice(senderInvoiceNoForRegistration(id));
     expect(invoice?.amount).toBe(600_000);
+    expect(res.body.amountDue).toBe(600_000);
 
     const row = (await readRegistration(id))!;
     expect(row.total_due).toBe(1_200_000);
@@ -106,9 +109,30 @@ describe("splitting a classroom group's fee", () => {
 
     const invoice = await findMockInvoice(senderInvoiceNoForRegistration(id));
     expect(invoice?.amount).toBe(1_200_000);
+    expect(res.body.amountDue).toBe(1_200_000);
     const row = (await readRegistration(id))!;
     expect(row.total_due).toBeNull();
     expect(row.installment_due_date).toBeNull();
+  });
+
+  it("quotes the same half when the payer reopens the QR", async () => {
+    const course = await createTestCourse({ price: "1,200,000₮", template: "songon" });
+    const user = await createTestUser();
+    const client = await signedInClient(user.phone, user.password);
+
+    const first = await enroll(client, {
+      programId: course.id,
+      payMethod: "qpay",
+      plan: "split",
+      nextPaymentDate: NEXT_PAYMENT,
+    });
+    // A reopened modal sends whatever the form currently holds — the stored
+    // plan, not the fresh request, has to decide the amount.
+    const again = await enroll(client, { programId: course.id, payMethod: "qpay", plan: "full" });
+
+    expect(again.status, again.text).toBe(200);
+    expect(again.body.registration!.id).toBe(first.body.registration!.id);
+    expect(again.body.amountDue).toBe(600_000);
   });
 
   it("refuses to split an ordinary course", async () => {
