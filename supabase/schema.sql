@@ -978,3 +978,9 @@ create table if not exists waitlist_requests (
 );
 create index if not exists waitlist_requests_status_idx
   on waitlist_requests (status, created_at desc);
+
+-- Хувааж төлөх: the date the second half was agreed for. Set only on
+-- registrations that chose the 50/50 plan at enrollment; `total_due` carries
+-- the full price and registration_payments records what has come in, so the
+-- balance is already answerable — this column is what the family promised.
+alter table registrations add column if not exists installment_due_date date;

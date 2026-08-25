@@ -15,7 +15,13 @@ import {
   IconCopy,
 } from "@/components/icons";
 import { extractCourseCategories, getCourseAudience } from "@/lib/courseTag";
+import {
+  earliestInstallmentDate,
+  INSTALLMENT_DEADLINE,
+  splitHalves,
+} from "@/lib/installment";
 import { DISTRICTS_BY_PROVINCE, PROVINCES, type Province } from "@/lib/mongoliaRegions";
+import { formatMnt, parsePriceToNumber } from "@/lib/price";
 
 type Role = "teacher" | "student";
 type PayMethod = "qpay" | "bank";
@@ -25,7 +31,14 @@ type Screen = "login" | "register" | "reset" | "payment" | "qpay-wait" | "succes
 // description (course.tag for real courses, the static program's own label
 // for yearly programs — see /api/enroll) so the client can compute the same
 // "Гүйлгээний утга" text without a round trip.
-type Program = { id: string; label: string; price: string; tag: string };
+type Program = {
+  id: string;
+  label: string;
+  price: string;
+  tag: string;
+  /** Whether this programme may be paid in two halves (yearly + songon). */
+  splittable?: boolean;
+};
 
 export type SessionUser = {
   id: string;
@@ -170,6 +183,10 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const otpTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [payMethod, setPayMethod] = useState<PayMethod | null>(null);
+  // Бүтэн / хувааж. Only offered on the programmes that allow it; the server
+  // checks again, so this only decides what the screen shows.
+  const [plan, setPlan] = useState<"full" | "split">("full");
+  const [nextPaymentDate, setNextPaymentDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [registrationStatus, setRegistrationStatus] = useState<"active" | "pending" | null>(null);
@@ -493,6 +510,8 @@ export default function ProgramRegisterProvider({ children }: { children: React.
         body: JSON.stringify({
           programId: program.id,
           payMethod: method,
+          plan,
+          nextPaymentDate: plan === "split" ? nextPaymentDate : undefined,
         }),
       });
       const json = await res.json();
@@ -658,6 +677,14 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const bankCategories = program ? extractCourseCategories(program.tag) : [];
   const bankCategoryLabel = bankCategories.length > 0 ? bankCategories.join(",") : "-";
   const bankAudienceLabel = program && getCourseAudience(program.tag) === "teacher" ? "Багш" : "Сурагч";
+  // What this screen is actually asking for right now — half under the split
+  // plan, the whole price otherwise.
+  const fullAmount = program ? parsePriceToNumber(program.price) : 0;
+  const splitting = Boolean(program?.splittable) && plan === "split";
+  const amountNow = splitting ? splitHalves(fullAmount).now : fullAmount;
+  // A split with no date is not a plan — the second half would be owed by
+  // nobody knows when, so the payment buttons wait for it.
+  const planIncomplete = splitting && !nextPaymentDate;
   const bankStudentName = `${sessionUser?.lastName ?? ""} ${sessionUser?.firstName ?? ""}`.trim();
   const bankDescription = `${sessionUser?.phone ?? ""} ${bankCategoryLabel} ${bankAudienceLabel}${
     bankStudentName ? ` + ${bankStudentName}` : ""
@@ -1148,15 +1175,91 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 {program && (
                   <div className="flex items-center justify-between gap-4 bg-blue-soft rounded-md px-5 py-4 mb-5">
                     <span className="font-bold text-ink-2 text-[.95rem]">{program.label}</span>
-                    <b className="text-[1.5rem] font-extrabold text-blue-strong shrink-0">{program.price}</b>
+                    <span className="shrink-0 text-right">
+                      <b className="text-[1.5rem] font-extrabold text-blue-strong block leading-none">
+                        {splitting ? formatMnt(amountNow) : program.price}
+                      </b>
+                      {splitting && (
+                        <small className="text-ink-3 font-bold text-[.78rem]">
+                          нийт {program.price}-ийн 50%
+                        </small>
+                      )}
+                    </span>
                   </div>
                 )}
+                {program?.splittable && (
+                  <div className="mb-5">
+                    <p className="font-bold text-ink-2 mb-1">Төлбөрөө хэрхэн төлөх вэ?</p>
+                    <div className="grid grid-cols-2 gap-2.5 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setPlan("full")}
+                        className={`border-[1.5px] rounded-md px-4 py-3 text-left transition-colors ${
+                          plan === "full" ? "border-blue bg-blue-soft" : "border-line-2"
+                        }`}
+                      >
+                        <b className="text-[.95rem] block">Бүтэн төлөх</b>
+                        <small className="block text-ink-3 font-semibold text-[.82rem]">
+                          {program.price}
+                        </small>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPlan("split")}
+                        className={`border-[1.5px] rounded-md px-4 py-3 text-left transition-colors ${
+                          plan === "split" ? "border-blue bg-blue-soft" : "border-line-2"
+                        }`}
+                      >
+                        <b className="text-[.95rem] block">Хувааж төлөх</b>
+                        <small className="block text-ink-3 font-semibold text-[.82rem]">
+                          50% + 50%
+                        </small>
+                      </button>
+                    </div>
+
+                    {plan === "split" && (
+                      <div className="bg-bg-soft rounded-md px-[18px] py-4 mt-3">
+                        <div className="flex items-center justify-between gap-4 py-1">
+                          <span className="font-bold text-ink-2 text-[.92rem]">Одоо төлөх 50%</span>
+                          <b className="font-extrabold text-[1.05rem] text-blue-strong">
+                            {formatMnt(splitHalves(parsePriceToNumber(program.price)).now)}
+                          </b>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 py-1 border-t border-line mt-1 pt-2">
+                          <span className="font-bold text-ink-2 text-[.92rem]">
+                            Дараагийн төлөлт 50%
+                          </span>
+                          <b className="font-extrabold text-[1.05rem]">
+                            {formatMnt(splitHalves(parsePriceToNumber(program.price)).later)}
+                          </b>
+                        </div>
+                        <label className="flex flex-col gap-1.5 mt-3.5">
+                          <span className="text-[.82rem] font-extrabold text-ink-3">
+                            Дараагийн төлөлт хийх огноо
+                          </span>
+                          <input
+                            type="date"
+                            value={nextPaymentDate}
+                            min={earliestInstallmentDate()}
+                            max={INSTALLMENT_DEADLINE}
+                            onChange={(e) => setNextPaymentDate(e.target.value)}
+                            className="w-full bg-surface border border-line rounded-sm px-4 py-3 font-semibold text-[.95rem]"
+                          />
+                          <span className="text-[.78rem] font-semibold text-ink-3">
+                            {INSTALLMENT_DEADLINE.replaceAll("-", ".")}-ээс өмнөх өдөр сонгоно уу.
+                          </span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <p className="font-bold text-ink-2 mb-1">Төлбөрийн хэлбэр сонгоно уу</p>
                 <div className="flex flex-col gap-3 mt-1.5">
                   {!isStaticYearlyProgram && (
                     <button
                       type="button"
-                      disabled={submitting}
+                      disabled={submitting || planIncomplete}
                       onClick={() => confirmPayment("qpay")}
                       className="flex items-center gap-3.5 border-[1.5px] border-line-2 rounded-md px-[18px] py-4 text-left transition-colors hover:border-blue disabled:opacity-50"
                     >
@@ -1190,6 +1293,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                       ["bank", "Банк", "Хаан Банк"],
                       ["account", "Дансны дугаар", "MN19000500 5034904750"],
                       ["recipient", "Хүлээн авагч", "Ганбат"],
+                      ["amount", splitting ? "Одоо шилжүүлэх дүн (50%)" : "Шилжүүлэх дүн", formatMnt(amountNow)],
                       ["description", "Гүйлгээний утга", bankDescription],
                     ].map(([key, k, v]) => (
                       <div key={key} className="flex items-center justify-between gap-4 py-1.5 text-[.95rem] font-bold">
@@ -1220,7 +1324,7 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                   <div className="mt-[22px]">
                     <button
                       type="button"
-                      disabled={submitting}
+                      disabled={submitting || planIncomplete}
                       onClick={() => confirmPayment("bank")}
                       className="w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50 disabled:pointer-events-none"
                     >

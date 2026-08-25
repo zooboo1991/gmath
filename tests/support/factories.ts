@@ -105,6 +105,8 @@ export async function createTestCourse(
     capacity: number;
     lessons: unknown[];
     zoomLink: string;
+    /** "songon" makes it a classroom group — the kind whose fee may be split. */
+    template: string;
   }> = {}
 ): Promise<TestCourse> {
   const title = overrides.title ?? `Тест сургалт ${randomUUID().slice(0, 8)}`;
@@ -121,6 +123,7 @@ export async function createTestCourse(
       capacity: overrides.capacity ?? null,
       lessons: overrides.lessons ?? [],
       zoom_link: overrides.zoomLink ?? null,
+      template: overrides.template ?? null,
     })
     .select("id")
     .single();

@@ -2,6 +2,7 @@ import { getPaymentProvider } from "./payment";
 import { getSupabase } from "./supabase";
 import { hashPassword, verifyPassword as verifyPasswordHash } from "./password";
 import { parsePriceToNumber } from "./price";
+import { splitHalves } from "./installment";
 import { nextCertificateNumbers } from "./certificateNumber";
 import { transliterate } from "./mnTransliterate";
 import { sendPushToUsers } from "./push";
@@ -200,6 +201,8 @@ export type Registration = {
   qpayShortUrl?: string;
   /** The actual agreed total for this student (can differ from `price` — discounts, negotiated deals). Set via the admin roster's payment tracking, yearly programs only. */
   totalDue?: number;
+  /** The 50/50 plan's promised date for the second half. Unset means paid in one go. */
+  installmentDueDate?: string;
 };
 
 /**
@@ -305,6 +308,7 @@ type RegistrationRow = {
   qpay_qr_image: string | null;
   qpay_short_url: string | null;
   total_due: number | null;
+  installment_due_date: string | null;
 };
 
 type CertificateRow = {
@@ -413,6 +417,7 @@ function registrationFromRow(row: RegistrationRow): Registration {
     qpayQrImage: row.qpay_qr_image ?? undefined,
     qpayShortUrl: row.qpay_short_url ?? undefined,
     totalDue: row.total_due ?? undefined,
+    installmentDueDate: row.installment_due_date ?? undefined,
   };
 }
 
@@ -1364,6 +1369,10 @@ export async function addRegistration(input: Omit<Registration, "id" | "createdA
       price: input.price,
       pay_method: input.payMethod,
       status: input.status,
+      // Both set together by the 50/50 plan, or neither: the full price to
+      // reach, and the day the second half was promised for.
+      total_due: input.totalDue ?? null,
+      installment_due_date: input.installmentDueDate ?? null,
     })
     .select("*")
     .single();
@@ -1527,6 +1536,23 @@ export async function settleRegistrationPayment(id: string): Promise<Registratio
   if (error) throw error;
   if (!data) return findRegistrationById(id);
   const updated = registrationFromRow(data as RegistrationRow);
+
+  // A 50/50 registration paid only its first half through QPay. Recording it
+  // here is what makes the roster's "Үлдэгдэл" the truth — the admin would
+  // otherwise have to type in money the gateway already took. Guarded by the
+  // status transition above, so this runs once.
+  if (updated.totalDue !== undefined && updated.installmentDueDate) {
+    const { now } = splitHalves(updated.totalDue);
+    await addRegistrationPayment({
+      registrationId: updated.id,
+      amount: now,
+      paidAt: new Date().toISOString().slice(0, 10),
+    }).catch(() => {
+      // The seat is granted either way; a missing payment row is something
+      // the admin can add, a refused enrollment is not.
+    });
+  }
+
   await notifyRegistrationActive(updated);
   return updated;
 }

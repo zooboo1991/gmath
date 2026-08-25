@@ -84,7 +84,7 @@ export default async function ProgramDetail({
   const { label, price } = yearlyProgram;
   // tag mirrors what /api/enroll uses server-side for this program (its own
   // label) — see the comment on the Program type in ProgramRegister.tsx.
-  const program = { id: programId, label, price, tag: label };
+  const program = { id: programId, label, price, tag: label, splittable: true };
 
   return (
     <>

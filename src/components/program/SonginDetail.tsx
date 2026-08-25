@@ -65,7 +65,13 @@ export default function SonginDetail({
 }) {
   // Same shape the ordinary course page builds — /api/enroll reads `tag`
   // server-side for the payment description.
-  const program = { id: course.id, label: `${course.title} (${course.tag})`, price: course.price, tag: course.tag };
+  const program = {
+    id: course.id,
+    label: `${course.title} (${course.tag})`,
+    price: course.price,
+    tag: course.tag,
+    splittable: true,
+  };
   const slots = parseWeeklySchedule(course.weeklySchedule);
 
   const capacity = course.capacity;

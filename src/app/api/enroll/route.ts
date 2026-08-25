@@ -9,6 +9,12 @@ import {
   updateRegistration,
 } from "@/lib/db";
 import { extractCourseCategories, getCourseAudience } from "@/lib/courseTag";
+import {
+  canSplitPayment,
+  isPaymentPlan,
+  isValidInstallmentDate,
+  splitHalves,
+} from "@/lib/installment";
 import { getPaymentProvider, stubPaymentsEnabled } from "@/lib/payment";
 import { parsePriceToNumber } from "@/lib/price";
 import { getSessionUser } from "@/lib/session";
@@ -22,7 +28,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Нэвтрээгүй байна" }, { status: 401 });
   }
 
-  const { programId, payMethod } = await request.json().catch(() => ({}));
+  const { programId, payMethod, plan, nextPaymentDate } = await request.json().catch(() => ({}));
 
   if (!programId || typeof programId !== "string") {
     return NextResponse.json({ ok: false, error: "Сургалтын мэдээлэл дутуу байна" }, { status: 400 });
@@ -41,12 +47,15 @@ export async function POST(request: Request) {
   // proper tag; the static yearly programs' label already reads "(C
   // ангилал)" etc., which extractCourseCategories can parse just as well.
   let courseTag: string;
+  /** Whether this particular programme may be paid in two halves. */
+  let splittable: boolean;
 
   const yearlyProgram = await findYearlyProgramById(programId);
   if (yearlyProgram) {
     programLabel = yearlyProgram.label;
     price = yearlyProgram.price;
     courseTag = yearlyProgram.tag;
+    splittable = canSplitPayment({ isYearlyProgram: true });
   } else if (UUID_RE.test(programId)) {
     const course = await findCourseById(programId);
     if (!course) {
@@ -68,9 +77,37 @@ export async function POST(request: Request) {
     price = course.price;
     facebookGroup = course.facebookGroup;
     courseTag = course.tag;
+    splittable = canSplitPayment({ isYearlyProgram: false, template: course.template });
   } else {
     return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
   }
+
+  // Хувааж төлөх: half now, the rest by a date the family chose. The plan is
+  // re-checked here rather than trusted from the form — the page offering it
+  // is not what decides who may split, or what half of the price is.
+  const wantsSplit = isPaymentPlan(plan) && plan === "split";
+  if (wantsSplit && !splittable) {
+    return NextResponse.json(
+      { ok: false, error: "Энэ сургалтыг хувааж төлөх боломжгүй." },
+      { status: 400 }
+    );
+  }
+  const dueDate = typeof nextPaymentDate === "string" ? nextPaymentDate : "";
+  if (wantsSplit && !isValidInstallmentDate(dueDate)) {
+    return NextResponse.json(
+      { ok: false, error: "Дараагийн төлөлтийн огноог зөв сонгоно уу." },
+      { status: 400 }
+    );
+  }
+
+  const fullAmount = parsePriceToNumber(price);
+  const halves = splitHalves(fullAmount);
+  const amountNow = wantsSplit ? halves.now : fullAmount;
+  // Only a split registration carries a total to reach and a promised date;
+  // a registration paid in one go leaves both unset, as before.
+  const installment = wantsSplit
+    ? { totalDue: fullAmount, installmentDueDate: dueDate }
+    : {};
 
   if (payMethod === "bank") {
     // Stays pending until an admin confirms receipt in /admin — unchanged.
@@ -82,8 +119,15 @@ export async function POST(request: Request) {
         price,
         payMethod: "bank",
         status: "pending",
+        ...installment,
       });
-      return NextResponse.json({ ok: true, registration, paid: false, facebookGroup: undefined });
+      return NextResponse.json({
+        ok: true,
+        registration,
+        paid: false,
+        facebookGroup: undefined,
+        amountDue: amountNow,
+      });
     } catch (err) {
       if ((err as { code?: string } | null)?.code === "23505") {
         return NextResponse.json(
@@ -120,6 +164,7 @@ export async function POST(request: Request) {
         price,
         payMethod: "qpay",
         status: "pending",
+        ...installment,
       });
     } catch (err) {
       if ((err as { code?: string } | null)?.code !== "23505") throw err;
@@ -132,6 +177,26 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
+    }
+  }
+
+  // The row may be left over from an earlier attempt that chose differently
+  // (bank first, or "бүтэн" then "хувааж"). While no invoice exists there is
+  // nothing to contradict, so the plan in front of the student wins.
+  if (!registration.qpayInvoiceId) {
+    const hasPlan = registration.totalDue !== undefined && Boolean(registration.installmentDueDate);
+    if (wantsSplit && (!hasPlan || registration.installmentDueDate !== dueDate)) {
+      registration =
+        (await updateRegistration(registration.id, {
+          total_due: fullAmount,
+          installment_due_date: dueDate,
+        })) ?? registration;
+    } else if (!wantsSplit && hasPlan) {
+      registration =
+        (await updateRegistration(registration.id, {
+          total_due: null,
+          installment_due_date: null,
+        })) ?? registration;
     }
   }
 
@@ -164,7 +229,10 @@ export async function POST(request: Request) {
     const description = `${user.phone} ${categoryLabel} ${audienceLabel}`;
 
     const start = await provider.createPayment({
-      amountMnt: parsePriceToNumber(price),
+      // Half for a split plan — the invoice is the money actually being taken.
+      amountMnt: registration.totalDue !== undefined && registration.installmentDueDate
+        ? splitHalves(registration.totalDue).now
+        : amountNow,
       description,
       // QPay caps sender_invoice_no at 45 chars — see the matching comment in
       // assessment/[id]/pay/route.ts.

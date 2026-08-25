@@ -59,7 +59,14 @@ export default function CourseDetail({
   // tag is the raw course.tag, matching what /api/enroll uses server-side to
   // build the payment description — see the comment on the Program type in
   // ProgramRegister.tsx. label (title + tag) is only for on-screen display.
-  const program = { id: course.id, label: `${course.title} (${course.tag})`, price: course.price, tag: course.tag };
+  const program = {
+    id: course.id,
+    label: `${course.title} (${course.tag})`,
+    price: course.price,
+    tag: course.tag,
+    // Only the classroom groups split their fee; an ordinary course does not.
+    splittable: course.template === "songon",
+  };
 
   return (
     <>

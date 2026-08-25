@@ -317,6 +317,11 @@ export default function RegistrationRoster({
                             {r.totalDue != null ? (
                               <span className={balance <= 0 ? "text-green" : "text-gold-strong"}>
                                 Үлдэгдэл {formatMnt(balance)}
+                                {/* The date the family promised the rest for —
+                                    the reason most balances here exist. */}
+                                {balance > 0 && r.installmentDueDate
+                                  ? ` · ${r.installmentDueDate.replaceAll("-", ".")}`
+                                  : ""}
                               </span>
                             ) : (
                               <span className="text-ink-3 font-semibold">Дүн тохируулаагүй</span>
