@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAnalyticsStatsForRange } from "@/lib/db";
+import { getActivityStats } from "@/lib/activityStats";
 import { isAdmin } from "@/lib/session";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -18,6 +19,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "Огноо буруу байна" }, { status: 400 });
   }
 
-  const stats = await getAnalyticsStatsForRange(from, to);
-  return NextResponse.json({ ok: true, stats });
+  const [stats, activity] = await Promise.all([
+    getAnalyticsStatsForRange(from, to),
+    getActivityStats(from, to),
+  ]);
+  return NextResponse.json({ ok: true, stats, activity });
 }

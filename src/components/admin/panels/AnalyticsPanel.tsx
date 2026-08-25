@@ -2,8 +2,42 @@
 
 import { useState } from "react";
 import type { AnalyticsRangeStats } from "@/lib/db";
+import type { ActivityStats } from "@/lib/activityStats";
 import { formatMnt } from "@/lib/price";
 import { StatSection, StatTile } from "@/components/admin/panels/DashboardPanel";
+
+/** A row of thin bars — used for the hour-of-day chart. */
+function BarRow({
+  bars,
+  ticks,
+}: {
+  bars: { key: string; value: number; label: string }[];
+  ticks: string[];
+}) {
+  const max = Math.max(1, ...bars.map((b) => b.value));
+  if (bars.length === 0) {
+    return <p className="text-ink-3 font-semibold text-[.9rem]">Мэдээлэл алга байна.</p>;
+  }
+  return (
+    <div>
+      <div className="flex items-end gap-[3px] h-24">
+        {bars.map((bar) => (
+          <div
+            key={bar.key}
+            title={bar.label}
+            className="flex-1 bg-blue rounded-t-xs min-w-[3px]"
+            style={{ height: `${Math.max(2, Math.round((bar.value / max) * 100))}%` }}
+          />
+        ))}
+      </div>
+      <div className="flex justify-between mt-1.5 text-[.72rem] font-bold text-ink-3">
+        {ticks.map((t) => (
+          <span key={t}>{t}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -57,18 +91,22 @@ const ANALYTICS_PRESETS: { label: string; range: () => [string, string] }[] = [
 
 export default function AnalyticsPanel({
   initialData,
+  initialActivity,
   initialFrom,
   initialTo,
   viewsAllTime,
 }: {
   initialData: AnalyticsRangeStats;
+  initialActivity: ActivityStats;
   initialFrom: string;
   initialTo: string;
+  /** Every view the site has ever logged — context for the range above it. */
   viewsAllTime: number;
 }) {
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
   const [data, setData] = useState(initialData);
+  const [activity, setActivity] = useState(initialActivity);
   const [activePreset, setActivePreset] = useState<string | null>("Энэ сар");
   const [loading, setLoading] = useState(false);
 
@@ -77,7 +115,10 @@ export default function AnalyticsPanel({
     try {
       const res = await fetch(`/api/admin/analytics?from=${f}&to=${t}`);
       const json = await res.json();
-      if (res.ok) setData(json.stats);
+      if (res.ok) {
+        setData(json.stats);
+        if (json.activity) setActivity(json.activity);
+      }
     } finally {
       setLoading(false);
     }
@@ -150,13 +191,46 @@ export default function AnalyticsPanel({
       <StatSection title={`Хуудас үзэлт (${from} – ${to})`}>
         <StatTile label="Үзэлт" value={data.views} />
         <StatTile label="Давхардалгүй зочин" value={data.visitors} tone="green" />
-        <StatTile label="Нийт (бүх цаг)" value={viewsAllTime} tone="blue" />
+        <StatTile label="Зочилсон удаа" value={data.sessions} />
+        <StatTile label="Сайтад байсан хугацаа" value={`${data.totalMinutes} мин`} tone="blue" />
+      </StatSection>
+
+      <StatSection title="Зочны зан төлөв">
+        <StatTile label="Дундаж айлчлал" value={`${data.avgSessionMinutes} мин`} />
+        <StatTile label="Нэг айлчлалд үзсэн хуудас" value={data.pagesPerSession} />
+        <StatTile
+          label="Нэг хуудсаар гарсан"
+          value={`${data.bounceRate}%`}
+          tone={data.bounceRate > 70 ? "gold" : undefined}
+        />
+        <StatTile label="Шинэ зочин" value={data.newVisitors} tone="green" />
       </StatSection>
 
       <StatSection title={`Бүртгэл, орлого (${from} – ${to})`}>
         <StatTile label="Шинэ бүртгэл" value={data.newRegistrations} />
         <StatTile label="Баталгаажсан орлого" value={formatMnt(data.newRevenue)} tone="blue" />
         <StatTile label="Шинэ хэрэглэгч" value={data.newUsers} tone="green" />
+        <StatTile
+          label="Зочноос бүртгэл болсон"
+          value={`${data.visitors > 0 ? Math.round((data.newRegistrations / data.visitors) * 1000) / 10 : 0}%`}
+        />
+      </StatSection>
+
+      <StatSection title="Сургалтын үйл ажиллагаа">
+        <StatTile label="Хичээлд ирсэн сурагч" value={activity.attended} tone="green" />
+        <StatTile label="Шалгалт эхлүүлсэн" value={activity.assessment.started} />
+        <StatTile label="Бодолт илгээсэн" value={activity.assessment.submitted} tone="gold" />
+        <StatTile label="Дүгнэлт гарсан" value={activity.assessment.completed} tone="green" />
+      </StatSection>
+
+      <StatSection title="Хандалт, сертификат">
+        <StatTile label="Шинэ чат" value={activity.chat.conversations} />
+        <StatTile label="Шийдэгдээгүй асуулт" value={activity.chat.issues} tone="gold" />
+        <StatTile label="Хүлээлгийн жагсаалт" value={activity.waitlist} />
+        <StatTile
+          label="Сертификат татсан / шалгасан"
+          value={`${activity.certificates.downloads} / ${activity.certificates.verifies}`}
+        />
       </StatSection>
 
       <div className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
@@ -175,6 +249,46 @@ export default function AnalyticsPanel({
             ))}
           </div>
         )}
+      </div>
+
+      <div className="grid grid-cols-1 nav:grid-cols-2 gap-4">
+        <div className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
+          <h3 className="font-extrabold text-[1rem]">Хэдэн цагт ордог вэ</h3>
+          <p className="text-ink-3 font-semibold text-[.8rem] mb-4">Улаанбаатарын цагаар</p>
+          <BarRow
+            bars={data.byHour.map((h) => ({
+              key: String(h.hour),
+              value: h.views,
+              label: `${String(h.hour).padStart(2, "0")}:00 — ${h.views}`,
+            }))}
+            ticks={["00", "06", "12", "18", "23"]}
+          />
+        </div>
+
+        <div className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
+          <h3 className="font-extrabold text-[1rem] mb-4">Долоо хоногийн аль өдөр</h3>
+          <div className="flex flex-col">
+            {data.byWeekday.map((d) => {
+              const max = Math.max(1, ...data.byWeekday.map((x) => x.views));
+              return (
+                <div key={d.weekday} className="flex items-center gap-3 py-1.5">
+                  <span className="w-[52px] shrink-0 font-bold text-[.85rem] text-ink-2">
+                    {d.weekday}
+                  </span>
+                  <div className="flex-1 h-2 rounded-sm bg-bg-soft overflow-hidden">
+                    <div
+                      className="h-full bg-blue rounded-sm"
+                      style={{ width: `${Math.round((d.views / max) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="w-9 shrink-0 text-right font-extrabold text-[.82rem]">
+                    {d.views}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 nav:grid-cols-2 gap-4">
@@ -217,9 +331,11 @@ export default function AnalyticsPanel({
         </div>
       </div>
 
-      <p className="text-ink-3 font-semibold text-[.78rem]">
-        Дээрх бүх мэдээлэл (хуудас үзэлт, бүртгэл, орлого, өдөр тутмын жагсаалт, хамгийн их үзсэн хуудас, эх
-        сурвалж) сонгосон хугацааны хүрээнд харагдаж байна. &quot;Нийт (бүх цаг)&quot; ганцаараа бүх түүхэн дүн.
+      <p className="text-ink-3 font-semibold text-[.78rem] leading-[1.7]">
+        Бүх тоо сонгосон хугацаанд хамаарна. «Зочилсон удаа» гэдэг нь нэг хүний нэг ирц — 30 минут
+        чимээгүй болбол дараагийн ирц болж тоологдоно. Хугацааг эхний ба сүүлийн хуудасны зөрүүгээр
+        хэмждэг тул нэг хуудас үзээд гарсан айлчлал 0 минут болно; өөрөөр хэлбэл бодит хугацаа үүнээс
+        арай урт. Сайт нээгдсэнээс хойшхи нийт үзэлт: {viewsAllTime.toLocaleString("mn-MN")}.
       </p>
     </div>
   );

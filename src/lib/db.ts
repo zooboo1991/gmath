@@ -2112,14 +2112,99 @@ export async function getTotalPageViews(): Promise<number> {
 export type AnalyticsRangeStats = {
   views: number;
   visitors: number;
+  /** Visits: one visitor's run of pages, ended by half an hour of silence. */
+  sessions: number;
+  /** Time spent on the site across every visit, in minutes. */
+  totalMinutes: number;
+  /** Average length of a visit, in minutes (one decimal). */
+  avgSessionMinutes: number;
+  /** Pages per visit (one decimal). */
+  pagesPerSession: number;
+  /** Percentage of visits that were a single page and nothing more. */
+  bounceRate: number;
+  /** Visitors whose very first view of the site falls in this range. */
+  newVisitors: number;
   topPages: { path: string; views: number }[];
   topReferrers: { referrer: string; views: number }[];
   /** One entry per calendar day in the range, oldest first. */
   daily: { date: string; views: number }[];
+  /** Views by hour of the Mongolian day, 0–23 — when people actually come. */
+  byHour: { hour: number; views: number }[];
+  /** Views by weekday, Monday first. */
+  byWeekday: { weekday: string; views: number }[];
   newRegistrations: number;
   newRevenue: number;
   newUsers: number;
 };
+
+/**
+ * Reads every row a filter matches, not the first page of them.
+ *
+ * PostgREST caps a response at 1000 rows. The analytics figures were counted
+ * off that capped array, so the moment a range held more than a thousand
+ * views every number on the page quietly froze at "1000" — which is exactly
+ * what the dashboard was showing.
+ */
+async function fetchAllRows<T>(build: () => {
+  range: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>;
+}): Promise<T[]> {
+  const PAGE = 1000;
+  const all: T[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await build().range(offset, offset + PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    all.push(...rows);
+    if (rows.length < PAGE) return all;
+  }
+}
+
+/** A visit ends after this much silence from the same visitor. */
+const SESSION_GAP_MS = 30 * 60 * 1000;
+const WEEKDAY_LABELS = ["Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба", "Ням"];
+
+/**
+ * Splits one visitor's views into visits and measures them.
+ *
+ * The last page of a visit has no "next view" to measure against, so a visit
+ * is only as long as the gap between its first and last view — a single-page
+ * visit counts as zero minutes. That undercounts, but every alternative
+ * (assuming an average, pinging from the browser) invents numbers instead.
+ */
+function measureSessions(
+  timestampsByVisitor: Map<string, number[]>
+): { sessions: number; totalMs: number; bounces: number } {
+  let sessions = 0;
+  let totalMs = 0;
+  let bounces = 0;
+
+  for (const times of timestampsByVisitor.values()) {
+    times.sort((a, b) => a - b);
+    let start = times[0];
+    let previous = times[0];
+    let pages = 1;
+
+    const close = () => {
+      sessions += 1;
+      totalMs += previous - start;
+      if (pages === 1) bounces += 1;
+    };
+
+    for (let i = 1; i < times.length; i += 1) {
+      if (times[i] - previous > SESSION_GAP_MS) {
+        close();
+        start = times[i];
+        pages = 1;
+      } else {
+        pages += 1;
+      }
+      previous = times[i];
+    }
+    close();
+  }
+
+  return { sessions, totalMs, bounces };
+}
 
 /**
  * Every analytics figure scoped to one admin-picked date range (calendar
@@ -2132,16 +2217,21 @@ export async function getAnalyticsStatsForRange(fromDate: string, toDate: string
   const fromIso = `${fromDate}T00:00:00.000Z`;
   const toIso = `${toDate}T23:59:59.999Z`;
 
-  const [viewRows, regRows, newUsers] = await Promise.all([
-    getSupabase()
-      .from("page_views")
-      .select("path, referrer, visitor_id, created_at")
-      .gte("created_at", fromIso)
-      .lte("created_at", toIso)
-      .then(({ data, error }) => {
-        if (error) throw error;
-        return data as { path: string; referrer: string | null; visitor_id: string; created_at: string }[];
-      }),
+  type ViewRow = { path: string; referrer: string | null; visitor_id: string; created_at: string };
+
+  const [viewRows, earlierVisitorRows, regRows, newUsers] = await Promise.all([
+    fetchAllRows<ViewRow>(() =>
+      getSupabase()
+        .from("page_views")
+        .select("path, referrer, visitor_id, created_at")
+        .gte("created_at", fromIso)
+        .lte("created_at", toIso)
+        .order("created_at")
+    ),
+    // Who had already been here before this range started — the rest are new.
+    fetchAllRows<{ visitor_id: string }>(() =>
+      getSupabase().from("page_views").select("visitor_id").lt("created_at", fromIso)
+    ),
     getSupabase()
       .from("registrations")
       .select("price, status, created_at")
@@ -2166,6 +2256,9 @@ export async function getAnalyticsStatsForRange(fromDate: string, toDate: string
   const byPage = new Map<string, number>();
   const byReferrer = new Map<string, number>();
   const byDay = new Map<string, number>();
+  const timesByVisitor = new Map<string, number[]>();
+  const hourCounts = new Array(24).fill(0) as number[];
+  const weekdayCounts = new Array(7).fill(0) as number[];
 
   for (const row of viewRows) {
     visitors.add(row.visitor_id);
@@ -2176,7 +2269,24 @@ export async function getAnalyticsStatsForRange(fromDate: string, toDate: string
 
     const day = row.created_at.slice(0, 10);
     byDay.set(day, (byDay.get(day) ?? 0) + 1);
+
+    const at = new Date(row.created_at);
+    const times = timesByVisitor.get(row.visitor_id) ?? [];
+    times.push(at.getTime());
+    timesByVisitor.set(row.visitor_id, times);
+
+    // Mongolian wall clock (UTC+8, no DST): "when do people come" has to be
+    // answered in the hours a parent here would recognise.
+    const local = new Date(at.getTime() + 8 * 60 * 60 * 1000);
+    hourCounts[local.getUTCHours()] += 1;
+    // getUTCDay() is Sunday-first; the labels start on Monday.
+    weekdayCounts[(local.getUTCDay() + 6) % 7] += 1;
   }
+
+  const { sessions, totalMs, bounces } = measureSessions(timesByVisitor);
+  const earlierVisitors = new Set(earlierVisitorRows.map((r) => r.visitor_id));
+  const newVisitors = [...visitors].filter((id) => !earlierVisitors.has(id)).length;
+  const round1 = (value: number) => Math.round(value * 10) / 10;
 
   const daily: { date: string; views: number }[] = [];
   for (
@@ -2208,6 +2318,14 @@ export async function getAnalyticsStatsForRange(fromDate: string, toDate: string
   return {
     views: viewRows.length,
     visitors: visitors.size,
+    sessions,
+    totalMinutes: Math.round(totalMs / 60000),
+    avgSessionMinutes: sessions > 0 ? round1(totalMs / 60000 / sessions) : 0,
+    pagesPerSession: sessions > 0 ? round1(viewRows.length / sessions) : 0,
+    bounceRate: sessions > 0 ? Math.round((bounces / sessions) * 100) : 0,
+    newVisitors,
+    byHour: hourCounts.map((views, hour) => ({ hour, views })),
+    byWeekday: weekdayCounts.map((views, i) => ({ weekday: WEEKDAY_LABELS[i], views })),
     topPages,
     topReferrers,
     daily,
