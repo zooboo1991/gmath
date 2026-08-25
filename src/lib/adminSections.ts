@@ -32,6 +32,8 @@ export type AdminSection =
    *  the queue without the fee settings and the problem bank. */
   | "grading"
   | "notifications"
+  /** Хүлээлгийн жагсаалт: who is waiting for a class that does not exist yet. */
+  | "waitlist"
   | "chat"
   | "logs"
   | "staff"

@@ -955,3 +955,26 @@ create table if not exists certificate_events (
 );
 create index if not exists certificate_events_lookup_idx
   on certificate_events (certificate_id, kind);
+
+-- Хүлээлгийн жагсаалт: which classes to open next, and when.
+--
+-- A parent whose child's grade has no open group leaves their name here, and
+-- the admin reads the list as "eleven sixth-graders are waiting, most of them
+-- asked for weekday evenings". `grade` is copied from the profile at the time
+-- of asking rather than joined live — a child moves up a year, but the class
+-- they were waiting for does not change.
+create table if not exists waitlist_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  grade text not null,
+  /** Free text: which times suit them, and anything else worth knowing. */
+  note text not null default '',
+  status text not null default 'waiting' check (status in ('waiting', 'notified', 'closed')),
+  created_at timestamptz not null default now(),
+  notified_at timestamptz,
+  -- One live request per person per grade: asking twice updates the note
+  -- rather than adding a second row to the same queue.
+  unique (user_id, grade)
+);
+create index if not exists waitlist_requests_status_idx
+  on waitlist_requests (status, created_at desc);

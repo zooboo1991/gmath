@@ -6,6 +6,8 @@ import CourseCard from "@/components/CourseCard";
 import SongonClassCard from "@/components/SongonClassCard";
 import CourseBrowser from "@/components/CourseBrowser";
 import { countRegistrationsForProgram, listCourses, listYearlyPrograms } from "@/lib/db";
+import WaitlistCard from "@/components/WaitlistCard";
+import { getSessionUser } from "@/lib/session";
 import { parseWeeklySchedule } from "@/lib/weeklySchedule";
 import { courseHref } from "@/lib/courseHref";
 
@@ -20,10 +22,13 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function CoursesPage() {
-  const [allUpcoming, vodCourses, yearlyPrograms] = await Promise.all([
+  const [allUpcoming, vodCourses, yearlyPrograms, user] = await Promise.all([
     listCourses("upcoming"),
     listCourses("vod"),
     listYearlyPrograms(),
+    // Only to decide whether the waiting-list form can be filled in — the
+    // list is for families the school can actually call back.
+    getSessionUser(),
   ]);
 
   // The classroom groups get their own band rather than sitting in the
@@ -41,6 +46,14 @@ export default async function CoursesPage() {
       <Navbar />
       <main>
         <PageHero eyebrow="Сургалтууд" title="Бүх сургалтын хөтөлбөрүүд" />
+
+        {/* Above the list on purpose: the parent who does not find their
+            child's grade below is exactly the one this is for. */}
+        <section className="pt-[34px]">
+          <div className="wrap">
+            <WaitlistCard signedIn={Boolean(user)} grade={user?.grade ?? ""} />
+          </div>
+        </section>
 
         {/* The yearly programmes are hand-written pages, not `courses` rows,
             so they sit outside the filtered list rather than appearing and

@@ -24,6 +24,7 @@ const ACTION_LABELS: Record<string, string> = {
   "lesson.note_delete": "Хичээлийн тэмдэглэл хассан",
   "certificate.issue_batch": "Сертификат бөөнөөр үүсгэсэн",
   "notification.send": "Мэдэгдэл илгээсэн",
+  "waitlist.status": "Хүлээлгийн жагсаалтын төлөв өөрчилсөн",
   "setting.update": "Тохиргоо өөрчилсөн",
   "messenger.profile_update": "Messenger цэс шинэчилсэн",
   "staff.create": "Эрх бүхий аккаунт үүсгэсэн",

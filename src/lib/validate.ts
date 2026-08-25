@@ -35,6 +35,8 @@ export const MAX_LEN = {
   levelName: 80,
   levelText: 2000,
   settingValue: 200,
+  waitlistGrade: 40,
+  waitlistNote: 500,
   notificationTitle: 150,
   notificationBody: 2000,
   chatMessage: 2000,

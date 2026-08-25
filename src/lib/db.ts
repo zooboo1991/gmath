@@ -220,7 +220,7 @@ export type Certificate = {
   createdAt: string;
 };
 
-type UserRow = {
+export type UserRow = {
   id: string;
   role: Role;
   last_name: string;
@@ -319,7 +319,7 @@ type CertificateRow = {
   created_at: string;
 };
 
-function userFromRow(row: UserRow): User {
+export function userFromRow(row: UserRow): User {
   return {
     id: row.id,
     role: row.role,
