@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { IconClock } from "@/components/icons";
 import { apiError, readJson } from "@/lib/fetchJson";
+import { WAITLIST_TIME_OPTIONS } from "@/lib/waitlistOptions";
 
 type WaitlistRequest = { id: string; grade: string; note: string; status: string };
 
@@ -26,6 +27,10 @@ export default function WaitlistCard({
   const [open, setOpen] = useState(false);
   const [mine, setMine] = useState<WaitlistRequest[] | null>(null);
   const [gradeInput, setGradeInput] = useState(grade);
+  // Ticked times plus anything extra they typed. Chips first because a
+  // free-text box on a phone gets skipped — the first requests all arrived
+  // with nothing in it.
+  const [times, setTimes] = useState<string[]>([]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,13 +52,20 @@ export default function WaitlistCard({
   }, [signedIn]);
 
   const submit = async () => {
+    if (times.length === 0 && !note.trim()) {
+      setError("Тохирох цагаа сонгоно уу.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ grade: gradeInput, note }),
+        body: JSON.stringify({
+          grade: gradeInput,
+          note: [times.join(", "), note.trim()].filter(Boolean).join(" · "),
+        }),
       });
       const json = await readJson<{ request?: WaitlistRequest }>(res);
       const saved = json.request;
@@ -64,6 +76,7 @@ export default function WaitlistCard({
       setMine((current) => [saved, ...(current ?? []).filter((r) => r.id !== saved.id)]);
       setOpen(false);
       setNote("");
+      setTimes([]);
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
@@ -172,15 +185,44 @@ export default function WaitlistCard({
               className="w-full bg-bg-soft border border-line rounded-sm px-4 py-3 font-semibold text-[.95rem]"
             />
           </label>
+          <div className="flex flex-col gap-2">
+            <span className="text-[.8rem] font-extrabold text-ink-3">
+              Ямар цагт хичээллэвэл тохиромжтой вэ? (олныг сонгож болно)
+            </span>
+            <div className="flex gap-2 flex-wrap">
+              {WAITLIST_TIME_OPTIONS.map((option) => {
+                const picked = times.includes(option);
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() =>
+                      setTimes((current) =>
+                        picked ? current.filter((t) => t !== option) : [...current, option]
+                      )
+                    }
+                    className={`text-[.85rem] font-extrabold px-4 py-2.5 rounded-full border transition-colors ${
+                      picked
+                        ? "bg-blue text-white border-blue"
+                        : "bg-surface text-ink-2 border-line"
+                    }`}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <label className="flex flex-col gap-1.5">
             <span className="text-[.8rem] font-extrabold text-ink-3">
-              Та манай сургалтыг ямар анги хичээллүүлэхийг хүсэж байна вэ?
+              Нэмж хэлэх зүйл (заавал биш)
             </span>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              rows={3}
-              placeholder="Жишээ: 6-р ангийн бүлэг, ажлын өдрийн орой 19:00-оос хойш"
+              rows={2}
+              placeholder="Жишээ: 19:00-оос хойш, эсвэл өөр анхаарах зүйл"
               className="w-full bg-bg-soft border border-line rounded-sm px-4 py-3 font-semibold text-[.95rem] resize-y"
             />
           </label>

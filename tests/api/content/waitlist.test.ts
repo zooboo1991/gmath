@@ -39,6 +39,15 @@ describe("joining the waiting list", () => {
     expect(res.body.request.status).toBe("waiting");
   });
 
+  it("insists on a time — a request with no time answers half the question", async () => {
+    const user = await createTestUser({ grade: "6-р анги" });
+    const client = await signedInClient(user.phone, user.password);
+
+    const res = await client.post<{ error: string }>("/api/waitlist", { note: "  " });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("цаг");
+  });
+
   it("asks for a grade when the profile has none", async () => {
     const user = await createTestUser({ grade: "" });
     const client = await signedInClient(user.phone, user.password);

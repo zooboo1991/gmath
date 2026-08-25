@@ -1,5 +1,6 @@
 import { getSupabase } from "./supabase";
 import { toPublicUser, userFromRow, type PublicUser, type UserRow } from "./db";
+export { WAITLIST_TIME_OPTIONS } from "./waitlistOptions";
 
 export type WaitlistStatus = "waiting" | "notified" | "closed";
 

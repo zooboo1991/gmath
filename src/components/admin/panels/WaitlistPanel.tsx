@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { WaitlistRequestWithUser } from "@/lib/waitlist";
 import { INPUT_CLASS } from "@/components/admin/panels/shared";
+import { WAITLIST_TIME_OPTIONS } from "@/lib/waitlistOptions";
 
 const STATUS_LABEL: Record<string, string> = {
   waiting: "Хүлээж байна",
@@ -168,7 +169,7 @@ export default function WaitlistPanel({
 
       {groups.map(({ grade, list }) => (
         <div key={grade} className="bg-surface border border-line rounded-md shadow-xs px-6 py-5">
-          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
             <b className="font-extrabold text-[1rem]">
               {grade} · {list.length} хүн
             </b>
@@ -179,6 +180,24 @@ export default function WaitlistPanel({
             >
               Бүгдийг сонгох
             </button>
+          </div>
+
+          {/* Which times this grade asked for, counted — the reason the list
+              exists. Requests made before the tick-boxes have no time on them
+              and simply do not appear here. */}
+          <div className="flex gap-2 flex-wrap mb-3">
+            {WAITLIST_TIME_OPTIONS.map((option) => {
+              const count = list.filter((r) => r.note.includes(option)).length;
+              if (count === 0) return null;
+              return (
+                <span
+                  key={option}
+                  className="text-[.78rem] font-extrabold text-blue-strong bg-blue-soft px-3 py-1 rounded-full"
+                >
+                  {option} · {count}
+                </span>
+              );
+            })}
           </div>
           <div className="flex flex-col">
             {list.map((request) => (
@@ -197,11 +216,13 @@ export default function WaitlistPanel({
                     {request.user ? `${request.user.lastName} ${request.user.firstName}` : "Устсан хэрэглэгч"}
                     {request.user?.phone ? ` · ${request.user.phone}` : ""}
                   </b>
-                  {request.note && (
-                    <span className="text-ink-2 font-medium text-[.85rem] block mt-0.5">
-                      {request.note}
-                    </span>
-                  )}
+                  <span
+                    className={`text-[.85rem] block mt-0.5 ${
+                      request.note ? "text-ink-2 font-medium" : "text-ink-3 font-semibold"
+                    }`}
+                  >
+                    {request.note || "Цаг заагаагүй (хуучин хүсэлт)"}
+                  </span>
                 </div>
                 <span
                   className={`shrink-0 text-[.75rem] font-extrabold px-2.5 py-1 rounded-full ${

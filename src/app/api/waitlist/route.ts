@@ -35,6 +35,14 @@ export async function POST(request: Request) {
   if (!grade) {
     return NextResponse.json({ ok: false, error: "Хүүхдийн ангиа бичнэ үү" }, { status: 400 });
   }
+  // The list exists to answer "which class, at what time" — a request with no
+  // time on it answers half the question.
+  if (!note) {
+    return NextResponse.json(
+      { ok: false, error: "Тохирох цагаа сонгоно уу" },
+      { status: 400 }
+    );
+  }
   if (isTooLong(grade, MAX_LEN.waitlistGrade)) {
     return NextResponse.json({ ok: false, error: "Анги хэт урт байна" }, { status: 400 });
   }
