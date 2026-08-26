@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import MathText from "@/components/assessment/MathText";
@@ -29,6 +30,8 @@ function isDone(step: Step): boolean {
 export default function SolutionUploader({ assessmentId }: { assessmentId: string }) {
   const router = useRouter();
   const [steps, setSteps] = useState<Step[] | null>(null);
+  // Handed in already? Then this page is a record, not a form.
+  const [submitted, setSubmitted] = useState(false);
   const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -38,13 +41,16 @@ export default function SolutionUploader({ assessmentId }: { assessmentId: strin
     let cancelled = false;
     fetch(`/api/assessment/${assessmentId}/solutions`)
       .then(async (res) => {
-        const json = await readJson<{ steps: Step[] }>(res);
+        const json = await readJson<{ steps: Step[]; status?: string }>(res);
         if (cancelled) return;
         if (!res.ok) {
           setError(apiError(res, json, "Ачаалахад алдаа гарлаа"));
           return;
         }
         const loaded = json.steps ?? [];
+        // The server refuses every change once the paper is in (409); showing
+        // live buttons here only produced errors the child could not act on.
+        setSubmitted(json.status !== undefined && json.status !== "questionnaire_done");
         setSteps(loaded);
         // Resume where they left off: the first problem with neither a photo
         // nor a "couldn't solve" against it.
@@ -67,6 +73,23 @@ export default function SolutionUploader({ assessmentId }: { assessmentId: strin
   }
   if (steps.length === 0) {
     return <div className={`${CARD} text-center text-ink-3 font-semibold`}>Бодлого алга байна.</div>;
+  }
+
+  if (submitted) {
+    return (
+      <div className={`${CARD} text-center`}>
+        <h2 className="text-[1.15rem] font-extrabold">Бодолт илгээгдсэн</h2>
+        <p className="text-ink-2 font-medium mt-2 leading-[1.7]">
+          Багш таны ажлыг шалгаж байна. Дүгнэлт гарсны дараа профайл дээр тань харагдана.
+        </p>
+        <Link
+          href="/profile/assessment"
+          className="inline-flex items-center justify-center font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-3.5 mt-5 transition-transform hover:-translate-y-0.5"
+        >
+          Явцыг харах →
+        </Link>
+      </div>
+    );
   }
 
   const step = steps[index];

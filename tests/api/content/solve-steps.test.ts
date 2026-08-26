@@ -343,6 +343,22 @@ describe("the paper, step by step", () => {
     expect(res.status).toBe(409);
   });
 
+  it("tells the child the paper is in, rather than offering the form again", async () => {
+    const { client, assessmentId, problemIds } = await readyToSolve();
+
+    for (const problemId of problemIds) await uploadPhoto(client, assessmentId, problemId);
+    await client.post(`/api/assessment/${assessmentId}/submit`);
+
+    // The status the solve page reads to decide between the stepper and the
+    // "handed in" card — every edit is refused past this point.
+    const after = await client.get<{ status: string }>(`/api/assessment/${assessmentId}/solutions`);
+    expect(after.body.status).toBe("problems_submitted");
+
+    const page = await client.get(`/assessment/${assessmentId}/solve`);
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("Бодолт илгээгдсэн");
+  });
+
   it("refuses a problem that is not on this child's paper", async () => {
     const { client, assessmentId } = await readyToSolve();
     const other = await readyToSolve();
