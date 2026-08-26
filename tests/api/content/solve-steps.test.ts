@@ -359,6 +359,43 @@ describe("the paper, step by step", () => {
     expect(page.text).toContain("Бодолт илгээгдсэн");
   });
 
+  it("reports the handed-in sitting even when the page is opened without ?exam=", async () => {
+    const { client, assessmentId, problemIds } = await readyToSolve();
+
+    for (const problemId of problemIds) await uploadPhoto(client, assessmentId, problemId);
+    await client.post(`/api/assessment/${assessmentId}/submit`);
+
+    // No ?exam= — the plain /assessment page. Offering "start" here ends in a
+    // 409 the child cannot do anything about.
+    const plain = await client.get<{ assessment: { id: string; status: string } | null }>(
+      "/api/assessment"
+    );
+    expect(plain.status, plain.text).toBe(200);
+    expect(plain.body.assessment?.id).toBe(assessmentId);
+    expect(plain.body.assessment?.status).toBe("problems_submitted");
+  });
+
+  it("puts an unpaid cancel back as unpaid, not into the grading queue", async () => {
+    const admin = await adminClient("full");
+    const { assessmentId } = await readyToSolve();
+
+    // Wind it back to the state a sitting is in before payment settles.
+    await testDb().from("assessments").update({ status: "awaiting_payment" }).eq("id", assessmentId);
+
+    await admin.post(`/api/admin/grading/${assessmentId}/cancel`);
+    await admin.post(`/api/admin/grading/${assessmentId}/restore`);
+
+    const { data } = await testDb()
+      .from("assessments")
+      .select("status")
+      .eq("id", assessmentId)
+      .single();
+    expect((data as { status: string }).status).toBe("awaiting_payment");
+
+    const queue = await admin.get<{ queue: { id: string }[] }>("/api/admin/grading");
+    expect(queue.body.queue.some((a) => a.id === assessmentId)).toBe(false);
+  });
+
   it("refuses a problem that is not on this child's paper", async () => {
     const { client, assessmentId } = await readyToSolve();
     const other = await readyToSolve();

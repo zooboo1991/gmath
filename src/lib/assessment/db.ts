@@ -564,10 +564,19 @@ export async function listCancelledAssessments(): Promise<AssessmentWithUser[]> 
 export async function restoreAssessment(id: string): Promise<Assessment | undefined> {
   const assessment = await findAssessment(id);
   const previous = assessment?.cancelledFrom;
+  // Every state a sitting can legitimately be cancelled from is restored as
+  // itself. Only a row with nothing recorded (cancelled before this column
+  // existed) falls back to the queue — an unpaid sitting must never land
+  // there, since there is no way to pay for it afterwards.
+  const RESTORABLE: AssessmentStatus[] = [
+    "awaiting_payment",
+    "paid",
+    "questionnaire_done",
+    "grading",
+    "problems_submitted",
+  ];
   const status: AssessmentStatus =
-    previous === "questionnaire_done" || previous === "grading" || previous === "paid"
-      ? previous
-      : "problems_submitted";
+    previous && RESTORABLE.includes(previous) ? previous : "problems_submitted";
   return updateAssessment(id, { status, cancelled_from: null });
 }
 

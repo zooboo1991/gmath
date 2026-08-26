@@ -29,11 +29,20 @@ export async function GET(request: Request) {
   // page would resume whichever assessment happened to be open — the wrong
   // exam, for a child invited to two.
   const wantedExam = new URL(request.url).searchParams.get("exam") ?? undefined;
-  // A finished sitting still has to be reported, otherwise the page offers a
-  // child their own graded exam as something new to start.
-  const assessment =
-    (await findOpenAssessment(user.id, wantedExam)) ??
-    (wantedExam ? await findAssessmentForExam(user.id, wantedExam) : undefined);
+  let assessment = await findOpenAssessment(user.id, wantedExam);
+  if (!assessment) {
+    // A finished sitting still has to be reported. With ?exam= that is one
+    // lookup; without it, the child opened /assessment plainly — check the
+    // exams they were invited to, or the page offers them a sitting they
+    // have already handed in and the next click is a 409.
+    const examIds = wantedExam
+      ? [wantedExam]
+      : (await listFreeInvitedExams(user.id).catch(() => [])).map((exam) => exam.id);
+    for (const examId of examIds) {
+      assessment = await findAssessmentForExam(user.id, examId);
+      if (assessment) break;
+    }
+  }
   // The fee shown up front is the open assessment's own track, or the price
   // list for the track picker when nothing is in progress.
   const [assessmentFee, quizFee, invitedExams] = await Promise.all([
