@@ -1309,10 +1309,18 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                       ["amount", splitting ? "Одоо шилжүүлэх дүн (50%)" : "Шилжүүлэх дүн", formatMnt(amountNow)],
                       ["description", "Гүйлгээний утга", bankDescription],
                     ].map(([key, k, v]) => (
-                      <div key={key} className="flex items-center justify-between gap-4 py-1.5 text-[.95rem] font-bold">
-                        <span className="text-ink-3 font-semibold shrink-0">{k}</span>
-                        <span className="flex items-center gap-2 min-w-0">
-                          <b className="text-right truncate">{v}</b>
+                      // Label above value at every width. Side by side, the
+                      // account number and the transfer description were cut
+                      // to "MN1900…" — and this box exists to be copied from.
+                      // The modal is narrow on a laptop too, so stacking is
+                      // not only a phone fix.
+                      <div
+                        key={key}
+                        className="flex flex-col items-start gap-0.5 py-2.5 text-[.95rem] font-bold border-b border-line last:border-0"
+                      >
+                        <span className="text-ink-3 font-semibold text-[.82rem]">{k}</span>
+                        <span className="flex items-start gap-2 min-w-0 w-full">
+                          <b className="min-w-0 break-words">{v}</b>
                           <button
                             type="button"
                             onClick={() => copyToClipboard(key, v)}
