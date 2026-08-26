@@ -1,4 +1,5 @@
 import { getSupabase } from "./supabase";
+import { fetchAllRows } from "./fetchAll";
 
 /**
  * What the school itself did in a date range, next to the traffic figures.
@@ -38,16 +39,18 @@ async function countInRange(
 
 /** Distinct students seen in a lesson — a count of rows would double-count rejoins. */
 async function countAttendees(fromIso: string, toIso: string): Promise<number> {
-  const { data, error } = await getSupabase()
-    .from("lesson_attendance")
-    .select("user_id, users(is_test)")
-    .gte("joined_at", fromIso)
-    .lte("joined_at", toIso);
-  if (error) throw error;
   type Row = { user_id: string; users: { is_test?: boolean | null } | null };
-  return new Set(
-    (data as Row[]).filter((row) => !row.users?.is_test).map((row) => row.user_id)
-  ).size;
+  // Paged: one busy month of lessons passes a thousand rows, and the count
+  // would then stop moving without anything looking wrong.
+  const rows = await fetchAllRows<Row>(() =>
+    getSupabase()
+      .from("lesson_attendance")
+      .select("user_id, users(is_test)")
+      .gte("joined_at", fromIso)
+      .lte("joined_at", toIso)
+      .order("id")
+  );
+  return new Set(rows.filter((row) => !row.users?.is_test).map((row) => row.user_id)).size;
 }
 
 export async function getActivityStats(fromDate: string, toDate: string): Promise<ActivityStats> {

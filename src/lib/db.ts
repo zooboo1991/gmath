@@ -5,6 +5,7 @@ import { parsePriceToNumber } from "./price";
 import { splitHalves } from "./installment";
 import { nextCertificateNumbers } from "./certificateNumber";
 import { registrationBalance } from "./registration";
+import { chunk, fetchAllRows } from "./fetchAll";
 import { transliterate } from "./mnTransliterate";
 import { sendPushToUsers } from "./push";
 import { sendSms } from "./sms/skytel";
@@ -686,15 +687,19 @@ export async function listUsers(): Promise<PublicUser[]> {
  * the user list. One query for everybody rather than one per row.
  */
 export async function getLastLoginByUser(): Promise<Record<string, string>> {
-  const { data, error } = await getSupabase()
-    .from("login_logs")
-    .select("user_id, created_at")
-    .order("created_at", { ascending: false })
-    .limit(5000);
-  if (error) throw error;
+  // `.limit(5000)` was wishful: PostgREST stops at 1000 whatever you ask for,
+  // so older accounts read as "never signed in". Paged instead, ordered by id
+  // as well so no row can slip between pages.
+  const rows = await fetchAllRows<{ user_id: string; created_at: string }>(() =>
+    getSupabase()
+      .from("login_logs")
+      .select("user_id, created_at")
+      .order("created_at", { ascending: false })
+      .order("id")
+  );
   const latest: Record<string, string> = {};
   // Newest first, so the first sighting of a user is their last login.
-  for (const row of data as { user_id: string; created_at: string }[]) {
+  for (const row of rows) {
     if (!latest[row.user_id]) latest[row.user_id] = row.created_at;
   }
   return latest;
@@ -1378,10 +1383,11 @@ export async function logCertificateEvent(
 
 /** Usage for every certificate, keyed by id — one query for the whole table. */
 export async function getCertificateUsage(): Promise<Record<string, CertificateUsage>> {
-  const { data, error } = await getSupabase().from("certificate_events").select("certificate_id, kind");
-  if (error) throw error;
+  const rows = await fetchAllRows<{ certificate_id: string; kind: string }>(() =>
+    getSupabase().from("certificate_events").select("certificate_id, kind").order("id")
+  );
   const usage: Record<string, CertificateUsage> = {};
-  for (const row of data as { certificate_id: string; kind: string }[]) {
+  for (const row of rows) {
     const entry = (usage[row.certificate_id] ??= { downloads: 0, verifies: 0 });
     if (row.kind === "download") entry.downloads += 1;
     else entry.verifies += 1;
@@ -1696,13 +1702,23 @@ function registrationPaymentFromRow(row: RegistrationPaymentRow): RegistrationPa
 /** Bulk-fetches every payment for a whole roster at once (~30 rows max) rather than lazily per row. */
 export async function listPaymentsForRegistrations(registrationIds: string[]): Promise<RegistrationPayment[]> {
   if (registrationIds.length === 0) return [];
-  const { data, error } = await getSupabase()
-    .from("registration_payments")
-    .select("*")
-    .in("registration_id", registrationIds)
-    .order("paid_at", { ascending: true });
-  if (error) throw error;
-  return (data as RegistrationPaymentRow[]).map(registrationPaymentFromRow);
+  // Chunked and paged: the whole roster used to go into one `.in()` — a URL
+  // that grows with the school, and a reply capped at 1000 rows, which would
+  // have under-reported every balance built on it.
+  const rows: RegistrationPaymentRow[] = [];
+  for (const ids of chunk(registrationIds)) {
+    rows.push(
+      ...(await fetchAllRows<RegistrationPaymentRow>(() =>
+        getSupabase()
+          .from("registration_payments")
+          .select("*")
+          .in("registration_id", ids)
+          .order("paid_at", { ascending: true })
+          .order("id")
+      ))
+    );
+  }
+  return rows.map(registrationPaymentFromRow);
 }
 
 export async function addRegistrationPayment(input: {
@@ -2178,28 +2194,6 @@ export type AnalyticsRangeStats = {
   newUsers: number;
 };
 
-/**
- * Reads every row a filter matches, not the first page of them.
- *
- * PostgREST caps a response at 1000 rows. The analytics figures were counted
- * off that capped array, so the moment a range held more than a thousand
- * views every number on the page quietly froze at "1000" — which is exactly
- * what the dashboard was showing.
- */
-async function fetchAllRows<T>(build: () => {
-  range: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>;
-}): Promise<T[]> {
-  const PAGE = 1000;
-  const all: T[] = [];
-  for (let offset = 0; ; offset += PAGE) {
-    const { data, error } = await build().range(offset, offset + PAGE - 1);
-    if (error) throw error;
-    const rows = (data ?? []) as T[];
-    all.push(...rows);
-    if (rows.length < PAGE) return all;
-  }
-}
-
 /** A visit ends after this much silence from the same visitor. */
 const SESSION_GAP_MS = 30 * 60 * 1000;
 const WEEKDAY_LABELS = ["Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба", "Ням"];
@@ -2268,10 +2262,13 @@ export async function getAnalyticsStatsForRange(fromDate: string, toDate: string
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
         .order("created_at")
+        .order("id")
     ),
     // Who had already been here before this range started — the rest are new.
+    // Ordered because it is paged: without one, rows shuffle between pages
+    // and some visitors are missed, which reads as "new" on the page.
     fetchAllRows<{ visitor_id: string }>(() =>
-      getSupabase().from("page_views").select("visitor_id").lt("created_at", fromIso)
+      getSupabase().from("page_views").select("visitor_id").lt("created_at", fromIso).order("id")
     ),
     getSupabase()
       .from("registrations")
