@@ -114,7 +114,33 @@ export default function UserObjectPage({
   payments: RegistrationPayment[];
 }) {
   const [tab, setTab] = useState<ObjectTab>("info");
+  const [isTest, setIsTest] = useState(Boolean(user.isTest));
+  const [savingTest, setSavingTest] = useState(false);
   const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
+  /** Keeps this account's money out of the school's books, or puts it back. */
+  const toggleTest = async () => {
+    const next = !isTest;
+    if (
+      next &&
+      !confirm(
+        "Энэ аккаунтыг тестийн гэж тэмдэглэх үү? Түүний бүртгэл, төлбөр хяналтын самбарын мөнгө болон аналитикийн тоонд орохгүй болно."
+      )
+    ) {
+      return;
+    }
+    setSavingTest(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isTest: next }),
+      });
+      if (res.ok) setIsTest(next);
+    } finally {
+      setSavingTest(false);
+    }
+  };
+
   const live = registrations.filter((r) => r.status !== "cancelled");
   const active = registrations.filter((r) => r.status === "active");
   const pending = registrations.filter((r) => r.status === "pending");
@@ -168,6 +194,11 @@ export default function UserObjectPage({
                 >
                   {user.role === "teacher" ? "Багш" : "Сурагч"}
                 </span>
+                {isTest && (
+                  <span className="text-[.72rem] font-extrabold px-2.5 py-1 rounded-full text-gold-strong bg-gold-soft">
+                    Тестийн аккаунт
+                  </span>
+                )}
               </div>
               <span className="text-ink-3 font-semibold text-[.85rem]">
                 {user.phone}
@@ -221,6 +252,27 @@ export default function UserObjectPage({
                 <InfoRow label="Анги" value={user.grade} />
                 <InfoRow label="Facebook" value={user.facebook} />
                 <InfoRow label="Бүртгүүлсэн огноо" value={formatDate(user.createdAt)} />
+              </div>
+
+              {/* The school's own test account enrols and pays for real; the
+                  books must not treat that as income. */}
+              <div className="mt-4 pt-4 border-t border-line flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <b className="font-extrabold text-[.92rem] block">Тестийн аккаунт</b>
+                  <span className="text-ink-3 font-semibold text-[.82rem]">
+                    Тэмдэглэвэл энэ хүний бүртгэл, төлбөр самбарын мөнгө, аналитикийн тоонд орохгүй.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={savingTest}
+                  onClick={toggleTest}
+                  className={`shrink-0 font-extrabold text-[.85rem] px-5 py-2.5 rounded-full disabled:opacity-50 ${
+                    isTest ? "bg-gold text-gold-ink" : "bg-bg-soft text-ink-2"
+                  }`}
+                >
+                  {savingTest ? "…" : isTest ? "Тест — унтраах" : "Тест гэж тэмдэглэх"}
+                </button>
               </div>
             </Card>
 

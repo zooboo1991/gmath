@@ -1012,3 +1012,9 @@ create index if not exists chat_reports_created_idx on chat_reports (created_at 
 alter table assessments drop constraint if exists assessments_status_check;
 alter table assessments add constraint assessments_status_check check (status in
   ('awaiting_payment','paid','questionnaire_done','problems_submitted','grading','completed','cancelled'));
+
+-- Тестийн аккаунт: an account the school uses to try the site out. Its
+-- registrations are real rows — the point is to exercise the real payment
+-- flow — so they are excluded from the money and the counts rather than
+-- deleted. Lessons, exams and chat still work normally for it.
+alter table users add column if not exists is_test boolean not null default false;

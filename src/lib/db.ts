@@ -69,6 +69,8 @@ export type User = {
   passwordHash: string;
   passwordSalt: string;
   createdAt: string;
+  /** An account the school tests with — kept out of the money and the counts. */
+  isTest?: boolean;
 };
 
 export type PublicUser = Omit<User, "passwordHash" | "passwordSalt">;
@@ -239,6 +241,7 @@ export type UserRow = {
   password_hash: string;
   password_salt: string;
   created_at: string;
+  is_test: boolean | null;
 };
 
 type CourseRow = {
@@ -340,6 +343,7 @@ export function userFromRow(row: UserRow): User {
     passwordHash: row.password_hash,
     passwordSalt: row.password_salt,
     createdAt: row.created_at,
+    isTest: row.is_test ?? false,
   };
 }
 
@@ -652,6 +656,18 @@ export async function updateUserProfile(
   if (input.facebook !== undefined) patch.facebook = input.facebook || null;
 
   const { data, error } = await getSupabase().from("users").update(patch).eq("id", userId).select("*").maybeSingle();
+  if (error) throw error;
+  return data ? userFromRow(data as UserRow) : undefined;
+}
+
+/** Flags (or unflags) one account as the school's own test account. */
+export async function setUserIsTest(id: string, isTest: boolean): Promise<User | undefined> {
+  const { data, error } = await getSupabase()
+    .from("users")
+    .update({ is_test: isTest })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
   if (error) throw error;
   return data ? userFromRow(data as UserRow) : undefined;
 }
@@ -1976,12 +1992,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   const { data, error } = await getSupabase()
     .from("registrations")
-    .select("id, user_id, program_label, price, total_due, pay_method, status, users(role)");
+    .select("id, user_id, program_label, price, total_due, pay_method, status, users(role, is_test)");
   if (error) throw error;
 
   // A registration belongs to exactly one user, but the client types an
   // embedded relation as an array, so accept either shape.
-  type JoinedUser = { role: Role } | { role: Role }[] | null;
+  type JoinedUser = { role: Role; is_test?: boolean | null } | { role: Role; is_test?: boolean | null }[] | null;
   const rows = data as unknown as {
     id: string;
     user_id: string;
@@ -1992,13 +2008,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     status: RegistrationStatus;
     users: JoinedUser;
   }[];
-  const roleOf = (users: JoinedUser): Role | undefined =>
-    (Array.isArray(users) ? users[0] : users)?.role;
+  const joined = (users: JoinedUser) => (Array.isArray(users) ? users[0] : users);
+  const roleOf = (users: JoinedUser): Role | undefined => joined(users)?.role;
+  /** The school's own test accounts sign up and pay for real — and must not move the numbers. */
+  const isTestAccount = (users: JoinedUser): boolean => Boolean(joined(users)?.is_test);
 
   // What has actually been received, per registration. Cancelled rows are
   // excluded below, so their payments never reach any total.
   const payments = await listPaymentsForRegistrations(
-    rows.filter((r) => r.status !== "cancelled").map((r) => r.id)
+    rows.filter((r) => r.status !== "cancelled" && !isTestAccount(r.users)).map((r) => r.id)
   );
   const paidByRegistration = new Map<string, number>();
   for (const payment of payments) {
@@ -2028,6 +2046,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   let bankCount = 0;
 
   for (const row of rows) {
+    if (isTestAccount(row.users)) continue;
     const amount = parsePriceToNumber(row.price);
     const bucket = byCourse.get(row.program_label) ?? { active: 0, pending: 0 };
 
@@ -2256,16 +2275,22 @@ export async function getAnalyticsStatsForRange(fromDate: string, toDate: string
     ),
     getSupabase()
       .from("registrations")
-      .select("price, status, created_at")
+      .select("price, status, created_at, users(is_test)")
       .gte("created_at", fromIso)
       .lte("created_at", toIso)
       .then(({ data, error }) => {
         if (error) throw error;
-        return data as { price: string; status: RegistrationStatus; created_at: string }[];
+        return data as {
+          price: string;
+          status: RegistrationStatus;
+          created_at: string;
+          users: { is_test?: boolean | null } | { is_test?: boolean | null }[] | null;
+        }[];
       }),
     getSupabase()
       .from("users")
       .select("*", { count: "exact", head: true })
+      .eq("is_test", false)
       .gte("created_at", fromIso)
       .lte("created_at", toIso)
       .then(({ count, error }) => {
@@ -2331,7 +2356,12 @@ export async function getAnalyticsStatsForRange(fromDate: string, toDate: string
 
   // A cancelled registration is not one this period produced — it read as one
   // fewer here back when cancelling deleted the row, and it still should.
-  const liveRegRows = regRows.filter((r) => r.status !== "cancelled");
+  const liveRegRows = regRows.filter((r) => {
+    if (r.status === "cancelled") return false;
+    // Test accounts enrol and pay for real; their money is not the school's.
+    const user = Array.isArray(r.users) ? r.users[0] : r.users;
+    return !user?.is_test;
+  });
   let newRevenue = 0;
   for (const r of liveRegRows) {
     if (r.status === "active") newRevenue += parsePriceToNumber(r.price);

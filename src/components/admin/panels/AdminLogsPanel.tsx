@@ -7,6 +7,8 @@ import { programAdminHref } from "@/lib/registration";
 
 const ACTION_LABELS: Record<string, string> = {
   "user.create": "Хэрэглэгч гараар нэмсэн",
+  "user.mark_test": "Тестийн аккаунт гэж тэмдэглэсэн",
+  "user.unmark_test": "Тестийн тэмдэглэгээг авсан",
   "course.create": "Сургалт үүсгэсэн",
   "course.update": "Сургалт засварласан",
   "yearly_program.update": "Жилийн хөтөлбөр засварласан",

@@ -146,7 +146,8 @@ export default function UsersPanel({
   }, [users, query, school, grade, role, enrolment, sort, stats, lastLogin]);
 
   const owingCount = useMemo(
-    () => filtered.filter((u) => statsFor(u.id).balance > 0).length,
+    // Test accounts owe nothing the school will ever collect.
+    () => filtered.filter((u) => !u.isTest && statsFor(u.id).balance > 0).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [filtered, stats]
   );
@@ -397,6 +398,11 @@ export default function UsersPanel({
                     >
                       {u.role === "teacher" ? "Багш" : "Сурагч"}
                     </span>
+                    {u.isTest && (
+                      <span className="ml-1.5 text-[.7rem] font-extrabold px-2 py-0.5 rounded-full text-gold-strong bg-gold-soft">
+                        Тест
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.phone}</td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.grade || "—"}</td>
