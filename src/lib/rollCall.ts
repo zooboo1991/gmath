@@ -54,7 +54,9 @@ async function allOwners(): Promise<Owner[]> {
 export async function getRoster(courseId: string): Promise<{ userId: string; name: string; phone: string }[]> {
   const registrations = await listRegistrationsByProgram(courseId);
   return registrations
-    .filter((r) => r.status === "active" && r.user)
+    // The school's own test account sits in no classroom — a teacher reading
+    // the register should not have to skip past it.
+    .filter((r) => r.status === "active" && r.user && !r.user.isTest)
     .map((r) => ({
       userId: r.user!.id,
       name: `${r.user!.lastName} ${r.user!.firstName}`.trim() || r.user!.phone,

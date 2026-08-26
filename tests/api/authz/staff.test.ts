@@ -186,6 +186,15 @@ describe("what a teacher's admin looks like", () => {
     expect(roster.status, roster.text).toBe(200);
     expect(roster.body.students.map((s) => s.userId)).toContain(user.id);
 
+    // A test account is not in the room, so it is not on the register either.
+    const tester = await createTestUser();
+    await createTestRegistration({ userId: tester.id, programId: course.id, status: "active" });
+    await testDb().from("users").update({ is_test: true }).eq("id", tester.id);
+    const withTester = await teacher.get<{ students: { userId: string }[] }>(
+      `/api/admin/roll-call?courseId=${course.id}&lessonIndex=0`
+    );
+    expect(withTester.body.students.map((s) => s.userId)).not.toContain(tester.id);
+
     const saved = await teacher.put<{ present: number; absent: number }>("/api/admin/roll-call", {
       courseId: course.id,
       lessonIndex: 0,
