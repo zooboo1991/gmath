@@ -316,18 +316,21 @@ export type LessonAttendanceWithName = LessonAttendance & { lastName: string; fi
 export async function listAttendanceForLessonWithNames(lessonMeetingId: string): Promise<LessonAttendanceWithName[]> {
   const { data, error } = await getSupabase()
     .from("lesson_attendance")
-    .select("*, users(last_name, first_name, phone)")
+    .select("*, users(last_name, first_name, phone, is_test)")
     .eq("lesson_meeting_id", lessonMeetingId)
     .order("joined_at", { ascending: true });
   if (error) throw error;
-  return (data as (LessonAttendanceRow & { users: { last_name: string; first_name: string; phone: string } | null })[]).map(
-    (row) => ({
+  type Joined = { last_name: string; first_name: string; phone: string; is_test?: boolean | null } | null;
+  return (data as (LessonAttendanceRow & { users: Joined })[])
+    // The school's own test account joins the room while something is being
+    // checked; nobody taking attendance wants to see it in the list.
+    .filter((row) => !row.users?.is_test)
+    .map((row) => ({
       ...lessonAttendanceFromRow(row),
       lastName: row.users?.last_name ?? "",
       firstName: row.users?.first_name ?? "",
       phone: row.users?.phone ?? "",
-    })
-  );
+    }));
 }
 
 export async function listAttendanceForUser(

@@ -97,10 +97,15 @@ async function findTodayLessons(now: Date): Promise<TodayLesson[]> {
 
   const { data: attendanceRows } = await supabase
     .from("lesson_attendance")
-    .select("lesson_meeting_id, user_id")
+    .select("lesson_meeting_id, user_id, users(is_test)")
     .in("lesson_meeting_id", meetings.map((m) => m.id));
   const seen = new Map<string, Set<string>>();
-  for (const row of (attendanceRows ?? []) as { lesson_meeting_id: string; user_id: string }[]) {
+  type AttendanceRow = {
+    lesson_meeting_id: string;
+    user_id: string;
+    users?: { is_test?: boolean | null } | null;
+  };
+  for (const row of ((attendanceRows ?? []) as AttendanceRow[]).filter((r) => !r.users?.is_test)) {
     const set = seen.get(row.lesson_meeting_id) ?? new Set<string>();
     set.add(row.user_id);
     seen.set(row.lesson_meeting_id, set);

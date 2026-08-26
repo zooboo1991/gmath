@@ -40,11 +40,14 @@ async function countInRange(
 async function countAttendees(fromIso: string, toIso: string): Promise<number> {
   const { data, error } = await getSupabase()
     .from("lesson_attendance")
-    .select("user_id")
+    .select("user_id, users(is_test)")
     .gte("joined_at", fromIso)
     .lte("joined_at", toIso);
   if (error) throw error;
-  return new Set((data as { user_id: string }[]).map((row) => row.user_id)).size;
+  type Row = { user_id: string; users: { is_test?: boolean | null } | null };
+  return new Set(
+    (data as Row[]).filter((row) => !row.users?.is_test).map((row) => row.user_id)
+  ).size;
 }
 
 export async function getActivityStats(fromDate: string, toDate: string): Promise<ActivityStats> {
