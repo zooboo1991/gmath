@@ -55,8 +55,8 @@ type LevelRow = {
 export type ProblemRow = {
   id: string;
   category: string | null;
-  level: number;
-  difficulty: number | string;
+  level: number | null;
+  difficulty: number | string | null;
   topic: string;
   body_latex: string | null;
   image_url: string | null;
@@ -138,9 +138,12 @@ function levelFromRow(row: LevelRow): Level {
 export function problemFromRow(row: ProblemRow): Problem {
   return {
     id: row.id,
-    level: row.level,
+    // Both columns are nullable since the ladder was dropped, and Number(null)
+    // is 0 — which the grading page then printed as "Хүндрэл 0" on every
+    // problem entered under the category-only form.
+    level: row.level ?? undefined,
     // Postgres numeric comes back as a string through PostgREST.
-    difficulty: Number(row.difficulty),
+    difficulty: row.difficulty === null ? undefined : Number(row.difficulty),
     topic: row.topic,
     bodyLatex: row.body_latex ?? undefined,
     imageUrl: row.image_url ?? undefined,

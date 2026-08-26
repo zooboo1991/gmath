@@ -469,7 +469,9 @@ function SolutionCard({
         <span className="text-[.72rem] font-extrabold text-blue-strong bg-blue-soft px-2.5 py-1 rounded-full">
           {index + 1}-р бодлого
         </span>
-        {item.problem && (
+        {/* Only the older problems carry a difficulty; the rest are filed by
+            category alone and have nothing to show here. */}
+        {item.problem?.difficulty !== undefined && (
           <span className="text-[.72rem] font-extrabold text-ink-2 bg-surface-2 px-2.5 py-1 rounded-full">
             Хүндрэл {item.problem.difficulty}
           </span>
