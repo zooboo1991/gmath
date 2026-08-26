@@ -74,6 +74,8 @@ export async function getRoster(courseId: string): Promise<{ userId: string; nam
  */
 export async function listRollCallLessons(opts: {
   onlyDate?: string;
+  /** Only lessons before this date — the history tab, which must not show days still to come. */
+  before?: string;
   courseId?: string;
   limit?: number;
 }): Promise<RollCallLesson[]> {
@@ -87,6 +89,7 @@ export async function listRollCallLessons(opts: {
       const { date, startTime, endTime } = parseScheduleString(lesson.schedule ?? "");
       if (!date) return;
       if (opts.onlyDate && date !== opts.onlyDate) return;
+      if (opts.before && date >= opts.before) return;
       found.push({
         courseId: owner.id,
         courseLabel: owner.label,

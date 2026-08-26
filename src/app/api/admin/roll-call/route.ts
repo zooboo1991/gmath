@@ -34,12 +34,15 @@ export async function GET(request: Request) {
 
   const history = url.searchParams.get("history") === "1";
   const today = mongoliaToday();
-  const lessons = await listRollCallLessons(history ? { limit: 40 } : { onlyDate: today });
-  return NextResponse.json({
-    ok: true,
-    today,
-    lessons: history ? lessons.filter((l) => l.date !== today) : lessons,
-  });
+  if (!history) {
+    return NextResponse.json({ ok: true, today, lessons: await listRollCallLessons({ onlyDate: today }) });
+  }
+
+  // Past lessons only. Bounding this after the 40-row slice was the bug: a
+  // course with lessons booked into next month filled the slice with days
+  // that have not happened, and the registers actually taken fell off the end.
+  const lessons = await listRollCallLessons({ before: today, limit: 40 });
+  return NextResponse.json({ ok: true, today, lessons });
 }
 
 export async function PUT(request: Request) {

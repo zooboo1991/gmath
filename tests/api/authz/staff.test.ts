@@ -210,6 +210,24 @@ describe("what a teacher's admin looks like", () => {
     expect(again.body.students.find((s) => s.userId === user.id)?.present).toBe(false);
   });
 
+  it("shows past lessons in the register's history, not ones still to come", async () => {
+    const teacher = await makeTeacher();
+    const course = await createTestCourse({
+      lessons: [
+        { topic: "Өнгөрсөн", schedule: "2020.03.02 Даваа гараг · 10:00–12:00", mode: "inperson" },
+        { topic: "Ирээдүйн", schedule: "2099.03.02 Даваа гараг · 10:00–12:00", mode: "inperson" },
+      ],
+    });
+
+    const history = await teacher.get<{ lessons: { courseId: string; topic: string }[] }>(
+      "/api/admin/roll-call?history=1"
+    );
+    expect(history.status, history.text).toBe(200);
+
+    const mine = history.body.lessons.filter((l) => l.courseId === course.id);
+    expect(mine.map((l) => l.topic)).toEqual(["Өнгөрсөн"]);
+  });
+
   it("lands on the attendance page, not the dashboard's revenue", async () => {
     const teacher = await makeTeacher();
 
