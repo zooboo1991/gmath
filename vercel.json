@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/publish-articles",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/weekly-chat-report",
+      "schedule": "0 1 * * 1"
     }
   ]
 }

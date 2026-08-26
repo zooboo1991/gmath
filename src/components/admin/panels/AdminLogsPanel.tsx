@@ -39,6 +39,7 @@ const ACTION_LABELS: Record<string, string> = {
   "chat.takeover": "Чатыг өөрөө авсан (бот зогссон)",
   "chat.release": "Чатыг ботод буцаасан",
   "chat.reply": "Чатад гараар хариулсан",
+  "chat_report.create": "Чатын тайлан гаргасан",
 };
 
 /** Where a log entry's course/program lives in the admin, if it still can be derived. */

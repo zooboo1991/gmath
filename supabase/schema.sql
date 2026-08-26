@@ -984,3 +984,23 @@ create index if not exists waitlist_requests_status_idx
 -- the full price and registration_payments records what has come in, so the
 -- balance is already answerable — this column is what the family promised.
 alter table registrations add column if not exists installment_due_date date;
+
+-- Чатын тайлан: what the chatbot heard in a date range, sorted into themes by
+-- the model and kept so the school can look back at what people were asking
+-- in September without re-reading three hundred messages.
+--
+-- `summary` holds the model's structured answer as JSON — the shape lives in
+-- src/lib/chatReport.ts. Stored rather than recomputed: the same range must
+-- read the same way next month, and each run costs a model call.
+create table if not exists chat_reports (
+  id uuid primary key default gen_random_uuid(),
+  from_date date not null,
+  to_date date not null,
+  message_count int not null default 0,
+  conversation_count int not null default 0,
+  summary jsonb not null,
+  /** Who pressed the button; null when the weekly cron made it. */
+  created_by text,
+  created_at timestamptz not null default now()
+);
+create index if not exists chat_reports_created_idx on chat_reports (created_at desc);
