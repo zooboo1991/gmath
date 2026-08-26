@@ -1035,3 +1035,8 @@ create table if not exists lesson_roll_call (
 );
 create index if not exists lesson_roll_call_lesson_idx
   on lesson_roll_call (course_id, lesson_index);
+
+-- Цуцлахын өмнөх төлөв, so restoring puts the sitting back where it was:
+-- a child cancelled mid-solve returns to solving, one cancelled after handing
+-- in returns to the queue.
+alter table assessments add column if not exists cancelled_from text;

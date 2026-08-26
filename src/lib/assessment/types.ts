@@ -122,6 +122,8 @@ export type Assessment = {
   id: string;
   userId: string;
   status: AssessmentStatus;
+  /** What the sitting was before it was cancelled, so it can be put back. */
+  cancelledFrom?: AssessmentStatus;
   track: AssessmentTrack;
   /** Olympiad track only — the problem bank this child is being assessed from. */
   category?: ProblemCategory;

@@ -278,6 +278,48 @@ describe("the paper, step by step", () => {
     expect(queue.body.queue.some((a) => a.id === assessmentId)).toBe(false);
   });
 
+  it("puts a voided sitting back in the queue when restored", async () => {
+    const admin = await adminClient("full");
+    const { client, assessmentId, problemIds } = await readyToSolve();
+
+    for (const problemId of problemIds) await uploadPhoto(client, assessmentId, problemId);
+    await client.post(`/api/assessment/${assessmentId}/submit`);
+    await admin.post(`/api/admin/grading/${assessmentId}/cancel`);
+
+    const restored = await admin.post(`/api/admin/grading/${assessmentId}/restore`);
+    expect(restored.status, restored.text).toBe(200);
+
+    // Back exactly where it was cancelled from — handed in, not mid-solve.
+    const { data } = await testDb()
+      .from("assessments")
+      .select("status")
+      .eq("id", assessmentId)
+      .single();
+    expect((data as { status: string }).status).toBe("problems_submitted");
+
+    const queue = await admin.get<{ queue: { id: string }[] }>("/api/admin/grading");
+    expect(queue.body.queue.some((a) => a.id === assessmentId)).toBe(true);
+
+    // Restoring something that was never cancelled is refused.
+    expect((await admin.post(`/api/admin/grading/${assessmentId}/restore`)).status).toBe(409);
+  });
+
+  it("restores a mid-solve cancel to solving, not to the queue", async () => {
+    const admin = await adminClient("full");
+    const { client, assessmentId, problemIds } = await readyToSolve();
+
+    await uploadPhoto(client, assessmentId, problemIds[0]);
+    await admin.post(`/api/admin/grading/${assessmentId}/cancel`);
+    await admin.post(`/api/admin/grading/${assessmentId}/restore`);
+
+    const { data } = await testDb()
+      .from("assessments")
+      .select("status")
+      .eq("id", assessmentId)
+      .single();
+    expect((data as { status: string }).status).toBe("questionnaire_done");
+  });
+
   it("will not void a sitting the teacher already finished", async () => {
     const admin = await adminClient("full");
     const { client, assessmentId, problemIds } = await readyToSolve();

@@ -90,6 +90,7 @@ type AssessmentRow = {
   paid_at: string | null;
   created_at: string;
   updated_at: string;
+  cancelled_from: string | null;
 };
 
 type QuestionnaireRow = {
@@ -176,6 +177,7 @@ function assessmentFromRow(row: AssessmentRow): Assessment {
     paidAt: row.paid_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    cancelledFrom: (row.cancelled_from as AssessmentStatus | null) ?? undefined,
   };
 }
 
@@ -518,8 +520,12 @@ export async function settleAssessmentPayment(id: string): Promise<Assessment | 
  * Voids one sitting. The photos and any marks stay on the row; nothing else
  * looks at a cancelled assessment, so the student's next attempt starts clean.
  */
-export async function cancelAssessment(id: string): Promise<Assessment | undefined> {
-  return updateAssessment(id, { status: "cancelled" });
+export async function cancelAssessment(
+  id: string,
+  previousStatus: AssessmentStatus
+): Promise<Assessment | undefined> {
+  // Remembered so restoring is not a guess — see restoreAssessment.
+  return updateAssessment(id, { status: "cancelled", cancelled_from: previousStatus });
 }
 
 export async function listAssessmentsForGrading(): Promise<AssessmentWithUser[]> {
@@ -537,6 +543,34 @@ export async function listAssessmentsForGrading(): Promise<AssessmentWithUser[]>
 }
 
 /** Finished assessments, newest first — the admin's record of past results. */
+/** Voided sittings — kept so a mistaken cancel can be undone. */
+export async function listCancelledAssessments(): Promise<AssessmentWithUser[]> {
+  const { data, error } = await getSupabase()
+    .from("assessments")
+    .select("*, users(*)")
+    .eq("status", "cancelled")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data as (AssessmentRow & { users: unknown })[]).map((row) => {
+    const { users, ...rest } = row;
+    return { ...assessmentFromRow(rest), user: publicUserFromJoin(users) };
+  });
+}
+
+/**
+ * Undoes a cancel, putting the sitting back in the state it was cancelled
+ * from — the queue for handed-in work, the paper for a child still solving.
+ */
+export async function restoreAssessment(id: string): Promise<Assessment | undefined> {
+  const assessment = await findAssessment(id);
+  const previous = assessment?.cancelledFrom;
+  const status: AssessmentStatus =
+    previous === "questionnaire_done" || previous === "grading" || previous === "paid"
+      ? previous
+      : "problems_submitted";
+  return updateAssessment(id, { status, cancelled_from: null });
+}
+
 export async function listCompletedAssessments(): Promise<AssessmentWithUser[]> {
   const { data, error } = await getSupabase()
     .from("assessments")

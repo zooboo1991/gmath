@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/dateFormat";
 import { useState } from "react";
 import type { AssessmentWithUser } from "@/lib/assessment/db";
@@ -16,12 +17,38 @@ function waitingDays(iso: string) {
 export default function GradingQueue({
   queue,
   completed,
+  cancelled,
 }: {
   queue: AssessmentWithUser[];
   completed: AssessmentWithUser[];
+  /** Voided sittings, kept so a mistaken cancel can be put back. */
+  cancelled: AssessmentWithUser[];
 }) {
-  const [tab, setTab] = useState<"queue" | "completed">("queue");
-  const rows = tab === "queue" ? queue : completed;
+  const router = useRouter();
+  const [tab, setTab] = useState<"queue" | "completed" | "cancelled">("queue");
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const rows = tab === "queue" ? queue : tab === "completed" ? completed : cancelled;
+
+  /** Puts a voided sitting back into the waiting queue. */
+  const restore = async (id: string) => {
+    if (!confirm("Энэ шалгалтыг сэргээх үү? «Хүлээгдэж буй» жагсаалтад буцаж орно.")) return;
+    setRestoringId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/grading/${id}/restore`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Сэргээхэд алдаа гарлаа");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setRestoringId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-bg-soft">
@@ -58,18 +85,32 @@ export default function GradingQueue({
           >
             Дууссан ({completed.length})
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("cancelled")}
+            className={`font-extrabold text-[.92rem] px-5 py-2.5 rounded-full transition-colors ${
+              tab === "cancelled" ? "bg-blue text-white" : "bg-surface text-ink-2"
+            }`}
+          >
+            Цуцалсан {cancelled.length > 0 && `(${cancelled.length})`}
+          </button>
         </div>
+
+        {error && <p className="text-red-soft font-semibold text-[.9rem] mb-3">{error}</p>}
 
         {rows.length === 0 ? (
           <p className="text-ink-3 font-semibold text-[.9rem] text-center py-12">
-            {tab === "queue" ? "Шалгах бодолт алга байна." : "Дууссан үнэлгээ алга байна."}
+            {tab === "queue"
+              ? "Шалгах бодолт алга байна."
+              : tab === "completed"
+                ? "Дууссан үнэлгээ алга байна."
+                : "Цуцалсан шалгалт алга байна."}
           </p>
         ) : (
           <div className="flex flex-col gap-2.5">
             {rows.map((a) => {
               const days = waitingDays(a.createdAt);
-              return (
-                <Link key={a.id} href={`/admin/grading/${a.id}`} className={`${CARD} block hover:border-blue-soft-2`}>
+              const body = (
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="min-w-0">
                       <b className="text-[1rem] font-extrabold block">
@@ -80,7 +121,21 @@ export default function GradingQueue({
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                      {a.status === "completed" ? (
+                      {a.status === "cancelled" ? (
+                        <>
+                          <span className="text-[.72rem] font-extrabold text-ink-3 bg-bg-soft px-2.5 py-1 rounded-full">
+                            Цуцалсан
+                          </span>
+                          <button
+                            type="button"
+                            disabled={restoringId === a.id}
+                            onClick={() => restore(a.id)}
+                            className="text-[.8rem] font-extrabold text-blue-strong bg-blue-soft px-4 py-1.5 rounded-full disabled:opacity-50"
+                          >
+                            {restoringId === a.id ? "…" : "Сэргээх"}
+                          </button>
+                        </>
+                      ) : a.status === "completed" ? (
                         <span className="text-[.72rem] font-extrabold text-green bg-green-soft px-2.5 py-1 rounded-full">
                           Шалгаж дууссан
                         </span>
@@ -101,6 +156,17 @@ export default function GradingQueue({
                       )}
                     </div>
                   </div>
+              );
+
+              // A cancelled sitting has nothing to mark, so its row does not
+              // open the grader — it only offers the way back.
+              return a.status === "cancelled" ? (
+                <div key={a.id} className={CARD}>
+                  {body}
+                </div>
+              ) : (
+                <Link key={a.id} href={`/admin/grading/${a.id}`} className={`${CARD} block hover:border-blue-soft-2`}>
+                  {body}
                 </Link>
               );
             })}

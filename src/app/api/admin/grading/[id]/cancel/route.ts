@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
   }
 
-  const cancelled = await cancelAssessment(id);
+  const cancelled = await cancelAssessment(id, assessment.status);
   await logAdminAction(request, {
     actionType: "assessment.cancel",
     targetId: id,

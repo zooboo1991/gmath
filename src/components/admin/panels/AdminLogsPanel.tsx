@@ -44,6 +44,7 @@ const ACTION_LABELS: Record<string, string> = {
   "chat.reply": "Чатад гараар хариулсан",
   "chat_report.create": "Чатын тайлан гаргасан",
   "assessment.cancel": "Шалгалтыг цуцалж дахин өгүүлсэн",
+  "assessment.restore": "Цуцалсан шалгалтыг сэргээсэн",
 };
 
 /** Where a log entry's course/program lives in the admin, if it still can be derived. */
