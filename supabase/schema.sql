@@ -1018,3 +1018,20 @@ alter table assessments add constraint assessments_status_check check (status in
 -- flow — so they are excluded from the money and the counts rather than
 -- deleted. Lessons, exams and chat still work normally for it.
 alter table users add column if not exists is_test boolean not null default false;
+
+-- Ирц бүртгэл (танхимын хичээл). Zoom answers "who was here" for online
+-- lessons on its own; a classroom lesson has nobody to ask, so the teacher
+-- marks it. One row per student per lesson — marking again updates it.
+create table if not exists lesson_roll_call (
+  id uuid primary key default gen_random_uuid(),
+  course_id text not null,
+  lesson_index int not null,
+  user_id uuid not null references users(id) on delete cascade,
+  present boolean not null,
+  /** The teacher's account name, so a correction has an author. */
+  marked_by text,
+  marked_at timestamptz not null default now(),
+  unique (course_id, lesson_index, user_id)
+);
+create index if not exists lesson_roll_call_lesson_idx
+  on lesson_roll_call (course_id, lesson_index);

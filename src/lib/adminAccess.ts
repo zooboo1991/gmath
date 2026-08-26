@@ -12,7 +12,7 @@ import { getAdminActor, getAdminRole, type AdminActor } from "./session";
  * they lack goes back to the dashboard rather than seeing an error page.
  */
 /** Where a teacher starts: the dashboard is not theirs to see. */
-export const TEACHER_LANDING = "/admin/courses";
+export const TEACHER_LANDING = "/admin/attendance";
 
 export async function requireAdminSection(section: AdminSection): Promise<AdminRole> {
   const role = await getAdminRole();

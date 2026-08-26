@@ -172,31 +172,61 @@ describe("what a teacher's account may not do", () => {
 });
 
 describe("what a teacher's admin looks like", () => {
-  it("lands on the courses page, not the dashboard's revenue", async () => {
+  it("takes the register for a classroom lesson", async () => {
+    const teacher = await makeTeacher();
+    const course = await createTestCourse({
+      lessons: [{ topic: "Танхимын хичээл", schedule: "2026.08.26 Лхагва гараг · 10:00–12:00", mode: "inperson" }],
+    });
+    const user = await createTestUser();
+    await createTestRegistration({ userId: user.id, programId: course.id, status: "active" });
+
+    const roster = await teacher.get<{ students: { userId: string }[] }>(
+      `/api/admin/roll-call?courseId=${course.id}&lessonIndex=0`
+    );
+    expect(roster.status, roster.text).toBe(200);
+    expect(roster.body.students.map((s) => s.userId)).toContain(user.id);
+
+    const saved = await teacher.put<{ present: number; absent: number }>("/api/admin/roll-call", {
+      courseId: course.id,
+      lessonIndex: 0,
+      marks: [{ userId: user.id, present: false }],
+    });
+    expect(saved.status, saved.text).toBe(200);
+    expect(saved.body).toMatchObject({ present: 0, absent: 1 });
+
+    // Reopening shows what was marked, not a fresh "everyone is here".
+    const again = await teacher.get<{ students: { userId: string; present?: boolean }[] }>(
+      `/api/admin/roll-call?courseId=${course.id}&lessonIndex=0`
+    );
+    expect(again.body.students.find((s) => s.userId === user.id)?.present).toBe(false);
+  });
+
+  it("lands on the attendance page, not the dashboard's revenue", async () => {
     const teacher = await makeTeacher();
 
     const res = await teacher.get("/admin");
 
     // A redirect, and specifically not back to /admin — that would loop.
     expect([302, 307, 308]).toContain(res.status);
-    expect(res.headers.get("location")).toContain("/admin/courses");
+    expect(res.headers.get("location")).toContain("/admin/attendance");
   });
 
   it("is kept out of the pages it has no use for", async () => {
     const teacher = await makeTeacher();
-    for (const path of ["/admin/problems", "/admin/exams", "/admin/assessment", "/admin/staff", "/admin/logs"]) {
+    // The course pages went with them: taking the register was what took a
+    // teacher there, and that has a screen of its own now.
+    for (const path of ["/admin/problems", "/admin/exams", "/admin/assessment", "/admin/staff", "/admin/logs", "/admin/courses"]) {
       const res = await teacher.get(path);
       expect([302, 307, 308], path).toContain(res.status);
-      expect(res.headers.get("location"), path).toContain("/admin/courses");
+      expect(res.headers.get("location"), path).toContain("/admin/attendance");
     }
   });
 
-  it("can open the grading queue and a course", async () => {
+  it("can open the grading queue and the register", async () => {
     const teacher = await makeTeacher();
-    const course = await createTestCourse();
 
     expect((await teacher.get("/admin/grading")).status).toBe(200);
-    expect((await teacher.get(`/admin/courses/${course.id}`)).status).toBe(200);
+    expect((await teacher.get("/admin/attendance")).status).toBe(200);
   });
 });
 

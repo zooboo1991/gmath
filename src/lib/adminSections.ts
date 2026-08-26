@@ -31,6 +31,8 @@ export type AdminSection =
   /** Marking what students submitted. Split from the above so a teacher gets
    *  the queue without the fee settings and the problem bank. */
   | "grading"
+  /** Ирц бүртгэх: the teacher's register for classroom lessons. */
+  | "attendance"
   | "notifications"
   /** Хүлээлгийн жагсаалт: who is waiting for a class that does not exist yet. */
   | "waitlist"
@@ -40,13 +42,13 @@ export type AdminSection =
   | "courseEditor";
 
 /**
- * A teacher's sections: their classes, and the work waiting to be marked.
+ * A teacher's sections: the register, and the work waiting to be marked.
  *
- * Not the dashboard — its first tile is total revenue. Not courseEditor —
- * that is the "create a course" form, which they cannot save anyway. Both
- * would have rendered pages full of things they may not use.
+ * Not the dashboard — its first tile is total revenue. Not the course pages
+ * either: taking attendance was what took them there, and it now has a screen
+ * of its own built for the job.
  */
-export const TEACHER_SECTIONS = ["courses", "grading"] as const;
+export const TEACHER_SECTIONS = ["attendance", "grading"] as const;
 
 export function canView(role: AdminRole, section: AdminSection): boolean {
   if (role === "full") return true;

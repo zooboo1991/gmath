@@ -24,6 +24,7 @@ const ACTION_LABELS: Record<string, string> = {
   "lesson.zoom_meeting_create": "Zoom meeting үүсгэсэн",
   "lesson.zoom_meeting_update": "Zoom meeting-ийн цаг шинэчилсэн",
   "lesson.note_delete": "Хичээлийн тэмдэглэл хассан",
+  "lesson.roll_call": "Ирц бүртгэсэн",
   "certificate.issue_batch": "Сертификат бөөнөөр үүсгэсэн",
   "notification.send": "Мэдэгдэл илгээсэн",
   "waitlist.status": "Хүлээлгийн жагсаалтын төлөв өөрчилсөн",
