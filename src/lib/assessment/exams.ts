@@ -53,14 +53,19 @@ function examFromRow(row: ExamRow): Exam {
   };
 }
 
-export async function listExams(): Promise<(Exam & { problemCount: number; freeCount: number })[]> {
+export async function listExams(): Promise<(Exam & { problemCount: number; freeCourseCount: number })[]> {
   const supabase = getSupabase();
-  const [{ data: rows, error }, { data: problemRows }, { data: freeRows }] = await Promise.all([
-    supabase.from("exams").select("*").order("created_at", { ascending: false }),
-    supabase.from("exam_problems").select("exam_id"),
-    supabase.from("exam_free_users").select("exam_id"),
-  ]);
+  const [{ data: rows, error }, { data: problemRows }, { data: freeRows, error: freeError }] =
+    await Promise.all([
+      supabase.from("exams").select("*").order("created_at", { ascending: false }),
+      supabase.from("exam_problems").select("exam_id"),
+      // exam_free_courses, not the exam_free_users table this used to read:
+      // that one was dropped when invitations became course-based, and its
+      // error went unchecked, so the count sat at zero for every exam.
+      supabase.from("exam_free_courses").select("exam_id"),
+    ]);
   if (error) throw error;
+  if (freeError) throw freeError;
 
   const countBy = (list: { exam_id: string }[] | null) => {
     const counts = new Map<string, number>();
@@ -68,12 +73,12 @@ export async function listExams(): Promise<(Exam & { problemCount: number; freeC
     return counts;
   };
   const problemCounts = countBy(problemRows as { exam_id: string }[] | null);
-  const freeCounts = countBy(freeRows as { exam_id: string }[] | null);
+  const freeCourseCounts = countBy(freeRows as { exam_id: string }[] | null);
 
   return (rows as ExamRow[]).map((row) => ({
     ...examFromRow(row),
     problemCount: problemCounts.get(row.id) ?? 0,
-    freeCount: freeCounts.get(row.id) ?? 0,
+    freeCourseCount: freeCourseCounts.get(row.id) ?? 0,
   }));
 }
 

@@ -98,6 +98,27 @@ export async function POST(
     );
   }
 
+  /**
+   * The student-facing join button is gated on lessons[i].zoomLink (see
+   * ProfileClient's LessonAction), so the link has to land on the owner row
+   * itself rather than waiting for the admin to press "Хадгалах" as well.
+   *
+   * Both branches below call this: a lesson whose meeting already exists but
+   * whose zoomLink was never saved reported success while the students still
+   * had no way in.
+   */
+  const persistJoinUrl = async (joinUrl: string) => {
+    if (owner.lessons[lessonIndex].zoomLink === joinUrl) return;
+    const lessons: Lesson[] = owner.lessons.map((l, i) =>
+      i === lessonIndex ? { ...l, zoomLink: joinUrl } : l
+    );
+    if (yearlyProgram) {
+      await updateYearlyProgram(courseId, { lessons });
+    } else {
+      await updateCourse(courseId, { lessons });
+    }
+  };
+
   const existingRow = await findLessonMeeting(courseId, lessonIndex);
 
   // A meeting already exists and the admin did not ask for a new one: they
@@ -129,6 +150,7 @@ export async function POST(
       details: { title: owner.title, topic: lesson.topic, schedule: lesson.schedule },
     });
 
+    await persistJoinUrl(existingRow.joinUrl);
     return NextResponse.json({ ok: true, meeting: existingRow, action: "updated" });
   }
 
@@ -166,20 +188,7 @@ export async function POST(
     }
   }
 
-  // The student-facing join button is gated on lessons[i].zoomLink (see
-  // ProfileClient's LessonAction) — persist it onto the owner row itself so
-  // the button appears right away, instead of depending on the admin also
-  // clicking "Хадгалах" afterward to save the client-side form state.
-  if (owner.lessons[lessonIndex].zoomLink !== meeting.joinUrl) {
-    const lessons: Lesson[] = owner.lessons.map((l, i) =>
-      i === lessonIndex ? { ...l, zoomLink: meeting!.joinUrl } : l
-    );
-    if (yearlyProgram) {
-      await updateYearlyProgram(courseId, { lessons });
-    } else {
-      await updateCourse(courseId, { lessons });
-    }
-  }
+  await persistJoinUrl(meeting.joinUrl);
 
   await logAdminAction(request, {
     actionType: "lesson.zoom_meeting_create",

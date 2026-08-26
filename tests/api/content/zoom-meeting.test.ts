@@ -238,3 +238,39 @@ describe("what the route refuses", () => {
     expect(res.body.action).toBe("created");
   });
 });
+
+describe("the join link on the lesson itself", () => {
+  it("is put back when the time is updated on a lesson that lost it", async () => {
+    const admin = await adminClient("full");
+    const course = await createTestCourse({
+      lessons: [{ topic: "Zoom тест", schedule: "2026.09.10 Пүрэв гараг · 19:00–21:00" }],
+    });
+
+    // Create the meeting: this is what normally writes zoomLink onto the lesson.
+    const created = await admin.post(`/api/admin/courses/${course.id}/lessons/0/zoom-meeting`, {
+      lessons: [{ topic: "Zoom тест", schedule: "2026.09.10 Пүрэв гараг · 19:00–21:00" }],
+    });
+    expect(created.status, created.text).toBe(200);
+    // Registered for cleanup like every other meeting row here: they key on a
+    // course id and cascade with nothing, and a leftover row collides with the
+    // mock's meeting numbering on the next run.
+    await trackMeetingRow(course.id);
+
+    // Someone clears the link and saves — the meeting still exists.
+    await admin.put(`/api/admin/courses/${course.id}/lessons`, {
+      lessons: [{ topic: "Zoom тест", schedule: "2026.09.11 Баасан гараг · 19:00–21:00" }],
+    });
+
+    const updated = await admin.post<{ action: string }>(
+      `/api/admin/courses/${course.id}/lessons/0/zoom-meeting`,
+      { lessons: [{ topic: "Zoom тест", schedule: "2026.09.11 Баасан гараг · 19:00–21:00" }] }
+    );
+    expect(updated.status, updated.text).toBe(200);
+    expect(updated.body.action).toBe("updated");
+
+    // The student's join button reads this field, so it has to be back.
+    const { data } = await testDb().from("courses").select("lessons").eq("id", course.id).single();
+    const lessons = (data as { lessons: { zoomLink?: string }[] }).lessons;
+    expect(lessons[0].zoomLink, "хичээл дээр join холбоос буцаж бичигдэх ёстой").toBeTruthy();
+  });
+});

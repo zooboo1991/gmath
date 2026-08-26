@@ -8,7 +8,7 @@ import { apiError, readJson } from "@/lib/fetchJson";
 import { PROBLEM_CATEGORIES, type ProblemCategory } from "@/lib/assessment/types";
 import type { Exam } from "@/lib/assessment/exams";
 
-type ExamRow = Exam & { problemCount: number; freeCount: number };
+type ExamRow = Exam & { problemCount: number; freeCourseCount: number };
 
 const STATUS_LABEL: Record<Exam["status"], string> = {
   draft: "Ноорог",
@@ -147,7 +147,7 @@ export default function ExamsPanel({ initialExams }: { initialExams: ExamRow[] }
                 <b className="font-extrabold text-[1.05rem] block mt-1.5">{exam.title}</b>
                 <span className="text-ink-3 font-semibold text-[.85rem]">
                   {exam.problemCount} бодлого · {exam.fee}
-                  {exam.freeCount > 0 && ` · ${exam.freeCount} үнэгүй сурагч`}
+                  {exam.freeCourseCount > 0 && ` · ${exam.freeCourseCount} сургалт үнэгүй`}
                 </span>
               </div>
               <span className="text-[.85rem] font-extrabold text-blue-strong shrink-0">Нээх →</span>
