@@ -59,7 +59,11 @@ export default async function ProfilePage() {
     listFreeInvitedExams(user.id).catch(() => []),
     // What they have already done about those invitations — an exam handed in
     // must not keep advertising itself as something still to sit.
-    listAssessmentsByUser(user.id).catch(() => []),
+    // Cancelled sittings are skipped so the invitation card offers the exam
+    // again, exactly as it did the first time.
+    listAssessmentsByUser(user.id)
+      .then((all) => all.filter((a) => a.status !== "cancelled"))
+      .catch(() => []),
   ]);
 
   return (

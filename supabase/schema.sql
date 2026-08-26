@@ -1004,3 +1004,11 @@ create table if not exists chat_reports (
   created_at timestamptz not null default now()
 );
 create index if not exists chat_reports_created_idx on chat_reports (created_at desc);
+
+-- Шалгалт цуцлах: a sitting can be voided so the student starts again from
+-- scratch — the case that forced it was a child who photographed the wrong
+-- page. Cancelled rows stay for the record; every query that looks for "this
+-- child's exam" skips them, so the next attempt behaves like a first one.
+alter table assessments drop constraint if exists assessments_status_check;
+alter table assessments add constraint assessments_status_check check (status in
+  ('awaiting_payment','paid','questionnaire_done','problems_submitted','grading','completed','cancelled'));

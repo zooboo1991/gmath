@@ -26,7 +26,9 @@ export type AssessmentStatus =
   | "questionnaire_done"
   | "problems_submitted"
   | "grading"
-  | "completed";
+  | "completed"
+  /** Voided by the school so the student can sit it again from the start. */
+  | "cancelled";
 
 /** What the student chose when a problem was put in front of them. */
 export type ProblemAction = "too_easy" | "dont_know" | "solving";

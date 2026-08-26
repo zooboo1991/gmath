@@ -249,6 +249,58 @@ describe("the paper, step by step", () => {
     expect(now.status, now.text).toBe(200);
   });
 
+  it("lets the school void a sitting so the child starts over", async () => {
+    const admin = await adminClient("full");
+    const { client, assessmentId, problemIds } = await readyToSolve();
+
+    await uploadPhoto(client, assessmentId, problemIds[0]);
+    const { data: exam } = await testDb()
+      .from("assessments")
+      .select("exam_id")
+      .eq("id", assessmentId)
+      .single();
+    const examId = (exam as { exam_id: string }).exam_id;
+
+    const cancelled = await admin.post(`/api/admin/grading/${assessmentId}/cancel`);
+    expect(cancelled.status, cancelled.text).toBe(200);
+
+    // Starting again gives a new paper, not the voided one — which is what
+    // makes it look like a first attempt to the child.
+    const restarted = await client.post<{ assessment: { id: string; status: string } }>(
+      "/api/assessment",
+      { track: "olympiad", examId }
+    );
+    expect(restarted.status, restarted.text).toBe(200);
+    expect(restarted.body.assessment.id).not.toBe(assessmentId);
+
+    // And the old one is out of the grading queue.
+    const queue = await admin.get<{ queue: { id: string }[] }>("/api/admin/grading");
+    expect(queue.body.queue.some((a) => a.id === assessmentId)).toBe(false);
+  });
+
+  it("will not void a sitting the teacher already finished", async () => {
+    const admin = await adminClient("full");
+    const { client, assessmentId, problemIds } = await readyToSolve();
+
+    for (const problemId of problemIds) await uploadPhoto(client, assessmentId, problemId);
+    await client.post(`/api/assessment/${assessmentId}/submit`);
+    const { data: rows } = await testDb()
+      .from("solutions")
+      .select("id")
+      .eq("assessment_id", assessmentId);
+    for (const row of rows as { id: string }[]) {
+      await admin.put(`/api/admin/grading/${assessmentId}/score`, {
+        solutionId: row.id,
+        graderScore: "5",
+        graderComment: "",
+      });
+    }
+    await admin.put(`/api/admin/grading/${assessmentId}/complete`, { teacherComment: "Дүгнэлт" });
+
+    const res = await admin.post<{ error: string }>(`/api/admin/grading/${assessmentId}/cancel`);
+    expect(res.status).toBe(409);
+  });
+
   it("refuses a problem that is not on this child's paper", async () => {
     const { client, assessmentId } = await readyToSolve();
     const other = await readyToSolve();

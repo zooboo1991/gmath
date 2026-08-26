@@ -153,6 +153,33 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
     }
   };
 
+  /** Voids the sitting so the student can start over — the wrong-photo case. */
+  const cancelSitting = async () => {
+    if (
+      !confirm(
+        "Энэ шалгалтыг цуцлах уу? Сурагч анхнаасаа дахин өгөх боломжтой болно. Одоо байгаа зураг, оноо хадгалагдах ч сурагчид харагдахгүй."
+      )
+    ) {
+      return;
+    }
+    setCompleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/grading/${id}/cancel`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Цуцлахад алдаа гарлаа");
+        return;
+      }
+      router.push("/admin/grading");
+      router.refresh();
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setCompleting(false);
+    }
+  };
+
   const complete = async () => {
     if (missing.length > 0) {
       setShowMissing(true);
@@ -386,6 +413,17 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
                 className="w-full font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-6 py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong disabled:opacity-50"
               >
                 {completing ? "Хадгалж байна…" : "Үнэлгээг дуусгаж сурагчид илгээх"}
+              </button>
+
+              {/* Rare but necessary: a child who photographed the wrong page
+                  has nothing markable here, and no way back on their own. */}
+              <button
+                type="button"
+                disabled={completing}
+                onClick={cancelSitting}
+                className="w-full font-extrabold text-[.88rem] text-red-soft bg-surface border border-line-2 rounded-full px-6 py-3 mt-2.5 disabled:opacity-50"
+              >
+                Шалгалтыг цуцлаж дахин өгүүлэх
               </button>
             </>
           )}

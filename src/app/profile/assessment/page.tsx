@@ -57,7 +57,10 @@ export default async function ProfileAssessmentPage({
   // The assessment tables are newer than the rest of the site — an install
   // that hasn't run the latest schema.sql should see the empty state, not a
   // crash.
-  const assessments = await listAssessmentsByUser(user.id).catch(() => [] as Assessment[]);
+  const assessments = (await listAssessmentsByUser(user.id).catch(() => [] as Assessment[])).filter(
+    // A voided sitting is not shown at all: the student is meant to start over.
+    (a) => a.status !== "cancelled"
+  );
   // ?a=<id> comes from the course card they pressed — a child sitting both the
   // C and the D exam has two of these, and they must not be shown each other's
   // marks. Without it: the finished one, falling back to whatever is running.

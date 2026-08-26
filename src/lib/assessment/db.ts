@@ -415,7 +415,7 @@ export async function findOpenAssessment(
   examId?: string
 ): Promise<Assessment | undefined> {
   const all = await listAssessmentsByUser(userId);
-  const open = all.filter((a) => a.status !== "completed");
+  const open = all.filter((a) => a.status !== "completed" && a.status !== "cancelled");
   if (!examId) return open[0];
   return open.find((a) => a.examId === examId);
 }
@@ -430,7 +430,11 @@ export async function findAssessmentForExam(
   userId: string,
   examId: string
 ): Promise<Assessment | undefined> {
-  return (await listAssessmentsByUser(userId)).find((a) => a.examId === examId);
+  // A cancelled sitting is not "their exam" any more — that is what lets the
+  // student start again and see the first-time screens.
+  return (await listAssessmentsByUser(userId)).find(
+    (a) => a.examId === examId && a.status !== "cancelled"
+  );
 }
 
 export async function createAssessment(
@@ -510,6 +514,14 @@ export async function settleAssessmentPayment(id: string): Promise<Assessment | 
  * the student who has waited longest is graded next. Joined to users because
  * a queue of bare UUIDs is unusable.
  */
+/**
+ * Voids one sitting. The photos and any marks stay on the row; nothing else
+ * looks at a cancelled assessment, so the student's next attempt starts clean.
+ */
+export async function cancelAssessment(id: string): Promise<Assessment | undefined> {
+  return updateAssessment(id, { status: "cancelled" });
+}
+
 export async function listAssessmentsForGrading(): Promise<AssessmentWithUser[]> {
   const { data, error } = await getSupabase()
     .from("assessments")
