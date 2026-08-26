@@ -8,6 +8,7 @@ import {
   listRegistrationsByUser,
   toPublicUser,
 } from "@/lib/db";
+import { getUserTimeline } from "@/lib/userTimeline";
 import { isAdmin } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -25,11 +26,13 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
   const user = await findUserById(id);
   if (!user) notFound();
 
-  const [registrations, loginLogs, chatConversations] = await Promise.all([
+  const [registrations, loginLogs, chatConversations, timeline] = await Promise.all([
     // The admin sees cancelled registrations too — that is the point of keeping them.
     listRegistrationsByUser(id, { includeCancelled: true }),
     listLoginLogs(id),
     listChatConversationsByUser(id),
+    // Newer tables feed this; one missing must not take the page down.
+    getUserTimeline(user).catch(() => []),
   ]);
 
   return (
@@ -38,6 +41,7 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
       registrations={registrations}
       loginLogs={loginLogs}
       chatConversations={chatConversations}
+      timeline={timeline}
     />
   );
 }

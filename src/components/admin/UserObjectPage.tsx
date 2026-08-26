@@ -9,8 +9,21 @@ import { KpiTile } from "@/components/admin/AdminObjectPageParts";
 import { IconArrowLeft, IconCheckCircle, IconClock } from "@/components/icons";
 import { describeUserAgent } from "@/lib/userAgent";
 import { payMethodLabel, programAdminHref } from "@/lib/registration";
+import type { TimelineEvent } from "@/lib/userTimeline";
 
-type ObjectTab = "info" | "devices" | "chat";
+type ObjectTab = "info" | "devices" | "chat" | "timeline";
+
+/** Дохионы өнгө: аль төрлийн үйл явдал болохыг цэгээр нь ялгана. */
+const TIMELINE_DOT: Record<TimelineEvent["kind"], string> = {
+  account: "bg-ink-3",
+  course: "bg-blue",
+  payment: "bg-green",
+  lesson: "bg-gold",
+  assessment: "bg-blue-strong",
+  chat: "bg-ink-2",
+  admin: "bg-red-soft",
+  other: "bg-line-2",
+};
 
 function StatusBadge({ status }: { status: RegistrationWithGroup["status"] }) {
   if (status === "active") {
@@ -77,17 +90,20 @@ export default function UserObjectPage({
   registrations,
   loginLogs,
   chatConversations,
+  timeline,
 }: {
   user: PublicUser;
   registrations: RegistrationWithGroup[];
   loginLogs: LoginLog[];
   chatConversations: AdminChatConversation[];
+  timeline: TimelineEvent[];
 }) {
   const [tab, setTab] = useState<ObjectTab>("info");
   const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
   const live = registrations.filter((r) => r.status !== "cancelled");
   const active = registrations.filter((r) => r.status === "active");
   const pending = registrations.filter((r) => r.status === "pending");
+  const cancelled = registrations.filter((r) => r.status === "cancelled");
 
   return (
     <div className="min-h-screen bg-bg-soft">
@@ -152,6 +168,11 @@ export default function UserObjectPage({
             active={tab === "chat"}
             onClick={() => setTab("chat")}
           />
+          <AnchorTab
+            label={`Түүх${timeline.length ? ` (${timeline.length})` : ""}`}
+            active={tab === "timeline"}
+            onClick={() => setTab("timeline")}
+          />
         </div>
       </header>
 
@@ -176,12 +197,23 @@ export default function UserObjectPage({
                 <p className="text-ink-3 font-semibold text-[.9rem]">Бүртгэл алга байна.</p>
               ) : (
                 <div className="flex flex-col gap-2.5">
-                  {[...active, ...pending]
-                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                    .map((r) => (
+                  {/* Cancelled rows are shown too, last and faded: the header
+                      counted them while the list left them out, so a student
+                      who moved to another course read as "2 сургалт" with one
+                      card under it. */}
+                  {[
+                    ...[...active, ...pending].sort(
+                      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    ),
+                    ...cancelled.sort(
+                      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    ),
+                  ].map((r) => (
                       <div
                         key={r.id}
-                        className="bg-bg-soft rounded-md px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap"
+                        className={`rounded-md px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap ${
+                          r.status === "cancelled" ? "bg-surface-2 opacity-70" : "bg-bg-soft"
+                        }`}
                       >
                         <div>
                           <Link
@@ -202,6 +234,39 @@ export default function UserObjectPage({
               )}
             </Card>
           </>
+        )}
+
+        {tab === "timeline" && (
+          <Card title="Хэрэглэгчийн бүх түүх">
+            <p className="text-ink-3 font-semibold text-[.85rem] mb-4">
+              Бүртгүүлснээс хойших бүх үйлдэл: сургалт, төлбөр, хичээл, шалгалт, чат, нэвтрэлт,
+              админаас хийсэн өөрчлөлт — шинэ нь дээрээ.
+            </p>
+            {timeline.length === 0 ? (
+              <p className="text-ink-3 font-semibold text-[.9rem]">Түүх алга байна.</p>
+            ) : (
+              <div className="flex flex-col">
+                {timeline.map((event, i) => (
+                  <div key={`${event.at}-${i}`} className="flex gap-3.5 group">
+                    {/* The rail: a dot per event, a line joining them. */}
+                    <div className="flex flex-col items-center shrink-0 pt-1.5">
+                      <span className={`w-2.5 h-2.5 rounded-full ${TIMELINE_DOT[event.kind]}`} />
+                      <span className="w-px flex-1 bg-line group-last:hidden" />
+                    </div>
+                    <div className="pb-4 min-w-0">
+                      <b className="font-extrabold text-[.9rem] block">{event.title}</b>
+                      <span className="text-ink-3 font-semibold text-[.8rem] block">
+                        {/* A recorded payment carries the day the admin typed,
+                            with no clock on it — inventing one would be a lie. */}
+                        {event.at.length === 10 ? formatDate(event.at) : formatDateTime(event.at)}
+                        {event.detail ? ` · ${event.detail}` : ""}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
         )}
 
         {tab === "devices" && (
