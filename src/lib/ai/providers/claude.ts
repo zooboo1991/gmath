@@ -12,7 +12,7 @@ function getClient(): Anthropic {
   return client;
 }
 
-export async function claudeChat({ system, messages, tier }: ChatRequest): Promise<ChatResult> {
+export async function claudeChat({ system, messages, tier, maxTokens }: ChatRequest): Promise<ChatResult> {
   const model =
     tier === "smart"
       ? process.env.ANTHROPIC_MODEL_SMART ?? "claude-sonnet-5"
@@ -20,7 +20,7 @@ export async function claudeChat({ system, messages, tier }: ChatRequest): Promi
 
   const response = await getClient().messages.create({
     model,
-    max_tokens: 1024,
+    max_tokens: maxTokens ?? 1024,
     // Cached: the system block carries the whole course/program catalogue and
     // repeats near-identically on every turn of a conversation, so paying full
     // input price for it each time is pure waste.

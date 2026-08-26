@@ -14,6 +14,11 @@ export type ChatRequest = {
   system: string;
   messages: ChatMessage[];
   tier: ModelTier;
+  /**
+   * Room for the answer. A chat reply is a paragraph; a report is pages of
+   * JSON, and the default cut one off mid-object where it could not be parsed.
+   */
+  maxTokens?: number;
 };
 
 export type ChatResult = {

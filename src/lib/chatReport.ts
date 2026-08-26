@@ -75,10 +75,14 @@ const SYSTEM = `Чи Монголын математикийн сургалты�
 
 Дүрэм:
 - Бүгдийг монгол хэлээр, кирилл үсгээр бич.
-- themes-ийг олон давтагдсанаар нь эрэмбэл, дээд тал нь 8.
+- ТОВЧ бич. themes дээд тал нь 6, faq 5, attention 4, suggestions 3.
+- Мөр бүр 90 тэмдэгтээс богино байх. Урт өгүүлбэр бүү бич.
+- themes-ийг олон давтагдсанаар нь эрэмбэл.
 - attention-д гомдол, төлбөрийн маргаан, ойлгомжгүй байсан зүйл, хариу
   аваагүй мэт харагдсан асуултыг оруул. Байхгүй бол хоосон массив.
 - Хүний нэр, утасны дугаарыг тайландаа бүү бич.
+- Мессежийн дугаар, дугаарын жагсаалтыг бүү дурд — тоо нь утасны дугаар мэт
+  уншигдаж, уншигчид ямар ч утгагүй. Оронд нь юу болсныг үгээр тайлбарла.
 - Тоо зохиож болохгүй — өгөгдсөн мессежээс тоол.`;
 
 /**
@@ -125,51 +129,76 @@ export async function buildChatReport(input: {
     });
   }
 
+  // No line numbers: given them, the model cites "(164, 183, 231)" in the
+  // report, which reads like phone numbers and means nothing to the reader.
   const transcript = messages
-    .map((m, i) => `${i + 1}. [${m.created_at.slice(0, 10)}] ${m.content.slice(0, MAX_MESSAGE_CHARS)}`)
+    .map((m) => `[${m.created_at.slice(0, 10)}] ${m.content.slice(0, MAX_MESSAGE_CHARS)}`)
     .join("\n");
 
-  const result = await routeChat({
-    system: SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: `Хугацаа: ${input.fromDate} — ${input.toDate}\nНийт ${messages.length} мессеж, ${conversationCount} харилцан яриа.\n\n${transcript}`,
-      },
-    ],
-  });
+  const prompt = `Хугацаа: ${input.fromDate} — ${input.toDate}\nНийт ${messages.length} мессеж, ${conversationCount} харилцан яриа.\n\n${transcript}`;
+
+  // Asked once; asked again, more sternly, if the answer came back as
+  // something JSON.parse refuses. On a long range the model occasionally
+  // slips — one retry is cheaper than handing the admin an empty report.
+  let summary = parseSummary(await ask(SYSTEM, prompt));
+  if (!summary) {
+    summary = parseSummary(
+      await ask(
+        `${SYSTEM}\n\nӨМНӨХ ОРОЛДЛОГО БҮТСЭНГҮЙ: хариу нь зөв JSON биш байлаа.
+Энэ удаад зөвхөн цэвэр JSON бич — код блок, тайлбар, шинэ мөр дотор
+хашилт бүү оруул. Богино байлга.`,
+        prompt
+      )
+    );
+  }
 
   return saveReport({
     ...input,
     messageCount: messages.length,
     conversationCount,
-    summary: parseSummary(result.text),
+    summary: summary ?? FAILED_SUMMARY,
   });
 }
 
+const FAILED_SUMMARY: ChatReportSummary = {
+  headline: "Тайланг боловсруулж чадсангүй. Хугацааны хязгаарыг богиносгоод дахин оролдоно уу.",
+  themes: [],
+  faq: [],
+  attention: [],
+  suggestions: [],
+};
+
+async function ask(system: string, prompt: string): Promise<string> {
+  const result = await routeChat({
+    system,
+    // A report is not a chat reply: it needs the better model and room to
+    // finish its JSON. Mongolian Cyrillic costs roughly two and a half tokens
+    // per character, so a page of it eats a budget that looks generous — at
+    // 4000 the answer stopped mid-string and could not be parsed at all.
+    tier: "smart",
+    maxTokens: 8000,
+    messages: [{ role: "user", content: prompt }],
+  });
+  return result.text;
+}
+
 /** The model is asked for bare JSON; a stray code fence must not lose the report. */
-function parseSummary(text: string): ChatReportSummary {
+function parseSummary(text: string): ChatReportSummary | null {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
-  const empty: ChatReportSummary = {
-    headline: "Тайланг боловсруулж чадсангүй. Дахин оролдоно уу.",
-    themes: [],
-    faq: [],
-    attention: [],
-    suggestions: [],
-  };
-  if (start === -1 || end <= start) return empty;
+  if (start === -1 || end <= start) return null;
   try {
     const parsed = JSON.parse(text.slice(start, end + 1)) as Partial<ChatReportSummary>;
+    if (!parsed.headline && !Array.isArray(parsed.themes)) return null;
     return {
-      headline: parsed.headline ?? empty.headline,
+      headline: parsed.headline ?? FAILED_SUMMARY.headline,
       themes: Array.isArray(parsed.themes) ? parsed.themes.slice(0, 8) : [],
       faq: Array.isArray(parsed.faq) ? parsed.faq.slice(0, 8) : [],
       attention: Array.isArray(parsed.attention) ? parsed.attention.slice(0, 8) : [],
       suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, 6) : [],
     };
   } catch {
-    return empty;
+    return null;
   }
 }
 

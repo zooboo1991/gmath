@@ -18,12 +18,17 @@ export function pickTier(message: string): ModelTier {
 export async function routeChat({
   system,
   messages,
+  tier: forcedTier,
+  maxTokens,
 }: {
   system: string;
   messages: ChatMessage[];
+  /** Set when the caller already knows which tier the job needs. */
+  tier?: ModelTier;
+  maxTokens?: number;
 }): Promise<ChatResult> {
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
-  const tier = pickTier(lastUserMessage?.content ?? "");
+  const tier = forcedTier ?? pickTier(lastUserMessage?.content ?? "");
   const chat = process.env.AI_PROVIDER === "deepseek" ? deepseekChat : claudeChat;
-  return chat({ system, messages, tier });
+  return chat({ system, messages, tier, maxTokens });
 }

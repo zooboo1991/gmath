@@ -12,7 +12,7 @@ type DeepSeekResponse = {
  * that's fine to leave the country (see the system prompt builder, which is
  * where a student's own registration details get injected).
  */
-export async function deepseekChat({ system, messages, tier }: ChatRequest): Promise<ChatResult> {
+export async function deepseekChat({ system, messages, tier, maxTokens }: ChatRequest): Promise<ChatResult> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("DEEPSEEK_API_KEY тохируулаагүй байна");
 
@@ -27,7 +27,7 @@ export async function deepseekChat({ system, messages, tier }: ChatRequest): Pro
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model,
-      max_tokens: 1024,
+      max_tokens: maxTokens ?? 1024,
       messages: [{ role: "system", content: system }, ...messages],
     }),
   });
