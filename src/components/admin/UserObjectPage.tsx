@@ -3,15 +3,22 @@
 import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/dateFormat";
 import { useState } from "react";
-import type { AdminChatConversation, LoginLog, PublicUser, RegistrationWithGroup } from "@/lib/db";
+import type {
+  AdminChatConversation,
+  LoginLog,
+  PublicUser,
+  RegistrationPayment,
+  RegistrationWithGroup,
+} from "@/lib/db";
 import ChatTranscript from "@/components/admin/ChatTranscript";
 import { KpiTile } from "@/components/admin/AdminObjectPageParts";
 import { IconArrowLeft, IconCheckCircle, IconClock } from "@/components/icons";
 import { describeUserAgent } from "@/lib/userAgent";
-import { payMethodLabel, programAdminHref } from "@/lib/registration";
+import { payMethodLabel, programAdminHref, registrationBalance } from "@/lib/registration";
+import { formatMnt } from "@/lib/price";
 import type { TimelineEvent } from "@/lib/userTimeline";
 
-type ObjectTab = "info" | "devices" | "chat" | "timeline";
+type ObjectTab = "info" | "payments" | "devices" | "chat" | "timeline";
 
 /** Дохионы өнгө: аль төрлийн үйл явдал болохыг цэгээр нь ялгана. */
 const TIMELINE_DOT: Record<TimelineEvent["kind"], string> = {
@@ -24,6 +31,12 @@ const TIMELINE_DOT: Record<TimelineEvent["kind"], string> = {
   admin: "bg-red-soft",
   other: "bg-line-2",
 };
+
+/** Today in Mongolia, for judging whether a promised date has passed. */
+function todayIso(): string {
+  const local = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  return local.toISOString().slice(0, 10);
+}
 
 function StatusBadge({ status }: { status: RegistrationWithGroup["status"] }) {
   if (status === "active") {
@@ -91,12 +104,14 @@ export default function UserObjectPage({
   loginLogs,
   chatConversations,
   timeline,
+  payments,
 }: {
   user: PublicUser;
   registrations: RegistrationWithGroup[];
   loginLogs: LoginLog[];
   chatConversations: AdminChatConversation[];
   timeline: TimelineEvent[];
+  payments: RegistrationPayment[];
 }) {
   const [tab, setTab] = useState<ObjectTab>("info");
   const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
@@ -104,6 +119,22 @@ export default function UserObjectPage({
   const active = registrations.filter((r) => r.status === "active");
   const pending = registrations.filter((r) => r.status === "pending");
   const cancelled = registrations.filter((r) => r.status === "cancelled");
+
+  // Fee, received and outstanding across everything this student is on.
+  const money = live.reduce(
+    (sum, registration) => {
+      const recorded = payments
+        .filter((p) => p.registrationId === registration.id)
+        .reduce((total, p) => total + p.amount, 0);
+      const totals = registrationBalance(registration, recorded);
+      return {
+        due: sum.due + totals.due,
+        paid: sum.paid + totals.paid,
+        balance: sum.balance + totals.balance,
+      };
+    },
+    { due: 0, paid: 0, balance: 0 }
+  );
 
   return (
     <div className="min-h-screen bg-bg-soft">
@@ -158,6 +189,7 @@ export default function UserObjectPage({
 
         <div className="wrap flex gap-1 overflow-x-auto">
           <AnchorTab label="Ерөнхий мэдээлэл" active={tab === "info"} onClick={() => setTab("info")} />
+          <AnchorTab label="Төлбөр" active={tab === "payments"} onClick={() => setTab("payments")} />
           <AnchorTab
             label={`Төхөөрөмж${loginLogs.length ? ` (${loginLogs.length})` : ""}`}
             active={tab === "devices"}
@@ -233,6 +265,114 @@ export default function UserObjectPage({
                 </div>
               )}
             </Card>
+          </>
+        )}
+
+        {tab === "payments" && (
+          <>
+            <div className="grid grid-cols-3 gap-3">
+              <KpiTile label="Нийт төлөх" value={formatMnt(money.due)} />
+              <KpiTile label="Төлсөн" value={formatMnt(money.paid)} tone="green" />
+              <KpiTile
+                label="Үлдэгдэл"
+                value={formatMnt(money.balance)}
+                tone={money.balance > 0 ? "gold" : "green"}
+              />
+            </div>
+
+            {live.length === 0 ? (
+              <Card title="Төлбөр">
+                <p className="text-ink-3 font-semibold text-[.9rem]">Идэвхтэй бүртгэл алга байна.</p>
+              </Card>
+            ) : (
+              live.map((registration) => {
+                const rows = payments.filter((p) => p.registrationId === registration.id);
+                const totals = registrationBalance(
+                  registration,
+                  rows.reduce((sum, p) => sum + p.amount, 0)
+                );
+                const overdue =
+                  totals.balance > 0 &&
+                  Boolean(registration.installmentDueDate) &&
+                  registration.installmentDueDate! < todayIso();
+
+                return (
+                  <Card key={registration.id} title={registration.programLabel}>
+                    <div className="flex flex-col">
+                      <InfoRow label="Төлөх дүн" value={formatMnt(totals.due)} />
+                      <InfoRow label="Төлсөн" value={formatMnt(totals.paid)} />
+                      <InfoRow
+                        label="Үлдэгдэл"
+                        value={totals.balance === 0 ? "Бүрэн төлсөн" : formatMnt(totals.balance)}
+                      />
+                      <InfoRow label="Төлбөрийн хэлбэр" value={payMethodLabel(registration.payMethod)} />
+                    </div>
+
+                    {registration.installmentDueDate && totals.balance > 0 && (
+                      <p
+                        className={`font-extrabold text-[.88rem] rounded-md px-4 py-3 mt-3 ${
+                          overdue
+                            ? "text-red-soft bg-[oklch(0.97_0.03_25)]"
+                            : "text-gold-strong bg-gold-soft"
+                        }`}
+                      >
+                        {overdue ? "Хугацаа хэтэрсэн" : "Дараагийн төлөлт"}:{" "}
+                        {registration.installmentDueDate.replaceAll("-", ".")} —{" "}
+                        {formatMnt(totals.balance)}
+                      </p>
+                    )}
+
+                    <div className="mt-4 pt-4 border-t border-line">
+                      <span className="text-[.8rem] font-extrabold text-ink-3 block mb-2">
+                        Хийсэн төлөлт ({rows.length})
+                      </span>
+                      {rows.length === 0 ? (
+                        <p className="text-ink-3 font-semibold text-[.88rem]">
+                          {totals.settledByGateway
+                            ? "QPay-ээр бүрэн төлөгдсөн тул тусад нь бүртгээгүй."
+                            : "Бүртгэсэн төлөлт алга байна."}
+                        </p>
+                      ) : (
+                        <div className="flex flex-col">
+                          {[...rows]
+                            .sort((a, b) => (a.paidAt < b.paidAt ? 1 : -1))
+                            .map((payment) => (
+                              <div
+                                key={payment.id}
+                                className="flex items-center justify-between gap-4 py-2 border-b border-line last:border-0"
+                              >
+                                <span className="text-ink-2 font-semibold text-[.88rem]">
+                                  {formatDate(payment.paidAt)}
+                                </span>
+                                <b className="font-extrabold text-[.9rem] tabular-nums">
+                                  {formatMnt(payment.amount)}
+                                </b>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+
+            {cancelled.length > 0 && (
+              <Card title={`Цуцалсан бүртгэл (${cancelled.length})`}>
+                <div className="flex flex-col">
+                  {cancelled.map((registration) => (
+                    <InfoRow
+                      key={registration.id}
+                      label={registration.programLabel}
+                      value={`${registration.price} · ${formatDate(registration.createdAt)}`}
+                    />
+                  ))}
+                </div>
+                <p className="text-ink-3 font-semibold text-[.82rem] mt-2">
+                  Цуцалсан бүртгэл төлбөрийн тооцоонд ороогүй.
+                </p>
+              </Card>
+            )}
           </>
         )}
 

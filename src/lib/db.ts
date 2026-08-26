@@ -4,6 +4,7 @@ import { hashPassword, verifyPassword as verifyPasswordHash } from "./password";
 import { parsePriceToNumber } from "./price";
 import { splitHalves } from "./installment";
 import { nextCertificateNumbers } from "./certificateNumber";
+import { registrationBalance } from "./registration";
 import { transliterate } from "./mnTransliterate";
 import { sendPushToUsers } from "./push";
 import { sendSms } from "./sms/skytel";
@@ -2031,17 +2032,19 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     if (row.pay_method === "qpay") qpayCount += 1;
     else bankCount += 1;
 
-    // The agreed amount where the admin set one; the course price otherwise.
-    const due = row.total_due ?? amount;
-    // A QPay registration with no installment plan was settled in full by the
-    // gateway — that money is in, even though no payment row was typed for it.
-    const settledByGateway =
-      row.total_due === null && row.status === "active" && row.pay_method === "qpay";
-    const received = settledByGateway ? due : (paidByRegistration.get(row.id) ?? 0);
+    // One rule, shared with the student's payment tab — see registrationBalance.
+    const { due, paid, balance: owed, settledByGateway } = registrationBalance(
+      {
+        price: row.price,
+        totalDue: row.total_due ?? undefined,
+        status: row.status,
+        payMethod: row.pay_method,
+      },
+      paidByRegistration.get(row.id) ?? 0
+    );
 
     money.totalDue += due;
-    money.paid += Math.min(received, due);
-    const owed = Math.max(0, due - received);
+    money.paid += paid;
     money.outstanding += owed;
     if (row.status === "active") {
       money.installmentBalance += owed;

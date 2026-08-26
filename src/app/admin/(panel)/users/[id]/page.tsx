@@ -5,6 +5,7 @@ import {
   findUserById,
   listChatConversationsByUser,
   listLoginLogs,
+  listPaymentsForRegistrations,
   listRegistrationsByUser,
   toPublicUser,
 } from "@/lib/db";
@@ -35,6 +36,10 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
     getUserTimeline(user).catch(() => []),
   ]);
 
+  // Instalments recorded against this student's registrations — the payment
+  // tab reads them, and they are what turns a fee into a balance.
+  const payments = await listPaymentsForRegistrations(registrations.map((r) => r.id)).catch(() => []);
+
   return (
     <UserObjectPage
       user={toPublicUser(user)}
@@ -42,6 +47,7 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
       loginLogs={loginLogs}
       chatConversations={chatConversations}
       timeline={timeline}
+      payments={payments}
     />
   );
 }
