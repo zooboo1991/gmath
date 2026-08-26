@@ -41,7 +41,10 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("otp send failed", trimmedPhone, purpose, err);
+    // No phone number here on purpose: the timestamp and purpose are enough
+    // to find the row in otp_codes, and a log line is not a place for a
+    // child's number.
+    console.error("otp send failed", purpose, err);
     return NextResponse.json(
       { ok: false, error: "Код илгээхэд алдаа гарлаа. Дахин оролдоно уу." },
       { status: 502 }

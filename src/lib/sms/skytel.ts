@@ -16,6 +16,15 @@ function requiredToken(): string {
   return token;
 }
 
+/**
+ * Hides phone numbers before anything reaches a log. The gateway echoes the
+ * recipient back in its response body, and a log line is the one place a
+ * student's number has no business being.
+ */
+function maskPhones(text: string): string {
+  return text.replace(/\b(\d{2})\d{4}(\d{2})\b/g, "$1****$2");
+}
+
 export async function sendSms(phone: string, message: string): Promise<void> {
   const url = new URL(BASE_URL);
   url.searchParams.set("token", requiredToken());
@@ -25,11 +34,11 @@ export async function sendSms(phone: string, message: string): Promise<void> {
   const res = await fetch(url.toString());
   const body = await res.text().catch(() => "");
   if (!res.ok) {
-    throw new Error(`SMS илгээхэд алдаа гарлаа: ${res.status} ${body.slice(0, 300)}`);
+    throw new Error(`SMS илгээхэд алдаа гарлаа: ${res.status} ${maskPhones(body.slice(0, 300))}`);
   }
   // Skytel's success/failure body format for this endpoint hasn't been
   // confirmed against a real send — logged so the first live send can
   // reveal it, until sendSms is tightened to check for an error indicator
   // in the body rather than trusting any HTTP 200.
-  console.log("[skytel] send response:", body.slice(0, 300));
+  console.log("[skytel] send response:", maskPhones(body.slice(0, 300)));
 }
