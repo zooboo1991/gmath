@@ -665,6 +665,25 @@ export async function listUsers(): Promise<PublicUser[]> {
   return (data as UserRow[]).map((row) => toPublicUser(userFromRow(row)));
 }
 
+/**
+ * When each account last signed in — for the "who is still active" column on
+ * the user list. One query for everybody rather than one per row.
+ */
+export async function getLastLoginByUser(): Promise<Record<string, string>> {
+  const { data, error } = await getSupabase()
+    .from("login_logs")
+    .select("user_id, created_at")
+    .order("created_at", { ascending: false })
+    .limit(5000);
+  if (error) throw error;
+  const latest: Record<string, string> = {};
+  // Newest first, so the first sighting of a user is their last login.
+  for (const row of data as { user_id: string; created_at: string }[]) {
+    if (!latest[row.user_id]) latest[row.user_id] = row.created_at;
+  }
+  return latest;
+}
+
 export async function listCourses(
   kind?: CourseKind,
   opts?: { includeDrafts?: boolean }
