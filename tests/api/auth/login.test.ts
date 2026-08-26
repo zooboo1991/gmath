@@ -113,29 +113,67 @@ describe("POST /api/account/login", () => {
     it("locks a phone number out after 8 wrong passwords", async () => {
       const user = await createTestUser();
       const client = anonClient();
+      // Its own IP: the per-IP limit added alongside this one is shared by
+      // every request without a forwarded-for header, and these tests would
+      // otherwise spend each other's budget.
+      const from = { "x-forwarded-for": "203.0.113.11" };
 
       // checkRateLimit("login:<phone>", 8, 5min): eight attempts are let
       // through, the ninth is refused.
       for (let attempt = 1; attempt <= 8; attempt += 1) {
-        const res = await client.post(`/api/account/login`, {
-          phone: user.phone,
-          password: "WrongPass9",
-        });
+        const res = await client.post(
+          `/api/account/login`,
+          { phone: user.phone, password: "WrongPass9" },
+          from
+        );
         expect(res.status, `attempt ${attempt}`).toBe(401);
       }
 
-      const blocked = await client.post<{ error: string }>("/api/account/login", {
-        phone: user.phone,
-        password: "WrongPass9",
-      });
+      const blocked = await client.post<{ error: string }>(
+        "/api/account/login",
+        { phone: user.phone, password: "WrongPass9" },
+        from
+      );
       expect(blocked.status).toBe(429);
 
       // And the lockout is not bypassable by suddenly knowing the password.
-      const withRightPassword = await anonClient().post("/api/account/login", {
-        phone: user.phone,
-        password: user.password,
-      });
+      const withRightPassword = await anonClient().post(
+        "/api/account/login",
+        { phone: user.phone, password: user.password },
+        from
+      );
       expect(withRightPassword.status).toBe(429);
+    });
+
+    it("stops one address spraying a password across many numbers", async () => {
+      // The per-phone limit never sees this attack: each number gets one
+      // guess. The per-IP limit is what ends it.
+      const from = { "x-forwarded-for": "203.0.113.13" };
+      let blocked = false;
+
+      for (let attempt = 1; attempt <= 31; attempt += 1) {
+        const res = await anonClient().post(
+          "/api/account/login",
+          { phone: String(80000000 + attempt), password: "Sprayed123" },
+          from
+        );
+        if (res.status === 429) {
+          blocked = true;
+          break;
+        }
+        expect(res.status, `attempt ${attempt}`).toBe(401);
+      }
+
+      expect(blocked, "31 оролдлогын дотор IP хаагдах ёстой").toBe(true);
+
+      // A different address is unaffected — one attacker cannot lock the site.
+      const bystander = await createTestUser();
+      const elsewhere = await anonClient().post(
+        "/api/account/login",
+        { phone: bystander.phone, password: bystander.password },
+        { "x-forwarded-for": "203.0.113.14" }
+      );
+      expect(elsewhere.status).toBe(200);
     });
 
     it("keeps the lockout to the phone number under attack", async () => {
@@ -143,10 +181,11 @@ describe("POST /api/account/login", () => {
       const bystander = await createTestUser();
 
       for (let attempt = 1; attempt <= 9; attempt += 1) {
-        await anonClient().post("/api/account/login", {
-          phone: target.phone,
-          password: "WrongPass9",
-        });
+        await anonClient().post(
+          "/api/account/login",
+          { phone: target.phone, password: "WrongPass9" },
+          { "x-forwarded-for": "203.0.113.12" }
+        );
       }
 
       const res = await anonClient().post("/api/account/login", {
