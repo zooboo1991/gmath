@@ -152,7 +152,22 @@ export async function updateMeeting(
     // while our row still points at it. The caller can recover from that by
     // making a new meeting — every other failure it cannot.
     if (res.status === 404) throw new ZoomMeetingGoneError(meetingId);
-    throw new Error(`Zoom meeting шинэчлэхэд алдаа гарлаа: ${res.status} ${await errorDetail(res)}`);
+    throw new ZoomUpdateError(res.status, await errorDetail(res));
+  }
+}
+
+/**
+ * Carries Zoom's own status and message so the admin sees what actually went
+ * wrong. Guessing from a generic "шинэчилж чадсангүй" cost a day of
+ * back-and-forth once already.
+ */
+export class ZoomUpdateError extends Error {
+  constructor(
+    readonly status: number,
+    readonly detail: string
+  ) {
+    super(`Zoom meeting шинэчлэхэд алдаа гарлаа: ${status} ${detail}`);
+    this.name = "ZoomUpdateError";
   }
 }
 

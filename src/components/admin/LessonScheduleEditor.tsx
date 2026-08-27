@@ -45,6 +45,8 @@ export default function LessonScheduleEditor({
         status: "loading" | "done" | "error";
         joinUrl?: string;
         error?: string;
+        /** The server found a meeting row even though the update failed. */
+        hasMeeting?: boolean;
         /** What the server actually did, so "✓ Үүслээ" can stop being a guess. */
         action?: "created" | "updated" | "recreated";
       }
@@ -177,7 +179,10 @@ export default function LessonScheduleEditor({
       });
       const json = await res.json();
       if (!res.ok) {
-        setZoomMeetingState((s) => ({ ...s, [index]: { status: "error", error: json.error } }));
+        setZoomMeetingState((s) => ({
+          ...s,
+          [index]: { status: "error", error: json.error, hasMeeting: json.hasMeeting === true },
+        }));
         return;
       }
       setZoomMeetingState((s) => ({
@@ -402,7 +407,7 @@ export default function LessonScheduleEditor({
                             ? "Zoom цагийг шинэчлэх"
                             : "Ирц бүртгэх Zoom meeting үүсгэх"}
                       </button>
-                      {lesson.zoomLink && (
+                      {(lesson.zoomLink || zoomMeetingState[i]?.hasMeeting) && (
                         <button
                           type="button"
                           disabled={zoomMeetingState[i]?.status === "loading"}

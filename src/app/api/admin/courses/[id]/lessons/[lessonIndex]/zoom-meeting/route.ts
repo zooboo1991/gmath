@@ -3,7 +3,12 @@ import { REFUSED, requireCapability } from "@/lib/adminAccess";
 import { findCourseById, findYearlyProgramById, updateCourse, updateYearlyProgram, type Lesson } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { parseScheduleString } from "@/lib/lessonSchedule";
-import { createMeeting, updateMeeting, ZoomMeetingGoneError } from "@/lib/zoom/client";
+import {
+  createMeeting,
+  updateMeeting,
+  ZoomMeetingGoneError,
+  ZoomUpdateError,
+} from "@/lib/zoom/client";
 import {
   createLessonMeeting,
   deleteRegistrantsForLessonMeeting,
@@ -142,10 +147,20 @@ export async function POST(
         recreateBecauseGone = true;
       } else {
         console.error("zoom meeting update failed", courseId, lessonIndex, err);
+        // Zoom's own words, shown as they are: without them the admin and
+        // whoever they ask are both guessing at what "чадсангүй" meant.
+        const detail =
+          err instanceof ZoomUpdateError
+            ? ` (Zoom: ${err.status} ${err.detail.slice(0, 160)})`
+            : "";
         return NextResponse.json(
           {
             ok: false,
-            error: "Zoom дээрх цагийг шинэчилж чадсангүй. Түр хүлээгээд дахин оролдоно уу.",
+            error: `Zoom дээрх цагийг шинэчилж чадсангүй.${detail}`,
+            // The page decides which buttons to show from the lesson's own
+            // zoomLink, which can be empty while a meeting row exists — and
+            // then "Шинээр үүсгэх" never appears and there is no way out.
+            hasMeeting: true,
           },
           { status: 502 }
         );
