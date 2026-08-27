@@ -84,6 +84,20 @@ describe("saving a finished test", () => {
     expect(await storedResult(user.id)).toBeNull();
   });
 
+  it("opens on the result for someone who has already sat it", async () => {
+    const user = await createTestUser();
+    const client = await signedInClient(user.phone, user.password);
+    await client.post(`/api/tests/${SLUG}/result`, { answers: SHEET });
+
+    // Coming back to read the result must not show "you have taken this" —
+    // the archetype itself is what they came for.
+    const page = await client.get(`/tests/${SLUG}`);
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("Хоёрдогч төрөл");
+    expect(page.text).toContain("Дахин өгөх");
+    expect(page.text).not.toContain("Эхлэх →");
+  });
+
   it("answers 404 for a test that does not exist", async () => {
     const user = await createTestUser();
     const client = await signedInClient(user.phone, user.password);

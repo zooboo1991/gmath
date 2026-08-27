@@ -42,8 +42,12 @@ export default function TestRunner({
   // Signed in when the page loaded, or signed in through the modal since.
   const signedIn = signedInOnLoad || Boolean(sessionUser);
 
-  const [screen, setScreen] = useState<"intro" | "quiz" | "gate" | "result">("intro");
-  const [answers, setAnswers] = useState<number[]>([]);
+  // Someone who has already sat this test came back to read their result, not
+  // to be told they have one: the page opens on the result itself.
+  const [screen, setScreen] = useState<"intro" | "quiz" | "gate" | "result">(
+    previousAnswers ? "result" : "intro"
+  );
+  const [answers, setAnswers] = useState<number[]>(previousAnswers ?? []);
   const [index, setIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -181,7 +185,7 @@ export default function TestRunner({
 
           {previousAnswers && (
             <p className="bg-green-soft text-green font-bold text-[.9rem] rounded-md px-4 py-3 mb-4">
-              Та энэ тестийг өмнө өгсөн байна. Дахин өгвөл өмнөх үр дүн шинэчлэгдэнэ.
+              Дахин өгвөл өмнөх үр дүн шинэчлэгдэнэ.
             </p>
           )}
 
