@@ -18,6 +18,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { adminClient } from "../../support/client";
 import { cleanupTracked, testDb } from "../../support/db";
 import { createTestCourse } from "../../support/factories";
+import { forgetMockZoomMeeting } from "../../support/mockControl";
 import { findMockZoomMeeting } from "../../support/mockControl";
 
 afterAll(async () => {
@@ -236,6 +237,41 @@ describe("what the route refuses", () => {
 
     expect(res.status, res.text).toBe(200);
     expect(res.body.action).toBe("created");
+  });
+});
+
+describe("a meeting deleted on Zoom's side", () => {
+  it("is replaced instead of refusing, keeping the same row", async () => {
+    const admin = await adminClient("full");
+    const lessons = [{ topic: "Устсаны дараа", schedule: "2026.10.05 Даваа гараг · 19:00–21:00" }];
+    const course = await createTestCourse({ lessons });
+
+    const created = await admin.post<{ meeting: { id: string; zoomMeetingId: string } }>(
+      `/api/admin/courses/${course.id}/lessons/0/zoom-meeting`,
+      { lessons }
+    );
+    expect(created.status, created.text).toBe(200);
+    await trackMeetingRow(course.id);
+    const first = created.body.meeting;
+
+    // The admin deletes it in Zoom. Our row still points at the old id.
+    await forgetMockZoomMeeting(first.zoomMeetingId);
+
+    // Pressing the same button again used to answer 502 and tell the admin to
+    // press "Дахин үүсгэх" — a button the page does not show in this state.
+    const again = await admin.post<{ action: string; meeting: { id: string; zoomMeetingId: string } }>(
+      `/api/admin/courses/${course.id}/lessons/0/zoom-meeting`,
+      { lessons }
+    );
+    expect(again.status, again.text).toBe(200);
+    expect(again.body.action).toBe("recreated");
+    expect(again.body.meeting.zoomMeetingId).not.toBe(first.zoomMeetingId);
+    // Same row: lesson_attendance points at it, and that history must survive.
+    expect(again.body.meeting.id).toBe(first.id);
+
+    const { data } = await testDb().from("courses").select("lessons").eq("id", course.id).single();
+    const saved = (data as { lessons: { zoomLink?: string }[] }).lessons;
+    expect(saved[0].zoomLink).toContain(again.body.meeting.zoomMeetingId);
   });
 });
 

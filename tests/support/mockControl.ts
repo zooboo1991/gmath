@@ -46,6 +46,11 @@ export async function findMockZoomMeeting(id: string): Promise<MockZoomMeeting |
   return (await listMockZoomMeetings()).find((m) => m.id === id) ?? null;
 }
 
+/** Simulates the meeting being deleted on Zoom's side, leaving our row stale. */
+export async function forgetMockZoomMeeting(id: string): Promise<void> {
+  await control(`/__mock/zoom/meetings/${id}`, { method: "DELETE" });
+}
+
 export async function listMockInvoices(): Promise<MockInvoice[]> {
   const { invoices } = await control<{ invoices: MockInvoice[] }>("/__mock/qpay/invoices");
   return invoices;

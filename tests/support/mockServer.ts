@@ -227,6 +227,13 @@ function handleControl(req: IncomingMessage, res: ServerResponse, url: URL, body
     return json(res, 200, { meetings: [...zoomMeetings.values()] });
   }
 
+  // "The admin deleted the meeting in Zoom while our row still points at it."
+  // Everything about that meeting then answers 404, exactly as Zoom does.
+  const forgetMatch = url.pathname.match(/^\/__mock\/zoom\/meetings\/([^/]+)$/);
+  if (forgetMatch && method === "DELETE") {
+    return json(res, 200, { forgotten: zoomMeetings.delete(forgetMatch[1]) });
+  }
+
   if (url.pathname === "/__mock/qpay/invoices" && method === "GET") {
     return json(res, 200, { invoices: [...invoices.values()] });
   }

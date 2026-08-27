@@ -3,7 +3,7 @@ import { REFUSED, requireCapability } from "@/lib/adminAccess";
 import { findCourseById, findYearlyProgramById, updateCourse, updateYearlyProgram, type Lesson } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { parseScheduleString } from "@/lib/lessonSchedule";
-import { createMeeting, updateMeeting } from "@/lib/zoom/client";
+import { createMeeting, updateMeeting, ZoomMeetingGoneError } from "@/lib/zoom/client";
 import {
   createLessonMeeting,
   deleteRegistrantsForLessonMeeting,
@@ -125,6 +125,7 @@ export async function POST(
   // pressed this because something about the lesson changed — almost always
   // its time. Move the existing meeting instead of silently handing back the
   // old one, which is what this used to do while reporting success.
+  let recreateBecauseGone = false;
   if (existingRow && !force) {
     const schedule = zoomSchedule(lesson.schedule);
     try {
@@ -133,17 +134,27 @@ export async function POST(
         schedule,
       });
     } catch (err) {
-      console.error("zoom meeting update failed", courseId, lessonIndex, err);
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Zoom дээрх цагийг шинэчилж чадсангүй. Meeting нь Zoom дээр устсан бол «Дахин үүсгэх» дарна уу.",
-        },
-        { status: 502 }
-      );
+      // Deleted on Zoom: our row is stale, and telling the admin to press
+      // "Дахин үүсгэх" was no help — that button only appears once the page
+      // knows a meeting exists, which in this state it does not. Make a new
+      // meeting instead, on the same row, so attendance history survives.
+      if (err instanceof ZoomMeetingGoneError) {
+        recreateBecauseGone = true;
+      } else {
+        console.error("zoom meeting update failed", courseId, lessonIndex, err);
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Zoom дээрх цагийг шинэчилж чадсангүй. Түр хүлээгээд дахин оролдоно уу.",
+          },
+          { status: 502 }
+        );
+      }
     }
+  }
 
+  // The update went through: nothing left to create.
+  if (existingRow && !force && !recreateBecauseGone) {
     await logAdminAction(request, {
       actionType: "lesson.zoom_meeting_update",
       targetId: `${courseId}#${lessonIndex}`,
@@ -154,11 +165,11 @@ export async function POST(
     return NextResponse.json({ ok: true, meeting: existingRow, action: "updated" });
   }
 
-  let meeting = force ? undefined : existingRow;
+  let meeting = force || recreateBecauseGone ? undefined : existingRow;
   if (!meeting) {
     try {
       const zoomMeeting = await createMeeting(`${owner.title} — ${lesson.topic}`, zoomSchedule(lesson.schedule));
-      if (force && existingRow) {
+      if ((force || recreateBecauseGone) && existingRow) {
         // Update in place (same row id) rather than delete+insert, so
         // lesson_attendance history — which references this id — survives.
         meeting = await updateLessonMeeting(existingRow.id, {
@@ -196,5 +207,9 @@ export async function POST(
     details: { title: owner.title, topic: lesson.topic, force },
   });
 
-  return NextResponse.json({ ok: true, meeting, action: force ? "recreated" : "created" });
+  return NextResponse.json({
+    ok: true,
+    meeting,
+    action: force || recreateBecauseGone ? "recreated" : "created",
+  });
 }

@@ -148,7 +148,19 @@ export async function updateMeeting(
     }),
   });
   if (!res.ok) {
+    // 404 has its own meaning here: the meeting was deleted on Zoom's side
+    // while our row still points at it. The caller can recover from that by
+    // making a new meeting — every other failure it cannot.
+    if (res.status === 404) throw new ZoomMeetingGoneError(meetingId);
     throw new Error(`Zoom meeting шинэчлэхэд алдаа гарлаа: ${res.status} ${await errorDetail(res)}`);
+  }
+}
+
+/** Thrown when Zoom no longer has the meeting our row remembers. */
+export class ZoomMeetingGoneError extends Error {
+  constructor(meetingId: string) {
+    super(`Zoom meeting ${meetingId} олдсонгүй — устгагдсан байна`);
+    this.name = "ZoomMeetingGoneError";
   }
 }
 
