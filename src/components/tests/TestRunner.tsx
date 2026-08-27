@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
+import { useProgramRegister } from "@/components/program/ProgramRegister";
 import { axisPositions, scoreTest, type PersonalityTest } from "@/lib/tests";
 
 /** How far a stranger gets before the site asks who they are. */
@@ -25,14 +26,22 @@ function subscribeToStorage(onChange: () => void) {
  */
 export default function TestRunner({
   test,
-  signedIn,
+  signedIn: signedInOnLoad,
   previousAnswers,
 }: {
   test: PersonalityTest;
+  /** Whether they were signed in when the page was rendered. */
   signedIn: boolean;
   /** What they answered last time, if they have sat this test before. */
   previousAnswers?: number[];
 }) {
+  // The site's own sign-in/registration modal — the same one the header
+  // opens. Sending a child to /profile instead landed them on a page that
+  // says "you are not signed in" with no way to sign in.
+  const { sessionUser, openLogin, openRegister } = useProgramRegister();
+  // Signed in when the page loaded, or signed in through the modal since.
+  const signedIn = signedInOnLoad || Boolean(sessionUser);
+
   const [screen, setScreen] = useState<"intro" | "quiz" | "gate" | "result">("intro");
   const [answers, setAnswers] = useState<number[]>([]);
   const [index, setIndex] = useState(0);
@@ -73,8 +82,9 @@ export default function TestRunner({
   };
 
   const answer = (choice: number) => {
+    const at = screen === "gate" ? Math.min(answers.length, test.questions.length - 1) : index;
     const next = [...answers];
-    next[index] = choice;
+    next[at] = choice;
     setAnswers(next);
     remember(next);
 
@@ -83,11 +93,12 @@ export default function TestRunner({
       setScreen("gate");
       return;
     }
-    if (index + 1 >= test.questions.length) {
+    if (at + 1 >= test.questions.length) {
       void finish(next);
       return;
     }
-    setIndex(index + 1);
+    setScreen("quiz");
+    setIndex(at + 1);
   };
 
   const finish = async (sheet: number[]) => {
@@ -135,6 +146,11 @@ export default function TestRunner({
   };
 
   const unfinished = stored.length > 0 && stored.length < test.questions.length;
+  // Signing in inside the modal makes `signedIn` true on the next render, so
+  // the gate simply stops being shown and the quiz picks up where it stopped.
+  const atGate = screen === "gate" && !signedIn;
+  const questionIndex =
+    screen === "gate" ? Math.min(answers.length, test.questions.length - 1) : index;
 
   // ---- intro -------------------------------------------------------------
   if (screen === "intro") {
@@ -203,7 +219,7 @@ export default function TestRunner({
   }
 
   // ---- the registration gate --------------------------------------------
-  if (screen === "gate") {
+  if (atGate) {
     return (
       <section className="section-pad">
         <div className="wrap max-w-[560px] mx-auto">
@@ -220,12 +236,22 @@ export default function TestRunner({
               Хариултууд чинь энэ хөтөч дээр хадгалагдсан — бүртгүүлээд буцаж ирэхэд{" "}
               {answers.length + 1}-р асуултаас үргэлжилнэ.
             </p>
-            <Link
-              href={`/profile?next=${encodeURIComponent(`/tests/${test.slug}`)}`}
-              className="inline-flex items-center justify-center font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[30px] py-4 mt-6 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
-            >
-              Бүртгүүлэх / Нэвтрэх →
-            </Link>
+            <div className="flex items-center justify-center gap-3 flex-wrap mt-6">
+              <button
+                type="button"
+                onClick={openRegister}
+                className="font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[30px] py-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+              >
+                Бүртгүүлэх →
+              </button>
+              <button
+                type="button"
+                onClick={openLogin}
+                className="font-extrabold text-[.9rem] text-blue-strong px-4 py-3"
+              >
+                Бүртгэлтэй юу? Нэвтрэх
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -365,7 +391,7 @@ export default function TestRunner({
   }
 
   // ---- one question ------------------------------------------------------
-  const question = test.questions[index];
+  const question = test.questions[questionIndex];
   return (
     <section className="section-pad">
       <div className="wrap max-w-[640px] mx-auto">
@@ -374,14 +400,14 @@ export default function TestRunner({
             <span
               key={i}
               className={`flex-1 h-1.5 rounded-sm ${
-                i < index ? "bg-blue" : i === index ? "bg-gold" : "bg-line-2"
+                i < questionIndex ? "bg-blue" : i === questionIndex ? "bg-gold" : "bg-line-2"
               }`}
             />
           ))}
         </div>
 
         <p className="font-mono text-[.8rem] tracking-[.18em] text-blue-strong mb-3">
-          {String(index + 1).padStart(2, "0")} / {test.questions.length}
+          {String(questionIndex + 1).padStart(2, "0")} / {test.questions.length}
         </p>
         <h1 className="text-[clamp(1.3rem,4.4vw,1.7rem)] font-extrabold leading-[1.35] mb-6 text-balance">
           {question.q}
@@ -403,10 +429,13 @@ export default function TestRunner({
           ))}
         </div>
 
-        {index > 0 && (
+        {questionIndex > 0 && (
           <button
             type="button"
-            onClick={() => setIndex(index - 1)}
+            onClick={() => {
+              setScreen("quiz");
+              setIndex(questionIndex - 1);
+            }}
             className="font-extrabold text-[.88rem] text-ink-3 mt-6"
           >
             ← Буцах

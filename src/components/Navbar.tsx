@@ -16,8 +16,8 @@ type NavLink = { href: string; label: string; match?: string; children?: { href:
 // of the strongest things this site has to say.
 const links: NavLink[] = [
   { href: "/#about", label: "Нүүр" },
-  { href: "/courses", label: "Сургалтууд", match: "/courses" },
-  { href: "/tests", label: "Тестүүд", match: "/tests" },
+  { href: "/courses", label: "Сургалт", match: "/courses" },
+  { href: "/tests", label: "Тест", match: "/tests" },
   { href: "/team", label: "Манай баг", match: "/team" },
   { href: "/articles", label: "Нийтлэл", match: "/articles" },
   { href: "/certificate", label: "Сертификат", match: "/certificate" },
