@@ -19,6 +19,7 @@ import {
   IconClose,
   IconVideoCamera,
   IconDocument,
+  IconLocation,
 } from "@/components/icons";
 import { compareByStartDate, formatCourseDate } from "@/lib/courseDate";
 import { DISTRICTS_BY_PROVINCE, PROVINCES, type Province } from "@/lib/mongoliaRegions";
@@ -579,6 +580,31 @@ function useNow(): Date | null {
  */
 type AttendanceSpan = { joinedAt: string; leftAt?: string };
 
+/**
+ * Онлайн / Танхим. Lessons saved before the field existed are online — the
+ * schedule editor assumes the same, so the two agree.
+ */
+function LessonModeTag({ mode }: { mode?: "online" | "inperson" }) {
+  const inPerson = mode === "inperson";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[.68rem] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
+        inPerson ? "text-gold-strong bg-gold-soft" : "text-blue-strong bg-blue-soft"
+      }`}
+    >
+      {inPerson ? (
+        <>
+          <IconLocation className="w-[11px] h-[11px]" /> Танхим
+        </>
+      ) : (
+        <>
+          <IconVideoCamera className="w-[11px] h-[11px]" /> Онлайн
+        </>
+      )}
+    </span>
+  );
+}
+
 function LessonSchedule({ registration }: { registration: RegistrationWithGroup }) {
   const now = useNow();
   const lessons = registration.lessons ?? [];
@@ -651,7 +677,13 @@ function LessonSchedule({ registration }: { registration: RegistrationWithGroup 
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <span className="block font-bold text-[.88rem] text-ink">{lesson.topic}</span>
+                <span className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-[.88rem] text-ink">{lesson.topic}</span>
+                  {/* Where the lesson happens decides what the family does that
+                      evening — it belongs next to the topic, not buried in a
+                      link they only see once the room opens. */}
+                  <LessonModeTag mode={lesson.mode} />
+                </span>
                 <div className="flex items-center justify-between gap-3 flex-wrap mt-1">
                   <span className="text-[.78rem] font-semibold text-ink-3">
                     {info?.dateLabel}
