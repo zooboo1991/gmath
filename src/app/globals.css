@@ -247,3 +247,18 @@
     animation: none;
   }
 }
+
+/* Test result glyphs: inline SVG bodies from src/lib/tests, drawn as line art
+   in the site's gold rather than carrying their own colours. */
+.test-glyph * {
+  stroke: var(--color-gold-strong);
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.test-glyph text {
+  fill: var(--color-gold-strong);
+  stroke: none;
+  font-family: ui-monospace, monospace;
+}

@@ -1040,3 +1040,23 @@ create index if not exists lesson_roll_call_lesson_idx
 -- a child cancelled mid-solve returns to solving, one cancelled after handing
 -- in returns to the queue.
 alter table assessments add column if not exists cancelled_from text;
+
+-- Сонирхолтой тестүүд (математик сэтгэлгээний архетип гэх мэт). The tests
+-- themselves live in code (src/lib/tests) — only what a child answered is
+-- data. One row per child per test: retaking replaces the earlier result,
+-- which is what the profile shows.
+create table if not exists personality_results (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  test_slug text not null,
+  /** The option index chosen for each question, in order. */
+  answers jsonb not null,
+  /** Points per archetype code, recomputed on the server from `answers`. */
+  scores jsonb not null,
+  primary_code text not null,
+  secondary_code text,
+  created_at timestamptz not null default now(),
+  unique (user_id, test_slug)
+);
+create index if not exists personality_results_user_idx
+  on personality_results (user_id, created_at desc);

@@ -33,7 +33,7 @@ import {
 import { getLessonStates, type LessonWithState } from "@/lib/lessonSchedule";
 import { formatMb } from "@/lib/imageResize";
 
-type Tab = "active" | "pending" | "certificates";
+type Tab = "active" | "pending" | "certificates" | "tests";
 type AudienceFilter = "all" | CourseAudience;
 type CategoryFilter = "all" | CourseCategory;
 
@@ -57,6 +57,7 @@ export default function ProfileClient({
   registrations,
   certificates,
   freeExams = [],
+  tests = [],
 }: {
   user: PublicUser;
   registrations: RegistrationWithGroup[];
@@ -67,6 +68,8 @@ export default function ProfileClient({
    * own card rather than floating at the top of the page.
    */
   freeExams?: FreeExam[];
+  /** Finished tests, newest first — see src/lib/tests. */
+  tests?: { slug: string; title: string; archetype: string; tag: string; takenAt: string }[];
 }) {
   const [user, setUser] = useState(initialUser);
   const [tab, setTab] = useState<Tab>("active");
@@ -137,7 +140,7 @@ export default function ProfileClient({
   });
 
   const filtered = audience !== "all" || category !== "all";
-  const showFilters = tab !== "certificates" && list.length >= MIN_ROWS_TO_FILTER;
+  const showFilters = tab === "active" || tab === "pending" ? list.length >= MIN_ROWS_TO_FILTER : false;
 
   return (
     <>
@@ -193,6 +196,9 @@ export default function ProfileClient({
           <TabButton active={tab === "certificates"} onClick={() => selectTab("certificates")}>
             Сертификат{certificates.length > 0 && ` (${certificates.length})`}
           </TabButton>
+          <TabButton active={tab === "tests"} onClick={() => selectTab("tests")}>
+            Тестүүд{tests.length > 0 && ` (${tests.length})`}
+          </TabButton>
         </div>
       </div>
 
@@ -244,7 +250,44 @@ export default function ProfileClient({
             </div>
           )}
 
-          {tab === "certificates" ? (
+          {tab === "tests" ? (
+            tests.length === 0 ? (
+              <div className="bg-bg-soft border border-line rounded-md px-6 py-8 text-center">
+                <p className="text-ink-2 font-medium">
+                  Та хараахан тест өгөөгүй байна. Богино тестүүд чиний сэтгэлгээний онцлогийг
+                  харуулна — дүн шалгахгүй.
+                </p>
+                <Link
+                  href="/tests"
+                  className="inline-flex items-center justify-center font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-3.5 mt-5 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+                >
+                  Тест өгөх →
+                </Link>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {tests.map((t) => (
+                  <Link
+                    key={t.slug}
+                    href={`/tests/${t.slug}`}
+                    className="bg-surface border border-line rounded-md shadow-xs px-6 py-5 flex items-center justify-between gap-4 flex-wrap transition-transform hover:-translate-y-0.5"
+                  >
+                    <div className="min-w-0">
+                      <span className="text-[.78rem] font-semibold text-ink-3 block">{t.title}</span>
+                      <b className="font-extrabold text-[1.15rem] block mt-0.5">{t.archetype}</b>
+                      <span className="text-ink-2 font-medium text-[.88rem]">{t.tag}</span>
+                      <span className="text-ink-3 font-semibold text-[.8rem] block mt-1">
+                        {formatCourseDate(t.takenAt.slice(0, 10))}
+                      </span>
+                    </div>
+                    <span className="shrink-0 font-extrabold text-[.88rem] text-blue-strong">
+                      Дүгнэлт харах →
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )
+          ) : tab === "certificates" ? (
             certificates.length === 0 ? (
               <p className="text-ink-2 font-medium bg-bg-soft border border-line rounded-md px-6 py-8 text-center">
                 Танд одоогоор сертификат олдсонгүй. Хэрэв та сургалт төгссөн бол бүртгэлтэй утасны

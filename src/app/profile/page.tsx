@@ -7,6 +7,8 @@ import ProfileClient from "@/components/profile/ProfileClient";
 import { listCertificatesByPhone, listRegistrationsByUser, toPublicUser } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { listAssessmentsByUser } from "@/lib/assessment/db";
+import { TESTS } from "@/lib/tests";
+import { listTestResults } from "@/lib/tests/db";
 import { listFreeInvitedExams } from "@/lib/assessment/exams";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +49,7 @@ export default async function ProfilePage() {
     );
   }
 
-  const [registrations, certificates, freeExams, myAssessments] = await Promise.all([
+  const [registrations, certificates, freeExams, myAssessments, testResults] = await Promise.all([
     listRegistrationsByUser(user.id),
     // certificates is a newer table — a site that hasn't run the latest
     // schema.sql yet shouldn't have its whole profile page go down over it.
@@ -64,7 +66,25 @@ export default async function ProfilePage() {
     listAssessmentsByUser(user.id)
       .then((all) => all.filter((a) => a.status !== "cancelled"))
       .catch(() => []),
+    // Тестүүд: what the child learned about how they think.
+    listTestResults(user.id).catch(() => []),
   ]);
+
+  const tests = testResults
+    .map((result) => {
+      const test = TESTS.find((t) => t.slug === result.testSlug);
+      const archetype = test?.archetypes[result.primaryCode];
+      return test && archetype
+        ? {
+            slug: test.slug,
+            title: test.title,
+            archetype: archetype.name,
+            tag: archetype.tag,
+            takenAt: result.createdAt,
+          }
+        : null;
+    })
+    .filter((t): t is NonNullable<typeof t> => t !== null);
 
   return (
     <>
@@ -74,6 +94,7 @@ export default async function ProfilePage() {
           user={toPublicUser(user)}
           registrations={registrations}
           certificates={certificates}
+          tests={tests}
           freeExams={freeExams.map((e) => {
             const mine = myAssessments.find((a) => a.examId === e.id);
             return {
