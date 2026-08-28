@@ -1,4 +1,5 @@
 import { getSupabase } from "../supabase";
+import { fetchAllRows } from "../fetchAll";
 import { findTest, scoreTest } from "./index";
 import type { TestOutcome } from "./types";
 
@@ -84,4 +85,26 @@ export async function findTestResult(userId: string, testSlug: string): Promise<
     .maybeSingle();
   if (error) throw error;
   return data ? fromRow(data as ResultRow) : undefined;
+}
+
+/**
+ * The archetype each person landed on, newest test first — for the admin's
+ * user list, where it is one column and not worth a query per row.
+ */
+export async function getPrimaryArchetypeByUser(): Promise<Record<string, { testSlug: string; primaryCode: string }>> {
+  const rows = await fetchAllRows<{ user_id: string; test_slug: string; primary_code: string }>(() =>
+    getSupabase()
+      .from("personality_results")
+      .select("user_id, test_slug, primary_code")
+      .order("created_at", { ascending: false })
+      .order("id")
+  );
+  const byUser: Record<string, { testSlug: string; primaryCode: string }> = {};
+  // Newest first, so the first sighting of a user is their latest result.
+  for (const row of rows) {
+    if (!byUser[row.user_id]) {
+      byUser[row.user_id] = { testSlug: row.test_slug, primaryCode: row.primary_code };
+    }
+  }
+  return byUser;
 }

@@ -17,6 +17,7 @@ export default function UsersPanel({
   registrations,
   payments,
   lastLogin,
+  archetypes,
   canEdit,
 }: {
   initialUsers: PublicUser[];
@@ -25,6 +26,8 @@ export default function UsersPanel({
   payments: RegistrationPayment[];
   /** userId → when they last signed in. */
   lastLogin: Record<string, string>;
+  /** userId → the archetype their latest test put them in. */
+  archetypes: Record<string, string>;
   // The read-only admin gets the list and the filters, not the add form.
   // Cosmetic only — POST /api/admin/users checks the role itself.
   canEdit: boolean;
@@ -154,12 +157,12 @@ export default function UsersPanel({
 
   /** The filtered list as a spreadsheet — what the admin would otherwise retype. */
   const downloadCsv = () => {
-    const header = ["Овог", "Нэр", "Төрөл", "Утас", "Имэйл", "Аймаг/Хот", "Сум/Дүүрэг", "Сургууль", "Анги", "Идэвхтэй сургалт", "Үлдэгдэл", "Бүртгүүлсэн", "Сүүлд нэвтэрсэн"];
+    const header = ["Овог", "Нэр", "Төрөл", "Утас", "Имэйл", "Аймаг/Хот", "Сум/Дүүрэг", "Сургууль", "Анги", "Тестийн төрөл", "Идэвхтэй сургалт", "Үлдэгдэл", "Бүртгүүлсэн", "Сүүлд нэвтэрсэн"];
     const rows = filtered.map((u) => {
       const { active, balance } = statsFor(u.id);
       return [
         u.lastName, u.firstName, u.role === "teacher" ? "Багш" : "Сурагч", u.phone, u.email,
-        u.province, u.district, u.school, u.grade, String(active), String(balance),
+        u.province, u.district, u.school, u.grade, archetypes[u.id] ?? "", String(active), String(balance),
         u.createdAt.slice(0, 10), (lastLogin[u.id] ?? "").slice(0, 10),
       ];
     });
@@ -372,6 +375,7 @@ export default function UsersPanel({
                 <th className="px-4 py-3">Утас</th>
                 <th className="px-4 py-3">Анги</th>
                 <th className="px-4 py-3">Сургууль</th>
+                <th className="px-4 py-3">Тестийн төрөл</th>
                 <th className="px-4 py-3">Сургалт</th>
                 <th className="px-4 py-3">Үлдэгдэл</th>
                 <th className="px-4 py-3">Сүүлд нэвтэрсэн</th>
@@ -407,6 +411,15 @@ export default function UsersPanel({
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.phone}</td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.grade || "—"}</td>
                   <td className="px-4 py-3 font-semibold text-[.88rem] text-ink-2">{u.school || "—"}</td>
+                  <td className="px-4 py-3 text-[.85rem] whitespace-nowrap">
+                    {archetypes[u.id] ? (
+                      <span className="font-extrabold text-blue-strong bg-blue-soft px-2.5 py-1 rounded-full">
+                        {archetypes[u.id]}
+                      </span>
+                    ) : (
+                      <span className="text-ink-3 font-semibold">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-extrabold text-[.88rem] tabular-nums">
                     {(() => {
                       const { active, total } = statsFor(u.id);
