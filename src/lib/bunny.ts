@@ -37,9 +37,10 @@ const DEFAULT_TTL_SECONDS = 3 * 60 * 60;
  * Bunny's embed-view token is `SHA256_HEX(tokenKey + videoId + expires)` with
  * `expires` a unix timestamp in **seconds** — milliseconds are rejected.
  *
- * The host is configurable because Bunny is mid-migration between the legacy
- * `iframe.mediadelivery.net` and the current `player.mediadelivery.net`; if a
- * library only answers on the old one, that's an env change, not a deploy.
+ * The host stays configurable, but the default is `iframe.mediadelivery.net`
+ * — the one that actually serves embeds. `player.mediadelivery.net` answers
+ * 404 to every /embed/ path, whatever the library or video id, which is what
+ * a student saw inside the player instead of their lesson.
  */
 export function signBunnyEmbedUrl(videoId: string, ttlSeconds = DEFAULT_TTL_SECONDS): string {
   const libraryId = process.env.BUNNY_STREAM_LIBRARY_ID;
@@ -48,7 +49,7 @@ export function signBunnyEmbedUrl(videoId: string, ttlSeconds = DEFAULT_TTL_SECO
     throw new Error("BUNNY_STREAM_LIBRARY_ID / BUNNY_STREAM_TOKEN_KEY тохируулаагүй байна");
   }
 
-  const host = process.env.BUNNY_STREAM_EMBED_HOST || "player.mediadelivery.net";
+  const host = process.env.BUNNY_STREAM_EMBED_HOST || "iframe.mediadelivery.net";
   const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
   const token = createHash("sha256").update(`${tokenKey}${videoId}${expires}`).digest("hex");
 

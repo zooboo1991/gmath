@@ -76,3 +76,22 @@ describe("what does not", () => {
     expect(parseBunnyVideoId(undefined)).toBeNull();
   });
 });
+
+describe("the signed embed URL", () => {
+  it("points at the host that actually serves embeds", async () => {
+    // player.mediadelivery.net answers 404 to every /embed/ path — whatever
+    // the library and video — so a lesson signed against it showed a child a
+    // bare "404 Not Found" where the recording should have been.
+    process.env.BUNNY_STREAM_LIBRARY_ID = "123456";
+    process.env.BUNNY_STREAM_TOKEN_KEY = "test-token-key";
+    delete process.env.BUNNY_STREAM_EMBED_HOST;
+
+    const { signBunnyEmbedUrl } = await import("@/lib/bunny");
+    const url = new URL(signBunnyEmbedUrl("f4ba8702-cb1e-43dc-84d5-4a83491302d7"));
+
+    expect(url.host).toBe("iframe.mediadelivery.net");
+    expect(url.pathname).toBe("/embed/123456/f4ba8702-cb1e-43dc-84d5-4a83491302d7");
+    expect(url.searchParams.get("token")).toMatch(/^[0-9a-f]{64}$/);
+    expect(Number(url.searchParams.get("expires"))).toBeGreaterThan(Date.now() / 1000);
+  });
+});
