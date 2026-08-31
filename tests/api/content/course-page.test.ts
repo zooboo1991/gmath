@@ -9,7 +9,11 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { anonClient, signedInClient } from "../../support/client";
 import { cleanupTracked, testDb, track } from "../../support/db";
-import { createTestCourse, createTestRegistration, createTestUser } from "../../support/factories";
+import {
+  createTestCourse,
+  createTestRegistration,
+  createTestUser,
+} from "../../support/factories";
 
 afterAll(async () => {
   await cleanupTracked();
@@ -20,7 +24,12 @@ const PAST_DATE = "2026.08.10";
 const PAST_LESSON_UTC_START = "2026-08-10T10:00:00Z";
 
 function lesson(topic: string, extra: Record<string, unknown> = {}) {
-  return { topic, schedule: `${PAST_DATE} Даваа гараг · 18:00–20:00`, mode: "online", ...extra };
+  return {
+    topic,
+    schedule: `${PAST_DATE} Даваа гараг · 18:00–20:00`,
+    mode: "online",
+    ...extra,
+  };
 }
 
 async function meetingFor(courseId: string, lessonIndex: number) {
@@ -40,18 +49,31 @@ async function meetingFor(courseId: string, lessonIndex: number) {
   return id;
 }
 
-async function attend(meetingId: string, userId: string, joinedAt: string, leftAt: string) {
+async function attend(
+  meetingId: string,
+  userId: string,
+  joinedAt: string,
+  leftAt: string,
+) {
   const { data, error } = await testDb()
     .from("lesson_attendance")
-    .insert({ lesson_meeting_id: meetingId, user_id: userId, joined_at: joinedAt, left_at: leftAt })
+    .insert({
+      lesson_meeting_id: meetingId,
+      user_id: userId,
+      joined_at: joinedAt,
+      left_at: leftAt,
+    })
     .select("id")
     .single();
-  if (error) throw new Error(`lesson_attendance insert failed: ${error.message}`);
+  if (error)
+    throw new Error(`lesson_attendance insert failed: ${error.message}`);
   track("lesson_attendance", (data as { id: string }).id);
 }
 
 /** Хоёр хичээлтэй сургалт, идэвхтэй бүртгэлтэй сурагч. */
-async function enrolledStudent(lessons = [lesson("Тоон онол"), lesson("Геометр")]) {
+async function enrolledStudent(
+  lessons = [lesson("Тоон онол"), lesson("Геометр")],
+) {
   const course = await createTestCourse({ lessons });
   const student = await createTestUser();
   await createTestRegistration({
@@ -88,7 +110,11 @@ describe("GET /profile/course/[id] — хандах эрх", () => {
   it("төлбөр нь баталгаажаагүй сурагчид 404 өгнө", async () => {
     const course = await createTestCourse({ lessons: [lesson("Тоон онол")] });
     const student = await createTestUser();
-    await createTestRegistration({ userId: student.id, programId: course.id, status: "pending" });
+    await createTestRegistration({
+      userId: student.id,
+      programId: course.id,
+      status: "pending",
+    });
     const client = await signedInClient(student.phone, student.password);
 
     const res = await client.get(`/profile/course/${course.id}`);
@@ -102,7 +128,12 @@ describe("GET /profile/course/[id] — ирц", () => {
     const { course, student } = await enrolledStudent([lesson("Тоон онол")]);
     const meeting = await meetingFor(course.id, 0);
     // 10:00–11:30 UTC = хоёр цагийн хичээлийн 75%.
-    await attend(meeting, student.id, PAST_LESSON_UTC_START, "2026-08-10T11:30:00Z");
+    await attend(
+      meeting,
+      student.id,
+      PAST_LESSON_UTC_START,
+      "2026-08-10T11:30:00Z",
+    );
     const client = await signedInClient(student.phone, student.password);
 
     const res = await client.get(`/profile/course/${course.id}?tab=attendance`);
@@ -116,7 +147,12 @@ describe("GET /profile/course/[id] — ирц", () => {
   it("талаас бага сууссан сурагчийг дутуу суусан гэж харуулна", async () => {
     const { course, student } = await enrolledStudent([lesson("Тоон онол")]);
     const meeting = await meetingFor(course.id, 0);
-    await attend(meeting, student.id, PAST_LESSON_UTC_START, "2026-08-10T10:30:00Z");
+    await attend(
+      meeting,
+      student.id,
+      PAST_LESSON_UTC_START,
+      "2026-08-10T10:30:00Z",
+    );
     const client = await signedInClient(student.phone, student.password);
 
     const res = await client.get(`/profile/course/${course.id}?tab=attendance`);
@@ -137,13 +173,21 @@ describe("GET /profile/course/[id] — ирц", () => {
   });
 
   it("танхимын хичээлд багшийн бүртгэлийг харуулна", async () => {
-    const { course, student } = await enrolledStudent([lesson("Геометр", { mode: "inperson" })]);
+    const { course, student } = await enrolledStudent([
+      lesson("Геометр", { mode: "inperson" }),
+    ]);
     const { data, error } = await testDb()
       .from("lesson_roll_call")
-      .insert({ course_id: course.id, lesson_index: 0, user_id: student.id, present: false })
+      .insert({
+        course_id: course.id,
+        lesson_index: 0,
+        user_id: student.id,
+        present: false,
+      })
       .select("id")
       .single();
-    if (error) throw new Error(`lesson_roll_call insert failed: ${error.message}`);
+    if (error)
+      throw new Error(`lesson_roll_call insert failed: ${error.message}`);
     track("lesson_roll_call", (data as { id: string }).id);
     const client = await signedInClient(student.phone, student.password);
 
@@ -160,7 +204,8 @@ describe("GET /profile/course/[id] — ирц", () => {
       .insert({ course_id: course.id, lesson_index: 0, user_id: student.id })
       .select("id")
       .single();
-    if (error) throw new Error(`lesson_recording_views insert failed: ${error.message}`);
+    if (error)
+      throw new Error(`lesson_recording_views insert failed: ${error.message}`);
     track("lesson_recording_views", (data as { id: string }).id);
     const client = await signedInClient(student.phone, student.password);
 
@@ -171,6 +216,63 @@ describe("GET /profile/course/[id] — ирц", () => {
   });
 });
 
+describe("бичлэг үзсэнийг тэмдэглэх", () => {
+  // Ирцийн хуудсан дээрх "Бичлэг үзсэн" тэмдэг энэ бичлэгээс л гардаг
+  // тул тэмдэглэл нь үнэхээр хийгддэгийг батлах ёстой.
+  it("бичлэг нээхэд үзэлт бүртгэгдэж, дахин нээхэд тоолуур нэмэгдэнэ", async () => {
+    const course = await createTestCourse({
+      lessons: [
+        lesson("Тоон онол", {
+          recordingLink:
+            "https://iframe.mediadelivery.net/embed/123456/0f6b4f9a-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
+        }),
+      ],
+    });
+    const student = await createTestUser();
+    await createTestRegistration({
+      userId: student.id,
+      programId: course.id,
+      status: "active",
+    });
+    const client = await signedInClient(student.phone, student.password);
+
+    const first = await client.post("/api/lessons/recording", {
+      courseId: course.id,
+      lessonIndex: 0,
+    });
+    expect(first.status, first.text).toBe(200);
+    await client.post("/api/lessons/recording", {
+      courseId: course.id,
+      lessonIndex: 0,
+    });
+
+    const { data } = await testDb()
+      .from("lesson_recording_views")
+      .select("id, view_count, first_viewed_at, last_viewed_at")
+      .eq("course_id", course.id)
+      .eq("user_id", student.id)
+      .single();
+    const row = data as {
+      id: string;
+      view_count: number;
+      first_viewed_at: string;
+      last_viewed_at: string;
+    };
+    track("lesson_recording_views", row.id);
+
+    // Нэг сурагч нэг хичээл дээр нэг мөр, тоолуур нь хоёр.
+    expect(row.view_count).toBe(2);
+    expect(new Date(row.last_viewed_at).getTime()).toBeGreaterThanOrEqual(
+      new Date(row.first_viewed_at).getTime(),
+    );
+
+    const page = await client.get(
+      `/profile/course/${course.id}?tab=attendance`,
+    );
+    expect(page.text).toContain("Бичлэг үзсэн");
+  });
+});
+
 describe("GET /profile/course/[id] — табууд", () => {
   it("бүх таб гарчигтайгаа гарч, хаягаар нь нээгдэнэ", async () => {
     const { course, student } = await enrolledStudent([lesson("Тоон онол")]);
@@ -178,13 +280,21 @@ describe("GET /profile/course/[id] — табууд", () => {
 
     const res = await client.get(`/profile/course/${course.id}`);
 
-    for (const label of ["Хичээлийн хуваарь", "Ирц", "Түвшин тогтоох", "Мини олимпиад", "Гэрээ"]) {
+    for (const label of [
+      "Хичээлийн хуваарь",
+      "Ирц",
+      "Түвшин тогтоох",
+      "Мини олимпиад",
+      "Гэрээ",
+    ]) {
       expect(res.text).toContain(label);
     }
     // Анхны таб бол хуваарь.
     expect(res.text).toContain("Тоон онол");
 
-    const contract = await client.get(`/profile/course/${course.id}?tab=contract`);
+    const contract = await client.get(
+      `/profile/course/${course.id}?tab=contract`,
+    );
     expect(contract.text).toContain("Гэрээ тун удахгүй");
   });
 });
