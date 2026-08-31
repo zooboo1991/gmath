@@ -6,7 +6,6 @@ import FormField from "@/components/FormField";
 import SchoolAutocomplete from "@/components/SchoolAutocomplete";
 import PushSettings from "@/components/profile/PushSettings";
 import { useNow, LessonAction } from "@/components/profile/LessonSchedule";
-import FreeExamBox, { type FreeExam } from "@/components/profile/FreeExamBox";
 import type { Certificate, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import {
   IconCheckCircle,
@@ -50,18 +49,11 @@ export default function ProfileClient({
   user: initialUser,
   registrations,
   certificates,
-  freeExams = [],
   tests = [],
 }: {
   user: PublicUser;
   registrations: RegistrationWithGroup[];
   certificates: Certificate[];
-  /**
-   * The exams this child's classes were invited to sit free — one per course.
-   * A child on both the C and the D programme has two, and each belongs on its
-   * own card rather than floating at the top of the page.
-   */
-  freeExams?: FreeExam[];
   /** Finished tests, newest first — see src/lib/tests. */
   tests?: { slug: string; title: string; archetype: string; tag: string; takenAt: string }[];
 }) {
@@ -334,11 +326,7 @@ export default function ProfileClient({
             <div className="flex flex-col gap-4">
               {shown.map((r) =>
                 r.status === "active" && isYearly(r) ? (
-                  <YearlyProgramCard
-                    key={r.id}
-                    registration={r}
-                    freeExam={freeExams.find((e) => e.programId === r.programId) ?? null}
-                  />
+                  <YearlyProgramCard key={r.id} registration={r} />
                 ) : (
                   <div
                     key={r.id}
@@ -377,28 +365,14 @@ export default function ProfileClient({
                     </div>
 
                     {r.status === "active" ? (
-                      <>
-                        <div className="relative z-[1] mt-3 flex items-center gap-2 flex-wrap pointer-events-none [&_a]:pointer-events-auto">
-                          <Link
-                            href={`/profile/course/${encodeURIComponent(r.programId)}`}
-                            className="inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft rounded-full px-4 py-2.5"
-                          >
-                            Дэлгэрэнгүй харах →
-                          </Link>
-                        </div>
-                        {/* Үнэгүй шалгалтын урилга картан дээрээ бүтнээрээ
-                            үлдэнэ: түвшин тогтоох бүгдэд хаалттай байхад ч
-                            энэ хүүхдэд нээлттэй байдаг тул хэн ч /assessment
-                            рүү очиж хайх бодолгүй. Нэг дарж нуух зүйл биш. */}
-                        {(() => {
-                          const exam = freeExams.find((e) => e.programId === r.programId);
-                          return exam ? (
-                            <div className="relative z-[1] mt-4">
-                              <FreeExamBox exam={exam} />
-                            </div>
-                          ) : null;
-                        })()}
-                      </>
+                      <div className="relative z-[1] mt-3 flex items-center gap-2 flex-wrap pointer-events-none [&_a]:pointer-events-auto">
+                        <Link
+                          href={`/profile/course/${encodeURIComponent(r.programId)}`}
+                          className="inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft rounded-full px-4 py-2.5"
+                        >
+                          Дэлгэрэнгүй харах →
+                        </Link>
+                      </div>
                     ) : (
                       <p className="mt-3 text-[.88rem] text-ink-3 font-semibold">
                         Админ төлбөрийг баталгаажуулсны дараа энд Facebook групп, хуваарийн холбоос
@@ -433,14 +407,7 @@ export default function ProfileClient({
  * assessments, contract) lives on the course's own page, which this links to.
  * Always pinned first in the active list (see ProfileClient).
  */
-function YearlyProgramCard({
-  registration,
-  freeExam = null,
-}: {
-  registration: RegistrationWithGroup;
-  /** Shown as a nudge on the card; the card itself opens the course page. */
-  freeExam?: { id: string; title: string } | null;
-}) {
+function YearlyProgramCard({ registration }: { registration: RegistrationWithGroup }) {
   const now = useNow();
   const lessons = registration.lessons ?? [];
   const states = now ? getLessonStates(lessons, now) : null;
@@ -497,11 +464,6 @@ function YearlyProgramCard({
           </Link>
         </div>
       </div>
-      {freeExam && (
-        <div className="relative z-[1] mt-4">
-          <FreeExamBox exam={freeExam} />
-        </div>
-      )}
     </div>
   );
 }

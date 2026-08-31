@@ -461,7 +461,7 @@ describe("who the invitation reaches", () => {
     expect(dResume.body.assessment?.id).toBe(dStart.body.assessment.id);
   });
 
-  it("shows the offer on the course card that carries it", async () => {
+  it("shows the offer on the page of the course that carries it", async () => {
     const admin = await adminClient("full");
     const course = await createTestCourse({ title: "C ангилал сургалт" });
     const user = await createTestUser({ grade: "9-р анги" });
@@ -469,11 +469,17 @@ describe("who the invitation reaches", () => {
     await createExam(admin, { category: "C", freeCourseIds: [course.id] });
 
     const client = await signedInClient(user.phone, user.password);
-    const page = await client.get("/profile");
+    const page = await client.get(`/profile/course/${course.id}?tab=assessment`);
 
     expect(page.status).toBe(200);
     expect(page.text).toContain("Түвшин тогтоох");
     expect(page.text).toContain("төлбөргүй өгнө");
+
+    // The профайл list stays a list of courses: the offer belongs to the
+    // course, and the course's own page is where every detail of it lives.
+    const list = await client.get("/profile");
+    expect(list.status).toBe(200);
+    expect(list.text).not.toContain("төлбөргүй өгнө");
   });
 });
 
@@ -522,7 +528,7 @@ describe("an invited class while the assessment is closed", () => {
     expect((await client.get(`/api/assessment/${assessmentId}/solutions`)).status).toBe(200);
   });
 
-  it("shows the invited child a button on their profile", async () => {
+  it("shows the invited child a button on their course page", async () => {
     const admin = await adminClient("full");
     const course = await createTestCourse();
     const invited = await createTestUser({ grade: "6" });
@@ -531,10 +537,11 @@ describe("an invited class while the assessment is closed", () => {
     await setAssessmentSwitch("off");
 
     const client = await signedInClient(invited.phone, invited.password);
-    const page = await client.get("/profile");
+    const page = await client.get(`/profile/course/${course.id}?tab=assessment`);
 
     expect(page.status).toBe(200);
-    // The offer lives on the course card that carries it, not in the header.
+    // Offered even while the assessment is shut to everyone else, so it has
+    // to be reachable from the course this child is actually enrolled on.
     expect(page.text).toContain("төлбөргүй өгнө");
   });
 
@@ -543,12 +550,16 @@ describe("an invited class while the assessment is closed", () => {
     const course = await createTestCourse();
     await createExam(admin, { category: "C", freeCourseIds: [course.id] });
     const outsider = await createTestUser({ grade: "6" });
+    // Энэ хүүхэд өөр сургалтад сууж байгаа — урилга нь тэр сургалтад ирээгүй.
+    const own = await createTestCourse();
+    await createTestRegistration({ userId: outsider.id, programId: own.id, status: "active" });
     await setAssessmentSwitch("off");
 
     const client = await signedInClient(outsider.phone, outsider.password);
-    const page = await client.get("/profile");
+    const page = await client.get(`/profile/course/${own.id}?tab=assessment`);
 
     expect(page.status).toBe(200);
     expect(page.text).not.toContain("төлбөргүй өгнө");
+    expect(page.text).toContain("нээлттэй түвшин тогтоох шалгалт алга");
   });
 });

@@ -6,10 +6,8 @@ import PageHero from "@/components/PageHero";
 import ProfileClient from "@/components/profile/ProfileClient";
 import { listCertificatesByPhone, listRegistrationsByUser, toPublicUser } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
-import { listAssessmentsByUser } from "@/lib/assessment/db";
 import { TESTS } from "@/lib/tests";
 import { listTestResults } from "@/lib/tests/db";
-import { listFreeInvitedExams } from "@/lib/assessment/exams";
 
 export const dynamic = "force-dynamic";
 
@@ -49,23 +47,11 @@ export default async function ProfilePage() {
     );
   }
 
-  const [registrations, certificates, freeExams, myAssessments, testResults] = await Promise.all([
+  const [registrations, certificates, testResults] = await Promise.all([
     listRegistrationsByUser(user.id),
     // certificates is a newer table — a site that hasn't run the latest
     // schema.sql yet shouldn't have its whole profile page go down over it.
     listCertificatesByPhone(user.phone).catch(() => []),
-    // An exam this child's class was invited to sit free. Shown here because
-    // the profile is where they already come to find their courses, and
-    // because it is offered even while the assessment is closed to everyone
-    // else — nobody would think to go looking at /assessment for it.
-    listFreeInvitedExams(user.id).catch(() => []),
-    // What they have already done about those invitations — an exam handed in
-    // must not keep advertising itself as something still to sit.
-    // Cancelled sittings are skipped so the invitation card offers the exam
-    // again, exactly as it did the first time.
-    listAssessmentsByUser(user.id)
-      .then((all) => all.filter((a) => a.status !== "cancelled"))
-      .catch(() => []),
     // Тестүүд: what the child learned about how they think.
     listTestResults(user.id).catch(() => []),
   ]);
@@ -95,16 +81,6 @@ export default async function ProfilePage() {
           registrations={registrations}
           certificates={certificates}
           tests={tests}
-          freeExams={freeExams.map((e) => {
-            const mine = myAssessments.find((a) => a.examId === e.id);
-            return {
-              id: e.id,
-              title: e.title,
-              programId: e.viaProgramId,
-              assessmentId: mine?.id ?? null,
-              status: mine?.status ?? null,
-            };
-          })}
         />
       </main>
       <Footer />
