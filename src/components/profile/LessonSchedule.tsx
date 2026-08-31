@@ -117,56 +117,67 @@ function NextLessonCard({
   const live = info.state === "live";
   const until = info.startsInMs !== undefined ? formatTimeUntil(info.startsInMs) : "";
 
+  // Zoom холбоос ч, тэмдэглэл ч ороогүй хичээл дээр LessonAction юу ч
+  // буцаадаггүй тул баруун баганыг огт гаргахгүй.
+  const hasAction = Boolean(
+    info.lesson.zoomLink || info.lesson.recordingLink || info.lesson.noteFile
+  );
+
   return (
     <div
       className={`rounded-md px-4 py-4 border ${
         live ? "bg-green-soft border-green/30" : "bg-surface border-blue-soft-2 shadow-xs"
       }`}
     >
-      <span
-        className={`inline-flex items-center gap-1.5 text-[.72rem] font-extrabold tracking-[.06em] uppercase ${
-          live ? "text-green" : "text-blue-strong"
-        }`}
-      >
-        {live ? (
-          <>
-            <span className="w-2 h-2 rounded-full bg-green" /> Хичээл яг одоо болж байна
-          </>
-        ) : (
-          <>
-            <IconClock className="w-3.5 h-3.5" /> Дараагийн хичээл
-          </>
-        )}
-      </span>
+      {/* Товч нь мэдээллийнхээ хажууд суудаг: доор нь тусдаа мөр болгоход
+          картын ёроолд ганцаараа үлдэж, юуны товч болох нь тасардаг.
+          Нарийн дэлгэц дээр л доошоо буун, гэхдээ тоолуурын шууд дор. */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="min-w-0">
+          <span
+            className={`inline-flex items-center gap-1.5 text-[.72rem] font-extrabold tracking-[.06em] uppercase ${
+              live ? "text-green" : "text-blue-strong"
+            }`}
+          >
+            {live ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-green" /> Хичээл яг одоо болж байна
+              </>
+            ) : (
+              <>
+                <IconClock className="w-3.5 h-3.5" /> Дараагийн хичээл
+              </>
+            )}
+          </span>
 
-      <div className="flex items-center gap-2 flex-wrap mt-1.5">
-        <b className="font-extrabold text-[1.05rem]">
-          {lessonIndex + 1}. {info.lesson.topic}
-        </b>
-        <LessonModeTag mode={info.lesson.mode} />
-      </div>
+          <div className="flex items-center gap-2 flex-wrap mt-1.5">
+            <b className="font-extrabold text-[1.05rem]">
+              {lessonIndex + 1}. {info.lesson.topic}
+            </b>
+            <LessonModeTag mode={info.lesson.mode} />
+          </div>
 
-      <span className="block text-[.85rem] font-semibold text-ink-2 mt-0.5">
-        {info.dateLabel}
-        {info.dateLabel && info.timeLabel && " · "}
-        {info.timeLabel}
-      </span>
+          <span className="block text-[.85rem] font-semibold text-ink-2 mt-0.5">
+            {info.dateLabel}
+            {info.dateLabel && info.timeLabel && " · "}
+            {info.timeLabel}
+          </span>
 
-      {/* Тоолуур: "3 цаг 20 минут" гэдэг нь "маргааш" гэхээс хамаагүй
-          ойлгомжтой — гэрийн хүн бэлдэх цагаа шууд мэднэ. */}
-      {!live && until && (
-        <span className="block font-extrabold text-[.95rem] text-blue-strong mt-2">
-          {`Хичээл эхлэхэд ${until} үлдлээ`}
-        </span>
-      )}
-
-      {/* Zoom холбоос ч, тэмдэглэл ч ороогүй хичээл дээр LessonAction юу ч
-          буцаадаггүй тул хоосон зай үлдээхгүйн тулд урьдчилж шалгана. */}
-      {(info.lesson.zoomLink || info.lesson.recordingLink || info.lesson.noteFile) && (
-        <div className="mt-3">
-          <LessonAction info={info} courseId={courseId} lessonIndex={lessonIndex} />
+          {/* Тоолуур: "3 цаг 20 минут" гэдэг нь "маргааш" гэхээс хамаагүй
+              ойлгомжтой — гэрийн хүн бэлдэх цагаа шууд мэднэ. */}
+          {!live && until && (
+            <span className="block font-extrabold text-[.95rem] text-blue-strong mt-2">
+              {`Хичээл эхлэхэд ${until} үлдлээ`}
+            </span>
+          )}
         </div>
-      )}
+
+        {hasAction && (
+          <div className="shrink-0">
+            <LessonAction info={info} courseId={courseId} lessonIndex={lessonIndex} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
