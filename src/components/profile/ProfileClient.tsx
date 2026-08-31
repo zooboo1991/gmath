@@ -1,25 +1,20 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import FormField from "@/components/FormField";
 import SchoolAutocomplete from "@/components/SchoolAutocomplete";
 import PushSettings from "@/components/profile/PushSettings";
-import RecordingPlayer from "@/components/profile/RecordingPlayer";
-import LessonNoteButton from "@/components/profile/LessonNoteButton";
+import { useNow, LessonAction } from "@/components/profile/LessonSchedule";
+import FreeExamBox, { type FreeExam } from "@/components/profile/FreeExamBox";
 import type { Certificate, PublicUser, RegistrationWithGroup } from "@/lib/db";
-import type { AssessmentStatus } from "@/lib/assessment/types";
 import {
   IconCheckCircle,
   IconClock,
-  IconFacebook,
   IconPerson,
   IconPencil,
-  IconTarget,
-  IconClose,
-  IconVideoCamera,
   IconDocument,
-  IconLocation,
+  IconClose,
 } from "@/components/icons";
 import { compareByStartDate, formatCourseDate } from "@/lib/courseDate";
 import { DISTRICTS_BY_PROVINCE, PROVINCES, type Province } from "@/lib/mongoliaRegions";
@@ -30,8 +25,7 @@ import {
   type CourseAudience,
   type CourseCategory,
 } from "@/lib/courseTag";
-import { getLessonStates, type LessonWithState } from "@/lib/lessonSchedule";
-import { formatMb } from "@/lib/imageResize";
+import { getLessonStates } from "@/lib/lessonSchedule";
 
 type Tab = "active" | "pending" | "certificates" | "tests";
 type AudienceFilter = "all" | CourseAudience;
@@ -343,19 +337,24 @@ export default function ProfileClient({
                   <YearlyProgramCard
                     key={r.id}
                     registration={r}
-                    initialExpanded={
-                      r.programId === focusCourseId ||
-                      freeExams.some((e) => e.programId === r.programId)
-                    }
                     freeExam={freeExams.find((e) => e.programId === r.programId) ?? null}
                   />
                 ) : (
                   <div
                     key={r.id}
                     id={`course-${r.programId}`}
-                    className="bg-surface border border-line rounded-md shadow-xs px-6 py-5"
+                    className={`relative bg-surface border border-line rounded-md shadow-xs px-6 py-5 ${
+                      r.status === "active" ? "transition-shadow hover:shadow-sm" : ""
+                    }`}
                   >
-                    <div className="flex items-center justify-between flex-wrap gap-3">
+                    {r.status === "active" && (
+                      <Link
+                        href={`/profile/course/${encodeURIComponent(r.programId)}`}
+                        aria-label={`${r.programLabel} — дэлгэрэнгүй`}
+                        className="absolute inset-0 rounded-md"
+                      />
+                    )}
+                    <div className="relative z-[1] flex items-center justify-between flex-wrap gap-3 pointer-events-none [&_a]:pointer-events-auto">
                       <div>
                         <b className="font-extrabold text-[1.05rem] block">{r.programLabel}</b>
                         {/* The start date is what the list is ordered by, so it
@@ -378,12 +377,28 @@ export default function ProfileClient({
                     </div>
 
                     {r.status === "active" ? (
-                      <div className="mt-4 pt-4 border-t border-line">
-                        <ActiveCourseDetails
-                          registration={r}
-                          freeExam={freeExams.find((e) => e.programId === r.programId) ?? null}
-                        />
-                      </div>
+                      <>
+                        <div className="relative z-[1] mt-3 flex items-center gap-2 flex-wrap pointer-events-none [&_a]:pointer-events-auto">
+                          <Link
+                            href={`/profile/course/${encodeURIComponent(r.programId)}`}
+                            className="inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft rounded-full px-4 py-2.5"
+                          >
+                            Дэлгэрэнгүй харах →
+                          </Link>
+                        </div>
+                        {/* Үнэгүй шалгалтын урилга картан дээрээ бүтнээрээ
+                            үлдэнэ: түвшин тогтоох бүгдэд хаалттай байхад ч
+                            энэ хүүхдэд нээлттэй байдаг тул хэн ч /assessment
+                            рүү очиж хайх бодолгүй. Нэг дарж нуух зүйл биш. */}
+                        {(() => {
+                          const exam = freeExams.find((e) => e.programId === r.programId);
+                          return exam ? (
+                            <div className="relative z-[1] mt-4">
+                              <FreeExamBox exam={exam} />
+                            </div>
+                          ) : null;
+                        })()}
+                      </>
                     ) : (
                       <p className="mt-3 text-[.88rem] text-ink-3 font-semibold">
                         Админ төлбөрийг баталгаажуулсны дараа энд Facebook групп, хуваарийн холбоос
@@ -413,127 +428,19 @@ export default function ProfileClient({
 }
 
 /**
- * An exam this child's course was invited to sit free, and how far they have
- * got with it.
- */
-type FreeExam = {
-  id: string;
-  title: string;
-  programId?: string;
-  /** Their assessment for this exam, if they have started one. */
-  assessmentId?: string | null;
-  status?: AssessmentStatus | null;
-};
-
-/**
- * The invitation card in a course's details.
- *
- * It has to read differently once the child has actually sat the exam —
- * a card that still says "Түвшин тогтоох →" after the work was handed in
- * invites them to do the whole thing a second time.
- */
-function FreeExamBox({ exam }: { exam: FreeExam }) {
-  const handedIn =
-    exam.status === "problems_submitted" ||
-    exam.status === "grading" ||
-    exam.status === "completed";
-
-  if (handedIn) {
-    const graded = exam.status === "completed";
-    return (
-      <div className="bg-green-soft border border-green/25 rounded-sm px-4 py-3.5">
-        <span className="inline-flex items-center gap-1.5 text-[.72rem] font-extrabold tracking-[.06em] uppercase text-green">
-          <IconCheckCircle className="w-3.5 h-3.5" /> Түвшин тогтоох өгсөн
-        </span>
-        <b className="block font-extrabold text-[.95rem] mt-1">{exam.title}</b>
-        <p className="text-ink-2 font-medium text-[.85rem] mt-1 leading-[1.6]">
-          {graded
-            ? "Багш бодолтыг чинь шалгаж, дүгнэлтээ бичсэн байна."
-            : "Бодолт багшид хүрсэн. Багш шалгаж дуусмагц дүгнэлт энд гарч ирнэ."}
-        </p>
-        <Link
-          href={exam.assessmentId ? `/profile/assessment?a=${exam.assessmentId}` : "/profile/assessment"}
-          className="inline-flex items-center justify-center gap-2 font-extrabold text-[.88rem] rounded-full bg-surface text-green border border-green/30 px-5 py-2.5 mt-3"
-        >
-          {graded ? "Дүгнэлт харах →" : "Явцыг харах →"}
-        </Link>
-      </div>
-    );
-  }
-
-  // Started but not handed in — the paper is open, so send them back to it
-  // rather than through the starting page again.
-  const inProgress = exam.status === "questionnaire_done" && Boolean(exam.assessmentId);
-
-  return (
-    <div className="bg-gold-soft border border-gold/30 rounded-sm px-4 py-3.5">
-      <span className="inline-flex items-center gap-1.5 text-[.72rem] font-extrabold tracking-[.06em] uppercase text-gold-strong">
-        <IconTarget className="w-3.5 h-3.5" /> Үнэгүй
-      </span>
-      <b className="block font-extrabold text-[.95rem] mt-1">{exam.title}</b>
-      <p className="text-ink-2 font-medium text-[.85rem] mt-1 leading-[1.6]">
-        {inProgress
-          ? "Эхэлсэн шалгалт дуусаагүй байна. Зогссон бодлогоосоо үргэлжлүүлнэ."
-          : "Энэ сургалтын сурагчид түвшин тогтоох шалгалтыг төлбөргүй өгнө. Бодлогоо бодоод бодолтынхоо зургийг хавсаргана."}
-      </p>
-      <Link
-        href={inProgress ? `/assessment/${exam.assessmentId}/solve` : `/assessment?exam=${exam.id}`}
-        className="inline-flex items-center justify-center gap-2 font-extrabold text-[.88rem] rounded-full bg-gold text-gold-ink shadow-gold px-5 py-2.5 mt-3 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
-      >
-        {inProgress ? "Үргэлжлүүлэх →" : "Түвшин тогтоох →"}
-      </Link>
-    </div>
-  );
-}
-
-/** The Facebook-group link + full lesson schedule shown for any active registration — shared by the plain course card and the yearly program's expanded view. */
-function ActiveCourseDetails({
-  registration,
-  freeExam,
-}: {
-  registration: RegistrationWithGroup;
-  /** The exam this course's students were invited to sit free, if any. */
-  freeExam?: FreeExam | null;
-}) {
-  return (
-    <div className="flex flex-col gap-3">
-      {freeExam && <FreeExamBox exam={freeExam} />}
-      {registration.facebookGroup ? (
-        <a
-          href={registration.facebookGroup}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-2.5 bg-blue-soft text-blue-strong font-bold text-[.9rem] rounded-sm px-4 py-3"
-        >
-          <IconFacebook className="w-[18px] h-[18px] shrink-0" /> Facebook группт нэгдэх
-        </a>
-      ) : (
-        <div className="flex items-center gap-2.5 bg-bg-soft text-ink-2 font-bold text-[.9rem] rounded-sm px-4 py-3">
-          <IconFacebook className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Facebook групп тун удахгүй
-        </div>
-      )}
-      <LessonSchedule registration={registration} />
-    </div>
-  );
-}
-
-/**
- * Collapsed by default to just the next lesson's date — the full schedule,
- * attendance, and Facebook link (identical to what a monthly course shows
- * inline) only appear once the student asks for them via "Дэлгэрэнгүй
- * харах". Always pinned first in the active list (see ProfileClient).
+ * The card carries only what a student decides on at a glance — is a lesson on
+ * right now, and when is the next one. Everything else (schedule, attendance,
+ * assessments, contract) lives on the course's own page, which this links to.
+ * Always pinned first in the active list (see ProfileClient).
  */
 function YearlyProgramCard({
   registration,
-  initialExpanded = false,
   freeExam = null,
 }: {
   registration: RegistrationWithGroup;
-  /** True when a notification deep link points at this programme, or a free exam is waiting. */
-  initialExpanded?: boolean;
+  /** Shown as a nudge on the card; the card itself opens the course page. */
   freeExam?: { id: string; title: string } | null;
 }) {
-  const [expanded, setExpanded] = useState(initialExpanded);
   const now = useNow();
   const lessons = registration.lessons ?? [];
   const states = now ? getLessonStates(lessons, now) : null;
@@ -549,9 +456,17 @@ function YearlyProgramCard({
   return (
     <div
       id={`course-${registration.programId}`}
-      className="bg-surface border border-line rounded-md shadow-xs px-6 py-5"
+      className="relative bg-surface border border-line rounded-md shadow-xs px-6 py-5 transition-shadow hover:shadow-sm"
     >
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* Картын аль ч хэсэгт дарахад сургалтын хуудас нээгдэнэ. Дотор нь
+          байгаа "Хичээлд орох" зэрэг товчнууд z-index-ээр дээр сууж,
+          өөрсдийн үйлдлээ хэвээр гүйцэтгэнэ. */}
+      <Link
+        href={`/profile/course/${encodeURIComponent(registration.programId)}`}
+        aria-label={`${registration.programLabel} — дэлгэрэнгүй`}
+        className="absolute inset-0 rounded-md"
+      />
+      <div className="relative z-[1] flex items-center justify-between flex-wrap gap-3 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
         <div>
           <span className="inline-flex items-center text-[.72rem] font-extrabold tracking-[.06em] uppercase text-gold-strong bg-gold-soft px-2.5 py-1 rounded-full mb-1.5">
             1 жилийн хөтөлбөр
@@ -574,292 +489,20 @@ function YearlyProgramCard({
           {live && (
             <LessonAction info={live} courseId={registration.programId} lessonIndex={liveIndex} />
           )}
-          <button
-            type="button"
-            onClick={() => setExpanded((e) => !e)}
+          <Link
+            href={`/profile/course/${encodeURIComponent(registration.programId)}`}
             className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft rounded-full px-4 py-2.5"
           >
-            {expanded ? "Хаах" : "Дэлгэрэнгүй харах"}
-          </button>
+            Дэлгэрэнгүй харах →
+          </Link>
         </div>
       </div>
-      {expanded && (
-        <div className="mt-4 pt-4 border-t border-line">
-          <ActiveCourseDetails registration={registration} freeExam={freeExam} />
+      {freeExam && (
+        <div className="relative z-[1] mt-4">
+          <FreeExamBox exam={freeExam} />
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * The Zoom room for a paid-up course. The live/next calculation runs here, in
- * the browser, so it uses the student's own clock rather than the server's UTC.
- */
-const TICK_MS = 30_000;
-
-/**
- * The wall clock as an external store: null while rendering on the server (so
- * hydration matches), then ticking every half minute so a student who leaves
- * the page open sees the button go live when the lesson actually starts.
- */
-function useNow(): Date | null {
-  const tick = useSyncExternalStore(
-    (onStoreChange) => {
-      const id = setInterval(onStoreChange, TICK_MS);
-      return () => clearInterval(id);
-    },
-    () => Math.floor(Date.now() / TICK_MS),
-    () => null
-  );
-  return tick === null ? null : new Date();
-}
-
-/**
- * The course's lessons, each offering exactly what is useful at that moment:
- * a recording once the lesson is over, the room while it is on, and nothing at
- * all for lessons that have not come round yet. Joining lives here rather than
- * in a separate card above, so there is one place to look.
- */
-type AttendanceSpan = { joinedAt: string; leftAt?: string };
-
-/**
- * Онлайн / Танхим. Lessons saved before the field existed are online — the
- * schedule editor assumes the same, so the two agree.
- */
-function LessonModeTag({ mode }: { mode?: "online" | "inperson" }) {
-  const inPerson = mode === "inperson";
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-[.68rem] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
-        inPerson ? "text-gold-strong bg-gold-soft" : "text-blue-strong bg-blue-soft"
-      }`}
-    >
-      {inPerson ? (
-        <>
-          <IconLocation className="w-[11px] h-[11px]" /> Танхим
-        </>
-      ) : (
-        <>
-          <IconVideoCamera className="w-[11px] h-[11px]" /> Онлайн
-        </>
-      )}
-    </span>
-  );
-}
-
-function LessonSchedule({ registration }: { registration: RegistrationWithGroup }) {
-  const now = useNow();
-  const lessons = registration.lessons ?? [];
-  const [attendance, setAttendance] = useState<Record<number, AttendanceSpan[]>>({});
-
-  useEffect(() => {
-    if (lessons.length === 0) return;
-    fetch(`/api/lessons/attendance?courseId=${encodeURIComponent(registration.programId)}`)
-      .then((res) => (res.ok ? res.json() : { byLessonIndex: {} }))
-      .then((json) => setAttendance(json.byLessonIndex ?? {}))
-      .catch(() => setAttendance({}));
-    // Only the course changes across a student's lifetime here, not the
-    // lesson count, so this doesn't need to depend on `lessons`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registration.programId]);
-
-  if (lessons.length === 0) {
-    // No schedule entered yet. If the course still has a room, keep a way in —
-    // otherwise removing the card above would have locked these students out.
-    return (
-      <div className="flex items-center justify-between gap-3 flex-wrap bg-bg-soft rounded-sm px-4 py-3">
-        <span className="flex items-center gap-2.5 text-ink-2 font-bold text-[.9rem]">
-          <IconClock className="w-[18px] h-[18px] shrink-0 text-ink-3" /> Хуваарь тун удахгүй
-        </span>
-        {registration.zoomLink && (
-          <a
-            href={registration.zoomLink}
-            target="_blank"
-            rel="noreferrer"
-            className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-white bg-blue shadow-blue rounded-full px-5 py-2.5 transition-transform hover:-translate-y-0.5"
-          >
-            <IconVideoCamera className="w-4 h-4" /> Хичээлд орох
-          </a>
-        )}
-      </div>
-    );
-  }
-
-  // Until hydration `now` is null, so every row renders in its neutral state
-  // and the server and client markup match.
-  const states = now ? getLessonStates(lessons, now) : null;
-
-  return (
-    <div className="bg-bg-soft rounded-sm px-4 py-3.5">
-      <div className="mb-2.5">
-        <b className="font-extrabold text-[.9rem] block">Хичээлийн хуваарь ({lessons.length})</b>
-        {/* Some students join from the Zoom app by ID rather than the link. */}
-        {(registration.zoomMeetingId || registration.zoomPasscode) && (
-          <span className="block text-[.78rem] font-semibold text-ink-3 mt-0.5">
-            {registration.zoomMeetingId && `ID: ${registration.zoomMeetingId}`}
-            {registration.zoomMeetingId && registration.zoomPasscode && " · "}
-            {registration.zoomPasscode && `Код: ${registration.zoomPasscode}`}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-col">
-        {lessons.map((lesson, i) => {
-          const info = states?.[i];
-          return (
-            // The topic gets the full row width; the date and the action share
-            // the line below it, so nothing has to be truncated on a phone.
-            <div key={i} className="flex gap-3 py-2.5 border-b border-line last:border-0">
-              <span
-                className={`w-6 h-6 rounded-md grid place-items-center font-extrabold text-[.72rem] shrink-0 mt-0.5 ${
-                  info?.state === "live"
-                    ? "bg-green text-white"
-                    : "bg-surface text-ink-2 border border-line-2"
-                }`}
-              >
-                {i + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <span className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold text-[.88rem] text-ink">{lesson.topic}</span>
-                  {/* Where the lesson happens decides what the family does that
-                      evening — it belongs next to the topic, not buried in a
-                      link they only see once the room opens. */}
-                  <LessonModeTag mode={lesson.mode} />
-                </span>
-                <div className="flex items-center justify-between gap-3 flex-wrap mt-1">
-                  <span className="text-[.78rem] font-semibold text-ink-3">
-                    {info?.dateLabel}
-                    {info?.dateLabel && info?.timeLabel && " · "}
-                    {info?.timeLabel}
-                  </span>
-                  <LessonAction info={info} courseId={registration.programId} lessonIndex={i} />
-                </div>
-                {attendance[i] && attendance[i].length > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[.75rem] font-bold text-green mt-1">
-                    <IconCheckCircle className="w-3 h-3" /> Ирц бүртгэгдсэн
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Entirely driven by what the teacher typed on the lesson itself — no
- * date gating and no falling back to the course-level room. A lesson shows a
- * join button only once it has been given its own Zoom link, so the schedule
- * reads as a checklist of what has actually been set up.
- * The one date check that remains: a *past* lesson without a recording says
- * so instead of offering a join button to a room that has already closed.
- */
-function LessonAction({
-  info,
-  courseId,
-  lessonIndex,
-}: {
-  info: LessonWithState | undefined;
-  courseId: string;
-  lessonIndex: number;
-}) {
-  const [joining, setJoining] = useState(false);
-  const [joinError, setJoinError] = useState<string | null>(null);
-
-  if (!info) return null;
-
-  // The notes sit beside whatever else the lesson offers rather than replacing
-  // it: a lesson can have notes while its recording is still being uploaded,
-  // and a student who attended live wants the notes without the video at all.
-  const note = info.lesson.noteFile ? (
-    <LessonNoteButton
-      courseId={courseId}
-      lessonIndex={lessonIndex}
-      sizeLabel={info.lesson.noteSize ? formatMb(info.lesson.noteSize) : undefined}
-    />
-  ) : null;
-  const withNote = (action: React.ReactNode) =>
-    note ? (
-      <span className="flex items-center justify-end gap-2 flex-wrap shrink-0">
-        {action}
-        {note}
-      </span>
-    ) : (
-      action
-    );
-
-  if (info.lesson.recordingLink) {
-    // The link itself is no longer rendered: RecordingPlayer asks the server
-    // for a signed, expiring URL and plays it here on the page.
-    return withNote(
-      <RecordingPlayer courseId={courseId} lessonIndex={lessonIndex} topic={info.lesson.topic} />
-    );
-  }
-
-  if (info.state === "past") {
-    return withNote(<span className="shrink-0 font-bold text-[.78rem] text-ink-3">Бичлэг удахгүй</span>);
-  }
-
-  if (!info.lesson.zoomLink) return note;
-
-  // The actual join link is resolved on click rather than rendered as a
-  // plain href — a lesson with a tracked Zoom meeting needs a personal,
-  // per-student registrant link (not the shared one), which only the
-  // server can hand out and only once, on demand.
-  const join = async () => {
-    setJoining(true);
-    setJoinError(null);
-    // Claimed inside the tap itself. Safari on a phone refuses window.open
-    // once the gesture that triggered it has expired — which is exactly what
-    // happens while the fetch below runs, and why the button used to look
-    // like it did nothing at all on an iPhone.
-    const room = window.open("", "_blank");
-    try {
-      const res = await fetch("/api/lessons/join", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId, lessonIndex }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.joinUrl) {
-        room?.close();
-        setJoinError(json.error ?? "Алдаа гарлаа, дахин дарна уу");
-        return;
-      }
-      if (room) {
-        room.location.href = json.joinUrl;
-      } else {
-        // The browser refused the new tab anyway — go there in this one
-        // rather than leaving the student staring at an unchanged page.
-        window.location.href = json.joinUrl;
-      }
-    } catch {
-      room?.close();
-      setJoinError("Сүлжээний алдаа. Дахин дарна уу");
-    } finally {
-      setJoining(false);
-    }
-  };
-
-  const isLive = info.state === "live";
-  return (
-    <span className="flex flex-col items-end gap-1">
-      <button
-        type="button"
-        disabled={joining}
-        onClick={join}
-        className={`shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-white rounded-full px-5 py-2.5 transition-transform hover:-translate-y-0.5 disabled:opacity-60 ${
-          isLive ? "bg-green shadow-sm" : "bg-blue shadow-blue"
-        }`}
-      >
-        <IconVideoCamera className="w-4 h-4" /> {joining ? "Түр хүлээнэ үү…" : "Хичээлд орох"}
-        {!joining && isLive ? " →" : ""}
-      </button>
-      {joinError && <span className="text-[.75rem] font-bold text-red-soft text-right">{joinError}</span>}
-    </span>
   );
 }
 

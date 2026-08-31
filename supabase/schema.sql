@@ -1060,3 +1060,20 @@ create table if not exists personality_results (
 );
 create index if not exists personality_results_user_idx
   on personality_results (user_id, created_at desc);
+
+-- Хичээлийн бичлэгийг хэн үзсэн бэ. Ирцийн хуудсанд "бичлэгээр нөхөж үзсэн"
+-- гэж харуулахад хэрэгтэй — хичээлдээ ороогүй ч дараа нь нөхсөн хүүхэд
+-- зүгээр таслагч мэт харагдах ёсгүй. Нэг сурагч нэг хичээл дээр нэг мөр:
+-- дахин үзэхэд тоолуур нэмэгдэж, сүүлд үзсэн цаг шинэчлэгдэнэ.
+create table if not exists lesson_recording_views (
+  id uuid primary key default gen_random_uuid(),
+  course_id text not null,
+  lesson_index int not null,
+  user_id uuid not null references users(id) on delete cascade,
+  first_viewed_at timestamptz not null default now(),
+  last_viewed_at timestamptz not null default now(),
+  view_count int not null default 1,
+  unique (course_id, lesson_index, user_id)
+);
+create index if not exists lesson_recording_views_user_course_idx
+  on lesson_recording_views (user_id, course_id);

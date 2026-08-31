@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { findCourseById, findRegistrationByUserAndProgram, findYearlyProgramById } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { bunnyConfigured, parseBunnyVideoId, signBunnyEmbedUrl } from "@/lib/bunny";
+import { recordRecordingView } from "@/lib/recordingViews";
 
 /**
  * Hands back a short-lived, signed playback URL for one lesson's recording.
@@ -34,6 +35,11 @@ export async function POST(request: Request) {
   if (!recordingLink) {
     return NextResponse.json({ ok: false, error: "Энэ хичээлийн бичлэг алга байна" }, { status: 404 });
   }
+
+  // Тэмдэглэгээ энд хийгдэнэ: сурагч бүртгэлтэй нь шалгагдсан, бичлэг нь
+  // байгаа нь батлагдсан цэг. Алдаа гарвал үл тоомсорлоно — ирцийн
+  // тоолуурын төлөө бичлэгийг нь хаах учиргүй.
+  await recordRecordingView({ courseId, lessonIndex, userId: user.id }).catch(() => {});
 
   const videoId = parseBunnyVideoId(recordingLink);
   if (!videoId) {

@@ -206,3 +206,25 @@ export async function saveRollCall(input: {
     absent: input.marks.filter((m) => !m.present).length,
   };
 }
+
+/**
+ * Нэг сурагчийн нэг сургалт дээрх бүх ирцийн тэмдэглэгээ, хичээлийн
+ * дугаараар. Багш бүртгэл аваагүй хичээл энд байхгүй — "тасалсан" биш
+ * "мэдэгдэхгүй" гэсэн үг тул дутуу мөрийг нөхөж болохгүй.
+ */
+export async function listRollCallForUser(
+  courseId: string,
+  userId: string
+): Promise<Record<number, boolean>> {
+  const { data, error } = await getSupabase()
+    .from("lesson_roll_call")
+    .select("lesson_index, present")
+    .eq("course_id", courseId)
+    .eq("user_id", userId);
+  if (error) throw error;
+  const byLessonIndex: Record<number, boolean> = {};
+  for (const row of (data ?? []) as { lesson_index: number; present: boolean }[]) {
+    byLessonIndex[row.lesson_index] = row.present;
+  }
+  return byLessonIndex;
+}
