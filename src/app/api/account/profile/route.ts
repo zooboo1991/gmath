@@ -30,6 +30,17 @@ export async function PUT(request: Request) {
     errors.email = "И-мэйл хаяг буруу байна";
   if (isTooLong(data.facebook, MAX_LEN.social)) errors.facebook = "Facebook нэр хэт урт байна";
 
+  // Гэрээний талбарууд — бүгд заавал биш, зөвхөн уртыг нь хязгаарлана.
+  if (isTooLong(data.parentName, MAX_LEN.name)) errors.parentName = "Нэр хэт урт байна";
+  if (isTooLong(data.parentPhone, MAX_LEN.name)) errors.parentPhone = "Утас хэт урт байна";
+  if (isTooLong(data.parentRegister, MAX_LEN.name)) errors.parentRegister = "Регистр хэт урт байна";
+  if (isTooLong(data.studentRegister, MAX_LEN.name)) errors.studentRegister = "Регистр хэт урт байна";
+  if (isTooLong(data.address, MAX_LEN.school)) errors.address = "Хаяг хэт урт байна";
+  // <input type="date"> нь ISO хэлбэрээр илгээдэг; өөр юм ирвэл Postgres
+  // хаяхаас нааш энд зогсооно.
+  if (data.birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(String(data.birthDate)))
+    errors.birthDate = "Огноо буруу байна";
+
   if (Object.keys(errors).length > 0) {
     return NextResponse.json({ ok: false, errors }, { status: 400 });
   }
@@ -43,6 +54,12 @@ export async function PUT(request: Request) {
     grade: data.grade?.trim() || undefined,
     email: data.email.trim(),
     facebook: data.facebook?.trim() || undefined,
+    parentName: data.parentName?.trim() ?? undefined,
+    parentPhone: data.parentPhone?.trim() ?? undefined,
+    parentRegister: data.parentRegister?.trim() ?? undefined,
+    studentRegister: data.studentRegister?.trim() ?? undefined,
+    birthDate: data.birthDate?.trim() ?? undefined,
+    address: data.address?.trim() ?? undefined,
   });
 
   if (!user) {

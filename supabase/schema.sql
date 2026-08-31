@@ -1077,3 +1077,51 @@ create table if not exists lesson_recording_views (
 );
 create index if not exists lesson_recording_views_user_course_idx
   on lesson_recording_views (user_id, course_id);
+
+-- ---------------------------------------------------------------------------
+-- Гэрээ (contracts)
+-- ---------------------------------------------------------------------------
+
+-- Гэрээнд шаардагддаг ч бүртгэлийн формд асуудаггүй талбарууд. Бүртгүүлэх
+-- урсгалыг хүндрүүлэхгүйн тулд бүгд optional: сурагч профайлаасаа, эсвэл
+-- админ хэрэглэгчийн хуудаснаас бөглөнө. Гэрээ үүсгэх үед хоосон талбар
+-- гэрээн дээр хоосон мөр болж үлдэнэ — гараар бөглөх боломжтой.
+alter table users add column if not exists parent_name text;
+alter table users add column if not exists parent_phone text;
+alter table users add column if not exists parent_register text;
+alter table users add column if not exists student_register text;
+alter table users add column if not exists birth_date date;
+alter table users add column if not exists address text;
+
+-- Гэрээний загвар: админы байршуулсан Word файл + доторх тагууд нь системийн
+-- аль талбартай холбогдохыг заасан зураглал.
+--
+-- Файл нь хувийн `contracts` bucket-д (нийтийн URL байхгүй). Тагуудыг jsonb-д
+-- хадгалав: тэдгээр нь зөвхөн эцэг мөртэйгээ хамт уншигддаг, тусад нь шүүх
+-- шаардлагагүй, тогтвортой id ч хэрэггүй — файл солигдоход бүхэлдээ дахин
+-- уншигдана.
+create table if not exists contract_templates (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  /** Storage path in the private `contracts` bucket; null until a file is uploaded. */
+  file_path text,
+  /** The name the admin's own file had, so they recognise which document this is. */
+  file_name text,
+  file_size int,
+  /** [{ tag, field }] — tag as written in the Word file, field as a key from src/lib/contracts/fields.ts. An unmapped tag renders empty. */
+  tags jsonb not null default '[]'::jsonb,
+  status text not null default 'draft' check (status in ('draft', 'active')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Гэрээ ↔ сургалт. Нэг гэрээг олон сургалтад, нэг сургалтад олон гэрээ
+-- холбож болно. program_id нь курсын uuid эсвэл "program-c" маягийн текст
+-- хоёуланг нь агуулдаг тул exam_free_courses-той адил гадаад түлхүүргүй text.
+create table if not exists contract_template_programs (
+  template_id uuid not null references contract_templates(id) on delete cascade,
+  program_id text not null,
+  primary key (template_id, program_id)
+);
+create index if not exists contract_template_programs_program_idx
+  on contract_template_programs (program_id);

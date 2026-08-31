@@ -37,6 +37,8 @@ export type AdminSection =
   /** Хүлээлгийн жагсаалт: who is waiting for a class that does not exist yet. */
   | "waitlist"
   | "chat"
+  /** Гэрээний загварууд: Word файл, тагийн зураглал, сургалттай холбох. */
+  | "contracts"
   | "logs"
   | "staff"
   | "courseEditor";

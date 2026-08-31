@@ -276,6 +276,8 @@ export default function UserObjectPage({
               </div>
             </Card>
 
+            <ContractFieldsCard user={user} />
+
             <Card title={`Сургалт, төлбөрийн түүх (${registrations.length})`}>
               {registrations.length === 0 ? (
                 <p className="text-ink-3 font-semibold text-[.9rem]">Бүртгэл алга байна.</p>
@@ -531,5 +533,90 @@ export default function UserObjectPage({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Гэрээ байгуулахад хэрэгтэй атал бүртгүүлэхэд асуудаггүй талбарууд.
+ *
+ * Эцэг эх ихэвчлэн утсаар мэдээллээ өгдөг тул админ энд шууд бөглөнө; сурагч
+ * өөрөө профайлаасаа ч бөглөж болно. Хоосон талбар гэрээн дээр хоосон мөр
+ * болж үлдэх тул заавал биш.
+ */
+function ContractFieldsCard({ user }: { user: PublicUser }) {
+  const [fields, setFields] = useState({
+    parentName: user.parentName ?? "",
+    parentPhone: user.parentPhone ?? "",
+    parentRegister: user.parentRegister ?? "",
+    studentRegister: user.studentRegister ?? "",
+    birthDate: user.birthDate ?? "",
+    address: user.address ?? "",
+  });
+  const [saved, setSaved] = useState(fields);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const dirty = JSON.stringify(fields) !== JSON.stringify(saved);
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        setError(json.error ?? "Хадгалж чадсангүй");
+        return;
+      }
+      setSaved(fields);
+    } catch {
+      setError("Сүлжээний алдаа");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const field = (key: keyof typeof fields, label: string, type = "text") => (
+    <label className="block">
+      <span className="block text-[.75rem] font-extrabold text-ink-3 uppercase tracking-[.04em] mb-1">
+        {label}
+      </span>
+      <input
+        type={type}
+        value={fields[key]}
+        onChange={(e) => setFields((f) => ({ ...f, [key]: e.target.value }))}
+        className="h-10 w-full rounded-md border border-line px-3 font-semibold text-[.88rem] bg-surface"
+      />
+    </label>
+  );
+
+  return (
+    <Card title="Гэрээний мэдээлэл">
+      <p className="text-ink-3 font-semibold text-[.82rem] -mt-2 mb-3.5 leading-[1.6]">
+        Сургалтын гэрээ үүсгэхэд хэрэглэгдэнэ. Заавал биш — хоосон талбар гэрээн дээр хоосон
+        мөр болж үлдэнэ.
+      </p>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {field("parentName", "Эцэг эх / асран хамгаалагч")}
+        {field("parentPhone", "Эцэг эхийн утас")}
+        {field("parentRegister", "Эцэг эхийн регистр")}
+        {field("studentRegister", "Сурагчийн регистр")}
+        {field("birthDate", "Төрсөн огноо", "date")}
+        {field("address", "Гэрийн хаяг")}
+      </div>
+      {error && <p className="text-red-soft font-bold text-[.85rem] mt-2">{error}</p>}
+      <button
+        type="button"
+        onClick={save}
+        disabled={saving || !dirty}
+        className="h-10 px-5 mt-3.5 rounded-md bg-navy text-white font-extrabold text-[.85rem] disabled:opacity-40"
+      >
+        {saving ? "Хадгалж байна…" : "Хадгалах"}
+      </button>
+    </Card>
   );
 }

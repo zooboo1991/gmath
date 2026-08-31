@@ -67,6 +67,19 @@ export type User = {
   school: string;
   grade?: string;
   facebook?: string;
+  /**
+   * Гэрээнд хэрэгтэй ч бүртгүүлэхэд асуудаггүй талбарууд. Бүртгэлийн
+   * урсгалыг хүндрүүлэхгүйн тулд бүгд optional — сурагч профайлаасаа,
+   * эсвэл админ хэрэглэгчийн хуудаснаас нөхөж бөглөнө.
+   */
+  parentName?: string;
+  parentPhone?: string;
+  parentRegister?: string;
+  studentRegister?: string;
+  /** ISO "YYYY-MM-DD". */
+  birthDate?: string;
+  /** Дэлгэрэнгүй гэрийн хаяг — province/district-ээс тусдаа. */
+  address?: string;
   passwordHash: string;
   passwordSalt: string;
   createdAt: string;
@@ -239,6 +252,12 @@ export type UserRow = {
   school: string;
   grade: string | null;
   facebook: string | null;
+  parent_name: string | null;
+  parent_phone: string | null;
+  parent_register: string | null;
+  student_register: string | null;
+  birth_date: string | null;
+  address: string | null;
   password_hash: string;
   password_salt: string;
   created_at: string;
@@ -341,6 +360,12 @@ export function userFromRow(row: UserRow): User {
     school: row.school,
     grade: row.grade ?? undefined,
     facebook: row.facebook ?? undefined,
+    parentName: row.parent_name ?? undefined,
+    parentPhone: row.parent_phone ?? undefined,
+    parentRegister: row.parent_register ?? undefined,
+    studentRegister: row.student_register ?? undefined,
+    birthDate: row.birth_date ?? undefined,
+    address: row.address ?? undefined,
     passwordHash: row.password_hash,
     passwordSalt: row.password_salt,
     createdAt: row.created_at,
@@ -643,7 +668,23 @@ export async function updateUserPassword(userId: string, newPassword: string): P
 export async function updateUserProfile(
   userId: string,
   input: Partial<
-    Pick<User, "lastName" | "firstName" | "province" | "district" | "school" | "grade" | "email" | "facebook">
+    Pick<
+      User,
+      | "lastName"
+      | "firstName"
+      | "province"
+      | "district"
+      | "school"
+      | "grade"
+      | "email"
+      | "facebook"
+      | "parentName"
+      | "parentPhone"
+      | "parentRegister"
+      | "studentRegister"
+      | "birthDate"
+      | "address"
+    >
   >
 ): Promise<User | undefined> {
   const patch: Record<string, unknown> = {};
@@ -655,6 +696,13 @@ export async function updateUserProfile(
   if (input.grade !== undefined) patch.grade = input.grade || null;
   if (input.email !== undefined) patch.email = input.email;
   if (input.facebook !== undefined) patch.facebook = input.facebook || null;
+  // Гэрээний талбарууд: хоосон мөр илгээх нь "цэвэрлэ" гэсэн үг.
+  if (input.parentName !== undefined) patch.parent_name = input.parentName || null;
+  if (input.parentPhone !== undefined) patch.parent_phone = input.parentPhone || null;
+  if (input.parentRegister !== undefined) patch.parent_register = input.parentRegister || null;
+  if (input.studentRegister !== undefined) patch.student_register = input.studentRegister || null;
+  if (input.birthDate !== undefined) patch.birth_date = input.birthDate || null;
+  if (input.address !== undefined) patch.address = input.address || null;
 
   const { data, error } = await getSupabase().from("users").update(patch).eq("id", userId).select("*").maybeSingle();
   if (error) throw error;

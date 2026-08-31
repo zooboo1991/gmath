@@ -544,6 +544,12 @@ type EditFields = {
   grade: string;
   email: string;
   facebook: string;
+  parentName: string;
+  parentPhone: string;
+  parentRegister: string;
+  studentRegister: string;
+  birthDate: string;
+  address: string;
 };
 
 function EditProfileModal({
@@ -564,6 +570,12 @@ function EditProfileModal({
     grade: user.grade ?? "",
     email: user.email,
     facebook: user.facebook ?? "",
+    parentName: user.parentName ?? "",
+    parentPhone: user.parentPhone ?? "",
+    parentRegister: user.parentRegister ?? "",
+    studentRegister: user.studentRegister ?? "",
+    birthDate: user.birthDate ?? "",
+    address: user.address ?? "",
   });
   const [errors, setErrors] = useState<Partial<Record<keyof EditFields, boolean>>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -692,6 +704,37 @@ function EditProfileModal({
         </FormField>
         <FormField label="Facebook аккаунт нэр">
           <input value={fields.facebook} onChange={(e) => setField("facebook", e.target.value)} />
+        </FormField>
+
+        {/* Гэрээ байгуулахад хэрэгтэй мэдээлэл. Бүртгүүлэхэд асуудаггүй тул
+            заавал биш — бөглөсөн бол сургалтын гэрээ бүрэн бэлэн болно. */}
+        <div className="mt-4 pt-4 border-t border-line">
+          <b className="block font-extrabold text-[.95rem]">Гэрээнд шаардлагатай мэдээлэл</b>
+          <p className="text-[.82rem] font-semibold text-ink-3 mt-0.5 mb-3 leading-[1.6]">
+            Заавал биш. Бөглөсөн бол сургалтын гэрээг бүрэн бэлэн болгож өгнө.
+          </p>
+        </div>
+        <FormField label="Эцэг эх / асран хамгаалагчийн нэр">
+          <input value={fields.parentName} onChange={(e) => setField("parentName", e.target.value)} />
+        </FormField>
+        <div className="grid sm:grid-cols-2 gap-x-3">
+          <FormField label="Эцэг эхийн утас">
+            <input value={fields.parentPhone} onChange={(e) => setField("parentPhone", e.target.value)} />
+          </FormField>
+          <FormField label="Эцэг эхийн регистр">
+            <input value={fields.parentRegister} onChange={(e) => setField("parentRegister", e.target.value)} />
+          </FormField>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-x-3">
+          <FormField label="Сурагчийн регистр">
+            <input value={fields.studentRegister} onChange={(e) => setField("studentRegister", e.target.value)} />
+          </FormField>
+          <FormField label="Төрсөн огноо">
+            <input type="date" value={fields.birthDate} onChange={(e) => setField("birthDate", e.target.value)} />
+          </FormField>
+        </div>
+        <FormField label="Гэрийн хаяг">
+          <input value={fields.address} onChange={(e) => setField("address", e.target.value)} />
         </FormField>
 
         {submitError && <p className="text-[.85rem] font-semibold text-red-soft mb-3">{submitError}</p>}

@@ -46,6 +46,7 @@ const MENU: { href: string; label: string; icon: (p: IconProps) => React.ReactNo
   { href: "/admin/waitlist", label: "Хүлээлгийн жагсаалт", icon: IconCalendar, section: "waitlist" },
   { href: "/admin/notifications", label: "Мэдэгдэл", icon: IconBell, section: "notifications" },
   { href: "/admin/chat", label: "Чат", icon: IconChat, section: "chat" },
+  { href: "/admin/contracts", label: "Гэрээ", icon: IconDocument, section: "contracts" },
   { href: "/admin/logs", label: "Түүх", icon: IconClock, section: "logs" },
   { href: "/admin/staff", label: "Эрх", icon: IconKey, section: "staff" },
 ];

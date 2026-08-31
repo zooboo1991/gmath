@@ -10,6 +10,9 @@ export const GRADED_SHEETS_BUCKET = "graded-sheets";
 /** Private: a lesson's notes PDF, for students registered on that course. */
 export const LESSON_NOTES_BUCKET = "lesson-notes";
 
+/** Гэрээний Word загварууд. Хувийн — нийтийн URL байхгүй. */
+export const CONTRACTS_BUCKET = "contracts";
+
 type ImageSignature = {
   mime: string;
   ext: string;
@@ -154,4 +157,30 @@ export async function removeStorageObject(bucket: string, path: string): Promise
 /** The shape createNoteUploadUrl hands out. Anything else stored in a lesson is not a note we wrote. */
 export function isLessonNotePath(value: unknown): value is string {
   return typeof value === "string" && /^notes\/[0-9a-f-]{36}\.pdf$/i.test(value);
+}
+
+/**
+ * Гэрээний Word загварыг браузераас шууд Storage руу тавих нэг удаагийн URL.
+ *
+ * Хичээлийн тэмдэглэлтэй ижил шалтгаанаар: замыг сервер өөрөө үүсгэдэг тул
+ * дуудагч байгаа объект руу эсвэл өөр bucket-ийн түлхүүрийн орон зай руу
+ * байршуулж чадахгүй.
+ */
+export async function createContractUploadUrl(): Promise<{ path: string; signedUrl: string; token: string }> {
+  const path = `templates/${crypto.randomUUID()}.docx`;
+  const { data, error } = await getSupabase().storage.from(CONTRACTS_BUCKET).createSignedUploadUrl(path);
+  if (error) throw error;
+  return { path, signedUrl: data.signedUrl, token: data.token };
+}
+
+/** The shape createContractUploadUrl hands out — anything else is not a template we wrote. */
+export function isContractTemplatePath(value: unknown): value is string {
+  return typeof value === "string" && /^templates\/[0-9a-f-]{36}\.docx$/i.test(value);
+}
+
+/** Хувийн bucket-аас файлыг сервер талдаа буулгаж авна (гэрээ бөглөхөд). */
+export async function downloadStorageObject(bucket: string, path: string): Promise<Buffer> {
+  const { data, error } = await getSupabase().storage.from(bucket).download(path);
+  if (error) throw error;
+  return Buffer.from(await data.arrayBuffer());
 }

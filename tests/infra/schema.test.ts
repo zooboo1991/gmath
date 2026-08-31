@@ -24,6 +24,8 @@ const TABLES = [
   "chat_conversations",
   "chat_issues",
   "chat_messages",
+  "contract_template_programs",
+  "contract_templates",
   "course_articles",
   "courses",
   "lesson_attendance",
@@ -53,19 +55,22 @@ const TABLES = [
   "yearly_programs",
 ];
 
-const BUCKETS = ["articles", "problems", "solutions", "graded-sheets"];
+const BUCKETS = ["articles", "problems", "solutions", "graded-sheets", "lesson-notes", "contracts"];
 
 describe("test database schema", () => {
   it("has every table supabase/schema.sql creates", async () => {
     const missing: string[] = [];
     for (const table of TABLES) {
-      const { error } = await testDb().from(table).select("*", { count: "exact", head: true });
+      // Мөр биш, хүснэгт байгаа эсэхийг шалгаж байна. `head: true` ашиглаж
+      // болохгүй: PostgREST байхгүй хүснэгтэд ч 204 буцаадаг тул алдаа
+      // гарахгүй өнгөрч, энэ тест хэзээ ч юу ч барихгүй болно.
+      const { error } = await testDb().from(table).select("*").limit(1);
       if (error) missing.push(`${table} (${error.message})`);
     }
     expect(missing, "supabase/schema.sql-ыг тестийн төслийн SQL Editor дээр ажиллуулна уу").toEqual([]);
   });
 
-  it("has the four storage buckets", async () => {
+  it("has every storage bucket the app writes to", async () => {
     const { data, error } = await testDb().storage.listBuckets();
     expect(error).toBeNull();
     const names = (data ?? []).map((b) => b.name);

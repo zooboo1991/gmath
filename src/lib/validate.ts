@@ -26,6 +26,8 @@ export const MAX_LEN = {
   articleAuthor: 100,
   analyticsPath: 300,
   analyticsReferrer: 500,
+  contractTitle: 150,
+  contractTag: 100,
   certificateNumber: 60,
   certificateCategory: 150,
   certificateCourse: 200,
