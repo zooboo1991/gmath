@@ -18,7 +18,14 @@ export const metadata: Metadata = {
   title: "Миний сургалт",
 };
 
-const TABS: CourseTab[] = ["schedule", "attendance", "assessment", "olympiad", "contract"];
+const TABS: CourseTab[] = [
+  "schedule",
+  "recordings",
+  "attendance",
+  "assessment",
+  "olympiad",
+  "contract",
+];
 
 /**
  * Нэг сургалтын дэлгэрэнгүй хуудас.
@@ -94,6 +101,7 @@ export default async function ProfileCoursePage({
           registration={registration}
           summary={summary}
           initialTab={TABS.find((t) => t === tab) ?? "schedule"}
+          nowIso={new Date().toISOString()}
           freeExam={
             invited
               ? {

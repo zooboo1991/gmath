@@ -3,15 +3,11 @@
 import { useState, useSyncExternalStore } from "react";
 import RecordingPlayer from "@/components/profile/RecordingPlayer";
 import LessonNoteButton from "@/components/profile/LessonNoteButton";
-import { IconClock, IconVideoCamera, IconLocation } from "@/components/icons";
+import { IconClock, IconVideoCamera, IconLocation, IconPlayBox } from "@/components/icons";
 import type { RegistrationWithGroup } from "@/lib/db";
-import { getLessonStates, type LessonWithState } from "@/lib/lessonSchedule";
+import { formatTimeUntil, getLessonStates, type LessonWithState } from "@/lib/lessonSchedule";
 import { formatMb } from "@/lib/imageResize";
 
-/**
- * The Zoom room for a paid-up course. The live/next calculation runs here, in
- * the browser, so it uses the student's own clock rather than the server's UTC.
- */
 const TICK_MS = 30_000;
 
 /**
@@ -31,12 +27,6 @@ export function useNow(): Date | null {
   return tick === null ? null : new Date();
 }
 
-/**
- * The course's lessons, each offering exactly what is useful at that moment:
- * a recording once the lesson is over, the room while it is on, and nothing at
- * all for lessons that have not come round yet. Joining lives here rather than
- * in a separate card above, so there is one place to look.
- */
 /**
  * Онлайн / Танхим. Lessons saved before the field existed are online — the
  * schedule editor assumes the same, so the two agree.
@@ -62,8 +52,146 @@ export function LessonModeTag({ mode }: { mode?: "online" | "inperson" }) {
   );
 }
 
-export default function LessonSchedule({ registration }: { registration: RegistrationWithGroup }) {
-  const now = useNow();
+/** Хичээлийн дугаар, сэдэв, огноо, үйлдэл — жагсаалтын нэг мөр. */
+function LessonRow({
+  info,
+  lesson,
+  lessonIndex,
+  courseId,
+}: {
+  info: LessonWithState | undefined;
+  lesson: { topic: string; mode?: "online" | "inperson" };
+  lessonIndex: number;
+  courseId: string;
+}) {
+  return (
+    // The topic gets the full row width; the date and the action share
+    // the line below it, so nothing has to be truncated on a phone.
+    <div className="flex gap-3 py-2.5 border-b border-line last:border-0">
+      <span
+        className={`w-6 h-6 rounded-md grid place-items-center font-extrabold text-[.72rem] shrink-0 mt-0.5 ${
+          info?.state === "live"
+            ? "bg-green text-white"
+            : "bg-surface text-ink-2 border border-line-2"
+        }`}
+      >
+        {lessonIndex + 1}
+      </span>
+      <div className="min-w-0 flex-1">
+        <span className="flex items-center gap-2 flex-wrap">
+          <span className="font-bold text-[.88rem] text-ink">{lesson.topic}</span>
+          {/* Where the lesson happens decides what the family does that
+              evening — it belongs next to the topic, not buried in a
+              link they only see once the room opens. */}
+          <LessonModeTag mode={lesson.mode} />
+        </span>
+        <div className="flex items-center justify-between gap-3 flex-wrap mt-1">
+          <span className="text-[.78rem] font-semibold text-ink-3">
+            {info?.dateLabel}
+            {info?.dateLabel && info?.timeLabel && " · "}
+            {info?.timeLabel}
+          </span>
+          <LessonAction info={info} courseId={courseId} lessonIndex={lessonIndex} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Хамгийн ойрын хичээл — жагсаалтын нэг мөр байхаас илүү зүйл.
+ *
+ * Сурагчийн энэ хуудсанд ирж байгаа гол шалтгаан нь "дараагийн хичээл
+ * хэзээ, хаанаас орох вэ" гэсэн асуулт тул түүнийг мөрүүдийн дунд
+ * төөрүүлэхгүй, дээр нь тодоор гаргана.
+ */
+function NextLessonCard({
+  info,
+  lessonIndex,
+  courseId,
+}: {
+  info: LessonWithState;
+  lessonIndex: number;
+  courseId: string;
+}) {
+  const live = info.state === "live";
+  const until = info.startsInMs !== undefined ? formatTimeUntil(info.startsInMs) : "";
+
+  return (
+    <div
+      className={`rounded-md px-4 py-4 border ${
+        live ? "bg-green-soft border-green/30" : "bg-surface border-blue-soft-2 shadow-xs"
+      }`}
+    >
+      <span
+        className={`inline-flex items-center gap-1.5 text-[.72rem] font-extrabold tracking-[.06em] uppercase ${
+          live ? "text-green" : "text-blue-strong"
+        }`}
+      >
+        {live ? (
+          <>
+            <span className="w-2 h-2 rounded-full bg-green" /> Хичээл яг одоо болж байна
+          </>
+        ) : (
+          <>
+            <IconClock className="w-3.5 h-3.5" /> Дараагийн хичээл
+          </>
+        )}
+      </span>
+
+      <div className="flex items-center gap-2 flex-wrap mt-1.5">
+        <b className="font-extrabold text-[1.05rem]">
+          {lessonIndex + 1}. {info.lesson.topic}
+        </b>
+        <LessonModeTag mode={info.lesson.mode} />
+      </div>
+
+      <span className="block text-[.85rem] font-semibold text-ink-2 mt-0.5">
+        {info.dateLabel}
+        {info.dateLabel && info.timeLabel && " · "}
+        {info.timeLabel}
+      </span>
+
+      {/* Тоолуур: "3 цаг 20 минут" гэдэг нь "маргааш" гэхээс хамаагүй
+          ойлгомжтой — гэрийн хүн бэлдэх цагаа шууд мэднэ. */}
+      {!live && until && (
+        <span className="block font-extrabold text-[.95rem] text-blue-strong mt-2">
+          {`Хичээл эхлэхэд ${until} үлдлээ`}
+        </span>
+      )}
+
+      {/* Zoom холбоос ч, тэмдэглэл ч ороогүй хичээл дээр LessonAction юу ч
+          буцаадаггүй тул хоосон зай үлдээхгүйн тулд урьдчилж шалгана. */}
+      {(info.lesson.zoomLink || info.lesson.recordingLink || info.lesson.noteFile) && (
+        <div className="mt-3">
+          <LessonAction info={info} courseId={courseId} lessonIndex={lessonIndex} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Хичээлүүдийг хоёр байдлаар харуулна:
+ *
+ * - `upcoming` — болоогүй хичээлүүд, хамгийн ойрынх нь дээрээ тодроод.
+ * - `past` — өнгөрсөн хичээлүүд, сүүлд болсон нь эхэндээ. Нөхөж үзэх
+ *   хүн хамгийн сүүлийн хичээлээ хайдаг болохоос эхнийхийг биш.
+ *
+ * `nowIso` нь серверийн цаг: эхний рендер сервер, браузер хоёрт яг адил
+ * гарч, hydration зөрөхгүй байх үүрэгтэй. Дараа нь браузерын цаг авна.
+ */
+export default function LessonSchedule({
+  registration,
+  show,
+  nowIso,
+}: {
+  registration: RegistrationWithGroup;
+  show: "upcoming" | "past";
+  nowIso: string;
+}) {
+  const clientNow = useNow();
+  const now = clientNow ?? new Date(nowIso);
   const lessons = registration.lessons ?? [];
 
   if (lessons.length === 0) {
@@ -88,60 +216,94 @@ export default function LessonSchedule({ registration }: { registration: Registr
     );
   }
 
-  // Until hydration `now` is null, so every row renders in its neutral state
-  // and the server and client markup match.
-  const states = now ? getLessonStates(lessons, now) : null;
+  const states = getLessonStates(lessons, now);
+  const numbered = states.map((info, lessonIndex) => ({ info, lessonIndex }));
+
+  if (show === "past") {
+    const done = numbered.filter(({ info }) => info.state === "past").reverse();
+    if (done.length === 0) {
+      return (
+        <div className="flex items-center gap-3 bg-bg-soft border border-line rounded-sm px-4 py-5 text-ink-2">
+          <IconPlayBox className="w-6 h-6 shrink-0 text-ink-3" />
+          <span className="font-semibold text-[.9rem]">
+            Болж өнгөрсөн хичээл хараахан алга байна.
+          </span>
+        </div>
+      );
+    }
+    return (
+      <div className="bg-bg-soft rounded-sm px-4 py-3.5">
+        <b className="font-extrabold text-[.9rem] block mb-2.5">
+          {`Болсон хичээлүүд (${done.length})`}
+        </b>
+        <div className="flex flex-col">
+          {done.map(({ info, lessonIndex }) => (
+            <LessonRow
+              key={lessonIndex}
+              info={info}
+              lesson={info.lesson}
+              lessonIndex={lessonIndex}
+              courseId={registration.programId}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const ahead = numbered.filter(({ info }) => info.state !== "past");
+  // Явж байгаа хичээл байвал тэр, үгүй бол хамгийн ойрын хуваарьтай нь.
+  const next =
+    ahead.find(({ info }) => info.state === "live") ??
+    ahead.find(({ info }) => info.state === "upcoming");
+  const rest = ahead.filter((row) => row !== next);
 
   return (
-    <div className="bg-bg-soft rounded-sm px-4 py-3.5">
-      <div className="mb-2.5">
-        <b className="font-extrabold text-[.9rem] block">Хичээлийн хуваарь ({lessons.length})</b>
-        {/* Some students join from the Zoom app by ID rather than the link. */}
-        {(registration.zoomMeetingId || registration.zoomPasscode) && (
-          <span className="block text-[.78rem] font-semibold text-ink-3 mt-0.5">
-            {registration.zoomMeetingId && `ID: ${registration.zoomMeetingId}`}
-            {registration.zoomMeetingId && registration.zoomPasscode && " · "}
-            {registration.zoomPasscode && `Код: ${registration.zoomPasscode}`}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-col">
-        {lessons.map((lesson, i) => {
-          const info = states?.[i];
-          return (
-            // The topic gets the full row width; the date and the action share
-            // the line below it, so nothing has to be truncated on a phone.
-            <div key={i} className="flex gap-3 py-2.5 border-b border-line last:border-0">
-              <span
-                className={`w-6 h-6 rounded-md grid place-items-center font-extrabold text-[.72rem] shrink-0 mt-0.5 ${
-                  info?.state === "live"
-                    ? "bg-green text-white"
-                    : "bg-surface text-ink-2 border border-line-2"
-                }`}
-              >
-                {i + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <span className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold text-[.88rem] text-ink">{lesson.topic}</span>
-                  {/* Where the lesson happens decides what the family does that
-                      evening — it belongs next to the topic, not buried in a
-                      link they only see once the room opens. */}
-                  <LessonModeTag mode={lesson.mode} />
-                </span>
-                <div className="flex items-center justify-between gap-3 flex-wrap mt-1">
-                  <span className="text-[.78rem] font-semibold text-ink-3">
-                    {info?.dateLabel}
-                    {info?.dateLabel && info?.timeLabel && " · "}
-                    {info?.timeLabel}
-                  </span>
-                  <LessonAction info={info} courseId={registration.programId} lessonIndex={i} />
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+    <div className="flex flex-col gap-3">
+      {next && (
+        <NextLessonCard
+          info={next.info}
+          lessonIndex={next.lessonIndex}
+          courseId={registration.programId}
+        />
+      )}
+
+      {(registration.zoomMeetingId || registration.zoomPasscode) && (
+        // Some students join from the Zoom app by ID rather than the link.
+        <span className="block text-[.78rem] font-semibold text-ink-3">
+          {registration.zoomMeetingId && `Zoom ID: ${registration.zoomMeetingId}`}
+          {registration.zoomMeetingId && registration.zoomPasscode && " · "}
+          {registration.zoomPasscode && `Код: ${registration.zoomPasscode}`}
+        </span>
+      )}
+
+      {rest.length > 0 ? (
+        <div className="bg-bg-soft rounded-sm px-4 py-3.5">
+          <b className="font-extrabold text-[.9rem] block mb-2.5">
+            {`Цаашдын хичээлүүд (${rest.length})`}
+          </b>
+          <div className="flex flex-col">
+            {rest.map(({ info, lessonIndex }) => (
+              <LessonRow
+                key={lessonIndex}
+                info={info}
+                lesson={info.lesson}
+                lessonIndex={lessonIndex}
+                courseId={registration.programId}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        !next && (
+          <div className="flex items-center gap-3 bg-bg-soft border border-line rounded-sm px-4 py-5 text-ink-2">
+            <IconClock className="w-6 h-6 shrink-0 text-ink-3" />
+            <span className="font-semibold text-[.9rem]">
+              Бүх хичээл болж дууссан байна. Бичлэгүүдийг «Хичээл нөхөж үзэх» хэсгээс үзнэ үү.
+            </span>
+          </div>
+        )
+      )}
     </div>
   );
 }

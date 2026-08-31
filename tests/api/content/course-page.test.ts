@@ -273,6 +273,54 @@ describe("бичлэг үзсэнийг тэмдэглэх", () => {
   });
 });
 
+describe("GET /profile/course/[id] — хуваарь ба нөхөж үзэх", () => {
+  /** Ирээдүйн хичээл: өнөөдрөөс хол, тул хэзээ ажиллуулсан ч болоогүй. */
+  const future = { topic: "Комбинаторик", schedule: "2099.01.05 Даваа гараг · 18:00–20:00", mode: "online" };
+
+  it("хуваарь табд болоогүй хичээл, дараагийнх нь тодроод харагдана", async () => {
+    const { course, student } = await enrolledStudent([lesson("Тоон онол"), future]);
+    const client = await signedInClient(student.phone, student.password);
+
+    const res = await client.get(`/profile/course/${course.id}`);
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("Дараагийн хичээл");
+    expect(res.text).toContain("Комбинаторик");
+    expect(res.text).toContain("Хичээл эхлэхэд");
+    // Болсон хичээлүүд энэ табд орохгүй. Сэдвийн нэрээр шалгаж болохгүй —
+    // Next-ийн RSC payload хуудасны төгсгөлд бүх хичээлийг агуулдаг тул
+    // зөвхөн энэ табд рендер хийгддэг гарчгаар шалгана.
+    expect(res.text).not.toContain("Болсон хичээлүүд");
+  });
+
+  it("нөхөж үзэх табд зөвхөн болсон хичээл, сүүлийнх нь эхэндээ", async () => {
+    const { course, student } = await enrolledStudent([
+      lesson("Эхний хичээл"),
+      { ...lesson("Сүүлийн хичээл"), schedule: "2026.08.17 Даваа гараг · 18:00–20:00" },
+      future,
+    ]);
+    const client = await signedInClient(student.phone, student.password);
+
+    const res = await client.get(`/profile/course/${course.id}?tab=recordings`);
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("Болсон хичээлүүд (2)");
+    expect(res.text).not.toContain("Дараагийн хичээл");
+    // 08.17-нд болсон нь 08.10-ныхаас хойно тул эхэнд гарна.
+    expect(res.text.indexOf("Сүүлийн хичээл")).toBeLessThan(res.text.indexOf("Эхний хичээл"));
+  });
+
+  it("бүх хичээл дууссан бол хуваарь табаас нөхөж үзэх рүү чиглүүлнэ", async () => {
+    const { course, student } = await enrolledStudent([lesson("Тоон онол")]);
+    const client = await signedInClient(student.phone, student.password);
+
+    const res = await client.get(`/profile/course/${course.id}`);
+
+    expect(res.text).toContain("Бүх хичээл болж дууссан");
+    expect(res.text).not.toContain("Дараагийн хичээл");
+  });
+});
+
 describe("GET /profile/course/[id] — табууд", () => {
   it("бүх таб гарчигтайгаа гарч, хаягаар нь нээгдэнэ", async () => {
     const { course, student } = await enrolledStudent([lesson("Тоон онол")]);

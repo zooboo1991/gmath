@@ -48,6 +48,7 @@ export function mongoliaLocalToUtc(isoDate: string, time: string): Date | null {
 type ScheduledLesson = {
   topic: string;
   schedule?: string;
+  mode?: "online" | "inperson";
   zoomLink?: string;
   recordingLink?: string;
   noteFile?: string;
@@ -68,6 +69,11 @@ export type LessonWithState = {
   dateLabel: string;
   /** "18:00–20:00" — empty when the lesson has no time. */
   timeLabel: string;
+  /**
+   * Хичээл эхлэхэд үлдсэн миллисекунд. Эхэлсэн бол сөрөг, хуваарьгүй
+   * хичээл дээр undefined. Тоолуур харуулахад хэрэглэнэ.
+   */
+  startsInMs?: number;
 };
 
 /** A lesson counts as "live" from fifteen minutes before it starts. */
@@ -75,27 +81,27 @@ const JOIN_EARLY_MS = 15 * 60 * 1000;
 /** How long a lesson is assumed to run when no end time was entered. */
 const ASSUMED_LENGTH_MS = 2 * 60 * 60 * 1000;
 
-function toLocalDate(isoDate: string, time: string): Date | null {
-  if (!isoDate || !time) return null;
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const [hh, mm] = time.split(":").map(Number);
-  // Built from local parts on purpose: this runs in the student's browser, so
-  // it lands in their timezone. Doing it on the server would compare against
-  // the host's UTC clock and be eight hours off for everyone in Mongolia.
-  const date = new Date(y, m - 1, d, hh, mm);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-type TimedLesson = { lesson: ScheduledLesson; start: Date; end: Date; endTime: string };
+type TimedLesson = {
+  lesson: ScheduledLesson;
+  start: Date;
+  end: Date;
+  date: string;
+  startTime: string;
+  endTime: string;
+};
 
 function withTimes(lessons: ScheduledLesson[]): TimedLesson[] {
   return lessons
     .map((lesson) => {
       const { date, startTime, endTime } = parseScheduleString(lesson.schedule ?? "");
-      const start = toLocalDate(date, startTime);
+      // Хичээлийн цаг Монголын хананы цагаар бичигдсэн байдаг тул үүнийг
+      // жинхэнэ агшин болгон хөрвүүлнэ. Урьд нь браузерын локал цагаар
+      // барьдаг байсан нь сервер дээр (UTC) 8 цагаар зөрдөг, гадаадад
+      // байгаа сурагчид ч буруу харагддаг байв.
+      const start = mongoliaLocalToUtc(date, startTime);
       if (!start) return null;
-      const end = toLocalDate(date, endTime) ?? new Date(start.getTime() + ASSUMED_LENGTH_MS);
-      return { lesson, start, end, endTime };
+      const end = mongoliaLocalToUtc(date, endTime) ?? new Date(start.getTime() + ASSUMED_LENGTH_MS);
+      return { lesson, start, end, date, startTime, endTime };
     })
     .filter((x): x is TimedLesson => x !== null);
 }
@@ -123,23 +129,40 @@ export function getLessonStates(lessons: ScheduledLesson[] | undefined, now: Dat
     return {
       lesson,
       state,
-      dateLabel: formatLessonDate(timed.start),
-      timeLabel: formatTimeRange(timed.start, timed.endTime),
+      dateLabel: formatLessonDate(timed.date),
+      timeLabel: formatTimeRange(timed.startTime, timed.endTime),
+      startsInMs: timed.start.getTime() - ms,
     };
   });
 }
 
-function formatLessonDate(start: Date): string {
-  const weekday = WEEKDAY_NAMES_MN[start.getDay()];
-  const month = String(start.getMonth() + 1).padStart(2, "0");
-  const day = String(start.getDate()).padStart(2, "0");
-  return `${month}-р сарын ${day}, ${weekday}`;
+/**
+ * "5 цаг 20 минут", "3 хоног 4 цаг", "12 минут" — хичээл эхлэхэд үлдсэн
+ * хугацаа. Хамгийн том хоёр нэгжийг л хэлнэ: сурагчид «2 хоног 4 цаг 13
+ * минут» гэдэг нарийвчлал хэрэггүй, «удахгүй» эсэхийг л мэдэх хэрэгтэй.
+ * Хугацаа өнгөрсөн бол хоосон.
+ */
+export function formatTimeUntil(ms: number): string {
+  if (ms <= 0) return "";
+  const totalMinutes = Math.floor(ms / 60_000);
+  if (totalMinutes < 1) return "1 минут";
+
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) return hours > 0 ? `${days} хоног ${hours} цаг` : `${days} хоног`;
+  if (hours > 0) return minutes > 0 ? `${hours} цаг ${minutes} минут` : `${hours} цаг`;
+  return `${minutes} минут`;
 }
 
-function formatTimeRange(start: Date, endTime: string): string {
-  const hh = String(start.getHours()).padStart(2, "0");
-  const mm = String(start.getMinutes()).padStart(2, "0");
-  return endTime ? `${hh}:${mm}–${endTime}` : `${hh}:${mm}`;
+/** "08-р сарын 24, Даваа" — хуваарийн мөрөнд бичигдсэн огноогоор. */
+function formatLessonDate(isoDate: string): string {
+  const [, month, day] = isoDate.split("-");
+  const weekday = getWeekdayNameMn(isoDate);
+  return `${month}-р сарын ${day}${weekday ? `, ${weekday}` : ""}`;
 }
 
-const WEEKDAY_NAMES_MN = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
+function formatTimeRange(startTime: string, endTime: string): string {
+  return endTime ? `${startTime}–${endTime}` : startTime;
+}

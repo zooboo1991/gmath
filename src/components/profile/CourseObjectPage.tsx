@@ -21,7 +21,13 @@ import type { AttendanceOutcome, AttendanceSummary } from "@/lib/courseAttendanc
 import { PRESENT_THRESHOLD_PERCENT } from "@/lib/courseAttendance";
 import { formatCourseDate } from "@/lib/courseDate";
 
-export type CourseTab = "schedule" | "attendance" | "assessment" | "olympiad" | "contract";
+export type CourseTab =
+  | "schedule"
+  | "recordings"
+  | "attendance"
+  | "assessment"
+  | "olympiad"
+  | "contract";
 
 type PastAssessment = {
   id: string;
@@ -32,6 +38,7 @@ type PastAssessment = {
 
 const TABS: { key: CourseTab; label: string }[] = [
   { key: "schedule", label: "Хичээлийн хуваарь" },
+  { key: "recordings", label: "Хичээл нөхөж үзэх" },
   { key: "attendance", label: "Ирц" },
   { key: "assessment", label: "Түвшин тогтоох" },
   { key: "olympiad", label: "Мини олимпиад" },
@@ -49,12 +56,15 @@ export default function CourseObjectPage({
   initialTab,
   freeExam,
   assessments,
+  nowIso,
 }: {
   registration: RegistrationWithGroup;
   summary: AttendanceSummary;
   initialTab: CourseTab;
   freeExam: FreeExam | null;
   assessments: PastAssessment[];
+  /** Серверийн цаг — эхний рендерийг сервер, браузер хоёрт нэг ижил байлгана. */
+  nowIso: string;
 }) {
   const [tab, setTab] = useState<CourseTab>(initialTab);
 
@@ -96,7 +106,10 @@ export default function CourseObjectPage({
           </div>
 
           <div className="pt-5">
-            {tab === "schedule" && <ScheduleTab registration={registration} />}
+            {tab === "schedule" && <ScheduleTab registration={registration} nowIso={nowIso} />}
+            {tab === "recordings" && (
+              <LessonSchedule registration={registration} show="past" nowIso={nowIso} />
+            )}
             {tab === "attendance" && <AttendanceTab summary={summary} />}
             {tab === "assessment" && (
               <AssessmentTab freeExam={freeExam} assessments={assessments} />
@@ -197,7 +210,13 @@ function Kpi({
   );
 }
 
-function ScheduleTab({ registration }: { registration: RegistrationWithGroup }) {
+function ScheduleTab({
+  registration,
+  nowIso,
+}: {
+  registration: RegistrationWithGroup;
+  nowIso: string;
+}) {
   return (
     <div className="flex flex-col gap-3">
       {registration.facebookGroup ? (
@@ -215,7 +234,7 @@ function ScheduleTab({ registration }: { registration: RegistrationWithGroup }) 
           удахгүй
         </div>
       )}
-      <LessonSchedule registration={registration} />
+      <LessonSchedule registration={registration} show="upcoming" nowIso={nowIso} />
     </div>
   );
 }
