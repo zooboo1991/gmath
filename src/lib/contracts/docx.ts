@@ -64,6 +64,12 @@ function open(buffer: Buffer): { doc: Docxtemplater<PizZip>; parts: string[] } {
   }
 }
 
+/**
+ * Тагийг бүтэн текстээс уншиж байгаа шалтгаан: docxtemplater-ийн албан ёсны
+ * `inspect-module` нь lodash шаарддаг ч түүнийгээ dependency-дээ жагсаадаггүй.
+ * Зөвхөн тагийн жагсаалтын төлөө гуравдагч сан нэмэх нь илүүц — `getFullText`
+ * нь хуваагдсан run-уудыг аль хэдийн нийлүүлж өгдөг тул хангалттай.
+ */
 export function readTemplateTags(buffer: Buffer): string[] {
   const { doc, parts } = open(buffer);
   const found: string[] = [];
