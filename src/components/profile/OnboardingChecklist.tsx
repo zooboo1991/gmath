@@ -112,20 +112,26 @@ export default function OnboardingChecklist({
                 {done && <IconCheck className="w-3.5 h-3.5" strokeWidth={3} />}
               </button>
 
-              <div className="min-w-0 flex-1">
-                <span
-                  className={`block font-bold text-[.92rem] ${done ? "text-ink-3 line-through" : "text-ink"}`}
-                >
-                  {labels.title}
-                </span>
-                <span className="block text-[.8rem] font-semibold text-ink-3 mt-0.5 leading-[1.55]">
-                  {missingGroup
-                    ? "Facebook групп тун удахгүй — багш бэлэн болмогц энд гарч ирнэ."
-                    : labels.hint}
-                </span>
-              </div>
+              {/* Нарийн дэлгэц дээр товч текстийн хажууд багтахгүй тул доош
+                  буудаг: эс бөгөөс тайлбар тав хүртэл мөр болж шахагдана. */}
+              <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <div className="min-w-0 flex-1">
+                  <span
+                    className={`block font-bold text-[.92rem] ${done ? "text-ink-3 line-through" : "text-ink"}`}
+                  >
+                    {labels.title}
+                  </span>
+                  <span className="block text-[.8rem] font-semibold text-ink-3 mt-0.5 leading-[1.55]">
+                    {missingGroup
+                      ? "Facebook групп тун удахгүй — багш бэлэн болмогц энд гарч ирнэ."
+                      : labels.hint}
+                  </span>
+                </div>
 
-              {!missingGroup && <StepAction step={step} registration={registration} label={labels.action} />}
+                {!missingGroup && (
+                  <StepAction step={step} registration={registration} label={labels.action} />
+                )}
+              </div>
             </div>
           );
         })}
@@ -151,7 +157,7 @@ function StepAction({
   label: string;
 }) {
   const className =
-    "shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.82rem] text-blue-strong bg-blue-soft rounded-full px-3.5 py-2";
+    "shrink-0 self-start inline-flex items-center gap-1.5 font-extrabold text-[.82rem] text-blue-strong bg-blue-soft rounded-full px-3.5 py-2";
 
   if (step === "schedule") {
     return (
