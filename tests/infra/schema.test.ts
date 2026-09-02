@@ -27,6 +27,7 @@ const TABLES = [
   "contract_template_programs",
   "contract_templates",
   "course_articles",
+  "course_onboarding_steps",
   "courses",
   "lesson_attendance",
   "lesson_meetings",

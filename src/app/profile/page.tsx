@@ -8,6 +8,7 @@ import { listCertificatesByPhone, listRegistrationsByUser, toPublicUser } from "
 import { getSessionUser } from "@/lib/session";
 import { TESTS } from "@/lib/tests";
 import { listTestResults } from "@/lib/tests/db";
+import { listOnboardingByProgram } from "@/lib/onboarding";
 
 export const dynamic = "force-dynamic";
 
@@ -47,13 +48,16 @@ export default async function ProfilePage() {
     );
   }
 
-  const [registrations, certificates, testResults] = await Promise.all([
+  const [registrations, certificates, testResults, onboarding] = await Promise.all([
     listRegistrationsByUser(user.id),
     // certificates is a newer table — a site that hasn't run the latest
     // schema.sql yet shouldn't have its whole profile page go down over it.
     listCertificatesByPhone(user.phone).catch(() => []),
     // Тестүүд: what the child learned about how they think.
     listTestResults(user.id).catch(() => []),
+    // Эхлэлийн чеклистийн төлөв. Хүснэгт нь шинэ — schema.sql-ээ ажиллуулаагүй
+    // орчинд профайл бүхэлдээ унах ёсгүй.
+    listOnboardingByProgram(user.id).catch(() => ({})),
   ]);
 
   const tests = testResults
@@ -81,6 +85,8 @@ export default async function ProfilePage() {
           registrations={registrations}
           certificates={certificates}
           tests={tests}
+          onboarding={onboarding}
+          nowIso={new Date().toISOString()}
         />
       </main>
       <Footer />

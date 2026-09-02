@@ -5,6 +5,7 @@ import Link from "next/link";
 import FormField from "@/components/FormField";
 import SchoolAutocomplete from "@/components/SchoolAutocomplete";
 import PushSettings from "@/components/profile/PushSettings";
+import OnboardingChecklist from "@/components/profile/OnboardingChecklist";
 import { useNow, LessonAction } from "@/components/profile/LessonSchedule";
 import type { Certificate, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import {
@@ -16,6 +17,7 @@ import {
   IconClose,
 } from "@/components/icons";
 import { compareByStartDate, formatCourseDate } from "@/lib/courseDate";
+import { ONBOARDING_STEPS, type OnboardingState } from "@/lib/onboarding";
 import { DISTRICTS_BY_PROVINCE, PROVINCES, type Province } from "@/lib/mongoliaRegions";
 import {
   COURSE_CATEGORIES,
@@ -43,6 +45,9 @@ function isYearly(r: RegistrationWithGroup): boolean {
   return r.programId.startsWith("program-");
 }
 
+/** Чеклист хэр удаан харагдах вэ — 30 хоног. */
+const ONBOARDING_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ProfileClient({
@@ -50,10 +55,19 @@ export default function ProfileClient({
   registrations,
   certificates,
   tests = [],
+  onboarding = {},
+  nowIso,
 }: {
   user: PublicUser;
   registrations: RegistrationWithGroup[];
   certificates: Certificate[];
+  /** Эхлэлийн чеклистийн төлөв, сургалтын id-гаар. */
+  onboarding?: Record<string, OnboardingState>;
+  /**
+   * Серверийн цаг. Рендерийн явцад цаг унших нь хориотой (React-ийн дүрэм) ба
+   * сервер, браузер хоёрын эхний рендер зөрөх ёсгүй тул prop-оор дамжина.
+   */
+  nowIso: string;
   /** Finished tests, newest first — see src/lib/tests. */
   tests?: { slug: string; title: string; archetype: string; tag: string; takenAt: string }[];
 }) {
@@ -113,6 +127,24 @@ export default function ProfileClient({
   const pending = sorted.filter((r) => r.status !== "active");
   const list = tab === "active" ? active : pending;
 
+  // Чеклистийг зөвхөн саяхан эхэлсэн сурагчид харуулна. Хэдэн сар суралцсан
+  // хүнд "эхлэхэд туслах" карт гарах нь тус болохгүй, зөвхөн хуудсыг дүүргэнэ.
+  // active[0] нь жилийн хөтөлбөр байвал тэр — тэднийг эхэнд пинлэсэн байдаг.
+  const main = active[0];
+  const fresh =
+    main !== undefined &&
+    new Date(nowIso).getTime() - new Date(main.createdAt).getTime() < ONBOARDING_WINDOW_MS;
+  const steps = main ? (onboarding[main.programId] ?? {}) : {};
+  const stepsLeft =
+    main !== undefined &&
+    ONBOARDING_STEPS.some((step) => {
+      // Facebook групп ороогүй бол тэр алхмыг тэмдэглэх боломжгүй тул
+      // "дуусаагүй" гэж тооцохгүй — эс бөгөөс карт хэзээ ч алга болохгүй.
+      if (step === "facebook" && !main.facebookGroup) return false;
+      return !steps[step];
+    });
+  const checklistFor = fresh && stepsLeft ? main : undefined;
+
   // Only offer categories the visible list actually carries, so picking one can
   // never lead to a guaranteed-empty result.
   const present = new Set(list.flatMap((r) => extractCourseCategories(tagOf(r))));
@@ -168,6 +200,13 @@ export default function ProfileClient({
       </section>
 
       <div className="wrap pt-5 flex flex-col gap-3">
+        {checklistFor && (
+          <OnboardingChecklist
+            registration={checklistFor}
+            initial={onboarding[checklistFor.programId] ?? {}}
+            otherActiveCount={active.length - 1}
+          />
+        )}
         <PushSettings />
       </div>
 

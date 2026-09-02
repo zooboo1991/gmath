@@ -1125,3 +1125,36 @@ create table if not exists contract_template_programs (
 );
 create index if not exists contract_template_programs_program_idx
   on contract_template_programs (program_id);
+
+-- ---------------------------------------------------------------------------
+-- Эхлэлийн 3 алхам (шинэ сурагчийн чеклист)
+-- ---------------------------------------------------------------------------
+-- Төлбөрөө баталгаажуулсан сурагч профайл дээрээ гурван алхам харна: Facebook
+-- группт нэгдэх, хичээлийн хуваариа харах, Zoom-оо турших. Алхам бүрийг сурагч
+-- өөрөө дарж тэмдэглэнэ. Гурвуулаа дуусмагц карт алга болно.
+--
+-- Тусдаа хүснэгт, `registrations` дээрх багана биш: registrations бол QPay-ийн
+-- callback болон админы баталгаажуулалт нөхцөлт UPDATE-ээр бичдэг мөнгөний мөр.
+-- Сурагчийн товч дарах бичилт тэр мөрд хүрэх ёсгүй — updateRegistration нь
+-- статусын хамгаалалтгүй бүтэн patch бичдэг тул зэрэг бичилт төлбөрийн төлвийг
+-- дарж болзошгүй.
+--
+-- `program_id` нь lesson_roll_call.course_id-тай адил гадаад түлхүүргүй text:
+-- курсын uuid ба "program-c" маягийн жилийн хөтөлбөрийн id хоёуланг агуулна.
+--
+-- Мөр устгахгүй, `done`-г эргүүлнэ (lesson_roll_call.present-ийн загвар): нэг
+-- upsert зам хангалттай, буцаахад тусдаа DELETE route хэрэггүй, анх хэзээ
+-- хийснийг `created_at` хадгалсаар үлдэнэ.
+create table if not exists course_onboarding_steps (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  program_id text not null,
+  step text not null check (step in ('facebook', 'schedule', 'zoom')),
+  done boolean not null default true,
+  created_at timestamptz not null default now(),
+  marked_at timestamptz not null default now(),
+  /** Plain (not partial) unique: PostgREST's upsert onConflict can only target a full unique constraint. */
+  unique (user_id, program_id, step)
+);
+create index if not exists course_onboarding_steps_user_program_idx
+  on course_onboarding_steps (user_id, program_id);
