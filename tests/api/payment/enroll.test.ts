@@ -21,12 +21,14 @@ import {
   createTestRegistration,
   createTestUser,
   makePhone,
+  notificationsFor,
   readRegistration,
   trackNotificationsForCreatedUsers,
 } from "../../support/factories";
 import {
   findMockInvoice,
   listMockInvoices,
+  mockCalls,
   payMockInvoice,
   senderInvoiceNoForRegistration,
 } from "../../support/mockControl";
@@ -366,6 +368,62 @@ describe("bank transfers", () => {
     expect(res.body.paid).toBe(false);
     expect(res.body.registration!.status).toBe("pending");
     expect((await listMockInvoices()).length).toBe(before);
+  });
+
+  /**
+   * Дансаар төлсөн сурагч өмнө нь юу ч сонсдоггүй байсан — админ баталгаажуулах
+   * хүртэл бүрэн чимээгүй. Одоо хүлээлт эхэлмэгц баталгаа очно.
+   */
+  it("хүлээлт эхлэхэд сурагчид мэдэгдэнэ, харин SMS зарцуулахгүй", async () => {
+    const course = await createTestCourse({ price: "200,000₮" });
+    const student = await createTestUser();
+    const client = await signedInClient(student.phone, student.password);
+
+    const smsBefore = (await mockCalls("skytel")).filter((c) => c.query.sendto === student.phone).length;
+    expect((await enroll(client, { programId: course.id, payMethod: "bank" })).status).toBe(200);
+
+    const titles = (await notificationsFor(student.id)).map((n) => n.title);
+    expect(titles).toEqual(["Төлбөр хүлээн авлаа"]);
+
+    // Тэр агшинд сурагч дэлгэц дээрээ ижил мэдээллийг уншиж байгаа тул SMS
+    // давхардал болно. SMS зөвхөн баталгаажилтад зарцуулагдана.
+    const smsAfter = (await mockCalls("skytel")).filter((c) => c.query.sendto === student.phone).length;
+    expect(smsAfter).toBe(smsBefore);
+  });
+
+  /**
+   * 24 цагийн амлалтыг биелүүлэх боломж олгодог цорын ганц зүйл: админ панелаа
+   * өөрөө нээх хүртэл гүйлгээ хүлээгдсээр байх ёсгүй.
+   *
+   * CHAT_ALERT_PHONES тохируулаагүй орчинд алгасана — тэр жагсаалт хоосон бол
+   * код өөрөө no-op болдог (сануулга лог үлдээнэ).
+   */
+  const alertPhone = (process.env.CHAT_ALERT_PHONES ?? "").split(",")[0]?.trim();
+  it.skipIf(!alertPhone)("дансны шилжүүлэг хүлээгдэж байгааг админд мэдэгдэнэ", async () => {
+    // Админ гэсэн аккаунтын төрөл байхгүй тул тэд өөрсдийн сурагчийн
+    // аккаунтаараа мэдэгдэл авдаг — утсаар нь олдоно.
+    const adminUser = await createTestUser({ phone: alertPhone });
+    const course = await createTestCourse({ price: "200,000₮" });
+    const student = await createTestUser();
+    const client = await signedInClient(student.phone, student.password);
+
+    expect((await enroll(client, { programId: course.id, payMethod: "bank" })).status).toBe(200);
+
+    const titles = (await notificationsFor(adminUser.id)).map((n) => n.title);
+    expect(titles).toContain("Дансны шилжүүлэг хүлээгдэж байна");
+  });
+
+  it("хоёр дахь оролдлого няцаагдаж, мэдэгдэл давхардахгүй", async () => {
+    const course = await createTestCourse({ price: "200,000₮" });
+    const student = await createTestUser();
+    const client = await signedInClient(student.phone, student.password);
+
+    expect((await enroll(client, { programId: course.id, payMethod: "bank" })).status).toBe(200);
+    expect((await enroll(client, { programId: course.id, payMethod: "bank" })).status).toBe(409);
+
+    // Давхардлын хамгаалалт нь registrations дээрх unique index-ээс ирдэг:
+    // хоёр дахь мөр огт үүсэхгүй тул хоёр дахь мэдэгдэл ч гарахгүй.
+    expect((await notificationsFor(student.id)).length).toBe(1);
   });
 
   /**

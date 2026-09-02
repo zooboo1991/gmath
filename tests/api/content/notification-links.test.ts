@@ -58,7 +58,7 @@ describe("what each automatic notification points at", () => {
 
     const links = await notificationLinksFor(user.id);
     expect(links).toContainEqual({
-      title: "Бүртгэл амжилттай боллоо",
+      title: "Төлбөр баталгаажлаа",
       link: `/profile?course=${encodeURIComponent(course.id)}`,
     });
   });

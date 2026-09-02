@@ -1336,6 +1336,13 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                         </span>
                       </div>
                     ))}
+                    {/* Хамгийн олон алдаа гардаг хоёр зүйл: гүйлгээний утга
+                        зөрөх, дараа нь хэзээ баталгаажихыг мэдэхгүй хүлээх. */}
+                    <p className="text-[.85rem] font-semibold text-ink-2 leading-[1.6] mt-3 pt-3 border-t border-line">
+                      Гүйлгээний утгыг яг хэвээр нь хуулж бичнэ үү — утга зөрвөл төлбөрийг тань таних
+                      боломжгүй болно. Шилжүүлсний дараа доорх товчийг дарахад бид ажлын өдрүүдэд 24
+                      цагийн дотор шалгаж баталгаажуулна.
+                    </p>
                   </div>
                 )}
 
@@ -1435,8 +1442,10 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 ) : (
                   <>
                     <h3 className="text-[1.4rem] font-extrabold">Баярлалаа! Бүртгэл хүлээн авлаа.</h3>
-                    <p className="text-ink-2 mt-2.5 font-medium">
-                      Админ таны төлбөрийг шалгаж баталгаажуулсны дараа Facebook групп, хуваарийн холбоосыг илгээнэ.
+                    <p className="text-ink-2 mt-2.5 font-medium leading-[1.7]">
+                      Таны төлбөрийг ажлын өдрүүдэд 24 цагийн дотор шалгаж баталгаажуулна.
+                      Баталгаажмагц танд SMS болон мэдэгдэл очиж, Facebook групп, хичээлийн хуваарь
+                      профайлд тань нээгдэнэ.
                     </p>
                   </>
                 )}

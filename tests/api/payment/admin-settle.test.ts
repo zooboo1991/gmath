@@ -21,12 +21,15 @@ import {
   createTestCourse,
   createTestRegistration,
   createTestUser,
+  notificationsFor,
   readRegistration,
   trackNotificationsForCreatedUsers,
 } from "../../support/factories";
+import { transliterate } from "@/lib/mnTransliterate";
 import {
   failMockInvoiceCheck,
   findMockInvoice,
+  mockCalls,
   payMockInvoice,
   senderInvoiceNoForRegistration,
 } from "../../support/mockControl";
@@ -376,5 +379,89 @@ describe("confirming by hand a row that still holds a QPay invoice", () => {
 
     expect(res.status).toBe(200);
     expect((await readRegistration(registration.id))?.status).toBe("active");
+  });
+});
+
+async function smsTo(phone: string): Promise<number> {
+  return (await mockCalls("skytel")).filter((c) => c.query.sendto === phone).length;
+}
+
+/**
+ * Баталгаажилтын мэдэгдэл — сурагчийн хүлээлт дуусах цорын ганц дохио.
+ *
+ * Хоёр шинж чухал: (1) үнэхээр очдог, (2) ЯГ НЭГ УДАА очдог. Хоёр удаа
+ * "баталгаажлаа" гэсэн мессеж авах нь огт аваагүйгээс дор — сурагч хоёр
+ * дахин төлсөн юм болов уу гэж эргэлзэнэ.
+ */
+describe("баталгаажилтын мэдэгдэл", () => {
+  it("дансны бүртгэлийг баталгаажуулахад яг нэг SMS, нэг мэдэгдэл явна", async () => {
+    const course = await createTestCourse({ title: "Тоон онолын сургалт" });
+    const user = await createTestUser();
+    const registration = await createTestRegistration({
+      userId: user.id,
+      programId: course.id,
+      payMethod: "bank",
+      status: "pending",
+    });
+
+    const smsBefore = await smsTo(user.phone);
+    const notesBefore = (await notificationsFor(user.id)).length;
+
+    const admin = await adminClient("full");
+    expect((await admin.post(`/api/admin/registrations/${registration.id}/approve`)).status).toBe(200);
+
+    expect(await smsTo(user.phone)).toBe(smsBefore + 1);
+    const titles = (await notificationsFor(user.id)).map((n) => n.title);
+    expect(titles).toContain("Төлбөр баталгаажлаа");
+    expect(titles.length).toBe(notesBefore + 1);
+  });
+
+  it("дахин баталгаажуулахад мэдэгдэл давхардахгүй", async () => {
+    const course = await createTestCourse();
+    const user = await createTestUser();
+    const registration = await createTestRegistration({
+      userId: user.id,
+      programId: course.id,
+      payMethod: "bank",
+      status: "pending",
+    });
+
+    const admin = await adminClient("full");
+    await admin.post(`/api/admin/registrations/${registration.id}/approve`);
+    const smsAfterFirst = await smsTo(user.phone);
+    const notesAfterFirst = (await notificationsFor(user.id)).length;
+
+    // Хоёр дахь даралт: нөхцөлт UPDATE нь pending мөрийг л хөддөг тул
+    // энэ удаад юу ч явахгүй.
+    await admin.post(`/api/admin/registrations/${registration.id}/approve`);
+
+    expect(await smsTo(user.phone)).toBe(smsAfterFirst);
+    expect((await notificationsFor(user.id)).length).toBe(notesAfterFirst);
+  });
+
+  it("SMS-д ямар сургалт болох нь бичигдэнэ", async () => {
+    // Өмнө нь бүх SMS ижил тогтмол мөр байсан тул хэд хэдэн сургалтад
+    // бүртгүүлсэн хүн аль нь баталгаажсаныг мэдэх аргагүй байв.
+    const course = await createTestCourse({ title: "Геометрийн гүнзгий" });
+    const user = await createTestUser();
+    const registration = await createTestRegistration({
+      userId: user.id,
+      programId: course.id,
+      programLabel: course.title,
+      payMethod: "bank",
+      status: "pending",
+    });
+
+    const admin = await adminClient("full");
+    await admin.post(`/api/admin/registrations/${registration.id}/approve`);
+
+    const sent = (await mockCalls("skytel")).filter((c) => c.query.sendto === user.phone);
+    const message = String(sent[sent.length - 1]?.query.message ?? "");
+    expect(message).toContain("Tulbur batalgaajlaa");
+    // Кирилл нэрийг латинаар бичсэн хэлбэрээр нь шалгана — хөрвүүлэлтийн
+    // хүснэгт өөрчлөгдвөл тест дагаж явна.
+    expect(message).toContain(transliterate(course.title).slice(0, 40));
+    // Нэг SMS-д багтах ёстой: Skytel урт мессежийг тодорхойгүй боловсруулдаг.
+    expect(message.length).toBeLessThanOrEqual(160);
   });
 });

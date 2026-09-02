@@ -5,6 +5,7 @@ import {
   findCourseById,
   findRegistrationByUserAndProgram,
   findYearlyProgramById,
+  notifyBankTransferPending,
   settleRegistrationPayment,
   updateRegistration,
 } from "@/lib/db";
@@ -121,6 +122,10 @@ export async function POST(request: Request) {
         status: "pending",
         ...installment,
       });
+      // Хүлээлт эндээс эхэлнэ: сурагчид баталгаа, админд ажил. Зөвхөн энэ
+      // салаанд — QPay-ийн pending мөр (доор) нь QR уншуулж төлөх гэж байгаа
+      // хүн тул "дансны шилжүүлэг хүлээгдэж байна" гэсэн мэдэгдэл буруу очно.
+      await notifyBankTransferPending(registration);
       return NextResponse.json({
         ok: true,
         registration,

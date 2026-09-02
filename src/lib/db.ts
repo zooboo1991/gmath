@@ -1565,28 +1565,113 @@ export async function updateRegistration(
  */
 async function notifyRegistrationActive(registration: Registration): Promise<void> {
   if (!registration.userId) return;
-  await createNotification({
-    title: "Бүртгэл амжилттай боллоо",
-    body: `Таны "${registration.programLabel}" сургалтанд бүртгэлээ. Та Профайл цэснээс сургалтын мэдээллээ харна уу.`,
-    targetType: "users",
-    userIds: [registration.userId],
-    channel: "site",
-    // Straight to their own card for this course — the Facebook group and the
-    // schedule they were just promised live there.
-    link: `/profile?course=${encodeURIComponent(registration.programId)}`,
-  });
 
-  // A fixed, hardcoded Latin string rather than transliterated Cyrillic —
-  // same convention as the OTP SMS in otp.ts — since the exact wording
-  // asked for here doesn't survive the Cyrillic->Latin map unchanged
-  // ("профайл" would come out "profail", not "profile"). Never let an SMS
-  // hiccup fail the registration that already succeeded.
-  const user = await findUserById(registration.userId);
-  if (user) {
-    await sendSms(
-      user.phone,
-      "Ganbat bagshiin surgaltand amjilttai burtgegdlee. Ta profile tsesnees surgaltiin medeellee harna uu."
-    ).catch((err) => console.error("[notifyRegistrationActive] sms send failed:", err));
+  // The whole body is guarded, not just the SMS. The status flip has already
+  // committed by the time this runs, and every caller reaches it through a
+  // conditional UPDATE that will not fire twice — so letting a notification
+  // error bubble up would 500 the request while leaving the row active, and
+  // the retry would be refused by that same guard. The student would then be
+  // permanently silent, which is the exact failure this notification exists
+  // to prevent.
+  try {
+    await createNotification({
+      // Deliberately not "Бүртгэл амжилттай боллоо": the student saw almost
+      // that sentence the moment they paid, so the confirmation read as a
+      // repeat rather than as the thing they were waiting for.
+      title: "Төлбөр баталгаажлаа",
+      body: `Таны "${registration.programLabel}" сургалтын төлбөр баталгаажиж, бүртгэл идэвхжлээ. Facebook групп, хичээлийн хуваарийг профайлаасаа харна уу.`,
+      targetType: "users",
+      userIds: [registration.userId],
+      channel: "site",
+      // Straight to their own card for this course — the Facebook group and the
+      // schedule they were just promised live there.
+      link: `/profile?course=${encodeURIComponent(registration.programId)}`,
+    });
+  } catch (err) {
+    console.error("[notifyRegistrationActive] notification failed:", registration.id, err);
+  }
+
+  // Latin rather than Cyrillic — Skytel mangles Cyrillic (see lib/otp.ts).
+  // The course name is transliterated and clipped so the message stays inside
+  // one SMS; the rest is a hand-written Latin string, since the map would turn
+  // "профайл" into "profail".
+  try {
+    const user = await findUserById(registration.userId);
+    if (user) {
+      const course = transliterate(registration.programLabel).slice(0, 40);
+      await sendSms(
+        user.phone,
+        `Tulbur batalgaajlaa. ${course} surgaltad burtgel idevhjlee. Ta profile tsesnees medeellee harna uu.`
+      );
+    }
+  } catch (err) {
+    console.error("[notifyRegistrationActive] sms send failed:", registration.id, err);
+  }
+}
+
+/**
+ * Дансаар шилжүүлсэн бүртгэл хүлээлтэд орох мөчид хоёр талд мэдэгдэнэ.
+ *
+ * Сурагчид: төлбөр нь замдаа явж байгааг батлах — тэр агшинд сайт дээрээ
+ * байгаа ч, дараа нь профайлаа нээхэд юу болж байгааг санах зүйл хэрэгтэй.
+ *
+ * Админд: "24 цагийн дотор" гэсэн амлалтыг биелүүлэх боломж олгодог цорын ганц
+ * зүйл. Үүнгүйгээр админ панелаа өөрөө нээх хүртэл гүйлгээ хүлээгдсээр байна.
+ * Хүлээн авагчийг chatHandover-той ижил CHAT_ALERT_PHONES жагсаалтаас олно —
+ * "админ" гэсэн аккаунтын төрөл байхгүй тул тэд өөрсдийн сурагчийн
+ * аккаунтаараа мэдэгдэл авдаг.
+ *
+ * SMS явуулахгүй: сурагч тэр агшинд дэлгэц дээрээ ижил мэдээллийг уншиж
+ * байгаа тул давхардал болно. SMS зөвхөн баталгаажилтад зарцуулагдана.
+ */
+export async function notifyBankTransferPending(registration: Registration): Promise<void> {
+  if (!registration.userId) return;
+
+  // Бүртгэл аль хэдийн үүссэн. Мэдэгдлийн алдаанаас болж 500 буцаавал
+  // сурагч төлчихөөд "бүртгэгдсэнгүй" гэж ойлгоно.
+  try {
+    await createNotification({
+      title: "Төлбөр хүлээн авлаа",
+      body: `Таны "${registration.programLabel}" сургалтын төлбөрийг шалгаж байна. Ажлын өдрүүдэд 24 цагийн дотор баталгаажиж, танд мэдэгдэнэ.`,
+      targetType: "users",
+      userIds: [registration.userId],
+      channel: "site",
+      link: `/profile?course=${encodeURIComponent(registration.programId)}`,
+    });
+  } catch (err) {
+    console.error("[notifyBankTransferPending] student notification failed:", registration.id, err);
+  }
+
+  try {
+    const phones = (process.env.CHAT_ALERT_PHONES ?? "")
+      .split(",")
+      .map((phone) => phone.trim())
+      .filter(Boolean);
+    if (phones.length === 0) {
+      // Чимээгүй no-op болохоос сэргийлж лог үлдээнэ: энэ хоосон байвал
+      // хугацааны амлалт ямар ч дэмжлэггүй үлдэнэ.
+      console.warn("[notifyBankTransferPending] CHAT_ALERT_PHONES хоосон — админд мэдэгдэхгүй");
+      return;
+    }
+
+    const { data, error } = await getSupabase().from("users").select("id").in("phone", phones);
+    if (error) throw error;
+    const userIds = (data as { id: string }[]).map((u) => u.id);
+    if (userIds.length === 0) return;
+
+    const student = await findUserById(registration.userId);
+    const who = student ? `${student.lastName} ${student.firstName}` : "Сурагч";
+    await createNotification({
+      title: "Дансны шилжүүлэг хүлээгдэж байна",
+      // Утасны дугаар оруулахгүй — админ панелаас бүрэн мэдээллийг харна.
+      body: `${who} — "${registration.programLabel}" (${registration.price}). Гүйлгээг шалгаад баталгаажуулна уу.`,
+      targetType: "users",
+      userIds,
+      channel: "site",
+      link: "/admin/registrations",
+    });
+  } catch (err) {
+    console.error("[notifyBankTransferPending] admin notification failed:", registration.id, err);
   }
 }
 

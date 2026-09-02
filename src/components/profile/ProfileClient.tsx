@@ -177,7 +177,7 @@ export default function ProfileClient({
             Идэвхтэй сургалт{active.length > 0 && ` (${active.length})`}
           </TabButton>
           <TabButton active={tab === "pending"} onClick={() => selectTab("pending")}>
-            Өмнөх сургалт{pending.length > 0 && ` (${pending.length})`}
+            Хүлээгдэж буй{pending.length > 0 && ` (${pending.length})`}
           </TabButton>
           <TabButton active={tab === "certificates"} onClick={() => selectTab("certificates")}>
             Сертификат{certificates.length > 0 && ` (${certificates.length})`}
@@ -303,12 +303,28 @@ export default function ProfileClient({
               </div>
             )
           ) : list.length === 0 ? (
-            <p className="text-ink-2 font-medium bg-bg-soft border border-line rounded-md px-6 py-8 text-center">
-              {tab === "active" ? "Идэвхтэй сургалт алга байна." : "Өмнөх сургалт алга байна."}{" "}
-              <Link href="/courses" className="text-blue-strong font-bold">
-                Сургалтууд үзэх →
-              </Link>
-            </p>
+            tab === "active" && pending.length > 0 ? (
+              <div className="bg-gold-soft border border-gold/30 rounded-md px-6 py-8 text-center">
+                <b className="block font-extrabold text-[1.02rem]">Төлбөрийг тань шалгаж байна</b>
+                <p className="text-ink-2 font-medium mt-1.5 max-w-[46ch] mx-auto leading-[1.6]">
+                  Баталгаажмагц сургалт энд гарч ирнэ. Ажлын өдрүүдэд 24 цагийн дотор шалгана.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => selectTab("pending")}
+                  className="text-[.9rem] font-extrabold text-blue-strong mt-3"
+                >
+                  Хүлээгдэж буй бүртгэлээ харах →
+                </button>
+              </div>
+            ) : (
+              <p className="text-ink-2 font-medium bg-bg-soft border border-line rounded-md px-6 py-8 text-center">
+                {tab === "active" ? "Идэвхтэй сургалт алга байна." : "Хүлээгдэж буй бүртгэл алга байна."}{" "}
+                <Link href="/courses" className="text-blue-strong font-bold">
+                  Сургалтууд үзэх →
+                </Link>
+              </p>
+            )
           ) : shown.length === 0 ? (
             <div className="bg-bg-soft border border-line rounded-md px-6 py-8 text-center">
               <p className="text-ink-2 font-medium max-w-[46ch] mx-auto">
@@ -374,9 +390,10 @@ export default function ProfileClient({
                         </Link>
                       </div>
                     ) : (
-                      <p className="mt-3 text-[.88rem] text-ink-3 font-semibold">
-                        Админ төлбөрийг баталгаажуулсны дараа энд Facebook групп, хуваарийн холбоос
-                        гарч ирнэ.
+                      <p className="mt-3 text-[.88rem] text-ink-2 font-semibold leading-[1.65]">
+                        Төлбөрийг тань шалгаж байна. Ажлын өдрүүдэд 24 цагийн дотор баталгаажиж,
+                        Facebook групп, хичээлийн хуваарь энд гарч ирнэ. 24 цаг өнгөрсөн ч
+                        баталгаажаагүй бол 9077 7400 дугаарт холбогдоно уу.
                       </p>
                     )}
                   </div>
