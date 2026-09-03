@@ -6,7 +6,7 @@ import { Fragment, useState } from "react";
 import type { PublicUser, Registration, RegistrationPayment } from "@/lib/db";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
 import { formatMnt } from "@/lib/price";
-import { payMethodLabel } from "@/lib/registration";
+import { payMethodLabel, registrationBalance } from "@/lib/registration";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 
@@ -24,11 +24,9 @@ function todayIso(): string {
  * how a phone-only row later attaches itself) and to remove a registration
  * outright. Shared between CourseObjectPage and YearlyProgramObjectPage.
  *
- * trackPayments/payments/onPaymentsChange are only passed by
- * YearlyProgramObjectPage — installment payment tracking (agreed total vs.
- * price, since discounts vary by signup month) is a yearly-program-only
- * feature, so CourseObjectPage's call site leaves these unset and the extra
- * column simply doesn't render.
+ * trackPayments/payments/onPaymentsChange нь төлбөрийн баганыг асаана. Энэ нь
+ * жилийн хөтөлбөрийн онцлог биш: сонгон ангид ч хагасаар нь төлдөг тул курсын
+ * хуудас ч дамжуулна. Дамжуулаагүй үед багана зүгээр л render хийгдэхгүй.
  */
 export default function RegistrationRoster({
   programId,
@@ -269,7 +267,10 @@ export default function RegistrationRoster({
                       .sort((a, b) => a.paidAt.localeCompare(b.paidAt))
                   : [];
                 const paidSum = regPayments.reduce((sum, p) => sum + p.amount, 0);
-                const balance = (r.totalDue ?? 0) - paidSum;
+                // Хяналтын самбар, хэрэглэгчийн хуудастай ижил тооцоо.
+                // Өмнө нь энд өөрийн томьёо байсан тул төлөвлөгөө тавиагүй
+                // мөрөнд сөрөг үлдэгдэл гардаг байв.
+                const { due, paid, balance } = registrationBalance(r, paidSum);
                 const expanded = expandedIds.has(r.id);
                 return (
                   <Fragment key={r.id}>
@@ -314,9 +315,12 @@ export default function RegistrationRoster({
                             onClick={() => toggleExpand(r)}
                             className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold"
                           >
+                            {/* Төлсөн/нийт хоёрыг зэрэг харуулна: зөвхөн
+                                үлдэгдэл харуулах нь "хэдийг төлсөн бэ" гэсэн
+                                хамгийн түгээмэл асуултыг задлахгүй. */}
                             {r.totalDue != null ? (
                               <span className={balance <= 0 ? "text-green" : "text-gold-strong"}>
-                                Үлдэгдэл {formatMnt(balance)}
+                                {`${formatMnt(paid)} / ${formatMnt(due)}`}
                                 {/* The date the family promised the rest for —
                                     the reason most balances here exist. */}
                                 {balance > 0 && r.installmentDueDate
@@ -324,7 +328,9 @@ export default function RegistrationRoster({
                                   : ""}
                               </span>
                             ) : (
-                              <span className="text-ink-3 font-semibold">Дүн тохируулаагүй</span>
+                              <span className="text-ink-3 font-semibold">
+                                {`${formatMnt(paid)} · дүн тохируулаагүй`}
+                              </span>
                             )}
                             <span className="text-ink-3 text-[.7rem]">{expanded ? "▲" : "▼"}</span>
                           </button>

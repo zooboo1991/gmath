@@ -63,7 +63,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
 
-  const registration = await settleRegistrationOutsideQpay(id, { amount, paidAt });
+  const settled = await settleRegistrationOutsideQpay(id, { amount, paidAt });
 
   await logAdminAction(request, {
     actionType: "registration.settle_manual",
@@ -78,5 +78,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
   });
 
-  return NextResponse.json({ ok: true, registration });
+  return NextResponse.json({
+    ok: true,
+    registration: settled?.registration,
+    // Админы жагсаалт үүнийг шууд өөрийн төлбөрийн жагсаалтдаа нэмнэ.
+    payment: settled?.payment,
+  });
 }

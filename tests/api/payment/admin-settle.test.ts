@@ -393,6 +393,82 @@ async function smsTo(phone: string): Promise<number> {
  * "баталгаажлаа" гэсэн мессеж авах нь огт аваагүйгээс дор — сурагч хоёр
  * дахин төлсөн юм болов уу гэж эргэлзэнэ.
  */
+/**
+ * Цэвэр дансны бүртгэлийг баталгаажуулах — QPay нэхэмжлэхгүй мөр.
+ *
+ * Өмнө нь энэ зам /approve руу ордог байсан бөгөөд төлбөрийн мөр огт
+ * үүсгэдэггүй тул хагасаа төлсөн сурагч "бүтэн төлсөн" мэт харагддаг байв.
+ * Одоо дүн заавал шаардагдана.
+ */
+describe("дансны бүртгэлийг дүнтэй баталгаажуулах", () => {
+  async function pendingBankRegistration(price = "1,200,000₮", totalDue?: number) {
+    const course = await createTestCourse({ price });
+    const student = await createTestUser();
+    const registration = await createTestRegistration({
+      userId: student.id,
+      programId: course.id,
+      price,
+      payMethod: "bank",
+      status: "pending",
+    });
+    if (totalDue !== undefined) {
+      await testDb().from("registrations").update({ total_due: totalDue }).eq("id", registration.id);
+    }
+    return { course, student, registrationId: registration.id };
+  }
+
+  async function paymentsOf(registrationId: string) {
+    const { data } = await testDb()
+      .from("registration_payments")
+      .select("id, amount, paid_at")
+      .eq("registration_id", registrationId);
+    const rows = (data ?? []) as { id: string; amount: number; paid_at: string }[];
+    for (const row of rows) track("registration_payments", row.id);
+    return rows;
+  }
+
+  it("оруулсан дүнгээр төлбөрийн мөр үүсгэж идэвхжүүлнэ", async () => {
+    const { registrationId } = await pendingBankRegistration("1,200,000₮", 1_200_000);
+    const admin = await adminClient("full");
+
+    const res = await admin.post(`/api/admin/registrations/${registrationId}/settle-manual`, {
+      amount: 600_000,
+      paidAt: "2026-09-01",
+    });
+
+    expect(res.status, res.text).toBe(200);
+    expect((await readRegistration(registrationId))?.status).toBe("active");
+    // Хагасыг нь төлсөн тул төлбөрийн мөр ЯГ тэр дүнгээр үлдэнэ.
+    expect(await paymentsOf(registrationId)).toEqual([
+      expect.objectContaining({ amount: 600_000, paid_at: "2026-09-01" }),
+    ]);
+  });
+
+  it("дүнгүйгээр баталгаажуулахыг зөвшөөрөхгүй", async () => {
+    const { registrationId } = await pendingBankRegistration();
+    const admin = await adminClient("full");
+
+    for (const body of [{ paidAt: "2026-09-01" }, { amount: 0, paidAt: "2026-09-01" }, { amount: -5, paidAt: "2026-09-01" }]) {
+      const res = await admin.post(`/api/admin/registrations/${registrationId}/settle-manual`, body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+    }
+    expect((await readRegistration(registrationId))?.status).toBe("pending");
+    expect(await paymentsOf(registrationId)).toEqual([]);
+  });
+
+  it("хоёр удаа дарахад төлбөр давхардахгүй", async () => {
+    const { registrationId } = await pendingBankRegistration("1,200,000₮", 1_200_000);
+    const admin = await adminClient("full");
+    const body = { amount: 600_000, paidAt: "2026-09-01" };
+
+    expect((await admin.post(`/api/admin/registrations/${registrationId}/settle-manual`, body)).status).toBe(200);
+    // Хоёр дахь нь идэвхтэй болсон мөрийг дахин барагдуулахгүй.
+    expect((await admin.post(`/api/admin/registrations/${registrationId}/settle-manual`, body)).status).toBe(409);
+
+    expect((await paymentsOf(registrationId)).length).toBe(1);
+  });
+});
+
 describe("баталгаажилтын мэдэгдэл", () => {
   it("дансны бүртгэлийг баталгаажуулахад яг нэг SMS, нэг мэдэгдэл явна", async () => {
     const course = await createTestCourse({ title: "Тоон онолын сургалт" });

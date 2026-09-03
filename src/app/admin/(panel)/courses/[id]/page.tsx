@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import CourseObjectPage from "@/components/admin/CourseObjectPage";
-import { findCourseById, listArticleIdsForProgram, listArticles, listRegistrationsByProgram } from "@/lib/db";
+import {
+  findCourseById,
+  listArticleIdsForProgram,
+  listArticles,
+  listPaymentsForRegistrations,
+  listRegistrationsByProgram,
+} from "@/lib/db";
 import { requireAdminSection } from "@/lib/adminAccess";
 import { can } from "@/lib/adminSections";
 
@@ -20,8 +26,13 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
   const course = await findCourseById(id);
   if (!course) notFound();
 
-  const [registrations, articleIds, articles] = await Promise.all([
-    listRegistrationsByProgram(id),
+  const registrations = await listRegistrationsByProgram(id);
+  const [payments, articleIds, articles] = await Promise.all([
+    // Хуваан төлөлт нь зөвхөн жилийн хөтөлбөрийнх биш: сонгон ангид ч
+    // хагасаар нь төлдөг. Төлбөрийн мөрийг эндээс уншихгүй бол roster нь
+    // үлдэгдлийн баганаа огт үзүүлэхгүй, хагас төлсөн сурагч бүтэн төлсөн
+    // мэт харагдана.
+    listPaymentsForRegistrations(registrations.map((r) => r.id)),
     listArticleIdsForProgram(id),
     // Scheduled articles are offered too: a course page written today may well
     // want to point at next week's post. The public page still hides it until
@@ -33,6 +44,7 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
     <CourseObjectPage
       course={course}
       initialRegistrations={registrations}
+      initialPayments={payments}
       articleOptions={articles.map((a) => ({ id: a.id, title: a.title, createdAt: a.createdAt }))}
       initialArticleIds={articleIds}
       canEdit={can(role, "courseInfo")}

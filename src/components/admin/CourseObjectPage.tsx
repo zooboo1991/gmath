@@ -4,7 +4,15 @@ import Link from "next/link";
 import { formatDate } from "@/lib/dateFormat";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { Course, CourseKind, CourseStatus, Lesson, PublicUser, Registration } from "@/lib/db";
+import type {
+  Course,
+  CourseKind,
+  CourseStatus,
+  Lesson,
+  PublicUser,
+  Registration,
+  RegistrationPayment,
+} from "@/lib/db";
 import { IconArrowLeft, IconCheckCircle, IconClock, IconClose, IconBank, IconQrCode, IconPerson } from "@/components/icons";
 import {
   buildCourseTag,
@@ -14,8 +22,8 @@ import {
   type CourseCategory,
 } from "@/lib/courseTag";
 import { toIsoDate } from "@/lib/courseDate";
-import { parsePriceToNumber, formatMnt } from "@/lib/price";
-import { payMethodLabel } from "@/lib/registration";
+import { formatMnt } from "@/lib/price";
+import { paidLabel, payMethodLabel, registrationBalance } from "@/lib/registration";
 import AdminField from "./AdminField";
 import { downscaleImage, formatMb, MAX_UPLOAD_BYTES } from "@/lib/imageResize";
 import { AnchorTab, Card, KpiTile } from "./AdminObjectPageParts";
@@ -73,6 +81,7 @@ export default function CourseObjectPage({
   course,
   initialKind = "upcoming",
   initialRegistrations,
+  initialPayments = [],
   articleOptions,
   initialArticleIds,
   canEdit,
@@ -82,6 +91,8 @@ export default function CourseObjectPage({
   course: Course | null;
   initialKind?: CourseKind;
   initialRegistrations: RegistrationWithUser[];
+  /** Бодит төлөлтүүд — хуваан төлсөн бүртгэлийн үлдэгдлийг эндээс тооцно. */
+  initialPayments?: RegistrationPayment[];
   articleOptions: ArticleOption[];
   initialArticleIds: string[];
   /**
@@ -103,6 +114,7 @@ export default function CourseObjectPage({
   const [tab, setTab] = useState<SectionTab>("info");
   const [status, setStatus] = useState<CourseStatus>(course?.status ?? "draft");
   const [registrations, setRegistrations] = useState(initialRegistrations);
+  const [payments, setPayments] = useState(initialPayments);
 
   const [form, setForm] = useState({
     kind: course?.kind ?? initialKind,
@@ -303,7 +315,18 @@ export default function CourseObjectPage({
   const live = registrations.filter((r) => r.status !== "cancelled");
   const pending = registrations.filter((r) => r.status === "pending");
   const active = registrations.filter((r) => r.status === "active");
-  const totalRevenue = active.reduce((sum, r) => sum + parsePriceToNumber(r.price), 0);
+  // Зарласан үнийн нийлбэр биш, бодитоор орсон мөнгө. Хуваан төлсөн сурагчийг
+  // бүтэн төлсөн гэж тоолох нь орлогыг байхгүй газраас гаргаж ирнэ.
+  const money = active.reduce(
+    (sum, r) => {
+      const recorded = payments
+        .filter((p) => p.registrationId === r.id)
+        .reduce((total, p) => total + p.amount, 0);
+      const totals = registrationBalance(r, recorded);
+      return { due: sum.due + totals.due, paid: sum.paid + totals.paid, balance: sum.balance + totals.balance };
+    },
+    { due: 0, paid: 0, balance: 0 }
+  );
   const qpayCount = live.filter((r) => r.payMethod === "qpay").length;
   const bankCount = live.filter((r) => r.payMethod === "bank").length;
   const manualCount = live.filter((r) => r.payMethod === "manual").length;
@@ -645,6 +668,9 @@ export default function CourseObjectPage({
           <Card title={`Бүртгүүлсэн сурагчид (${live.length})`}>
             <RegistrationRoster
               programId={course.id}
+              trackPayments
+              payments={payments}
+              onPaymentsChange={setPayments}
               registrations={registrations}
               onChange={setRegistrations}
               canEdit={canEdit}
@@ -691,7 +717,11 @@ export default function CourseObjectPage({
                     {canManageRegistrations && (
                       <PendingRegistrationActions
                         registration={r}
-                        onDone={(patch) => patchRegistration(r.id, patch)}
+                        onDone={(patch, payment) => {
+                          patchRegistration(r.id, patch);
+                          // Сая бүртгэсэн төлбөр roster-т шууд гарч ирнэ.
+                          if (payment) setPayments((ps) => [...ps, payment]);
+                        }}
                       />
                     )}
                   </div>
@@ -712,7 +742,7 @@ export default function CourseObjectPage({
                       <span className="font-bold text-[.88rem] text-ink-2">Хэрэглэгч устсан</span>
                     )}
                     <span className="text-ink-3 font-semibold text-[.82rem]">
-                      {payMethodLabel(r.payMethod)} · {r.price} · {formatDate(r.createdAt)}
+                      {payMethodLabel(r.payMethod)} · {paidLabel(r, payments)} · {formatDate(r.createdAt)}
                     </span>
                   </div>
                 ))}
@@ -724,10 +754,10 @@ export default function CourseObjectPage({
         {tab === "report" && isEditing && (
           <div className="flex flex-col gap-5">
             <div className="grid grid-cols-2 nav:grid-cols-4 gap-3.5">
-              <KpiTile label="Нийт бүртгэл" value={String(live.length)} />
               <KpiTile label="Идэвхтэй" value={String(active.length)} tone="green" />
-              <KpiTile label="Хүлээгдэж буй" value={String(pending.length)} tone="gold" />
-              <KpiTile label="Нийт орлого" value={formatMnt(totalRevenue)} tone="blue" />
+              <KpiTile label="Нийт төлөгдөх" value={formatMnt(money.due)} />
+              <KpiTile label="Төлөгдсөн" value={formatMnt(money.paid)} tone="blue" />
+              <KpiTile label="Үлдэгдэл" value={formatMnt(money.balance)} tone="gold" />
             </div>
             <Card title="Төлбөрийн хэлбэрээр">
               <div className="flex flex-col gap-2">

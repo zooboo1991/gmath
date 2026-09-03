@@ -1722,9 +1722,12 @@ export async function settleRegistrationPayment(id: string): Promise<Registratio
       registrationId: updated.id,
       amount: now,
       paidAt: new Date().toISOString().slice(0, 10),
-    }).catch(() => {
+    }).catch((err) => {
       // The seat is granted either way; a missing payment row is something
-      // the admin can add, a refused enrollment is not.
+      // the admin can add, a refused enrollment is not. It must not vanish
+      // without a trace though: money that really arrived would otherwise be
+      // invisible to every screen with nothing to say it went missing.
+      console.error("[qpay] installment payment row failed", updated.id, err);
     });
   }
 
@@ -1789,7 +1792,7 @@ export async function setRegistrationTotalDue(id: string, totalDue: number): Pro
 export async function settleRegistrationOutsideQpay(
   id: string,
   payment: { amount: number; paidAt: string }
-): Promise<Registration | undefined> {
+): Promise<{ registration: Registration; payment?: RegistrationPayment } | undefined> {
   const { data, error } = await getSupabase()
     .from("registrations")
     .update({ status: "active", pay_method: "bank" })
@@ -1798,12 +1801,21 @@ export async function settleRegistrationOutsideQpay(
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  if (!data) return findRegistrationById(id);
+  if (!data) {
+    const existing = await findRegistrationById(id);
+    return existing ? { registration: existing } : undefined;
+  }
 
   const registration = registrationFromRow(data as RegistrationRow);
-  await addRegistrationPayment({ registrationId: id, amount: payment.amount, paidAt: payment.paidAt });
+  // Буцаагдсан мөрийг админы дэлгэц шууд жагсаалтдаа нэмнэ — эс бөгөөс
+  // сая бүртгэсэн төлбөр нь хуудсаа шинэчлэх хүртэл "0₮" гэж харагдана.
+  const recorded = await addRegistrationPayment({
+    registrationId: id,
+    amount: payment.amount,
+    paidAt: payment.paidAt,
+  });
   await notifyRegistrationActive(registration);
-  return registration;
+  return { registration, payment: recorded };
 }
 
 export type RegistrationPayment = {

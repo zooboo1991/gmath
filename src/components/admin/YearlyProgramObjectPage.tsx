@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Lesson, PublicUser, Registration, RegistrationPayment, YearlyProgram } from "@/lib/db";
 import { IconArrowLeft, IconBank, IconPerson, IconQrCode } from "@/components/icons";
-import { formatMnt, parsePriceToNumber } from "@/lib/price";
-import { payMethodLabel } from "@/lib/registration";
+import { formatMnt } from "@/lib/price";
+import { paidLabel, payMethodLabel, registrationBalance } from "@/lib/registration";
 import AdminField from "./AdminField";
 import { AnchorTab, Card, KpiTile } from "./AdminObjectPageParts";
 import LessonScheduleEditor from "./LessonScheduleEditor";
@@ -129,7 +129,18 @@ export default function YearlyProgramObjectPage({
   const live = registrations.filter((r) => r.status !== "cancelled");
   const pending = registrations.filter((r) => r.status === "pending");
   const active = registrations.filter((r) => r.status === "active");
-  const totalRevenue = active.reduce((sum, r) => sum + parsePriceToNumber(r.price), 0);
+  // Зарласан үнийн нийлбэр биш, бодитоор орсон мөнгө — CourseObjectPage-тэй
+  // ижил тооцоо, ижил эх сурвалж.
+  const money = active.reduce(
+    (sum, r) => {
+      const recorded = payments
+        .filter((p) => p.registrationId === r.id)
+        .reduce((total, p) => total + p.amount, 0);
+      const totals = registrationBalance(r, recorded);
+      return { due: sum.due + totals.due, paid: sum.paid + totals.paid, balance: sum.balance + totals.balance };
+    },
+    { due: 0, paid: 0, balance: 0 }
+  );
   const qpayCount = live.filter((r) => r.payMethod === "qpay").length;
   const bankCount = live.filter((r) => r.payMethod === "bank").length;
   const manualCount = live.filter((r) => r.payMethod === "manual").length;
@@ -358,9 +369,11 @@ export default function YearlyProgramObjectPage({
               programId={program.id}
               registrations={registrations}
               onChange={setRegistrations}
-              // Balances and payment history are money: the owner's column,
-              // not the teacher's, even though both read the same roster.
-              trackPayments={canEdit}
+              // Үлдэгдэл, төлөлтийн түүх нь харах эрхтэй админд ч нээлттэй —
+              // canEdit нь зөвхөн бичих контролуудыг хаана (RegistrationRoster-ийн
+              // өөрийнх нь тайлбар үүнийг амласан ч бодитоор бүхэл багана
+              // алга болдог байсан).
+              trackPayments
               payments={payments}
               onPaymentsChange={setPayments}
               canEdit={canEdit}
@@ -407,7 +420,11 @@ export default function YearlyProgramObjectPage({
                     {canManageRegistrations && (
                       <PendingRegistrationActions
                         registration={r}
-                        onDone={(patch) => patchRegistration(r.id, patch)}
+                        onDone={(patch, payment) => {
+                          patchRegistration(r.id, patch);
+                          // Сая бүртгэсэн төлбөр roster-т шууд гарч ирнэ.
+                          if (payment) setPayments((ps) => [...ps, payment]);
+                        }}
                       />
                     )}
                   </div>
@@ -428,7 +445,7 @@ export default function YearlyProgramObjectPage({
                       <span className="font-bold text-[.88rem] text-ink-2">Хэрэглэгч устсан</span>
                     )}
                     <span className="text-ink-3 font-semibold text-[.82rem]">
-                      {payMethodLabel(r.payMethod)} · {r.price} · {formatDate(r.createdAt)}
+                      {payMethodLabel(r.payMethod)} · {paidLabel(r, payments)} · {formatDate(r.createdAt)}
                     </span>
                   </div>
                 ))}
@@ -440,10 +457,10 @@ export default function YearlyProgramObjectPage({
         {tab === "report" && (
           <div className="flex flex-col gap-5">
             <div className="grid grid-cols-2 nav:grid-cols-4 gap-3.5">
-              <KpiTile label="Нийт бүртгэл" value={String(live.length)} />
               <KpiTile label="Идэвхтэй" value={String(active.length)} tone="green" />
-              <KpiTile label="Хүлээгдэж буй" value={String(pending.length)} tone="gold" />
-              <KpiTile label="Нийт орлого" value={formatMnt(totalRevenue)} tone="blue" />
+              <KpiTile label="Нийт төлөгдөх" value={formatMnt(money.due)} />
+              <KpiTile label="Төлөгдсөн" value={formatMnt(money.paid)} tone="blue" />
+              <KpiTile label="Үлдэгдэл" value={formatMnt(money.balance)} tone="gold" />
             </div>
             <Card title="Төлбөрийн хэлбэрээр">
               <div className="flex flex-col gap-2">

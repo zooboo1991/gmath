@@ -4,7 +4,9 @@ import { useState } from "react";
 import { IconBank, IconCheck, IconClock, IconQrCode } from "@/components/icons";
 import { INPUT_CLASS } from "@/components/admin/panels/shared";
 import { apiError, readJson } from "@/lib/fetchJson";
-import type { Registration } from "@/lib/db";
+import { splitHalves } from "@/lib/installment";
+import { parsePriceToNumber } from "@/lib/price";
+import type { Registration, RegistrationPayment } from "@/lib/db";
 
 /**
  * What an admin may do with a registration that hasn't been confirmed yet.
@@ -12,8 +14,9 @@ import type { Registration } from "@/lib/db";
  * The two payment methods need different answers, and the old UI gave them the
  * same one — a single "Баталгаажуулах" button on every pending row:
  *
- *   · **bank** — the admin reads their statement and confirms. That is the
- *     whole design of the bank method, so the button stays.
+ *   · **bank** — the admin reads their statement and confirms. The button now
+ *     asks how much actually arrived: half-paid students were being confirmed
+ *     with no payment record at all, so the books showed them as paid in full.
  *   · **qpay** — QPay is the authority. A row sits here because nobody paid,
  *     and confirming it by hand hands out a paid seat for free. The button is
  *     replaced by "ask QPay", which settles only on QPay's own answer.
@@ -39,7 +42,7 @@ export default function PendingRegistrationActions({
    * keeps its own copy of the list in state, so it patches that copy — a
    * `router.refresh()` alone would leave the stale row on screen.
    */
-  onDone: (patch: Partial<Registration>) => void;
+  onDone: (patch: Partial<Registration>, payment?: RegistrationPayment) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +66,7 @@ export default function PendingRegistrationActions({
         method: "POST",
         ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
       });
-      const json = await readJson<{ paid?: boolean }>(res);
+      const json = await readJson<{ paid?: boolean; payment?: RegistrationPayment }>(res);
       if (!res.ok) {
         setError(apiError(res, json, "Үйлдэл гүйцэтгэхэд алдаа гарлаа"));
         return false;
@@ -77,8 +80,25 @@ export default function PendingRegistrationActions({
     }
   };
 
-  const approve = async () => {
-    if (await run(`/api/admin/registrations/${registration.id}/approve`)) onDone({ status: "active" });
+  /** Монголын өнөөдөр (UTC+8) — банкны хуулга ихэвчлэн тэр өдрийнх. */
+  const mongoliaToday = () =>
+    new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  /**
+   * Хуваан төлөх төлөвлөгөөтэй мөрөнд хагасыг, бусад дээр бүтэн үнийг санал
+   * болгоно. Админ засаж болно — банкны хуулга л эцсийн үг.
+   */
+  const suggestedAmount = registration.totalDue
+    ? splitHalves(registration.totalDue).now
+    : parsePriceToNumber(registration.price);
+
+  const openManualForm = () => {
+    const next = !manualOpen;
+    if (next) {
+      if (!amount) setAmount(String(suggestedAmount));
+      if (!paidAt) setPaidAt(mongoliaToday());
+    }
+    setManualOpen(next);
   };
 
   const askQpay = async () => {
@@ -104,8 +124,16 @@ export default function PendingRegistrationActions({
       reference,
     });
     // The route rewrites the row as a bank payment, so the caller's copy has to
-    // stop calling it a QPay row too — otherwise it keeps showing "QPay".
-    if (done) onDone({ status: "active", payMethod: "bank" });
+    // stop calling it a QPay row too — otherwise it keeps showing "QPay". The
+    // recorded payment goes up with it, or the roster the admin switches to
+    // next would still read "0₮" for money they just entered.
+    if (done) {
+      setManualOpen(false);
+      onDone(
+        { status: "active", payMethod: "bank" },
+        typeof done === "object" ? done.payment : undefined
+      );
+    }
   };
 
   return (
@@ -124,7 +152,7 @@ export default function PendingRegistrationActions({
             <button
               type="button"
               disabled={busy}
-              onClick={() => setManualOpen((o) => !o)}
+              onClick={openManualForm}
               className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-ink-2 bg-bg-soft px-4 py-2 rounded-full disabled:opacity-50"
             >
               <IconBank className="w-3.5 h-3.5" /> Дансаар төлсөн
@@ -134,10 +162,10 @@ export default function PendingRegistrationActions({
           <button
             type="button"
             disabled={busy}
-            onClick={approve}
+            onClick={openManualForm}
             className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-white bg-gold-strong px-4 py-2 rounded-full disabled:opacity-50"
           >
-            <IconClock className="w-3.5 h-3.5" /> {busy ? "…" : "Баталгаажуулах"}
+            <IconClock className="w-3.5 h-3.5" /> Баталгаажуулах
           </button>
         )}
       </div>
@@ -145,11 +173,12 @@ export default function PendingRegistrationActions({
       {note && <span className="text-[.8rem] font-semibold text-ink-3 text-right max-w-[46ch]">{note}</span>}
       {error && <span className="text-[.8rem] font-semibold text-red-soft text-right max-w-[46ch]">{error}</span>}
 
-      {manualOpen && isQpay && (
+      {manualOpen && (
         <div className="w-full max-w-[420px] bg-surface border border-line rounded-md px-4 py-3.5 mt-1">
           <p className="text-[.82rem] font-semibold text-ink-3 leading-[1.5]">
-            Банкны хуулгаа шалгаад, орсон дүн, огноог бичнэ үү. QPay-ийн нэхэмжлэх цуцлагдаж,
-            бүртгэл дансаар төлсөн болж хадгалагдана.
+            {isQpay
+              ? "Банкны хуулгаа шалгаад, орсон дүн, огноог бичнэ үү. QPay-ийн нэхэмжлэх цуцлагдаж, бүртгэл дансаар төлсөн болж хадгалагдана."
+              : "Банкны хуулгаар орсон дүнг бичнэ үү. Хуваан төлж байгаа бол одоо орсон хэсгийг нь бичнэ — үлдэгдэл нь сургалтын хуудсанд харагдана."}
           </p>
           <div className="grid grid-cols-2 gap-2.5 mt-3">
             <input

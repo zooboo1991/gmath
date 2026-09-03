@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { PublicUser, Registration } from "@/lib/db";
+import type { PublicUser, Registration, RegistrationPayment } from "@/lib/db";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
-import { payMethodLabel, programAdminHref } from "@/lib/registration";
+import { paidLabel, payMethodLabel, programAdminHref } from "@/lib/registration";
 import PendingRegistrationActions from "@/components/admin/PendingRegistrationActions";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
@@ -12,9 +12,12 @@ type RegistrationWithUser = Registration & { user?: PublicUser };
 /** The registrations tab as its own route component — approve/cancel state used to live in the dashboard parent. */
 export default function RegistrationsPanel({
   initialRegistrations,
+  payments = [],
   canEdit,
 }: {
   initialRegistrations: RegistrationWithUser[];
+  /** Бодит төлөлтүүд — хуваан төлсөн мөрөнд "төлсөн / нийт" харуулна. */
+  payments?: RegistrationPayment[];
   // The read-only admin sees the same list without the two action buttons.
   // Cosmetic only — the approve/cancel endpoints check the role themselves.
   canEdit: boolean;
@@ -77,7 +80,7 @@ export default function RegistrationsPanel({
               ) : (
                 "Хэрэглэгч устсан"
               )}{" "}
-              · {payMethodLabel(r.payMethod)} · {r.price}
+              · {payMethodLabel(r.payMethod)} · {paidLabel(r, payments)}
             </span>
           </div>
           {r.status === "active" ? (
