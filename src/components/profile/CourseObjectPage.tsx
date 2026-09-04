@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import FreeExamBox, { type FreeExam } from "@/components/profile/FreeExamBox";
 import LessonSchedule, { LessonModeTag } from "@/components/profile/LessonSchedule";
@@ -20,14 +21,28 @@ import type { AssessmentStatus } from "@/lib/assessment/types";
 import type { AttendanceOutcome, AttendanceSummary } from "@/lib/courseAttendance";
 import { PRESENT_THRESHOLD_PERCENT } from "@/lib/courseAttendance";
 import { formatCourseDate } from "@/lib/courseDate";
+import { formatMnt } from "@/lib/price";
+import BalancePayModal from "@/components/profile/BalancePayModal";
 
 export type CourseTab =
   | "schedule"
   | "recordings"
   | "attendance"
+  | "payment"
   | "assessment"
   | "olympiad"
   | "contract";
+
+export type CoursePayment = {
+  due: number;
+  paid: number;
+  balance: number;
+  /** Хоёр дахь төлөлтийн амласан огноо, ISO. */
+  dueDate?: string;
+  history: { id: string; amount: number; paidAt: string }[];
+  /** Дансаар мэдэгдсэн, админ хараахан баталгаажуулаагүй дүн. */
+  pendingBank: number | null;
+};
 
 type PastAssessment = {
   id: string;
@@ -40,6 +55,7 @@ const TABS: { key: CourseTab; label: string }[] = [
   { key: "schedule", label: "Хичээлийн хуваарь" },
   { key: "recordings", label: "Хичээл нөхөж үзэх" },
   { key: "attendance", label: "Ирц" },
+  { key: "payment", label: "Төлбөр" },
   { key: "assessment", label: "Түвшин тогтоох" },
   { key: "olympiad", label: "Мини олимпиад" },
   { key: "contract", label: "Гэрээ" },
@@ -56,6 +72,7 @@ export default function CourseObjectPage({
   initialTab,
   freeExam,
   assessments,
+  payment,
   nowIso,
 }: {
   registration: RegistrationWithGroup;
@@ -63,6 +80,8 @@ export default function CourseObjectPage({
   initialTab: CourseTab;
   freeExam: FreeExam | null;
   assessments: PastAssessment[];
+  /** Төлбөрийн байдал — дүнг сервер боддог. */
+  payment: CoursePayment;
   /** Серверийн цаг — эхний рендерийг сервер, браузер хоёрт нэг ижил байлгана. */
   nowIso: string;
 }) {
@@ -111,6 +130,9 @@ export default function CourseObjectPage({
               <LessonSchedule registration={registration} show="past" nowIso={nowIso} />
             )}
             {tab === "attendance" && <AttendanceTab summary={summary} />}
+            {tab === "payment" && (
+              <PaymentTab registration={registration} payment={payment} nowIso={nowIso} />
+            )}
             {tab === "assessment" && (
               <AssessmentTab freeExam={freeExam} assessments={assessments} />
             )}
@@ -433,3 +455,112 @@ function Empty({ icon, text }: { icon: React.ReactNode; text: string }) {
     </div>
   );
 }
+
+/**
+ * Сурагчийн төлбөрийн байдал: хэдийг төлөх ёстой, хэдийг төлсөн, хэд үлдсэн,
+ * дараа нь хэзээ төлөх вэ — нэг дэлгэц дээр.
+ *
+ * Төлөвлөгөө тавиагүй бүртгэлд ҮЛДЭГДЭЛ ЗААХГҮЙ: тийм мөрийг систем бүтэн
+ * төлөгдсөнд тооцдог тул "та өртэй" гэж хэлэх нь худал болно.
+ */
+function PaymentTab({
+  registration,
+  payment,
+  nowIso,
+}: {
+  registration: RegistrationWithGroup;
+  payment: CoursePayment;
+  /** Серверийн цаг — рендерийн явцад цаг унших нь React-д хориотой. */
+  nowIso: string;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const owing = payment.balance > 0;
+  // Хугацаа хэтэрсэн эсэхийг серверийн огноотой ISO мөрөөр харьцуулна.
+  const overdue = Boolean(payment.dueDate && owing && payment.dueDate < nowIso.slice(0, 10));
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-3 gap-2.5">
+        <Kpi label="Нийт төлөх" value={formatMnt(payment.due)} />
+        <Kpi label="Төлсөн" value={formatMnt(payment.paid)} tone="green" />
+        <Kpi label="Үлдэгдэл" value={formatMnt(payment.balance)} tone={owing ? "gold" : undefined} />
+      </div>
+
+      {!owing ? (
+        <div className="flex items-center gap-3 bg-green-soft border border-green/25 rounded-sm px-4 py-4">
+          <IconCheckCircle className="w-6 h-6 shrink-0 text-green" />
+          <span className="font-bold text-[.95rem] text-green">Төлбөр бүрэн төлөгдсөн</span>
+        </div>
+      ) : (
+        <div
+          className={`rounded-md px-4 py-4 border ${
+            overdue ? "bg-red-soft/10 border-red-soft/30" : "bg-surface border-line"
+          }`}
+        >
+          {payment.dueDate && (
+            <span
+              className={`inline-flex items-center gap-1.5 text-[.8rem] font-extrabold ${
+                overdue ? "text-red-soft" : "text-ink-2"
+              }`}
+            >
+              <IconClock className="w-3.5 h-3.5" />
+              {overdue
+                ? `Хугацаа хэтэрсэн — ${formatCourseDate(payment.dueDate)}`
+                : `Дараагийн төлөлт: ${formatCourseDate(payment.dueDate)}`}
+            </span>
+          )}
+          <p className="text-ink-2 font-medium text-[.9rem] mt-1.5 leading-[1.6]">
+            {`Үлдэгдэл ${formatMnt(payment.balance)}. QPay-ээр эсвэл дансаар төлж болно.`}
+          </p>
+          {payment.pendingBank !== null && (
+            <p className="text-[.85rem] font-semibold text-gold-strong bg-gold-soft rounded-sm px-3 py-2.5 mt-3 leading-[1.6]">
+              {`${formatMnt(payment.pendingBank)}-ийн дансны шилжүүлгийг шалгаж байна. Ажлын өдрүүдэд 24 цагийн дотор баталгаажиж, танд мэдэгдэнэ.`}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-2 font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-6 py-3 mt-4 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+          >
+            Үлдэгдэл төлөх →
+          </button>
+        </div>
+      )}
+
+      <div className="bg-bg-soft rounded-sm px-4 py-3.5">
+        <b className="font-extrabold text-[.9rem] block mb-2">Төлөлтийн түүх</b>
+        {payment.history.length === 0 ? (
+          <p className="text-[.85rem] font-semibold text-ink-3">
+            Одоогоор бүртгэгдсэн төлөлт байхгүй байна.
+          </p>
+        ) : (
+          <div className="flex flex-col divide-y divide-line">
+            {payment.history.map((row) => (
+              <div key={row.id} className="flex items-center justify-between gap-3 py-2.5">
+                <span className="text-[.85rem] font-semibold text-ink-2">
+                  {formatCourseDate(row.paidAt)}
+                </span>
+                <b className="font-extrabold text-[.9rem]">{formatMnt(row.amount)}</b>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {open && (
+        <BalancePayModal
+          registrationId={registration.id}
+          balance={payment.balance}
+          transferNote={registration.programLabel}
+          onClose={() => {
+            setOpen(false);
+            router.refresh();
+          }}
+          onPaid={() => router.refresh()}
+        />
+      )}
+    </div>
+  );
+}
+

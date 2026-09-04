@@ -22,6 +22,7 @@ import {
 } from "@/lib/installment";
 import { DISTRICTS_BY_PROVINCE, PROVINCES, type Province } from "@/lib/mongoliaRegions";
 import { formatMnt, parsePriceToNumber } from "@/lib/price";
+import { BANK_ACCOUNT, BANK_NAME, BANK_RECIPIENT } from "@/lib/bankAccount";
 
 type Role = "teacher" | "student";
 type PayMethod = "qpay" | "bank";
@@ -1303,9 +1304,9 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                 {payMethod === "bank" && (
                   <div className="mt-[18px] bg-bg-soft rounded-md px-[22px] py-5">
                     {[
-                      ["bank", "Банк", "Хаан Банк"],
-                      ["account", "Дансны дугаар", "MN19000500 5034904750"],
-                      ["recipient", "Хүлээн авагч", "Ганбат"],
+                      ["bank", "Банк", BANK_NAME],
+                      ["account", "Дансны дугаар", BANK_ACCOUNT],
+                      ["recipient", "Хүлээн авагч", BANK_RECIPIENT],
                       ["amount", splitting ? "Одоо шилжүүлэх дүн (50%)" : "Шилжүүлэх дүн", formatMnt(amountNow)],
                       ["description", "Гүйлгээний утга", bankDescription],
                     ].map(([key, k, v]) => (

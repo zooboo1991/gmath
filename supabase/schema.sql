@@ -1158,3 +1158,42 @@ create table if not exists course_onboarding_steps (
 );
 create index if not exists course_onboarding_steps_user_program_idx
   on course_onboarding_steps (user_id, program_id);
+
+-- ---------------------------------------------------------------------------
+-- Үлдэгдлийн төлбөр (сурагч өөрөө төлөх)
+-- ---------------------------------------------------------------------------
+-- Сурагчийн ЭХЛҮҮЛСЭН төлбөр — орж ирсэн эсэх нь тодорхойгүй хэвээр.
+--
+-- Зориудаар `registration_payments`-д биш: тэнд мөр байна гэдэг нь "мөнгө
+-- дансанд орсон" гэсэн үг бөгөөд registrationBalance, paidLabel, хяналтын
+-- самбар, гэрээ үүсгэгч болон таван админы дэлгэц бүгд яг тэгж уншдаг. Тэр
+-- хүснэгтэд төлөв нэмбэл тэдгээр нийлбэр бүрд шүүлт нэмэх үүрэг үүсэж,
+-- нэгийг нь мартвал данс худал болно.
+--
+-- Санаархал бүр өөрийн QPay нэхэмжлэхтэй байдаг нь нэг бүртгэлийг олон удаа
+-- нэхэмжлэх боломж олгодог: sender_invoice_no нь ЭНЭ id-гаас гарна
+-- (gm-i-<id>), бүртгэлийн id-гаас хэзээ ч биш. QPay давтагдсан
+-- sender_invoice_no-г үүрд татгалздаг.
+create table if not exists registration_payment_intents (
+  id uuid primary key default gen_random_uuid(),
+  registration_id uuid not null references registrations(id) on delete cascade,
+  amount bigint not null check (amount > 0),
+  method text not null check (method in ('qpay', 'bank')),
+  status text not null default 'pending' check (status in ('pending', 'paid', 'cancelled')),
+  qpay_invoice_id text,
+  qpay_payment_id text,
+  qpay_qr_image text,
+  qpay_short_url text,
+  created_at timestamptz not null default now(),
+  paid_at timestamptz
+);
+
+create index if not exists registration_payment_intents_registration_idx
+  on registration_payment_intents (registration_id, status);
+
+-- Нэг бүртгэлд нэг л амьд QPay нэхэмжлэх. Үүнгүйгээр давхар товч дарах (эсвэл
+-- хоёр таб) ижил үлдэгдэлд хоёр нэхэмжлэх үүсгэж, гэр бүл хоёуланг нь төлж
+-- болно — энэ систем буцаах механизмгүй.
+create unique index if not exists registration_payment_intents_open_qpay_unique
+  on registration_payment_intents (registration_id)
+  where status = 'pending' and method = 'qpay';

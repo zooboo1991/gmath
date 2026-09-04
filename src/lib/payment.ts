@@ -12,7 +12,10 @@ export type PaymentStart =
   | { provider: string; paid: true; reference: string; paidAt: string }
   | { provider: string; paid: false; invoiceId: string; qrImage: string; shortUrl: string };
 
-export type PaymentCheckResult = { paid: false } | { paid: true; reference: string; paidAt: string };
+export type PaymentCheckResult =
+  | { paid: false }
+  /** `amount` нь QPay-ийн бүртгэсэн бодит дүн — нэхэмжилсэнтэй зөрж болно. */
+  | { paid: true; reference: string; paidAt: string; amount?: number };
 
 export interface PaymentProvider {
   readonly name: string;
@@ -90,7 +93,14 @@ export class QPayPaymentProvider implements PaymentProvider {
     // QPay's check response carries no settlement timestamp of its own —
     // this records when *we* learned about it, which is what paidAt means
     // everywhere else it's used (audit trail, not a bank ledger).
-    return { paid: true, reference: settled.paymentId, paidAt: new Date().toISOString() };
+    return {
+      paid: true,
+      reference: settled.paymentId,
+      paidAt: new Date().toISOString(),
+      // QPay-ийн бодит дүн: нэхэмжилсэн дүнтэй зөрвөл дэвтэрт бодитыг нь
+      // бичих ёстой — эс бөгөөс данс бидний таамгаар бичигдэнэ.
+      amount: Number.isFinite(settled.amount) ? settled.amount : undefined,
+    };
   }
 
   async cancelPayment(invoiceId: string): Promise<void> {

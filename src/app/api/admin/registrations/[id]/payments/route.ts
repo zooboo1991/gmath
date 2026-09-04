@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { closeBankIntents } from "@/lib/paymentIntents";
 import { addRegistrationPayment, findRegistrationById } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { isFullAdmin } from "@/lib/session";
@@ -28,6 +29,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const payment = await addRegistrationPayment({ registrationId: id, amount, paidAt });
+  // Сурагчийн "дансаар шилжүүллээ" гэсэн туг мөнхөд өлгөөтэй үлдэх ёсгүй.
+  // Тугны алдаа төлбөр бүртгэхийг блоклохгүй.
+  await closeBankIntents(id).catch((err) =>
+    console.error("[payments] дансны хүлээлт хаахад алдаа", id, err)
+  );
+
 
   await logAdminAction(request, {
     actionType: "registration.add_payment",

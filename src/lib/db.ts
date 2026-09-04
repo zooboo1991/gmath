@@ -1676,6 +1676,62 @@ export async function notifyBankTransferPending(registration: Registration): Pro
 }
 
 /**
+ * Сурагч үлдэгдлээ дансаар шилжүүлэхээр мэдэгдсэн үед хоёр талд мэдэгдэнэ.
+ *
+ * Сурагчийн "төлсөн" гэсэн үгээр үлдэгдэл ХЭЗЭЭ Ч хасагдахгүй — админ банкны
+ * хуулгаа хараад төлбөрийг бүртгэж байж дэвтэрт мөр орно. Энэ нь зөвхөн
+ * хүлээлт эхэлснийг хоёр талд хэлж байгаа хэрэг.
+ */
+export async function notifyBalanceBankPending(
+  registration: Registration,
+  amount: number
+): Promise<void> {
+  if (!registration.userId) return;
+  const sum = amount.toLocaleString("en-US");
+
+  try {
+    await createNotification({
+      title: "Үлдэгдлийн төлбөрийг хүлээн авлаа",
+      body: `"${registration.programLabel}" сургалтын ${sum}₮ шилжүүлгийг шалгаж байна. Ажлын өдрүүдэд 24 цагийн дотор баталгаажиж, танд мэдэгдэнэ.`,
+      targetType: "users",
+      userIds: [registration.userId],
+      channel: "site",
+      link: `/profile/course/${encodeURIComponent(registration.programId)}?tab=payment`,
+    });
+  } catch (err) {
+    console.error("[balance] student notification failed:", registration.id, err);
+  }
+
+  try {
+    const phones = (process.env.CHAT_ALERT_PHONES ?? "")
+      .split(",")
+      .map((phone) => phone.trim())
+      .filter(Boolean);
+    if (phones.length === 0) {
+      console.warn("[balance] CHAT_ALERT_PHONES хоосон — админд мэдэгдэхгүй");
+      return;
+    }
+    const { data, error } = await getSupabase().from("users").select("id").in("phone", phones);
+    if (error) throw error;
+    const userIds = (data as { id: string }[]).map((u) => u.id);
+    if (userIds.length === 0) return;
+
+    const student = await findUserById(registration.userId);
+    const who = student ? `${student.lastName} ${student.firstName}` : "Сурагч";
+    await createNotification({
+      title: "Үлдэгдлийн шилжүүлэг хүлээгдэж байна",
+      body: `${who} — "${registration.programLabel}" (${sum}₮). Гүйлгээг шалгаад төлбөрийг бүртгэнэ үү.`,
+      targetType: "users",
+      userIds,
+      channel: "site",
+      link: "/admin/registrations",
+    });
+  } catch (err) {
+    console.error("[balance] admin notification failed:", registration.id, err);
+  }
+}
+
+/**
  * Re-checks a still-pending QPay registration and marks it active if QPay
  * confirms it settled. Safe to call repeatedly — from the callback, a
  * client poll, or a manual "Шалгах" click.

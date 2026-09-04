@@ -48,6 +48,7 @@ const TABLES = [
   "quiz_answers",
   "quiz_questions",
   "rate_limits",
+  "registration_payment_intents",
   "registration_payments",
   "registrations",
   "sessions",

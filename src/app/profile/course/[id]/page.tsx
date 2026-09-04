@@ -10,6 +10,9 @@ import { listRollCallForUser } from "@/lib/rollCall";
 import { listRecordingViews } from "@/lib/recordingViews";
 import { summariseAttendance, type AttendanceSpan } from "@/lib/courseAttendance";
 import { listAssessmentsByUser } from "@/lib/assessment/db";
+import { listPaymentsForRegistrations } from "@/lib/db";
+import { listIntentsForRegistration } from "@/lib/paymentIntents";
+import { registrationBalance, sumPaymentsFor } from "@/lib/registration";
 import { listExams, listFreeInvitedExams } from "@/lib/assessment/exams";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +25,7 @@ const TABS: CourseTab[] = [
   "schedule",
   "recordings",
   "attendance",
+  "payment",
   "assessment",
   "olympiad",
   "contract",
@@ -69,6 +73,13 @@ export default async function ProfileCoursePage({
     listExams().catch(() => []),
   ]);
 
+  // Төлбөрийн хэсэг. Санаархлын хүснэгт шинэ тул schema.sql-ээ ажиллуулаагүй
+  // орчинд бүтэн хуудас унах ёсгүй.
+  const [coursePayments, intents] = await Promise.all([
+    listPaymentsForRegistrations([registration.id]).catch(() => []),
+    listIntentsForRegistration(registration.id).catch(() => []),
+  ]);
+
   const attendance = await listAttendanceForUser(
     user.id,
     meetings.map((m) => m.id)
@@ -112,6 +123,18 @@ export default async function ProfileCoursePage({
                 }
               : null
           }
+          payment={{
+            // Дүнг сервер өөрөө боддог — клиентээс ирсэн тоог хэзээ ч
+            // итгэхгүй нь ижил зарчим, зөвхөн эсрэг чиглэлд.
+            ...registrationBalance(registration, sumPaymentsFor(registration.id, coursePayments)),
+            dueDate: registration.installmentDueDate,
+            history: coursePayments
+              .map((p) => ({ id: p.id, amount: p.amount, paidAt: p.paidAt }))
+              .sort((a, b) => b.paidAt.localeCompare(a.paidAt)),
+            pendingBank: intents.some((i) => i.method === "bank" && i.status === "pending")
+              ? intents.find((i) => i.method === "bank" && i.status === "pending")!.amount
+              : null,
+          }}
           assessments={assessments.map((a) => ({
             id: a.id,
             title: exams.find((e) => e.id === a.examId)?.title ?? "Түвшин тогтоох шалгалт",

@@ -59,6 +59,7 @@ export default function RegistrationRoster({
   const [addError, setAddError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  const [province, setProvince] = useState("all");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [totalDueDraft, setTotalDueDraft] = useState<Record<string, string>>({});
   const [savingTotalDueId, setSavingTotalDueId] = useState<string | null>(null);
@@ -189,6 +190,13 @@ export default function RegistrationRoster({
     }
   };
 
+  // Жагсаалтад байгаа аймаг/хотууд, монгол цагаан толгойн дарааллаар.
+  const provinces = [...new Set(registrations.map((r) => r.user?.province || "").filter(Boolean))].sort(
+    (a, b) => a.localeCompare(b, "mn")
+  );
+  const shown =
+    province === "all" ? registrations : registrations.filter((r) => (r.user?.province || "") === province);
+
   return (
     <div className="flex flex-col gap-4">
       {canEdit && (
@@ -244,15 +252,50 @@ export default function RegistrationRoster({
       </div>
       )}
 
+      {/* Аймаг/хот — багш нар хаанахын хүүхэд хэд байгааг байнга асуудаг.
+          Зөвхөн жагсаалтад БАЙГАА аймгуудыг л сонголтод гаргана: хоосон
+          үр дүн гарах сонголт байх шаардлагагүй. */}
+      {provinces.length > 1 && (
+        <div className="flex items-center gap-2 flex-wrap mb-3">
+          <span className="text-[.78rem] font-extrabold text-ink-3 uppercase tracking-[.04em]">
+            Аймаг/Хот
+          </span>
+          <select
+            value={province}
+            onChange={(e) => setProvince(e.target.value)}
+            className="h-9 rounded-md border border-line px-2.5 font-semibold text-[.85rem] bg-surface"
+          >
+            <option value="all">{`Бүгд (${registrations.length})`}</option>
+            {provinces.map((name) => (
+              <option key={name} value={name}>
+                {`${name} (${registrations.filter((r) => (r.user?.province || "") === name).length})`}
+              </option>
+            ))}
+          </select>
+          {province !== "all" && (
+            <button
+              type="button"
+              onClick={() => setProvince("all")}
+              className="text-[.82rem] font-extrabold text-blue-strong"
+            >
+              Цэвэрлэх
+            </button>
+          )}
+        </div>
+      )}
+
       {registrations.length === 0 ? (
         <p className="text-ink-3 font-semibold text-[.9rem]">Одоогоор бүртгэл алга байна.</p>
+      ) : shown.length === 0 ? (
+        <p className="text-ink-3 font-semibold text-[.9rem]">Энэ аймаг/хотод бүртгэл алга байна.</p>
       ) : (
         <div className="overflow-x-auto -mx-2">
-          <table className="w-full text-left border-collapse min-w-[620px]">
+          <table className="w-full text-left border-collapse min-w-[760px]">
             <thead>
               <tr className="text-ink-3 text-[.76rem] font-extrabold tracking-[.05em] uppercase">
                 <th className="px-2 py-2">Сурагч</th>
                 <th className="px-2 py-2">Утас</th>
+                <th className="px-2 py-2">Сургууль</th>
                 <th className="px-2 py-2">Огноо</th>
                 <th className="px-2 py-2">Төлөв</th>
                 {trackPayments && <th className="px-2 py-2">Төлбөр</th>}
@@ -260,7 +303,7 @@ export default function RegistrationRoster({
               </tr>
             </thead>
             <tbody>
-              {registrations.map((r) => {
+              {shown.map((r) => {
                 const regPayments = trackPayments
                   ? (payments ?? [])
                       .filter((p) => p.registrationId === r.id)
@@ -288,6 +331,20 @@ export default function RegistrationRoster({
                       </td>
                       <td className="px-2 py-3 font-semibold text-[.88rem] text-ink-2">
                         {r.user?.phone ?? r.phone ?? "—"}
+                      </td>
+                      <td className="px-2 py-3 font-semibold text-[.88rem] text-ink-2">
+                        {r.user?.school ? (
+                          <span className="block max-w-[220px] truncate" title={r.user.school}>
+                            {r.user.school}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                        {r.user?.province && (
+                          <span className="block text-[.76rem] text-ink-3">
+                            {r.user.district ? `${r.user.province}, ${r.user.district}` : r.user.province}
+                          </span>
+                        )}
                       </td>
                       <td className="px-2 py-3 font-semibold text-[.88rem] text-ink-2">
                         {new Date(r.createdAt).toLocaleDateString("mn-MN")}

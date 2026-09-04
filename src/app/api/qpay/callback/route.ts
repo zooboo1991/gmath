@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { settleAssessmentPayment } from "@/lib/assessment/db";
 import { settleRegistrationPayment } from "@/lib/db";
+import { settleInstallmentIntent } from "@/lib/paymentIntents";
 
 /**
  * QPay's payment notification webhook — GET, with `qpay_payment_id` appended
@@ -26,6 +27,11 @@ export async function GET(request: Request) {
       await settleAssessmentPayment(ref);
     } else if (type === "registration" && ref) {
       await settleRegistrationPayment(ref);
+    } else if (type === "installment" && ref) {
+      // Үлдэгдлийн төлбөр: бүртгэл аль хэдийн идэвхтэй тул төлөв солихгүй,
+      // зөвхөн төлбөрийн дэвтэрт мөр нэмнэ. settleRegistrationPayment нь
+      // идэвхтэй бүртгэл дээр чимээгүй буцдаг тул энд тусдаа зам хэрэгтэй.
+      await settleInstallmentIntent(ref);
     }
   } catch (err) {
     console.error("qpay callback settle failed", type, ref, err);
