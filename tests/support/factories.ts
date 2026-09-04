@@ -240,7 +240,7 @@ export async function createTestAssessment(input: {
     | "problems_submitted"
     | "grading"
     | "completed";
-  track?: "regular" | "advanced" | "olympiad";
+  track?: "regular" | "advanced" | "olympiad" | "placement";
   amount?: string;
   quizGrade?: number;
   paymentInvoiceId?: string;

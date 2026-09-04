@@ -4,6 +4,7 @@ import {
   findAssessmentForExam,
   findOpenAssessment,
   getFeeForTrack,
+  getPlacementGrades,
 } from "@/lib/assessment/db";
 import { findOpenExam, isFreeForUser, listFreeInvitedExams } from "@/lib/assessment/exams";
 import { ASSESSMENT_CLOSED, canUseAssessment } from "@/lib/assessment/guard";
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
   });
 }
 
-const TRACKS: AssessmentTrack[] = ["regular", "advanced", "olympiad"];
+const TRACKS: AssessmentTrack[] = ["regular", "advanced", "olympiad", "placement"];
 
 export async function POST(request: Request) {
   const user = await getSessionUser();
@@ -84,6 +85,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Ангиа сонгоно уу" }, { status: 400 });
     }
     quizGrade = grade;
+  }
+
+  // Шаталсан шалгалт анги бүрээр нээгддэг: сан нь бэлэн болоогүй ангид
+  // мөнгө авчихаад асуух юмгүй суулгаж болохгүй.
+  if (track === "placement") {
+    const openGrades = await getPlacementGrades();
+    if (!openGrades.includes(quizGrade!)) {
+      return NextResponse.json(
+        { ok: false, error: "Энэ ангийн түвшин тогтоох шалгалт одоогоор нээгдээгүй байна." },
+        { status: 503 }
+      );
+    }
   }
 
   // An invitation outranks everything below: the teacher named this child's

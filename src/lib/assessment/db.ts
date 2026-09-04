@@ -272,6 +272,19 @@ export async function getPlacementFee(): Promise<string> {
   return (await getSetting("placement_fee")) ?? DEFAULT_PLACEMENT_FEE;
 }
 
+/**
+ * Сурагчдад нээлттэй ангиуд ("6,7" гэх мэт). Хоосон бол шалгалт хаанаас ч
+ * харагдахгүй — анги бүрийн сан бэлэн болмогц эзэн нээнэ.
+ */
+export async function getPlacementGrades(): Promise<number[]> {
+  const raw = await getSetting("placement_grades").catch(() => undefined);
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((g) => Number(g.trim()))
+    .filter((g) => Number.isInteger(g) && g >= 4 && g <= 12);
+}
+
 /** Шаталсан шалгалтын нийт хугацаа, минутаар. Буруу утга анхдагч руугаа буудаг. */
 export async function getPlacementMinutes(): Promise<number> {
   const raw = await getSetting("placement_minutes").catch(() => undefined);

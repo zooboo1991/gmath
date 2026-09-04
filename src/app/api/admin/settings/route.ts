@@ -5,7 +5,15 @@ import { isFullAdmin } from "@/lib/session";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 
 /** Only keys listed here can be written, so the endpoint can't set anything. */
-const EDITABLE_KEYS = new Set(["assessment_fee", "quiz_fee", "assessment_sla", "assessment_enabled"]);
+const EDITABLE_KEYS = new Set([
+  "assessment_fee",
+  "quiz_fee",
+  "assessment_sla",
+  "assessment_enabled",
+  "placement_fee",
+  "placement_minutes",
+  "placement_grades",
+]);
 
 export async function GET() {
   if (!(await isFullAdmin())) {
