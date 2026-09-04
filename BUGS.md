@@ -239,3 +239,37 @@ POST /api/admin/upload   (JSON body, админаар нэвтэрсэн)
 сонгох (`registrations.find(...)?.status !== "active"` бол `pending` таб
 руу). Мөн `ProfileClient.tsx:66-67` дахь тайлбар хуучирсан — «for a yearly
 programme, opened» гэсэн зан төлөв `f431fec`-ээр устсан.
+
+---
+
+## #7 — Бодлого 1000-аас олон болмогц засварлах боломжгүй болно
+
+**Хаана:** [src/app/api/admin/problems/[id]/route.ts:20](src/app/api/admin/problems/[id]/route.ts:20)
+(мөн [src/lib/assessment/db.ts:322](src/lib/assessment/db.ts:322) — `listProblems`)
+
+**Юу болж байна:** Бодлого засах PUT нь тухайн бодлогыг id-гаар нь ШУУД
+хайхын оронд `listProblems({ includeInactive: true })`-ээр **бүх** бодлогыг
+татаад санах ойд `.find()` хийдэг. `listProblems` нь хуудаслалтгүй тул
+PostgREST 1000 мөрөөр таслана. Жагсаалт `created_at`-аар эрэмбэлэгддэг тул
+**хамгийн шинэ** бодлогууд эхний 1000-д багтахаа больж, засах гэхэд
+«Бодлого олдсонгүй» гэсэн 404 буцна. Устгах DELETE ижил замаар явдаг.
+
+**Хэрхэн давтах:**
+
+```
+problems хүснэгтэд 1000-аас олон мөр байхад:
+POST /api/admin/problems      → 200, шинэ бодлого үүснэ
+PUT  /api/admin/problems/<id> → 404 "Бодлого олдсонгүй"
+```
+
+Тестийн санд 1028 мөр болоход `olympiad-category.test.ts` дээрх
+`stores and returns the category` тест яг ингэж унасан.
+
+**Эрсдэл:** дунд. Production дээр одоогоор 30 бодлого байгаа тул хараахан
+хамаагүй, гэхдээ бодлогын сан өсөх тусам гарцаагүй тулгарна. Мөнгө, эрхэд
+нөлөөлөхгүй ч админ шинэ бодлогоо засаж чадахгүй болно.
+
+**Боломжит засвар:** `findProblemById(id)` гэсэн ганц мөрийн асуулга нэмээд
+PUT/DELETE хоёрыг түүгээр солих (1000+ мөр татахгүй тул хурдан ч болно).
+Эсвэл `listProblems`-д `fetchAllRows` (src/lib/fetchAll.ts) хэрэглэх —
+өмнө нь `getLastLoginByUser` дээр яг ижил алдаа гарч тэгж зассан байдаг.
