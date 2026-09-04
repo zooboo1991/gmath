@@ -7,6 +7,7 @@ import { IconArrowLeft, IconCheckCircle, IconClock } from "@/components/icons";
 import { INPUT_CLASS } from "@/components/admin/panels/shared";
 import { apiError, readJson } from "@/lib/fetchJson";
 import type { PlacementProblem } from "@/lib/assessment/placementDb";
+import PlacementPreview from "@/components/admin/PlacementPreview";
 
 /**
  * Шаталсан түвшин тогтоолтын бодлогын сан.
@@ -33,6 +34,7 @@ export default function PlacementProblemsPanel({
   );
   const [grade, setGrade] = useState<number>(grades[0] ?? 6);
   const [editing, setEditing] = useState<PlacementProblem | "new" | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   const shown = problems.filter((p) => p.grade === grade);
   const missingAnswers = shown.filter((p) => p.answers.length === 0).length;
@@ -76,6 +78,13 @@ export default function PlacementProblemsPanel({
               <option key={g} value={g}>{`${g}-р анги`}</option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={() => setPreviewing(true)}
+            className="h-11 px-4 rounded-md border border-line font-extrabold text-[.88rem] text-blue-strong"
+          >
+            Шалгалтыг турших
+          </button>
           <button
             type="button"
             onClick={() => setEditing("new")}
@@ -156,6 +165,10 @@ export default function PlacementProblemsPanel({
             </div>
           ))}
         </div>
+      )}
+
+      {previewing && (
+        <PlacementPreview grade={grade} problems={problems} onClose={() => setPreviewing(false)} />
       )}
 
       {editing && (
