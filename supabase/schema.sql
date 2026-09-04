@@ -1197,3 +1197,64 @@ create index if not exists registration_payment_intents_registration_idx
 create unique index if not exists registration_payment_intents_open_qpay_unique
   on registration_payment_intents (registration_id)
   where status = 'pending' and method = 'qpay';
+
+-- ---------------------------------------------------------------------------
+-- Шаталсан түвшин тогтоолт (placement)
+-- ---------------------------------------------------------------------------
+-- Стандарт түвшин тогтоолтын шинэ хэлбэр: сэдэв бүр 2-р түвшний бодлогоос
+-- эхэлж, зөв бол тэр сэдвийн 3-р түвшин, буруу бол 1-р түвшин рүү шилжинэ.
+-- Сэдэв бүр 0-3 оноотой гарч, radar диаграмын тэнхлэг болно.
+--
+-- Өмнөх адаптив хөдөлгүүрийг "хүүхэд бүр өөр бодлого авдаг тул үр дүн
+-- харьцуулагдахгүй" гэж устгасан түүхтэй. Энэ загвар тэр асуудалгүй:
+-- (grade, topic_order, level) гурвалд ЯГ НЭГ бодлого ногддог тул анги бүрийн
+-- шат тогтмол — бүх хүүхэд ижил бодлогоор шалгагдаж, зөвхөн аль мөчрөөр
+-- явах нь л ялгаатай.
+create table if not exists placement_problems (
+  id uuid primary key default gen_random_uuid(),
+  grade int not null check (grade between 4 and 12),
+  /** Radar дээр харагдах сэдвийн нэр ("ХИЕХ, ХБЕХ"). */
+  topic text not null,
+  /** Тэнхлэгийн байрлал ба шалгалтын дараалал, 1-ээс эхэлнэ. */
+  topic_order int not null check (topic_order >= 1),
+  level int not null check (level in (1, 2, 3)),
+  body_latex text not null,
+  /**
+   * Зөвшөөрөгдөх хариултууд, текст массив: ["13/20", "0.65"]. Оролт
+   * нормчлогдож харьцуулагдана (src/lib/assessment/placement.ts).
+   * Хоосон массивтай бодлого идэвхжиж чадахгүй — шалгах юмгүй.
+   */
+  answers jsonb not null default '[]'::jsonb,
+  /** Анхдагчаар идэвхгүй: файлаас орсон ноорог хариулт авч байж л асуугдана. */
+  active boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (grade, topic_order, level)
+);
+create index if not exists placement_problems_grade_idx
+  on placement_problems (grade, active);
+
+-- Нэг шалгалтын явц: аль сэдвийн, аль түвшний бодлого хэзээ өгөгдөж, юу гэж
+-- хариулснаас зөв эсэх нь. quiz_answers-тай ижил зарчим — мөр нь асуулт
+-- ҮҮСГЭГДЭХ үед бичигдэж, хариулахад дүүргэгдэнэ. Хугацааны хязгаар эхний
+-- мөрийн created_at-аас тоологдоно — тусдаа started_at багана хэрэггүй.
+create table if not exists placement_steps (
+  id uuid primary key default gen_random_uuid(),
+  assessment_id uuid not null references assessments(id) on delete cascade,
+  problem_id uuid not null references placement_problems(id),
+  topic_order int not null,
+  level int not null,
+  shown_order int not null,
+  given_answer text,
+  is_correct boolean,
+  answered_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (assessment_id, problem_id)
+);
+create index if not exists placement_steps_assessment_idx
+  on placement_steps (assessment_id, shown_order);
+
+-- Шинэ төрөл: стандарт түвшин тогтоолтын байрыг эзэлнэ. Хуучин "regular"
+-- мөрүүд үр дүнгээ харуулсаар үлдэнэ.
+alter table assessments drop constraint if exists assessments_track_check;
+alter table assessments add constraint assessments_track_check
+  check (track in ('regular', 'advanced', 'olympiad', 'placement'));

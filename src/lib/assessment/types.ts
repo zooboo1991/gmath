@@ -10,14 +10,17 @@
  *  - olympiad: the original flow — questionnaire, hand-picked problems,
  *    photographed solutions, a teacher grades and concludes.
  */
-export type AssessmentTrack = "regular" | "advanced" | "olympiad";
+export type AssessmentTrack = "regular" | "advanced" | "olympiad" | "placement";
 
-export type QuizTrack = Exclude<AssessmentTrack, "olympiad">;
+export type QuizTrack = Exclude<AssessmentTrack, "olympiad" | "placement">;
 
 export const TRACK_LABELS: Record<AssessmentTrack, string> = {
+  // Хуучин мөрүүдийн үр дүнгийн хуудсанд л харагдана — шинэ шалгалт
+  // "placement" төрлөөр явна.
   regular: "Энгийн ангийн тест",
   advanced: "Сонгон ангийн тест",
   olympiad: "Олимпиадын түвшин тогтоолт",
+  placement: "Түвшин тогтоох шалгалт",
 };
 
 export type AssessmentStatus =

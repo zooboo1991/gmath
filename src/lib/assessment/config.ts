@@ -16,6 +16,12 @@ export const QUIZ_QUESTIONS_PER_TEST = 10;
 /** Questions in the free, sign-in-free taster. Short enough to finish standing up. */
 export const SAMPLE_QUESTIONS_PER_TEST = 5;
 
+/** Used when app_settings has no placement_fee row yet (шаталсан түвшин тогтоолт). */
+export const DEFAULT_PLACEMENT_FEE = "10,000₮";
+
+/** Шаталсан шалгалтын нийт хугацаа (минут), тохиргоо байхгүй үеийн анхдагч. */
+export const DEFAULT_PLACEMENT_MINUTES = 40;
+
 /** Used when app_settings has no assessment_sla row yet. */
 export const DEFAULT_ASSESSMENT_SLA = "1-2 хоног";
 

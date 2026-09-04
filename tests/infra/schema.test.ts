@@ -42,6 +42,8 @@ const TABLES = [
   "notifications",
   "otp_codes",
   "page_views",
+  "placement_problems",
+  "placement_steps",
   "problems",
   "push_subscriptions",
   "questionnaire_answers",

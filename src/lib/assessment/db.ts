@@ -3,6 +3,8 @@ import { getSupabase } from "../supabase";
 import { publicUserFromJoin, type PublicUser } from "../db";
 import {
   DEFAULT_ASSESSMENT_FEE,
+  DEFAULT_PLACEMENT_FEE,
+  DEFAULT_PLACEMENT_MINUTES,
   DEFAULT_ASSESSMENT_SLA,
   DEFAULT_QUIZ_FEE,
   QUIZ_QUESTIONS_PER_TEST,
@@ -266,6 +268,19 @@ export async function getQuizFee(): Promise<string> {
   return (await getSetting("quiz_fee")) ?? DEFAULT_QUIZ_FEE;
 }
 
+export async function getPlacementFee(): Promise<string> {
+  return (await getSetting("placement_fee")) ?? DEFAULT_PLACEMENT_FEE;
+}
+
+/** Шаталсан шалгалтын нийт хугацаа, минутаар. Буруу утга анхдагч руугаа буудаг. */
+export async function getPlacementMinutes(): Promise<number> {
+  const raw = await getSetting("placement_minutes").catch(() => undefined);
+  const minutes = Number(raw);
+  return Number.isInteger(minutes) && minutes >= 5 && minutes <= 180
+    ? minutes
+    : DEFAULT_PLACEMENT_MINUTES;
+}
+
 /** How long the teacher's verdict takes, as shown to parents before they pay. */
 export async function getAssessmentSla(): Promise<string> {
   return (await getSetting("assessment_sla")) ?? DEFAULT_ASSESSMENT_SLA;
@@ -273,7 +288,9 @@ export async function getAssessmentSla(): Promise<string> {
 
 /** The price an assessment of this track starts at. */
 export async function getFeeForTrack(track: AssessmentTrack): Promise<string> {
-  return track === "olympiad" ? getAssessmentFee() : getQuizFee();
+  if (track === "olympiad") return getAssessmentFee();
+  if (track === "placement") return getPlacementFee();
+  return getQuizFee();
 }
 
 // ---------------------------------------------------------------------------
@@ -931,7 +948,7 @@ export async function countQuizQuestionsByGrade(track: QuizTrack): Promise<Recor
 export async function getOrAssembleQuiz(
   assessment: Assessment
 ): Promise<{ questions: QuizQuestion[]; answers: QuizAnswer[] }> {
-  if (assessment.track === "olympiad" || !assessment.quizGrade) {
+  if (assessment.track === "olympiad" || assessment.track === "placement" || !assessment.quizGrade) {
     throw new Error("not a quiz assessment");
   }
 
