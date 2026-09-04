@@ -46,16 +46,26 @@ export async function GET(request: Request) {
   }
   // The fee shown up front is the open assessment's own track, or the price
   // list for the track picker when nothing is in progress.
-  const [assessmentFee, quizFee, invitedExams] = await Promise.all([
+  const [assessmentFee, quizFee, placementFee, placementGrades, invitedExams] = await Promise.all([
     getFeeForTrack("olympiad"),
     getFeeForTrack("regular"),
+    getFeeForTrack("placement"),
+    getPlacementGrades().catch(() => []),
     listFreeInvitedExams(user.id).catch(() => []),
   ]);
+  const feeFor = (track?: string) =>
+    track === "regular" || track === "advanced"
+      ? quizFee
+      : track === "placement"
+        ? placementFee
+        : assessmentFee;
   return NextResponse.json({
     ok: true,
     assessment: assessment ?? null,
-    fee: assessment?.track === "regular" || assessment?.track === "advanced" ? quizFee : assessmentFee,
-    fees: { olympiad: assessmentFee, quiz: quizFee },
+    fee: feeFor(assessment?.track),
+    fees: { olympiad: assessmentFee, quiz: quizFee, placement: placementFee },
+    // Шаталсан шалгалт нээлттэй ангиуд — ангийн сонголт үүгээр хязгаарлагдана.
+    placementGrades,
     // A child whose class was invited has an exam waiting, so the page can
     // take them to it instead of asking which of three kinds they want. Two
     // programmes means two invitations, and the page picks by ?exam=.

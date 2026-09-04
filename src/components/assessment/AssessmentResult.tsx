@@ -1,5 +1,6 @@
 import Link from "next/link";
 import MathText from "@/components/assessment/MathText";
+import PlacementRadar from "@/components/assessment/PlacementRadar";
 import { IconCheckCircle, IconClock, IconTarget } from "@/components/icons";
 import type { AssessmentReport, ReportItem } from "@/lib/assessment/report";
 import { TRACK_LABELS } from "@/lib/assessment/types";
@@ -37,11 +38,14 @@ const IN_PROGRESS_COPY: Record<string, { title: string; text: string; cta?: stri
 export default function AssessmentResult({
   assessment,
   report,
+  placement = null,
   open = true,
 }: {
   assessment: Assessment | null;
   /** The marked paper. Null until there is work to show. */
   report: AssessmentReport | null;
+  /** Шаталсан шалгалтын дүн — зөвхөн track="placement" үед. */
+  placement: { levelLabel: string; topics: { topicOrder: number; topic: string; score: number }[] } | null;
   /**
    * False while the level test is switched off. A result already earned stays
    * readable — it is the student's own — but nothing here may invite them into
@@ -119,6 +123,40 @@ export default function AssessmentResult({
           >
             {copy.cta} →
           </Link>
+        )}
+      </div>
+    );
+  }
+
+  // Шаталсан шалгалт: түвшин + сэдэв бүрийн radar + AI дүгнэлт.
+  if (assessment.track === "placement") {
+    return (
+      <div className={CARD}>
+        <div className="text-center">
+          <span className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-blue-soft">
+            <b className="text-[1.15rem] font-extrabold text-blue-strong">
+              {placement?.levelLabel ?? "Түвшин тогтоолт"}
+            </b>
+          </span>
+          <h2 className="text-[1.3rem] font-extrabold mt-4">Түвшин тогтоолтын үр дүн</h2>
+          {assessment.quizGrade && (
+            <p className="text-ink-3 font-semibold text-[.9rem] mt-1">
+              {assessment.quizGrade}-р ангийн шалгалт
+            </p>
+          )}
+        </div>
+        {placement && placement.topics.length > 0 && (
+          <div className="mt-5">
+            <PlacementRadar topics={placement.topics} />
+          </div>
+        )}
+        {assessment.aiRecommendation && (
+          <div className="bg-bg-soft rounded-md px-5 py-4 mt-5">
+            <b className="font-extrabold text-[.95rem] block mb-2">Дүгнэлт</b>
+            <p className="text-ink-2 font-medium leading-[1.75] whitespace-pre-wrap text-[.95rem]">
+              {assessment.aiRecommendation}
+            </p>
+          </div>
         )}
       </div>
     );

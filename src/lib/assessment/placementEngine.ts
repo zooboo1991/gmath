@@ -38,7 +38,7 @@ export type PlacementView =
       /** Хугацаа дуусах хүртэл үлдсэн секунд. Эхлээгүй бол бүтэн хугацаа. */
       remainingSeconds: number;
     }
-  | { done: true; result: PlacementResult };
+  | { done: true; result: PlacementResult; recommendation?: string };
 
 export type PlacementResult = {
   level: 1 | 2 | 3;
@@ -109,7 +109,7 @@ async function finalize(
   assessment: Assessment,
   topics: Map<number, PlacementProblem[]>,
   steps: PlacementStep[]
-): Promise<PlacementResult> {
+): Promise<{ result: PlacementResult; recommendation?: string }> {
   const result = summarise(topics, steps);
 
   const { data, error } = await getSupabase()
@@ -131,8 +131,9 @@ async function finalize(
     await setQuizRecommendation(assessment.id, text).catch((err) =>
       console.error("[placement] recommendation save failed", assessment.id, err)
     );
+    return { result, recommendation: text };
   }
-  return result;
+  return { result, recommendation: assessment.aiRecommendation };
 }
 
 /**
@@ -148,7 +149,11 @@ export async function placementState(assessment: Assessment): Promise<PlacementV
   const steps = await listPlacementSteps(assessment.id);
 
   if (assessment.status === "completed") {
-    return { done: true, result: summarise(topics, steps) };
+    return {
+      done: true,
+      result: summarise(topics, steps),
+      recommendation: assessment.aiRecommendation,
+    };
   }
   if (topics.size === 0) {
     throw new PlacementNotReadyError();
@@ -156,7 +161,8 @@ export async function placementState(assessment: Assessment): Promise<PlacementV
 
   const { startedAt, limitMs } = await deadline(steps);
   if (startedAt !== undefined && Date.now() - startedAt > limitMs) {
-    return { done: true, result: await finalize(assessment, topics, steps) };
+    const finished = await finalize(assessment, topics, steps);
+    return { done: true, result: finished.result, recommendation: finished.recommendation };
   }
 
   // Хариулаагүй өгөгдчихсөн бодлого байвал түүнийгээ л дахин үзүүлнэ.
@@ -187,7 +193,8 @@ export async function placementState(assessment: Assessment): Promise<PlacementV
     return view(problem, [...steps, created], topics, startedAt ?? Date.now(), limitMs);
   }
 
-  return { done: true, result: await finalize(assessment, topics, steps) };
+  const finished = await finalize(assessment, topics, steps);
+  return { done: true, result: finished.result, recommendation: finished.recommendation };
 }
 
 export class PlacementNotReadyError extends Error {

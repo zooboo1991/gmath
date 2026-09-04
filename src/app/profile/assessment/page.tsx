@@ -9,6 +9,7 @@ import { isAssessmentOpen, listAssessmentsByUser } from "@/lib/assessment/db";
 import { buildAssessmentReport, type AssessmentReport } from "@/lib/assessment/report";
 import type { Assessment } from "@/lib/assessment/types";
 import { getSessionUser } from "@/lib/session";
+import { placementState } from "@/lib/assessment/placementEngine";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,15 @@ export default async function ProfileAssessmentPage({
       ? await buildAssessmentReport(assessment).catch(() => null)
       : null;
 
+  // Шаталсан шалгалтын сэдэв бүрийн оноо — radar-т. Хөдөлгүүр өөрөө
+  // дүгнэлтээ бодож өгдөг тул энд зөвхөн уншина.
+  const placement =
+    assessment?.track === "placement" && assessment.status === "completed"
+      ? await placementState(assessment)
+          .then((view) => (view.done ? view.result : null))
+          .catch(() => null)
+      : null;
+
   return (
     <>
       <Navbar />
@@ -85,7 +95,7 @@ export default async function ProfileAssessmentPage({
         <PageHero eyebrow="Түвшин тогтоох" title="Багшийн дүгнэлт" />
         <section className="section-pad">
           <div className="wrap max-w-[700px] mx-auto">
-            <AssessmentResult assessment={assessment} report={report} open={open} />
+            <AssessmentResult assessment={assessment} report={report} placement={placement} open={open} />
             <Link
               href="/profile"
               className="inline-flex items-center gap-2 font-extrabold text-[.92rem] text-blue-strong mt-7"

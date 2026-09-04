@@ -17,8 +17,14 @@ import type { PlacementProblem } from "@/lib/assessment/placementDb";
  */
 export default function PlacementProblemsPanel({
   initialProblems,
+  initialFee,
+  initialMinutes,
+  initialOpenGrades,
 }: {
   initialProblems: PlacementProblem[];
+  initialFee: string;
+  initialMinutes: number;
+  initialOpenGrades: number[];
 }) {
   const [problems, setProblems] = useState(initialProblems);
   const grades = useMemo(
@@ -79,6 +85,13 @@ export default function PlacementProblemsPanel({
           </button>
         </div>
       </div>
+
+      <PlacementSettings
+        initialFee={initialFee}
+        initialMinutes={initialMinutes}
+        initialOpenGrades={initialOpenGrades}
+        gradesWithProblems={grades}
+      />
 
       {missingAnswers > 0 && (
         <p className="text-[.88rem] font-bold text-gold-strong bg-gold-soft rounded-sm px-4 py-3 mb-4 leading-[1.6]">
@@ -362,6 +375,131 @@ function ProblemModal({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Үнэ, хугацаа, нээлттэй ангиуд. Ангийг нээхэд тэр ангийн шалгалт сурагчдад
+ * шууд харагдана — тиймээс сан нь бэлэн эсэхийг хажууд нь сануулна.
+ */
+function PlacementSettings({
+  initialFee,
+  initialMinutes,
+  initialOpenGrades,
+  gradesWithProblems,
+}: {
+  initialFee: string;
+  initialMinutes: number;
+  initialOpenGrades: number[];
+  gradesWithProblems: number[];
+}) {
+  const [fee, setFee] = useState(initialFee);
+  const [minutes, setMinutes] = useState(String(initialMinutes));
+  const [openGrades, setOpenGrades] = useState<number[]>(initialOpenGrades);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const put = async (key: string, value: string) => {
+    setBusyKey(key);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value }),
+      });
+      const json = await readJson(res);
+      if (!res.ok) setError(apiError(res, json, "Хадгалж чадсангүй"));
+    } catch {
+      setError("Сүлжээний алдаа");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const toggleGrade = async (grade: number) => {
+    const next = openGrades.includes(grade)
+      ? openGrades.filter((g) => g !== grade)
+      : [...openGrades, grade].sort((a, b) => a - b);
+    setOpenGrades(next);
+    // Тохиргооны PUT хоосон утга авдаггүй тул бүгд хаалттайг "off" гэж бичнэ —
+    // parser нь тоо биш бүхнийг үл тоодог.
+    await put("placement_grades", next.length ? next.join(",") : "off");
+  };
+
+  return (
+    <div className="bg-surface border border-line rounded-md px-5 py-4 mb-4">
+      <div className="grid sm:grid-cols-2 gap-4">
+        <label className="block">
+          <span className="block text-[.72rem] font-extrabold text-ink-3 uppercase mb-1">Үнэ</span>
+          <div className="flex gap-2">
+            <input value={fee} onChange={(e) => setFee(e.target.value)} className={INPUT_CLASS} />
+            <button
+              type="button"
+              disabled={busyKey === "placement_fee"}
+              onClick={() => put("placement_fee", fee.trim())}
+              className="shrink-0 px-4 rounded-md bg-navy text-white font-extrabold text-[.82rem] disabled:opacity-50"
+            >
+              Хадгалах
+            </button>
+          </div>
+        </label>
+        <label className="block">
+          <span className="block text-[.72rem] font-extrabold text-ink-3 uppercase mb-1">
+            Хугацаа (минут)
+          </span>
+          <div className="flex gap-2">
+            <input
+              value={minutes}
+              onChange={(e) => setMinutes(e.target.value)}
+              inputMode="numeric"
+              className={INPUT_CLASS}
+            />
+            <button
+              type="button"
+              disabled={busyKey === "placement_minutes"}
+              onClick={() => put("placement_minutes", minutes.trim())}
+              className="shrink-0 px-4 rounded-md bg-navy text-white font-extrabold text-[.82rem] disabled:opacity-50"
+            >
+              Хадгалах
+            </button>
+          </div>
+        </label>
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-line">
+        <span className="block text-[.72rem] font-extrabold text-ink-3 uppercase mb-2">
+          Сурагчдад нээлттэй ангиуд
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: 9 }, (_, i) => i + 4).map((g) => {
+            const open = openGrades.includes(g);
+            const hasBank = gradesWithProblems.includes(g);
+            return (
+              <button
+                key={g}
+                type="button"
+                disabled={busyKey === "placement_grades"}
+                onClick={() => toggleGrade(g)}
+                title={hasBank ? undefined : "Энэ ангид бодлого ороогүй байна"}
+                className={`px-3.5 py-2 rounded-full font-extrabold text-[.85rem] border transition-colors disabled:opacity-50 ${
+                  open
+                    ? "bg-green-soft text-green border-green/30"
+                    : "bg-bg-soft text-ink-3 border-line"
+                }`}
+              >
+                {g}-р анги{open ? " ✓" : ""}
+                {!hasBank && "⚠"}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[.78rem] font-semibold text-ink-3 mt-2 leading-[1.55]">
+          Нээгдээгүй ангид шалгалт эхлэхгүй. ⚠ — тэр ангид бодлого ороогүй байна.
+        </p>
+      </div>
+      {error && <p className="text-red-soft font-bold text-[.85rem] mt-2">{error}</p>}
     </div>
   );
 }

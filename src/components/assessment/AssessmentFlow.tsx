@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import MathText from "@/components/assessment/MathText";
+import PlacementRadar from "@/components/assessment/PlacementRadar";
+import { IconClock } from "@/components/icons";
 import FormField from "@/components/FormField";
 import { useProgramRegister } from "@/components/program/ProgramRegister";
 import { TRACK_LABELS, type Assessment, type AssessmentTrack, type PublicQuizQuestion } from "@/lib/assessment/types";
@@ -18,6 +20,8 @@ type Step =
   | "solve"
   | "quiz"
   | "quiz-result"
+  | "placement"
+  | "placement-result"
   | "submitted";
 
 const CARD = "bg-surface border border-line rounded-lg shadow-sm px-[26px] py-[26px]";
@@ -29,7 +33,8 @@ export default function AssessmentFlow() {
   const [step, setStep] = useState<Step>("loading");
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [fee, setFee] = useState("");
-  const [fees, setFees] = useState<{ olympiad: string; quiz: string } | null>(null);
+  const [fees, setFees] = useState<{ olympiad: string; quiz: string; placement: string } | null>(null);
+  const [placementGrades, setPlacementGrades] = useState<number[]>([]);
   const [invitedExams, setInvitedExams] = useState<{ id: string; title: string }[]>([]);
   const [examId, setExamId] = useState<string | null>(null);
   // The picker's choices, before an assessment row exists to carry them.
@@ -42,6 +47,12 @@ export default function AssessmentFlow() {
   const stepForStatus = (a: Assessment | null): Step => {
     if (!a) return "track";
     const isQuiz = a.track === "regular" || a.track === "advanced";
+    if (a.track === "placement") {
+      if (a.status === "awaiting_payment") return "payment";
+      if (a.status === "paid") return "placement";
+      if (a.status === "completed") return "placement-result";
+      return "submitted";
+    }
     if (a.status === "awaiting_payment") return "payment";
     // An exam's paper is laid out on payment, so an exam assessment is never
     // waiting on a form — including one that was started before this changed
@@ -72,6 +83,7 @@ export default function AssessmentFlow() {
         setAssessment(json.assessment);
         setFee(json.fee);
         setFees(json.fees ?? null);
+        setPlacementGrades(json.placementGrades ?? []);
         setInvitedExams(json.invitedExams ?? []);
         setExamId(
           wanted && (json.invitedExams ?? []).some((e: { id: string }) => e.id === wanted)
@@ -263,7 +275,13 @@ export default function AssessmentFlow() {
           fees={fees}
           onPick={(t) => {
             setPickedTrack(t);
-            setFee(t === "olympiad" ? fees?.olympiad ?? "" : fees?.quiz ?? "");
+            setFee(
+              t === "olympiad"
+                ? fees?.olympiad ?? ""
+                : t === "placement"
+                  ? fees?.placement ?? ""
+                  : fees?.quiz ?? ""
+            );
             setStep(t === "olympiad" ? "payment" : "grade");
           }}
         />
@@ -272,6 +290,7 @@ export default function AssessmentFlow() {
       {step === "grade" && (
         <GradeStep
           onBack={() => setStep("track")}
+          openGrades={pickedTrack === "placement" ? placementGrades : undefined}
           onPick={(g) => {
             setPickedGrade(g);
             setStep("payment");
@@ -324,6 +343,14 @@ export default function AssessmentFlow() {
 
       {step === "quiz-result" && assessment && <QuizResultStep assessment={assessment} />}
 
+      {step === "placement" && assessment && (
+        <PlacementStep assessmentId={assessment.id} onDone={() => setStep("placement-result")} />
+      )}
+
+      {step === "placement-result" && assessment && (
+        <PlacementResultStep assessmentId={assessment.id} />
+      )}
+
       {step === "submitted" && <SubmittedStep />}
     </>
   );
@@ -368,15 +395,17 @@ function TrackStep({
   fees,
   onPick,
 }: {
-  fees: { olympiad: string; quiz: string } | null;
+  fees: { olympiad: string; quiz: string; placement: string } | null;
   onPick: (track: AssessmentTrack) => void;
 }) {
   const cards: { track: AssessmentTrack; title: string; text: string; fee: string }[] = [
     {
-      track: "regular",
-      title: "Энгийн анги",
-      text: "Ангийн хөтөлбөрийн хялбар тест. Оноо болон AI зөвлөмж шууд гарна.",
-      fee: fees?.quiz ?? "",
+      // Стандарт түвшин тогтоолт: хуучин "Энгийн" тестийн байрыг эзэлсэн
+      // шаталсан шалгалт. Хуучин regular мөрүүд үр дүнгээ харуулсаар үлдэнэ.
+      track: "placement",
+      title: "Түвшин тогтоох",
+      text: "Сэдэв бүрээр шатлан асууж түвшинг тогтооно. Сэдвийн задаргаа, AI дүгнэлт шууд гарна.",
+      fee: fees?.placement ?? "",
     },
     {
       track: "advanced",
@@ -415,7 +444,16 @@ function TrackStep({
   );
 }
 
-function GradeStep({ onBack, onPick }: { onBack: () => void; onPick: (grade: number) => void }) {
+function GradeStep({
+  onBack,
+  onPick,
+  openGrades,
+}: {
+  onBack: () => void;
+  onPick: (grade: number) => void;
+  /** Тодорхойлогдсон бол зөвхөн эдгээр анги дарагдана — бусад нь "тун удахгүй". */
+  openGrades?: number[];
+}) {
   return (
     <div className={CARD}>
       <h2 className="text-[1.25rem] font-extrabold">Хэддүгээр ангид сурдаг вэ?</h2>
@@ -423,16 +461,25 @@ function GradeStep({ onBack, onPick }: { onBack: () => void; onPick: (grade: num
         Тест нь сонгосон ангийн хөтөлбөрөөс бүрдэнэ.
       </p>
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5 mt-5">
-        {Array.from({ length: 9 }, (_, i) => i + 4).map((g) => (
-          <button
-            key={g}
-            type="button"
-            onClick={() => onPick(g)}
-            className="bg-surface-2 border-[1.5px] border-line-2 rounded-md py-3.5 font-extrabold text-[1rem] hover:border-blue transition-colors"
-          >
-            {g}-р анги
-          </button>
-        ))}
+        {Array.from({ length: 9 }, (_, i) => i + 4).map((g) => {
+          const closed = openGrades !== undefined && !openGrades.includes(g);
+          return (
+            <button
+              key={g}
+              type="button"
+              disabled={closed}
+              onClick={() => onPick(g)}
+              className={`border-[1.5px] rounded-md py-3.5 font-extrabold text-[1rem] transition-colors ${
+                closed
+                  ? "bg-bg-soft border-line text-ink-3 cursor-not-allowed"
+                  : "bg-surface-2 border-line-2 hover:border-blue"
+              }`}
+            >
+              {g}-р анги
+              {closed && <span className="block text-[.65rem] font-bold">тун удахгүй</span>}
+            </button>
+          );
+        })}
       </div>
       <button type="button" onClick={onBack} className="mt-5 text-[.88rem] font-extrabold text-ink-3 hover:text-ink">
         ← Буцах
@@ -846,6 +893,266 @@ function QuizResultStep({ assessment }: { assessment: Assessment }) {
           <b className="font-extrabold text-[.95rem] block mb-2">Зөвлөмж</b>
           <p className="text-ink-2 font-medium leading-[1.75] whitespace-pre-wrap text-[.95rem]">
             {assessment.aiRecommendation}
+          </p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-center gap-3 flex-wrap mt-6">
+        <Link
+          href="/courses"
+          className="inline-flex items-center justify-center font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-3.5 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+        >
+          Сургалтууд үзэх →
+        </Link>
+        <Link href="/profile/assessment" className="font-extrabold text-[.9rem] text-blue-strong">
+          Профайл дээрх үр дүн
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/** Шаталсан шалгалтын серверээс ирдэг харагдац. */
+type PlacementViewPayload =
+  | {
+      done: false;
+      problem: { id: string; topic: string; topicOrder: number; level: number; bodyLatex: string };
+      position: number;
+      total: number;
+      remainingSeconds: number;
+    }
+  | {
+      done: true;
+      result: {
+        level: number;
+        levelLabel: string;
+        topics: { topicOrder: number; topic: string; score: number }[];
+      };
+      recommendation?: string;
+    };
+
+/**
+ * Шаталсан шалгалт: бодлого нэг нэгээр, тоон хариулттай, тоолууртай.
+ *
+ * Дараагийн бодлогыг сервер л шийднэ — энэ компонент зөвхөн одоогийнхоо
+ * биеийг харуулж, хариултыг илгээгээд ирснийг нь дагана. Зөв/бурууг дэлгэц
+ * дээр хэлэхгүй: шалгалтын дундуур шантрахаас хамгаална.
+ */
+function PlacementStep({
+  assessmentId,
+  onDone,
+}: {
+  assessmentId: string;
+  onDone: () => void;
+}) {
+  const [view, setView] = useState<PlacementViewPayload | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deadlineAt, setDeadlineAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  const applyView = useCallback(
+    (next: PlacementViewPayload) => {
+      setView(next);
+      if (next.done) {
+        onDone();
+      } else {
+        setDeadlineAt(Date.now() + next.remainingSeconds * 1000);
+        setAnswer("");
+      }
+    },
+    [onDone]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/assessment/${assessmentId}/placement`);
+        const json = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(json.error ?? "Алдаа гарлаа");
+          return;
+        }
+        applyView(json.view);
+      } catch {
+        if (!cancelled) setError("Сүлжээний алдаа гарлаа. Хуудсаа шинэчилнэ үү.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [assessmentId, applyView]);
+
+  // Тоолуур: секунд тутам. Хугацаа дуусмагц сервер лүү хандана — тэр өөрөө
+  // дүгнэчихнэ (клиентийн цагийг итгэдэггүй, зөвхөн харуулна).
+  useEffect(() => {
+    if (deadlineAt === null) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [deadlineAt]);
+
+  useEffect(() => {
+    if (deadlineAt === null || now < deadlineAt) return;
+    (async () => {
+      const res = await fetch(`/api/assessment/${assessmentId}/placement`);
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.view) applyView(json.view);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [now >= (deadlineAt ?? Infinity)]);
+
+  const submit = async () => {
+    if (!answer.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/assessment/${assessmentId}/placement/answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answer }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Алдаа гарлаа");
+        return;
+      }
+      applyView(json.view);
+    } catch {
+      setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (error && !view) {
+    return <div className={`${CARD} text-center text-red-soft font-semibold`}>{error}</div>;
+  }
+  if (!view) {
+    return <div className={`${CARD} text-center text-ink-3 font-semibold`}>Ачаалж байна…</div>;
+  }
+  if (view.done) {
+    return <div className={`${CARD} text-center text-ink-3 font-semibold`}>Дүгнэж байна…</div>;
+  }
+
+  const remaining = deadlineAt === null ? 0 : Math.max(0, Math.floor((deadlineAt - now) / 1000));
+  const minutes = Math.floor(remaining / 60);
+  const seconds = String(remaining % 60).padStart(2, "0");
+
+  return (
+    <div className={CARD}>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <span className="text-[.82rem] font-extrabold text-ink-3">
+          {`Бодлого ${view.position} / ${view.total}`}
+        </span>
+        <span
+          className={`inline-flex items-center gap-1.5 text-[.9rem] font-extrabold tabular-nums ${
+            remaining < 300 ? "text-red-soft" : "text-ink-2"
+          }`}
+        >
+          <IconClock className="w-4 h-4" /> {minutes}:{seconds}
+        </span>
+      </div>
+
+      {/* Явцын зурвас. */}
+      <div className="h-1.5 bg-bg-soft rounded-full mt-3 overflow-hidden">
+        <div
+          className="h-full bg-blue rounded-full transition-all"
+          style={{ width: `${((view.position - 1) / view.total) * 100}%` }}
+        />
+      </div>
+
+      <div className="mt-5">
+        <span className="inline-flex items-center text-[.72rem] font-extrabold tracking-[.06em] uppercase text-blue-strong bg-blue-soft px-2.5 py-1 rounded-full">
+          {view.problem.topic}
+        </span>
+        <div className="text-[1.05rem] leading-[1.7] mt-3">
+          <MathText source={view.problem.bodyLatex} />
+        </div>
+      </div>
+
+      <div className="flex items-stretch gap-2.5 mt-5">
+        <input
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="Хариултаа бичнэ үү"
+          inputMode="text"
+          autoFocus
+          className="flex-1 h-12 rounded-md border-[1.5px] border-line-2 px-4 font-bold text-[1.05rem] bg-surface focus:border-blue outline-none"
+        />
+        <button
+          type="button"
+          disabled={busy || !answer.trim()}
+          onClick={submit}
+          className="shrink-0 px-6 rounded-md bg-blue text-white font-extrabold shadow-blue disabled:opacity-50"
+        >
+          {busy ? "…" : "Илгээх"}
+        </button>
+      </div>
+      <p className="text-[.8rem] font-semibold text-ink-3 mt-2 leading-[1.55]">
+        Тоон хариултыг бутархайгаар ч (13/20), аравтаар ч (0.65) бичиж болно. Илгээснийг буцаах
+        боломжгүй.
+      </p>
+      {error && <p className="text-red-soft font-bold text-[.85rem] mt-2">{error}</p>}
+    </div>
+  );
+}
+
+/** Үр дүн: түвшин, сэдэв бүрийн radar, AI дүгнэлт. */
+function PlacementResultStep({ assessmentId }: { assessmentId: string }) {
+  const [view, setView] = useState<PlacementViewPayload | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/assessment/${assessmentId}/placement`);
+        const json = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(json.error ?? "Алдаа гарлаа");
+          return;
+        }
+        setView(json.view);
+      } catch {
+        if (!cancelled) setError("Сүлжээний алдаа гарлаа. Хуудсаа шинэчилнэ үү.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [assessmentId]);
+
+  if (error) return <div className={`${CARD} text-center text-red-soft font-semibold`}>{error}</div>;
+  if (!view || !view.done) {
+    return <div className={`${CARD} text-center text-ink-3 font-semibold`}>Ачаалж байна…</div>;
+  }
+
+  return (
+    <div className={CARD}>
+      <div className="text-center">
+        <span className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-blue-soft">
+          <b className="text-[1.15rem] font-extrabold text-blue-strong">{view.result.levelLabel}</b>
+        </span>
+        <h2 className="text-[1.3rem] font-extrabold mt-4">Түвшин тогтоолтын үр дүн</h2>
+        <p className="text-ink-3 font-semibold text-[.9rem] mt-1">
+          Сэдэв бүрийн ойлголт — 0-оос 3 хүртэл
+        </p>
+      </div>
+
+      <div className="mt-5">
+        <PlacementRadar topics={view.result.topics} />
+      </div>
+
+      {view.recommendation && (
+        <div className="bg-bg-soft rounded-md px-5 py-4 mt-5">
+          <b className="font-extrabold text-[.95rem] block mb-2">Дүгнэлт</b>
+          <p className="text-ink-2 font-medium leading-[1.75] whitespace-pre-wrap text-[.95rem]">
+            {view.recommendation}
           </p>
         </div>
       )}
