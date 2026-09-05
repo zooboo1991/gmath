@@ -71,7 +71,7 @@ async function paidPlacement(): Promise<{ client: TestClient; id: string }> {
 }
 
 type View =
-  | { done: false; problem: { bodyLatex: string; level: number; topicOrder: number }; position: number; total: number; remainingSeconds: number }
+  | { done: false; problem: { bodyLatex: string; level: number; topicOrder: number; answerHint: string }; position: number; total: number; remainingSeconds: number }
   | { done: true; result: { level: number; topics: { topic: string; score: number }[] } };
 
 async function state(client: TestClient, id: string): Promise<View> {
@@ -134,6 +134,10 @@ describe("шатлал ба дүгнэлт", () => {
     if (first.done) return;
     expect(first.problem.level).toBe(2);
     expect(first.total).toBe(2);
+    // Бичих заавар хариултын хэлбэрээс гарна ("12" → бүхэл тоо), гэхдээ
+    // хариултыг өөрийг нь агуулахгүй.
+    expect(first.problem.answerHint).toContain("бүхэл тоогоор");
+    expect(first.problem.answerHint).not.toContain("12");
     // Зөв хариулт хариултын биед хаана ч байхгүй.
     const raw = await client.get(`/api/assessment/${id}/placement`);
     expect(raw.text).not.toContain('"answers"');

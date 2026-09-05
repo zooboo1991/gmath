@@ -35,6 +35,9 @@ export default function PlacementProblemsPanel({
   const [grade, setGrade] = useState<number>(grades[0] ?? 6);
   const [editing, setEditing] = useState<PlacementProblem | "new" | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  // Туршилтын тоолуур сүүлд ХАДГАЛСАН хугацааг дагана — хуудас ачаалснаас
+  // хойш тохиргоог өөрчилсөн бол хуучин минутаар турших нь худал болно.
+  const [savedMinutes, setSavedMinutes] = useState(initialMinutes);
 
   const shown = problems.filter((p) => p.grade === grade);
   const missingAnswers = shown.filter((p) => p.answers.length === 0).length;
@@ -100,6 +103,7 @@ export default function PlacementProblemsPanel({
         initialMinutes={initialMinutes}
         initialOpenGrades={initialOpenGrades}
         gradesWithProblems={grades}
+        onMinutesSaved={setSavedMinutes}
       />
 
       {missingAnswers > 0 && (
@@ -168,7 +172,7 @@ export default function PlacementProblemsPanel({
       )}
 
       {previewing && (
-        <PlacementPreview grade={grade} problems={problems} onClose={() => setPreviewing(false)} />
+        <PlacementPreview grade={grade} minutes={savedMinutes} problems={problems} onClose={() => setPreviewing(false)} />
       )}
 
       {editing && (
@@ -401,11 +405,13 @@ function PlacementSettings({
   initialMinutes,
   initialOpenGrades,
   gradesWithProblems,
+  onMinutesSaved,
 }: {
   initialFee: string;
   initialMinutes: number;
   initialOpenGrades: number[];
   gradesWithProblems: number[];
+  onMinutesSaved: (minutes: number) => void;
 }) {
   const [fee, setFee] = useState(initialFee);
   const [minutes, setMinutes] = useState(String(initialMinutes));
@@ -424,6 +430,11 @@ function PlacementSettings({
       });
       const json = await readJson(res);
       if (!res.ok) setError(apiError(res, json, "Хадгалж чадсангүй"));
+      else if (key === "placement_minutes") {
+        // getPlacementMinutes-ийн яг дүрэм: 5-180 бүхэл тоо, бусад нь 40.
+        const parsed = Number(value);
+        onMinutesSaved(Number.isInteger(parsed) && parsed >= 5 && parsed <= 180 ? parsed : 40);
+      }
     } catch {
       setError("Сүлжээний алдаа");
     } finally {

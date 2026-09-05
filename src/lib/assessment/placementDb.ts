@@ -1,4 +1,5 @@
 import { getSupabase } from "../supabase";
+import { answerFormatHint } from "./placement";
 
 /**
  * Шаталсан түвшин тогтоолтын бодлогын сан ба явцын бүртгэл.
@@ -21,8 +22,10 @@ export type PlacementProblem = {
   createdAt: string;
 };
 
-/** Сурагч руу явдаг хэлбэр: хариултгүй. */
-export type PublicPlacementProblem = Omit<PlacementProblem, "answers" | "active" | "createdAt">;
+/** Сурагч руу явдаг хэлбэр: хариултгүй, харин бичих зааврыг хэлбэрээс нь гаргаж дагуулна. */
+export type PublicPlacementProblem = Omit<PlacementProblem, "answers" | "active" | "createdAt"> & {
+  answerHint: string;
+};
 
 export function toPublicPlacementProblem(problem: PlacementProblem): PublicPlacementProblem {
   return {
@@ -32,6 +35,7 @@ export function toPublicPlacementProblem(problem: PlacementProblem): PublicPlace
     topicOrder: problem.topicOrder,
     level: problem.level,
     bodyLatex: problem.bodyLatex,
+    answerHint: answerFormatHint(problem.answers),
   };
 }
 

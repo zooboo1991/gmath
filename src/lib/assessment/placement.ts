@@ -120,3 +120,60 @@ export function overallLevel(scores: number[]): 1 | 2 | 3 {
   if (average <= 2.5) return 2;
   return 3;
 }
+
+/**
+ * Хариултын талбарын бичих заавар — тухайн бодлогод тохируулсан хариултын
+ * хэлбэрээс гаргана.
+ *
+ * Жишээ тоог жижиг нөөцөөс сонгохдоо тухайн бодлогын зөв хариулттай
+ * (текстээр ч, тоогоор ч) давхцахгүйг нь баталгаажуулна — үгүй бол зөв
+ * хариулт дэлгэц дээр "жишээ" нэрээр бичээстэй гарчихна. Хэлбэрээ хэлэх нь
+ * бичлэгийн алдаанаас хамгаална: 1/3 гэж хадгалсан хариултыг 0.33 гэж
+ * бичвэл тоон харьцуулалт (1e-9) тэнцэхгүй тул бутархайгаар бичихийг
+ * урьдчилж хэлэх ёстой.
+ */
+const HINT_EXAMPLES = {
+  fraction: ["3/4", "2/5", "5/8", "7/12", "4/9", "11/6"],
+  decimal: ["0.75", "0.4", "1.25", "2.6", "0.15", "3.8"],
+  integer: ["24", "17", "132", "8", "451", "60"],
+} as const;
+
+function hintExample(kind: keyof typeof HINT_EXAMPLES, accepted: string[]): string {
+  return (
+    HINT_EXAMPLES[kind].find((example) => !isAnswerCorrect(example, accepted)) ??
+    HINT_EXAMPLES[kind][0]
+  );
+}
+
+export function answerFormatHint(accepted: string[]): string {
+  const normalized = accepted.map((a) => normalizeAnswer(a)).filter(Boolean);
+  const kindOf = (a: string): "fraction" | "decimal" | "integer" | "text" => {
+    if (/^-?\d+(?:\.\d+)?\/\d+(?:\.\d+)?$/.test(a)) return "fraction";
+    if (/^-?\d+\.\d+$/.test(a)) return "decimal";
+    if (/^-?\d+$/.test(a)) return "integer";
+    return "text";
+  };
+  const kinds = new Set(normalized.map(kindOf));
+
+  if (kinds.has("fraction")) {
+    // "Аль нь ч болно" гэж зөвхөн бутархай утга бүр нь аравт/бүхэл хэлбэрээрээ
+    // мөн зөвшөөрөгдсөн үед л амлана. Үгүй бол (жишээ нь 1/3) аравтаар бичсэн
+    // сурагч буруу унах тул бутархайн зааврыг л өгнө.
+    const everyFractionHasPlainTwin = normalized
+      .filter((a) => kindOf(a) === "fraction")
+      .every((fraction) =>
+        normalized.some((other) => kindOf(other) !== "fraction" && isAnswerCorrect(other, [fraction]))
+      );
+    if (everyFractionHasPlainTwin && (kinds.has("decimal") || kinds.has("integer"))) {
+      return `Хариултаа энгийн бутархайгаар (жишээ нь: ${hintExample("fraction", accepted)}) эсвэл аравтын бутархайгаар (жишээ нь: ${hintExample("decimal", accepted)}) бичиж болно.`;
+    }
+    return `Хариултаа энгийн бутархайгаар бичээрэй. Жишээ нь: ${hintExample("fraction", accepted)} гэсэн хэлбэрээр.`;
+  }
+  if (kinds.has("decimal")) {
+    return `Хариултаа аравтын бутархайгаар бичээрэй. Жишээ нь: ${hintExample("decimal", accepted)} гэсэн хэлбэрээр.`;
+  }
+  if (kinds.has("integer")) {
+    return `Хариултаа бүхэл тоогоор бичээрэй. Жишээ нь: ${hintExample("integer", accepted)} гэсэн хэлбэрээр.`;
+  }
+  return "Хариултаа товч бичээрэй.";
+}

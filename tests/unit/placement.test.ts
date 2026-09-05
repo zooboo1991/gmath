@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
-import {
-  isAnswerCorrect,
+import { answerFormatHint, isAnswerCorrect,
   nextLevelForTopic,
   normalizeAnswer,
   overallLevel,
-  topicScore,
-} from "@/lib/assessment/placement";
+  topicScore } from "@/lib/assessment/placement";
 
 /**
  * Шаталсан түвшин тогтоолтын цөм дүрмүүд. Хариултын шалгалт нь хүүхдийн
@@ -124,5 +122,58 @@ describe("ерөнхий түвшин", () => {
 
   it("хоосон жагсаалт хамгийн доод түвшин", () => {
     expect(overallLevel([])).toBe(1);
+  });
+});
+
+describe("бичих заавар (answerFormatHint)", () => {
+  it("бүхэл тоо", () => {
+    expect(answerFormatHint(["24"])).toContain("бүхэл тоогоор");
+    expect(answerFormatHint(["-7"])).toContain("бүхэл тоогоор");
+  });
+
+  it("аравтын бутархай", () => {
+    expect(answerFormatHint(["0.65"])).toContain("аравтын бутархайгаар");
+    expect(answerFormatHint(["0,65"])).toContain("аравтын бутархайгаар");
+  });
+
+  it("энгийн бутархай", () => {
+    const hint = answerFormatHint(["13/20"]);
+    expect(hint).toContain("энгийн бутархайгаар");
+    expect(hint).not.toContain("аравтын");
+  });
+
+  it("нэг утгын хоёр хэлбэр зэрэг зөвшөөрөгдвөл хоёуланг нь заана", () => {
+    const hint = answerFormatHint(["13/20", "0.65"]);
+    expect(hint).toContain("энгийн бутархайгаар");
+    expect(hint).toContain("аравтын бутархайгаар");
+  });
+
+  it("өөр өөр утгууд холилдвол аравтыг амлахгүй — 1/3-ыг 0.33 гэж бичүүлэхгүй", () => {
+    // ["1/3", "2"] нь хоёр тусдаа хариулт: 1/3-ын аравтын хэлбэр жагсаалтад
+    // байхгүй тул "аравтаар ч болно" гэж хэлбэл 0.33 гэж бичсэн сурагч
+    // буруугаар унана. Зөвхөн бутархайн заавар өгөх ёстой.
+    const hint = answerFormatHint(["1/3", "2"]);
+    expect(hint).toContain("энгийн бутархайгаар");
+    expect(hint).not.toContain("аравтын");
+  });
+
+  it("тоон бус хариултад ерөнхий заавар", () => {
+    expect(answerFormatHint(["x=3"])).toBe("Хариултаа товч бичээрэй.");
+    expect(answerFormatHint([])).toBe("Хариултаа товч бичээрэй.");
+  });
+
+  it("жишээ тоо нь зөв хариулттай давхцвал өөр жишээг сонгоно", () => {
+    // Жишээ нь өөрөө оноо авчихдаг бол заавар биш хариултын түлхүүр болно.
+    // Текстээр ("24"), тоогоор ("6/8" = 3/4, "0.750" = 0.75) давхцах хоёр
+    // замын аль алиныг нь тойрох ёстой.
+    for (const answers of [["24"], ["3/4"], ["0.75"], ["6/8"], ["0.750"], ["13/20"], ["-124"]]) {
+      const hint = answerFormatHint(answers);
+      const examples = hint.match(/жишээ нь: ([^\s)]+)/gi) ?? [];
+      for (const match of examples) {
+        const example = match.replace(/жишээ нь: /i, "");
+        expect(isAnswerCorrect(example, answers), `${hint} ← ${answers[0]}`).toBe(false);
+      }
+      expect(examples.length).toBeGreaterThan(0);
+    }
   });
 });

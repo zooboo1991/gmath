@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import MathText from "@/components/assessment/MathText";
-import PlacementRadar from "@/components/assessment/PlacementRadar";
-import { IconClock } from "@/components/icons";
+import { PlacementQuestionCard, PlacementResultCard } from "@/components/assessment/PlacementCards";
 import FormField from "@/components/FormField";
 import { useProgramRegister } from "@/components/program/ProgramRegister";
 import { TRACK_LABELS, type Assessment, type AssessmentTrack, type PublicQuizQuestion } from "@/lib/assessment/types";
@@ -916,7 +915,7 @@ function QuizResultStep({ assessment }: { assessment: Assessment }) {
 type PlacementViewPayload =
   | {
       done: false;
-      problem: { id: string; topic: string; topicOrder: number; level: number; bodyLatex: string };
+      problem: { id: string; topic: string; topicOrder: number; level: number; bodyLatex: string; answerHint: string };
       position: number;
       total: number;
       remainingSeconds: number;
@@ -1038,66 +1037,21 @@ function PlacementStep({
   }
 
   const remaining = deadlineAt === null ? 0 : Math.max(0, Math.floor((deadlineAt - now) / 1000));
-  const minutes = Math.floor(remaining / 60);
-  const seconds = String(remaining % 60).padStart(2, "0");
 
   return (
-    <div className={CARD}>
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <span className="text-[.82rem] font-extrabold text-ink-3">
-          {`Бодлого ${view.position} / ${view.total}`}
-        </span>
-        <span
-          className={`inline-flex items-center gap-1.5 text-[.9rem] font-extrabold tabular-nums ${
-            remaining < 300 ? "text-red-soft" : "text-ink-2"
-          }`}
-        >
-          <IconClock className="w-4 h-4" /> {minutes}:{seconds}
-        </span>
-      </div>
-
-      {/* Явцын зурвас. */}
-      <div className="h-1.5 bg-bg-soft rounded-full mt-3 overflow-hidden">
-        <div
-          className="h-full bg-blue rounded-full transition-all"
-          style={{ width: `${((view.position - 1) / view.total) * 100}%` }}
-        />
-      </div>
-
-      <div className="mt-5">
-        <span className="inline-flex items-center text-[.72rem] font-extrabold tracking-[.06em] uppercase text-blue-strong bg-blue-soft px-2.5 py-1 rounded-full">
-          {view.problem.topic}
-        </span>
-        <div className="text-[1.05rem] leading-[1.7] mt-3">
-          <MathText source={view.problem.bodyLatex} />
-        </div>
-      </div>
-
-      <div className="flex items-stretch gap-2.5 mt-5">
-        <input
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
-          placeholder="Хариултаа бичнэ үү"
-          inputMode="text"
-          autoFocus
-          className="flex-1 h-12 rounded-md border-[1.5px] border-line-2 px-4 font-bold text-[1.05rem] bg-surface focus:border-blue outline-none"
-        />
-        <button
-          type="button"
-          disabled={busy || !answer.trim()}
-          onClick={submit}
-          className="shrink-0 px-6 rounded-md bg-blue text-white font-extrabold shadow-blue disabled:opacity-50"
-        >
-          {busy ? "…" : "Илгээх"}
-        </button>
-      </div>
-      <p className="text-[.8rem] font-semibold text-ink-3 mt-2 leading-[1.55]">
-        Тоон хариултыг бутархайгаар ч (13/20), аравтаар ч (0.65) бичиж болно. Илгээснийг буцаах
-        боломжгүй.
-      </p>
-      {error && <p className="text-red-soft font-bold text-[.85rem] mt-2">{error}</p>}
-    </div>
+    <PlacementQuestionCard
+      position={view.position}
+      total={view.total}
+      remainingSeconds={remaining}
+      topic={view.problem.topic}
+      bodyLatex={view.problem.bodyLatex}
+      answerHint={view.problem.answerHint}
+      answer={answer}
+      onAnswerChange={setAnswer}
+      onSubmit={submit}
+      busy={busy}
+      error={error}
+    />
   );
 }
 
@@ -1133,41 +1087,23 @@ function PlacementResultStep({ assessmentId }: { assessmentId: string }) {
   }
 
   return (
-    <div className={CARD}>
-      <div className="text-center">
-        <span className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-blue-soft">
-          <b className="text-[1.15rem] font-extrabold text-blue-strong">{view.result.levelLabel}</b>
-        </span>
-        <h2 className="text-[1.3rem] font-extrabold mt-4">Түвшин тогтоолтын үр дүн</h2>
-        <p className="text-ink-3 font-semibold text-[.9rem] mt-1">
-          Сэдэв бүрийн ойлголт — 0-оос 3 хүртэл
-        </p>
-      </div>
-
-      <div className="mt-5">
-        <PlacementRadar topics={view.result.topics} />
-      </div>
-
-      {view.recommendation && (
-        <div className="bg-bg-soft rounded-md px-5 py-4 mt-5">
-          <b className="font-extrabold text-[.95rem] block mb-2">Дүгнэлт</b>
-          <p className="text-ink-2 font-medium leading-[1.75] whitespace-pre-wrap text-[.95rem]">
-            {view.recommendation}
-          </p>
-        </div>
-      )}
-
-      <div className="flex items-center justify-center gap-3 flex-wrap mt-6">
-        <Link
-          href="/courses"
-          className="inline-flex items-center justify-center font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-3.5 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
-        >
-          Сургалтууд үзэх →
-        </Link>
-        <Link href="/profile/assessment" className="font-extrabold text-[.9rem] text-blue-strong">
-          Профайл дээрх үр дүн
-        </Link>
-      </div>
-    </div>
+    <PlacementResultCard
+      levelLabel={view.result.levelLabel}
+      topics={view.result.topics}
+      recommendation={view.recommendation}
+      footer={
+        <>
+          <Link
+            href="/courses"
+            className="inline-flex items-center justify-center font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[26px] py-3.5 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+          >
+            Сургалтууд үзэх →
+          </Link>
+          <Link href="/profile/assessment" className="font-extrabold text-[.9rem] text-blue-strong">
+            Профайл дээрх үр дүн
+          </Link>
+        </>
+      }
+    />
   );
 }
