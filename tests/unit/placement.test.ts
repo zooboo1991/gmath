@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { suspiciousAnswer } from "@/components/admin/PlacementProblemsPanel";
 import { answerFormatHint, isAnswerCorrect,
   nextLevelForTopic,
   normalizeAnswer,
@@ -17,6 +18,18 @@ describe("хариултын нормчлол", () => {
     expect(normalizeAnswer("0,65")).toBe("0.65");
     expect(normalizeAnswer("Х=5")).toBe("x=5");
     expect(normalizeAnswer("−4")).toBe("-4");
+  });
+
+  it("холимог тооны зайг хадгална — 31/2 биш", () => {
+    // Энэ зай утга тээнэ: "3 1/2" нь 3.5, "31/2" нь 15.5.
+    expect(normalizeAnswer("3 1/2")).toBe("3 1/2");
+    expect(normalizeAnswer(" 3  1 / 2 ")).toBe("3 1/2");
+    expect(normalizeAnswer("31/2")).toBe("31/2");
+  });
+
+  it("нэгдмэл бутархай тэмдэгтийг задална", () => {
+    expect(normalizeAnswer("3½")).toBe("3 1/2");
+    expect(normalizeAnswer("½")).toBe("1/2");
   });
 });
 
@@ -55,6 +68,34 @@ describe("хариултын шалгалт", () => {
 
   it("тэгд хуваасан бутархайд унахгүй", () => {
     expect(isAnswerCorrect("5/0", ["24"])).toBe(false);
+    expect(isAnswerCorrect("3 1/0", ["24"])).toBe(false);
+  });
+});
+
+describe("холимог тоо", () => {
+  it("холимог, буруу, аравтын гурван хэлбэрийг ижил гэж үзнэ", () => {
+    // Эзэн аль нэг хэлбэрээр бичихэд хангалттай — үлдсэнийг тоо нь барина.
+    for (const key of [["10/3"], ["3 1/3"]]) {
+      expect(isAnswerCorrect("10/3", key), `${key} ← 10/3`).toBe(true);
+      expect(isAnswerCorrect("3 1/3", key), `${key} ← 3 1/3`).toBe(true);
+      expect(isAnswerCorrect("3½", ["7/2"])).toBe(true);
+    }
+    expect(isAnswerCorrect("3 1/2", ["3.5"])).toBe(true);
+    expect(isAnswerCorrect("3.5", ["3 1/2"])).toBe(true);
+    expect(isAnswerCorrect("17 11/12", ["215/12"])).toBe(true);
+  });
+
+  it("холимог тоог буруу бутархайтай хольж андуурахгүй", () => {
+    // Хамгийн аюултай хос: зайгүй бичсэн "31/2" нь огт өөр тоо.
+    expect(isAnswerCorrect("31/2", ["3 1/2"])).toBe(false);
+    expect(isAnswerCorrect("3 1/2", ["31/2"])).toBe(false);
+    expect(isAnswerCorrect("3 1/3", ["3.33"])).toBe(false);
+  });
+
+  it("сөрөг холимог тоог бүхэлд нь сөрөг гэж уншина", () => {
+    expect(isAnswerCorrect("-2 1/2", ["-2.5"])).toBe(true);
+    expect(isAnswerCorrect("−2 1/2", ["-5/2"])).toBe(true);
+    expect(isAnswerCorrect("-2 1/2", ["-1.5"])).toBe(false);
   });
 });
 
@@ -157,6 +198,13 @@ describe("бичих заавар (answerFormatHint)", () => {
     expect(hint).not.toContain("аравтын");
   });
 
+  it("холимог тоонд хоёр хэлбэрийг зөвшөөрснөө хэлнэ", () => {
+    const hint = answerFormatHint(["3 1/3"]);
+    expect(hint).toContain("холимог тоогоор");
+    expect(hint).toContain("энгийн бутархайгаар");
+    expect(hint).toContain("зай авна");
+  });
+
   it("тоон бус хариултад ерөнхий заавар", () => {
     expect(answerFormatHint(["x=3"])).toBe("Хариултаа товч бичээрэй.");
     expect(answerFormatHint([])).toBe("Хариултаа товч бичээрэй.");
@@ -174,6 +222,26 @@ describe("бичих заавар (answerFormatHint)", () => {
         expect(isAnswerCorrect(example, answers), `${hint} ← ${answers[0]}`).toBe(false);
       }
       expect(examples.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+
+describe("админы хариултын анхааруулга", () => {
+  it("таслалаар тусгаарласныг барина", () => {
+    // Эзний бодитоор хийсэн алдаа: "3 1/2, 3.5, 7/2" нь НЭГ хариулт болж
+    // хадгалагдаад ямар ч сурагч таарахгүй болдог.
+    expect(suspiciousAnswer("3 1/2, 3.5, 7/2")).toContain("цэг таслалаар");
+    expect(suspiciousAnswer("6, 360")).toContain("цэг таслалаар");
+  });
+
+  it("нэг хариулт доторх олон тоог барина", () => {
+    expect(suspiciousAnswer("102 336 1116")).toContain("хэд хэдэн тоо");
+  });
+
+  it("зөв бичсэн хариултад чимээгүй байна", () => {
+    for (const clean of ["24", "-4", "13/20", "0.65", "3 1/2", "17 11/12", "тийм"]) {
+      expect(suspiciousAnswer(clean), clean).toBeNull();
     }
   });
 });

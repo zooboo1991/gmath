@@ -16,25 +16,56 @@ export const PLACEMENT_LEVEL_LABELS: Record<1 | 2 | 3, string> = {
   3: "3-р түвшин (C)",
 };
 
+/** Гараас бичихэд хэцүү нэгдмэл бутархай тэмдэгтүүд. */
+const VULGAR_FRACTIONS: Record<string, string> = {
+  "½": " 1/2", "⅓": " 1/3", "⅔": " 2/3", "¼": " 1/4", "¾": " 3/4",
+  "⅕": " 1/5", "⅖": " 2/5", "⅗": " 3/5", "⅘": " 4/5", "⅙": " 1/6",
+  "⅚": " 5/6", "⅐": " 1/7", "⅛": " 1/8", "⅜": " 3/8", "⅝": " 5/8",
+  "⅞": " 7/8", "⅑": " 1/9", "⅒": " 1/10",
+};
+
 /**
  * Хариултын оролтыг харьцуулахад бэлдэнэ.
  *
  * Хүүхэд "13 / 20", "0,65", " 24" гэх мэтээр бичнэ — эдгээр нь бүгд бичлэгийн
- * ялгаа болохоос мэдлэгийн ялгаа биш. Зай арилгаж, таслалыг цэг болгож,
- * кириллийн х-г латин x болгоно (тэгшитгэлийн хариултад гардаг).
+ * ялгаа болохоос мэдлэгийн ялгаа биш. Кириллийн х-г латин x болгож
+ * (тэгшитгэлийн хариултад гардаг), хасахын хувилбаруудыг нэгтгэнэ.
+ *
+ * Зайг бүгдийг нь хасдаггүй: цифр хоорондын ганц зай нь холимог тооны утгыг
+ * тээдэг — "3 1/2" (гурван бүхэл хагас) ба "31/2" хоёр өөр тоо. Бусад зайг
+ * хэвээр нь хасна.
  */
 export function normalizeAnswer(raw: string): string {
-  return raw
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/,/g, ".")
+  let text = raw.trim().toLowerCase();
+  for (const [glyph, replacement] of Object.entries(VULGAR_FRACTIONS)) {
+    text = text.split(glyph).join(replacement);
+  }
+  return text
     .replace(/х/g, "x")
-    .replace(/–|−/g, "-");
+    .replace(/–|−|—/g, "-")
+    .replace(/,/g, ".")
+    .replace(/\s+/g, " ")
+    // Тоон бус тэмдэгтийн эргэн тойрны зайг хасна. Цифр—зай—цифр гэсэн
+    // байрлалд ямар ч тэмдэг таарахгүй тул холимог тооны зай хэвээр үлдэнэ.
+    .replace(/ *([^\d ]) */g, "$1")
+    .trim();
 }
 
-/** "a/b" хэлбэрийн энгийн бутархайг тоо болгоно; болохгүй бол NaN. */
+/**
+ * Нормчилсон бичлэгийг тоо болгоно; болохгүй бол NaN.
+ *
+ * Гурван хэлбэр: холимог тоо ("3 1/3"), энгийн бутархай ("10/3"), энгийн
+ * тоо ("3.5"). Гурвуулаа нэг утга илэрхийлж чадах тул сурагч аль хэлбэрээр
+ * нь бичсэн ч ижил тоо болж гарна.
+ */
 function toNumber(normalized: string): number {
+  const mixed = normalized.match(/^(-?)(\d+) (\d+)\/(\d+)$/);
+  if (mixed) {
+    const denominator = Number(mixed[4]);
+    if (denominator === 0) return NaN;
+    const magnitude = Number(mixed[2]) + Number(mixed[3]) / denominator;
+    return mixed[1] === "-" ? -magnitude : magnitude;
+  }
   const fraction = normalized.match(/^(-?\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/);
   if (fraction) {
     const denominator = Number(fraction[2]);
@@ -133,6 +164,7 @@ export function overallLevel(scores: number[]): 1 | 2 | 3 {
  * урьдчилж хэлэх ёстой.
  */
 const HINT_EXAMPLES = {
+  mixed: ["2 3/5", "1 1/4", "5 2/7", "3 5/8", "4 1/6", "7 3/10"],
   fraction: ["3/4", "2/5", "5/8", "7/12", "4/9", "11/6"],
   decimal: ["0.75", "0.4", "1.25", "2.6", "0.15", "3.8"],
   integer: ["24", "17", "132", "8", "451", "60"],
@@ -147,13 +179,20 @@ function hintExample(kind: keyof typeof HINT_EXAMPLES, accepted: string[]): stri
 
 export function answerFormatHint(accepted: string[]): string {
   const normalized = accepted.map((a) => normalizeAnswer(a)).filter(Boolean);
-  const kindOf = (a: string): "fraction" | "decimal" | "integer" | "text" => {
+  const kindOf = (a: string): "mixed" | "fraction" | "decimal" | "integer" | "text" => {
+    if (/^-?\d+ \d+\/\d+$/.test(a)) return "mixed";
     if (/^-?\d+(?:\.\d+)?\/\d+(?:\.\d+)?$/.test(a)) return "fraction";
     if (/^-?\d+\.\d+$/.test(a)) return "decimal";
     if (/^-?\d+$/.test(a)) return "integer";
     return "text";
   };
   const kinds = new Set(normalized.map(kindOf));
+
+  // Холимог тоог хамгийн түрүүнд: түлхүүр нь "3 1/3" бол сурагч "10/3" гэж
+  // бичсэн ч тоогоор тэнцэх тул хоёуланг нь зөвшөөрч байгаагаа хэлнэ.
+  if (kinds.has("mixed")) {
+    return `Хариултаа холимог тоогоор (жишээ нь: ${hintExample("mixed", accepted)}) эсвэл энгийн бутархайгаар (жишээ нь: ${hintExample("fraction", accepted)}) бичиж болно. Бүхэл хэсэг ба бутархайн хооронд зай авна.`;
+  }
 
   if (kinds.has("fraction")) {
     // "Аль нь ч болно" гэж зөвхөн бутархай утга бүр нь аравт/бүхэл хэлбэрээрээ

@@ -10,6 +10,24 @@ import type { PlacementProblem } from "@/lib/assessment/placementDb";
 import PlacementPreview from "@/components/admin/PlacementPreview";
 
 /**
+ * Хариултын мөрөнд олон утга нуугдаж байвал анхааруулна.
+ *
+ * "3 1/2, 3.5, 7/2" гэж бичих нь амархан алдаа: таслал нь тусгаарлагч биш,
+ * тусгаарлагч нь цэг таслал. Ийм мөр бүхэлдээ НЭГ хариулт болж хадгалагдах
+ * тул ямар ч сурагч таарахгүй — үүнийг чимээгүй өнгөрөөж болохгүй.
+ */
+export function suspiciousAnswer(answer: string): string | null {
+  if (answer.includes(",")) {
+    return "Таслал ашигласан байна. Олон хариулт бичих бол цэг таслалаар (;) тусгаарлана уу — таслалыг систем аравтын таслал гэж үзнэ.";
+  }
+  // "102 336 1116" мэт олон тоо — холимог тоо ("3 1/2") нь зөвшөөрөгдөнө.
+  if (/\d\s+\d/.test(answer.trim()) && !/^-?\d+\s+\d+\/\d+$/.test(answer.trim())) {
+    return "Нэг хариултад хэд хэдэн тоо байна. Сурагч яг ийм бичвэл л зөв болно — олон тоо шаардсан бодлогыг одоогийн хэлбэрээр асуухад бэрх.";
+  }
+  return null;
+}
+
+/**
  * Шаталсан түвшин тогтоолтын бодлогын сан.
  *
  * Бодлого бүр (анги, сэдэв, түвшин) гурвалд яг нэг байрлана. Хариултгүй
@@ -219,6 +237,18 @@ function ProblemModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Хадгалахаас өмнө биш, бичиж байх үед нь харуулна — алдаагаа тэр дороо мэдэх нь чухал.
+  const answerWarnings = [
+    ...new Set(
+      form.answers
+        .split(";")
+        .map((a) => a.trim())
+        .filter(Boolean)
+        .map(suspiciousAnswer)
+        .filter((w): w is string => w !== null)
+    ),
+  ];
+
   const save = async () => {
     setBusy(true);
     setError(null);
@@ -344,8 +374,16 @@ function ProblemModal({
             placeholder="24"
           />
           <span className="block text-[.76rem] font-semibold text-ink-3 mt-1 leading-[1.5]">
-            Бутархай ба аравтын бичлэгийг систем ижилд тооцно — 13/20 гэж оруулбал 0.65 ч зөв.
+            Бутархай, холимог, аравтын бичлэгийг систем ижилд тооцно — 7/2 гэж оруулбал 3 1/2 ба
+            3.5 ч зөв. Холимог тоонд бүхэл хэсэг ба бутархайн хооронд зай авна.
           </span>
+          {answerWarnings.length > 0 && (
+            <span className="block text-[.78rem] font-bold text-gold-strong bg-gold-soft rounded-sm px-3 py-2 mt-1.5 leading-[1.5]">
+              {answerWarnings.map((w) => (
+                <span key={w} className="block">{`⚠ ${w}`}</span>
+              ))}
+            </span>
+          )}
         </label>
 
         <label className="flex items-center gap-2.5 mb-4 cursor-pointer">
