@@ -28,13 +28,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const data = await request.json().catch(() => ({}));
+  // Нүдэн хариулт массиваар, чөлөөт бичвэр нэг мөрөөр ирнэ. Аль нь ирснийг
+  // бодлогын төрөл шийднэ — сервер өөрөө шалгана.
+  const boxes = Array.isArray(data.boxes)
+    ? data.boxes.slice(0, 6).map((b: unknown) => (typeof b === "string" ? b : ""))
+    : null;
   const answer = typeof data.answer === "string" ? data.answer : "";
-  if (!answer.trim()) {
+
+  if (boxes) {
+    if (boxes.length === 0 || boxes.some((b: string) => !b.trim())) {
+      return NextResponse.json({ ok: false, error: "Нүд бүрийг бөглөнө үү" }, { status: 400 });
+    }
+  } else if (!answer.trim()) {
     return NextResponse.json({ ok: false, error: "Хариултаа бичнэ үү" }, { status: 400 });
   }
 
   try {
-    return NextResponse.json({ ok: true, view: await placementAnswer(assessment, answer) });
+    return NextResponse.json({
+      ok: true,
+      view: await placementAnswer(assessment, boxes ?? answer),
+    });
   } catch (err) {
     if (err instanceof PlacementNotReadyError) {
       return NextResponse.json({ ok: false, error: err.message }, { status: 503 });

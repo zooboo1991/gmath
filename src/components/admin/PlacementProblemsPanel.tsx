@@ -8,6 +8,14 @@ import { INPUT_CLASS } from "@/components/admin/panels/shared";
 import { apiError, readJson } from "@/lib/fetchJson";
 import type { PlacementProblem } from "@/lib/assessment/placementDb";
 import PlacementPreview from "@/components/admin/PlacementPreview";
+import AnswerBoxes from "@/components/assessment/AnswerBoxes";
+import {
+  ANSWER_TYPES,
+  ANSWER_TYPE_SPECS,
+  boxCountFor,
+  boxesAreComplete,
+  type AnswerType,
+} from "@/lib/assessment/answerShape";
 
 /**
  * Хариултын мөрөнд олон утга нуугдаж байвал анхааруулна.
@@ -16,6 +24,13 @@ import PlacementPreview from "@/components/admin/PlacementPreview";
  * тусгаарлагч нь цэг таслал. Ийм мөр бүхэлдээ НЭГ хариулт болж хадгалагдах
  * тул ямар ч сурагч таарахгүй — үүнийг чимээгүй өнгөрөөж болохгүй.
  */
+export function hasAnswer(problem: PlacementProblem): boolean {
+  // Чөлөөт бичвэрт хариултын жагсаалт, нүдэн төрөлд нүд бүр бөглөгдсөн байх ёстой.
+  return problem.answerType === "text"
+    ? problem.answers.length > 0
+    : boxesAreComplete(problem.answerType, problem.answerBoxes);
+}
+
 export function suspiciousAnswer(answer: string): string | null {
   if (answer.includes(",")) {
     return "Таслал ашигласан байна. Олон хариулт бичих бол цэг таслалаар (;) тусгаарлана уу — таслалыг систем аравтын таслал гэж үзнэ.";
@@ -58,7 +73,7 @@ export default function PlacementProblemsPanel({
   const [savedMinutes, setSavedMinutes] = useState(initialMinutes);
 
   const shown = problems.filter((p) => p.grade === grade);
-  const missingAnswers = shown.filter((p) => p.answers.length === 0).length;
+  const missingAnswers = shown.filter((p) => !hasAnswer(p)).length;
 
   // Сэдвийн дарааллаар бүлэглэнэ: мөр бүр нэг сэдэв, багана нь 3 түвшин.
   const topicRows = useMemo(() => {
@@ -169,7 +184,7 @@ export default function PlacementProblemsPanel({
                           ) : (
                             <span className="inline-flex items-center gap-1 text-[.7rem] font-extrabold text-gold-strong">
                               <IconClock className="w-3 h-3" />
-                              {problem.answers.length === 0 ? "Хариултгүй" : "Ноорог"}
+                              {hasAnswer(problem) ? "Ноорог" : "Хариултгүй"}
                             </span>
                           ))}
                       </span>
@@ -232,6 +247,10 @@ function ProblemModal({
     level: problem?.level ?? 2,
     bodyLatex: problem?.bodyLatex ?? "",
     answers: (problem?.answers ?? []).join("; "),
+    answerType: (problem?.answerType ?? "text") as AnswerType,
+    answerBoxes: problem?.answerBoxes?.length
+      ? problem.answerBoxes.map((b) => ({ value: b.value, label: b.label ?? "" }))
+      : [{ value: "", label: "" }, { value: "", label: "" }],
     active: problem?.active ?? false,
   });
   const [busy, setBusy] = useState(false);
@@ -249,12 +268,25 @@ function ProblemModal({
     ),
   ];
 
+  // Төрөл солиход нүдний тоо шууд тааруулагдана — хэрэглэгч гараар засах ёсгүй.
+  const shownBoxes = Array.from(
+    { length: boxCountFor(form.answerType, form.answerBoxes.length) },
+    (_, i) => form.answerBoxes[i] ?? { value: "", label: "" }
+  );
+
   const save = async () => {
     setBusy(true);
     setError(null);
     const body = {
       ...form,
       answers: form.answers.split(";").map((a) => a.trim()).filter(Boolean),
+      answerType: form.answerType,
+      answerBoxes:
+        form.answerType === "text"
+          ? []
+          : form.answerBoxes
+              .slice(0, boxCountFor(form.answerType, form.answerBoxes.length))
+              .map((b) => (b.label.trim() ? { value: b.value.trim(), label: b.label.trim() } : { value: b.value.trim() })),
     };
     try {
       const res = await fetch(
@@ -365,26 +397,110 @@ function ProblemModal({
 
         <label className="block mb-3">
           <span className="block text-[.72rem] font-extrabold text-ink-3 uppercase mb-1">
-            Зөв хариултууд (цэг таслалаар тусгаарлана: 13/20; 0.65)
+            Хариултын төрөл
           </span>
-          <input
-            value={form.answers}
-            onChange={(e) => setForm((f) => ({ ...f, answers: e.target.value }))}
+          <select
+            value={form.answerType}
+            onChange={(e) => setForm((f) => ({ ...f, answerType: e.target.value as AnswerType }))}
             className={INPUT_CLASS}
-            placeholder="24"
-          />
-          <span className="block text-[.76rem] font-semibold text-ink-3 mt-1 leading-[1.5]">
-            Бутархай, холимог, аравтын бичлэгийг систем ижилд тооцно — 7/2 гэж оруулбал 3 1/2 ба
-            3.5 ч зөв. Холимог тоонд бүхэл хэсэг ба бутархайн хооронд зай авна.
-          </span>
-          {answerWarnings.length > 0 && (
-            <span className="block text-[.78rem] font-bold text-gold-strong bg-gold-soft rounded-sm px-3 py-2 mt-1.5 leading-[1.5]">
-              {answerWarnings.map((w) => (
-                <span key={w} className="block">{`⚠ ${w}`}</span>
-              ))}
-            </span>
-          )}
+          >
+            {ANSWER_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {ANSWER_TYPE_SPECS[t].label}
+              </option>
+            ))}
+          </select>
         </label>
+
+        {form.answerType === "text" ? (
+          <label className="block mb-3">
+            <span className="block text-[.72rem] font-extrabold text-ink-3 uppercase mb-1">
+              Зөв хариултууд (цэг таслалаар тусгаарлана: 13/20; 0.65)
+            </span>
+            <input
+              value={form.answers}
+              onChange={(e) => setForm((f) => ({ ...f, answers: e.target.value }))}
+              className={INPUT_CLASS}
+              placeholder="24"
+            />
+            <span className="block text-[.76rem] font-semibold text-ink-3 mt-1 leading-[1.5]">
+              Бутархай, холимог, аравтын бичлэгийг систем ижилд тооцно — 7/2 гэж оруулбал 3 1/2 ба
+              3.5 ч зөв. Холимог тоонд бүхэл хэсэг ба бутархайн хооронд зай авна.
+            </span>
+            {answerWarnings.length > 0 && (
+              <span className="block text-[.78rem] font-bold text-gold-strong bg-gold-soft rounded-sm px-3 py-2 mt-1.5 leading-[1.5]">
+                {answerWarnings.map((w) => (
+                  <span key={w} className="block">{`⚠ ${w}`}</span>
+                ))}
+              </span>
+            )}
+          </label>
+        ) : (
+          <div className="mb-3">
+            <span className="block text-[.72rem] font-extrabold text-ink-3 uppercase mb-2">
+              Зөв хариулт — нүд бүрд
+            </span>
+            {/* Сурагчид харагдах яг тэр нүднүүд: юу хаана орохыг эндээс шууд харна. */}
+            <div className="bg-bg-soft rounded-sm px-4 py-3.5">
+              <AnswerBoxes
+                type={form.answerType}
+                boxes={shownBoxes.map((b) => (b.label.trim() ? { label: b.label.trim() } : {}))}
+                values={shownBoxes.map((b) => b.value)}
+                onChange={(values) =>
+                  setForm((f) => ({
+                    ...f,
+                    answerBoxes: values.map((v, i) => ({ value: v, label: f.answerBoxes[i]?.label ?? "" })),
+                  }))
+                }
+                onSubmit={() => {}}
+              />
+            </div>
+
+            {form.answerType === "list" && (
+              <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                {shownBoxes.map((b, i) => (
+                  <input
+                    key={i}
+                    value={b.label}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        answerBoxes: f.answerBoxes.map((box, j) =>
+                          j === i ? { ...box, label: e.target.value } : box
+                        ),
+                      }))
+                    }
+                    placeholder={`${i + 1}-р нүдний нэр`}
+                    className="h-9 w-[136px] rounded-md border border-line px-2.5 text-[.82rem] font-semibold bg-surface"
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForm((f) => ({ ...f, answerBoxes: [...f.answerBoxes, { value: "", label: "" }] }))
+                  }
+                  disabled={shownBoxes.length >= 6}
+                  className="h-9 px-3 rounded-md border border-line font-extrabold text-[.82rem] disabled:opacity-40"
+                >
+                  + Нүд
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, answerBoxes: f.answerBoxes.slice(0, -1) }))}
+                  disabled={shownBoxes.length <= 2}
+                  className="h-9 px-3 rounded-md border border-line font-extrabold text-[.82rem] disabled:opacity-40"
+                >
+                  − Нүд
+                </button>
+              </div>
+            )}
+
+            <span className="block text-[.76rem] font-semibold text-ink-3 mt-2 leading-[1.5]">
+              {ANSWER_TYPE_SPECS[form.answerType].hint} Сурагч яг эдгээр нүдийг хоосон байдлаар нь
+              хараад цифрээ нөхнө.
+            </span>
+          </div>
+        )}
 
         <label className="flex items-center gap-2.5 mb-4 cursor-pointer">
           <input

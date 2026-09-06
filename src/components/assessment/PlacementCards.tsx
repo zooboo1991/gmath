@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import MathText from "@/components/assessment/MathText";
 import PlacementRadar from "@/components/assessment/PlacementRadar";
 import { IconClock } from "@/components/icons";
+import AnswerBoxes from "@/components/assessment/AnswerBoxes";
+import type { AnswerType, PublicAnswerBox } from "@/lib/assessment/answerShape";
 
 /**
  * Шаталсан шалгалтын харагдах картууд — сурагчийн урсгал, админы туршилт
@@ -22,8 +24,12 @@ export function PlacementQuestionCard({
   topic,
   bodyLatex,
   answerHint,
+  answerType,
+  answerBoxes,
   answer,
   onAnswerChange,
+  boxValues,
+  onBoxesChange,
   onSubmit,
   busy,
   error,
@@ -34,8 +40,12 @@ export function PlacementQuestionCard({
   topic: string;
   bodyLatex: string;
   answerHint: string;
+  answerType: AnswerType;
+  answerBoxes: PublicAnswerBox[];
   answer: string;
   onAnswerChange: (value: string) => void;
+  boxValues: string[];
+  onBoxesChange: (values: string[]) => void;
   onSubmit: () => void;
   busy: boolean;
   error: string | null;
@@ -75,25 +85,45 @@ export function PlacementQuestionCard({
         </div>
       </div>
 
-      <div className="flex items-stretch gap-2.5 mt-5">
-        <input
-          value={answer}
-          onChange={(e) => onAnswerChange(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onSubmit()}
-          placeholder="Хариултаа бичнэ үү"
-          inputMode="text"
-          autoFocus
-          className="flex-1 h-12 rounded-md border-[1.5px] border-line-2 px-4 font-bold text-[1.05rem] bg-surface focus:border-blue outline-none"
-        />
-        <button
-          type="button"
-          disabled={busy || !answer.trim()}
-          onClick={onSubmit}
-          className="shrink-0 px-6 rounded-md bg-blue text-white font-extrabold shadow-blue disabled:opacity-50"
-        >
-          {busy ? "…" : "Илгээх"}
-        </button>
-      </div>
+      {answerType === "text" ? (
+        <div className="flex items-stretch gap-2.5 mt-5">
+          <input
+            value={answer}
+            onChange={(e) => onAnswerChange(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && onSubmit()}
+            placeholder="Хариултаа бичнэ үү"
+            inputMode="text"
+            autoFocus
+            className="flex-1 h-12 rounded-md border-[1.5px] border-line-2 px-4 font-bold text-[1.05rem] bg-surface focus:border-blue outline-none"
+          />
+          <button
+            type="button"
+            disabled={busy || !answer.trim()}
+            onClick={onSubmit}
+            className="shrink-0 px-6 rounded-md bg-blue text-white font-extrabold shadow-blue disabled:opacity-50"
+          >
+            {busy ? "…" : "Илгээх"}
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-end justify-between gap-4 flex-wrap mt-5">
+          <AnswerBoxes
+            type={answerType}
+            boxes={answerBoxes}
+            values={boxValues}
+            onChange={onBoxesChange}
+            onSubmit={onSubmit}
+          />
+          <button
+            type="button"
+            disabled={busy || boxValues.length !== answerBoxes.length || boxValues.some((v) => !v.trim())}
+            onClick={onSubmit}
+            className="shrink-0 h-12 px-6 rounded-md bg-blue text-white font-extrabold shadow-blue disabled:opacity-50"
+          >
+            {busy ? "…" : "Илгээх"}
+          </button>
+        </div>
+      )}
       <p className="text-[.8rem] font-semibold text-ink-3 mt-2 leading-[1.55]">
         {`${answerHint} Илгээснийг буцаах боломжгүй.`}
       </p>

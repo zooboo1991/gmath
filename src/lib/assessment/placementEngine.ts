@@ -18,6 +18,7 @@ import {
   type PublicPlacementProblem,
 } from "./placementDb";
 import { getPlacementMinutes, setQuizRecommendation } from "./db";
+import { isBoxedAnswerCorrect, renderBoxedAnswer } from "./answerShape";
 import { writePlacementRecommendation } from "./placementRecommendation";
 
 /**
@@ -229,7 +230,8 @@ function view(
  */
 export async function placementAnswer(
   assessment: Assessment,
-  givenAnswer: string
+  /** Чөлөөт бичвэрт нэг мөр, нүдэн төрөлд нүд бүрийн утга. */
+  given: string | string[]
 ): Promise<PlacementView> {
   if (!assessment.quizGrade) throw new Error("placement needs a grade");
   const steps = await listPlacementSteps(assessment.id);
@@ -245,10 +247,18 @@ export async function placementAnswer(
   const problem = problems.find((p) => p.id === open.problemId);
   if (!problem) return placementState(assessment);
 
+  // Нүдэн төрөлд нүд бүрийг тусад нь харьцуулна; түүхэнд уншигдахуйц
+  // нэг мөр болгож хадгална ("3 1/2"), тусдаа багана нэмэх шаардлагагүй.
+  const boxes = Array.isArray(given) ? given : [given];
+  const isBoxed = problem.answerType !== "text";
+  const record = isBoxed ? renderBoxedAnswer(problem.answerType, boxes) : boxes[0] ?? "";
+
   await answerPlacementStep({
     stepId: open.id,
-    givenAnswer: givenAnswer.slice(0, 200),
-    isCorrect: isAnswerCorrect(givenAnswer, problem.answers),
+    givenAnswer: record.slice(0, 200),
+    isCorrect: isBoxed
+      ? isBoxedAnswerCorrect(problem.answerBoxes, boxes)
+      : isAnswerCorrect(record, problem.answers),
   });
   return placementState(assessment);
 }

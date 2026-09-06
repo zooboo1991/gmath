@@ -1,5 +1,12 @@
 import { getSupabase } from "../supabase";
 import { answerFormatHint } from "./placement";
+import {
+  ANSWER_TYPE_SPECS,
+  toPublicBoxes,
+  type AnswerBox,
+  type AnswerType,
+  type PublicAnswerBox,
+} from "./answerShape";
 
 /**
  * Шаталсан түвшин тогтоолтын бодлогын сан ба явцын бүртгэл.
@@ -18,13 +25,22 @@ export type PlacementProblem = {
   bodyLatex: string;
   /** Зөвшөөрөгдөх хариултууд — зөвхөн сервер талд. */
   answers: string[];
+  /** Хариултыг хэрхэн авах: чөлөөт бичвэр эсвэл нүдэн хэлбэрүүд. */
+  answerType: AnswerType;
+  /** Нүд бүрийн зөв утга — зөвхөн сервер талд. */
+  answerBoxes: AnswerBox[];
   active: boolean;
   createdAt: string;
 };
 
 /** Сурагч руу явдаг хэлбэр: хариултгүй, харин бичих зааврыг хэлбэрээс нь гаргаж дагуулна. */
-export type PublicPlacementProblem = Omit<PlacementProblem, "answers" | "active" | "createdAt"> & {
+export type PublicPlacementProblem = Omit<
+  PlacementProblem,
+  "answers" | "answerBoxes" | "active" | "createdAt"
+> & {
   answerHint: string;
+  /** Нүдний байрлал ба нэр — зөв утгагүй. */
+  answerBoxes: PublicAnswerBox[];
 };
 
 export function toPublicPlacementProblem(problem: PlacementProblem): PublicPlacementProblem {
@@ -35,7 +51,12 @@ export function toPublicPlacementProblem(problem: PlacementProblem): PublicPlace
     topicOrder: problem.topicOrder,
     level: problem.level,
     bodyLatex: problem.bodyLatex,
-    answerHint: answerFormatHint(problem.answers),
+    answerType: problem.answerType,
+    answerBoxes: toPublicBoxes(problem.answerBoxes),
+    answerHint:
+      problem.answerType === "text"
+        ? answerFormatHint(problem.answers)
+        : ANSWER_TYPE_SPECS[problem.answerType].hint,
   };
 }
 
@@ -47,6 +68,8 @@ type ProblemRow = {
   level: number;
   body_latex: string;
   answers: string[];
+  answer_type: AnswerType;
+  answer_boxes: AnswerBox[];
   active: boolean;
   created_at: string;
 };
@@ -60,6 +83,8 @@ function problemFromRow(row: ProblemRow): PlacementProblem {
     level: row.level,
     bodyLatex: row.body_latex,
     answers: row.answers ?? [],
+    answerType: row.answer_type ?? "text",
+    answerBoxes: row.answer_boxes ?? [],
     active: row.active,
     createdAt: row.created_at,
   };
@@ -99,6 +124,8 @@ export async function createPlacementProblem(input: {
   level: number;
   bodyLatex: string;
   answers: string[];
+  answerType: AnswerType;
+  answerBoxes: AnswerBox[];
   active: boolean;
 }): Promise<PlacementProblem> {
   const { data, error } = await getSupabase()
@@ -110,6 +137,8 @@ export async function createPlacementProblem(input: {
       level: input.level,
       body_latex: input.bodyLatex,
       answers: input.answers,
+      answer_type: input.answerType,
+      answer_boxes: input.answerBoxes,
       active: input.active,
     })
     .select("*")
@@ -120,7 +149,12 @@ export async function createPlacementProblem(input: {
 
 export async function updatePlacementProblem(
   id: string,
-  input: Partial<Pick<PlacementProblem, "topic" | "topicOrder" | "level" | "bodyLatex" | "answers" | "active">>
+  input: Partial<
+    Pick<
+      PlacementProblem,
+      "topic" | "topicOrder" | "level" | "bodyLatex" | "answers" | "answerType" | "answerBoxes" | "active"
+    >
+  >
 ): Promise<PlacementProblem | undefined> {
   const patch: Record<string, unknown> = {};
   if (input.topic !== undefined) patch.topic = input.topic;
@@ -128,6 +162,8 @@ export async function updatePlacementProblem(
   if (input.level !== undefined) patch.level = input.level;
   if (input.bodyLatex !== undefined) patch.body_latex = input.bodyLatex;
   if (input.answers !== undefined) patch.answers = input.answers;
+  if (input.answerType !== undefined) patch.answer_type = input.answerType;
+  if (input.answerBoxes !== undefined) patch.answer_boxes = input.answerBoxes;
   if (input.active !== undefined) patch.active = input.active;
 
   const { data, error } = await getSupabase()

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import MathText from "@/components/assessment/MathText";
 import { PlacementQuestionCard, PlacementResultCard } from "@/components/assessment/PlacementCards";
+import type { AnswerType, PublicAnswerBox } from "@/lib/assessment/answerShape";
 import FormField from "@/components/FormField";
 import { useProgramRegister } from "@/components/program/ProgramRegister";
 import { TRACK_LABELS, type Assessment, type AssessmentTrack, type PublicQuizQuestion } from "@/lib/assessment/types";
@@ -915,7 +916,16 @@ function QuizResultStep({ assessment }: { assessment: Assessment }) {
 type PlacementViewPayload =
   | {
       done: false;
-      problem: { id: string; topic: string; topicOrder: number; level: number; bodyLatex: string; answerHint: string };
+      problem: {
+        id: string;
+        topic: string;
+        topicOrder: number;
+        level: number;
+        bodyLatex: string;
+        answerHint: string;
+        answerType: AnswerType;
+        answerBoxes: PublicAnswerBox[];
+      };
       position: number;
       total: number;
       remainingSeconds: number;
@@ -946,6 +956,7 @@ function PlacementStep({
 }) {
   const [view, setView] = useState<PlacementViewPayload | null>(null);
   const [answer, setAnswer] = useState("");
+  const [boxValues, setBoxValues] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deadlineAt, setDeadlineAt] = useState<number | null>(null);
@@ -959,6 +970,7 @@ function PlacementStep({
       } else {
         setDeadlineAt(Date.now() + next.remainingSeconds * 1000);
         setAnswer("");
+        setBoxValues(next.problem.answerBoxes.map(() => ""));
       }
     },
     [onDone]
@@ -1004,14 +1016,16 @@ function PlacementStep({
   }, [now >= (deadlineAt ?? Infinity)]);
 
   const submit = async () => {
-    if (!answer.trim() || busy) return;
+    if (busy || !view || view.done) return;
+    const boxed = view.problem.answerType !== "text";
+    if (boxed ? boxValues.some((v) => !v.trim()) : !answer.trim()) return;
     setBusy(true);
     setError(null);
     try {
       const res = await fetch(`/api/assessment/${assessmentId}/placement/answer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answer }),
+        body: JSON.stringify(boxed ? { boxes: boxValues } : { answer }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -1046,8 +1060,12 @@ function PlacementStep({
       topic={view.problem.topic}
       bodyLatex={view.problem.bodyLatex}
       answerHint={view.problem.answerHint}
+      answerType={view.problem.answerType}
+      answerBoxes={view.problem.answerBoxes}
       answer={answer}
       onAnswerChange={setAnswer}
+      boxValues={boxValues}
+      onBoxesChange={setBoxValues}
       onSubmit={submit}
       busy={busy}
       error={error}

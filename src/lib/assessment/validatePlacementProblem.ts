@@ -1,4 +1,11 @@
 import { isTooLong } from "../validate";
+import {
+  ANSWER_TYPES,
+  ANSWER_TYPE_SPECS,
+  boxesAreComplete,
+  type AnswerBox,
+  type AnswerType,
+} from "./answerShape";
 
 /**
  * Бодлогын оролтын нэг шалгагч — POST/PUT хоёулаа үүгээр орно.
@@ -14,6 +21,8 @@ export type PlacementProblemInput = {
   level: number;
   bodyLatex: string;
   answers: string[];
+  answerType: AnswerType;
+  answerBoxes: AnswerBox[];
   active: boolean;
 };
 
@@ -21,6 +30,9 @@ const MAX_BODY = 2000;
 const MAX_TOPIC = 100;
 const MAX_ANSWER = 120;
 const MAX_ANSWERS = 8;
+const MAX_BOXES = 6;
+const MAX_BOX_VALUE = 20;
+const MAX_BOX_LABEL = 24;
 
 export function validatePlacementProblemInput(
   data: unknown
@@ -58,10 +70,52 @@ export function validatePlacementProblemInput(
     return { ok: false, error: "Хариулт хэт урт байна" };
   }
 
-  const active = d.active === true;
-  if (active && answers.length === 0) {
-    return { ok: false, error: "Хариултгүй бодлогыг идэвхжүүлэх боломжгүй — эхлээд хариултаа оруулна уу" };
+  const answerType: AnswerType = ANSWER_TYPES.includes(d.answerType as AnswerType)
+    ? (d.answerType as AnswerType)
+    : "text";
+
+  const answerBoxes: AnswerBox[] = Array.isArray(d.answerBoxes)
+    ? d.answerBoxes
+        .slice(0, MAX_BOXES)
+        .map((raw) => {
+          const b = (raw ?? {}) as Record<string, unknown>;
+          const value = typeof b.value === "string" ? b.value.trim() : "";
+          const label = typeof b.label === "string" ? b.label.trim() : "";
+          return label ? { value, label } : { value };
+        })
+    : [];
+
+  if (answerType !== "text") {
+    const expected = ANSWER_TYPE_SPECS[answerType].boxes;
+    if (expected !== null && answerBoxes.length !== expected) {
+      return { ok: false, error: `Энэ төрөлд ${expected} нүд байх ёстой` };
+    }
+    if (expected === null && answerBoxes.length < 2) {
+      return { ok: false, error: "Дор хаяж хоёр нүд хэрэгтэй" };
+    }
+    if (answerBoxes.some((b) => isTooLong(b.value, MAX_BOX_VALUE))) {
+      return { ok: false, error: "Нүдний утга хэт урт байна" };
+    }
+    if (answerBoxes.some((b) => b.label !== undefined && isTooLong(b.label, MAX_BOX_LABEL))) {
+      return { ok: false, error: "Нүдний нэр хэт урт байна" };
+    }
   }
 
-  return { ok: true, value: { grade, topic, topicOrder, level, bodyLatex, answers, active } };
+  const active = d.active === true;
+  // Идэвхжихийн тулд шалгах юмтай байх ёстой: чөлөөт бичвэрт хариулт,
+  // нүдэн төрөлд нүд бүр бөглөгдсөн байна.
+  if (active) {
+    const ready = answerType === "text" ? answers.length > 0 : boxesAreComplete(answerType, answerBoxes);
+    if (!ready) {
+      return {
+        ok: false,
+        error: "Хариултгүй бодлогыг идэвхжүүлэх боломжгүй — эхлээд хариултаа оруулна уу",
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    value: { grade, topic, topicOrder, level, bodyLatex, answers, answerType, answerBoxes, active },
+  };
 }

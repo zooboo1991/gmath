@@ -7,6 +7,12 @@ import {
 } from "@/components/assessment/PlacementCards";
 import { IconCheckCircle, IconClose } from "@/components/icons";
 import {
+  ANSWER_TYPE_SPECS,
+  isBoxedAnswerCorrect,
+  renderBoxedAnswer,
+  toPublicBoxes,
+} from "@/lib/assessment/answerShape";
+import {
   answerFormatHint,
   isAnswerCorrect,
   nextLevelForTopic,
@@ -46,7 +52,13 @@ export default function PlacementPreview({
   const skipped: string[] = [];
   for (const [order, list] of [...byOrder.entries()].sort((a, b) => a[0] - b[0])) {
     const complete = [1, 2, 3].every((level) =>
-      list.some((p) => p.level === level && p.answers.length > 0)
+      list.some(
+        (p) =>
+          p.level === level &&
+          (p.answerType === "text"
+            ? p.answers.length > 0
+            : p.answerBoxes.length > 0 && p.answerBoxes.every((b) => b.value.trim() !== ""))
+      )
     );
     if (complete) topics.set(order, list);
     else skipped.push(`${order}. ${list[0].topic}`);
@@ -54,6 +66,7 @@ export default function PlacementPreview({
 
   const [steps, setSteps] = useState<{ topicOrder: number; level: number; isCorrect: boolean }[]>([]);
   const [answer, setAnswer] = useState("");
+  const [boxValues, setBoxValues] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<{ correct: boolean; expected: string } | null>(null);
   const [deadlineAt, setDeadlineAt] = useState(() => Date.now() + minutes * 60_000);
   const [now, setNow] = useState(() => Date.now());
@@ -77,12 +90,21 @@ export default function PlacementPreview({
     break;
   }
 
+  const boxed = current !== undefined && current.answerType !== "text";
+
   const submit = () => {
-    if (!current || !answer.trim() || remaining === 0) return;
-    const correct = isAnswerCorrect(answer, current.answers);
-    setFeedback({ correct, expected: current.answers.join("; ") });
+    if (!current || remaining === 0) return;
+    if (boxed ? boxValues.some((v) => !v.trim()) : !answer.trim()) return;
+    const correct = boxed
+      ? isBoxedAnswerCorrect(current.answerBoxes, boxValues)
+      : isAnswerCorrect(answer, current.answers);
+    const expected = boxed
+      ? renderBoxedAnswer(current.answerType, current.answerBoxes.map((b) => b.value))
+      : current.answers.join("; ");
+    setFeedback({ correct, expected });
     setSteps((s) => [...s, { topicOrder: current.topicOrder, level: current.level, isCorrect: correct }]);
     setAnswer("");
+    setBoxValues([]);
   };
 
   const scores = [...topics.entries()].map(([order, list]) => ({
@@ -131,6 +153,7 @@ export default function PlacementPreview({
                   onClick={() => {
                     setSteps([]);
                     setAnswer("");
+                    setBoxValues([]);
                     setFeedback(null);
                     setDeadlineAt(Date.now() + minutes * 60_000);
                   }}
@@ -183,9 +206,21 @@ export default function PlacementPreview({
               remainingSeconds={remaining}
               topic={current.topic}
               bodyLatex={current.bodyLatex}
-              answerHint={answerFormatHint(current.answers)}
+              answerHint={
+                current.answerType === "text"
+                  ? answerFormatHint(current.answers)
+                  : ANSWER_TYPE_SPECS[current.answerType].hint
+              }
+              answerType={current.answerType}
+              answerBoxes={toPublicBoxes(current.answerBoxes)}
               answer={answer}
               onAnswerChange={setAnswer}
+              boxValues={
+                boxValues.length === current.answerBoxes.length
+                  ? boxValues
+                  : current.answerBoxes.map(() => "")
+              }
+              onBoxesChange={setBoxValues}
               onSubmit={submit}
               busy={false}
               error={null}

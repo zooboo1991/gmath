@@ -71,7 +71,20 @@ async function paidPlacement(): Promise<{ client: TestClient; id: string }> {
 }
 
 type View =
-  | { done: false; problem: { bodyLatex: string; level: number; topicOrder: number; answerHint: string }; position: number; total: number; remainingSeconds: number }
+  | {
+      done: false;
+      problem: {
+        bodyLatex: string;
+        level: number;
+        topicOrder: number;
+        answerHint: string;
+        answerType: string;
+        answerBoxes: { label?: string }[];
+      };
+      position: number;
+      total: number;
+      remainingSeconds: number;
+    }
   | { done: true; result: { level: number; topics: { topic: string; score: number }[] } };
 
 async function state(client: TestClient, id: string): Promise<View> {
@@ -86,6 +99,31 @@ async function answer(client: TestClient, id: string, value: string): Promise<Vi
   });
   expect(res.status, res.text).toBe(200);
   return res.body.view;
+}
+
+/** Нүдэн хариулт — ЭЕШ маягийн бодлогод. */
+async function answerBoxes(client: TestClient, id: string, boxes: string[]): Promise<View> {
+  const res = await client.post<{ view: View }>(`/api/assessment/${id}/placement/answer`, { boxes });
+  expect(res.status, res.text).toBe(200);
+  return res.body.view;
+}
+
+/** Гурван түвшин нь холимог тооны нүдтэй нэг сэдэв. */
+async function seedBoxedTopic(topicOrder: number): Promise<void> {
+  const rows = [1, 2, 3].map((level) => ({
+    grade: GRADE,
+    topic: `Нүдэн сэдэв ${topicOrder}`,
+    topic_order: topicOrder,
+    level,
+    body_latex: `Нүдэн бодлого ${level}`,
+    answers: [],
+    answer_type: "mixed",
+    // Түвшин бүрд өөр утга: 1 1/2, 2 1/2, 3 1/2
+    answer_boxes: [{ value: String(level) }, { value: "1" }, { value: "2" }],
+    active: true,
+  }));
+  const { error } = await testDb().from("placement_problems").insert(rows);
+  if (error) throw new Error(`seedBoxedTopic failed: ${error.message}`);
 }
 
 describe("хандах эрх", () => {
@@ -234,5 +272,68 @@ describe("шатлал ба дүгнэлт", () => {
     const first = await state(client, id);
     if (first.done) return;
     expect(first.total).toBe(2); // ганц бүрэн сэдэв × 2
+  });
+});
+
+
+describe("нүдэн хариулт", () => {
+  it("нүд бүр таарвал зөв, зөв утга клиент рүү явахгүй", async () => {
+    await seedBoxedTopic(1);
+    const { client, id } = await paidPlacement();
+
+    const first = await state(client, id);
+    expect(first.done).toBe(false);
+    if (first.done) return;
+    expect(first.problem.answerType).toBe("mixed");
+    // Нүдний тоо ирнэ, зөв утга нь ирэхгүй.
+    expect(first.problem.answerBoxes).toHaveLength(3);
+    const raw = await client.get(`/api/assessment/${id}/placement`);
+    expect(raw.text).not.toContain('"answer_boxes"');
+    expect(raw.text).not.toContain('"value"');
+
+    // 2-р түвшний зөв хариулт: 2 1/2 → 3-р түвшин рүү гарна.
+    const second = await answerBoxes(client, id, ["2", "1", "2"]);
+    expect(second.done).toBe(false);
+    if (second.done) return;
+    expect(second.problem.level).toBe(3);
+  });
+
+  it("нэг нүд зөрвөл буруу — доод түвшин рүү буулгана", async () => {
+    await seedBoxedTopic(1);
+    const { client, id } = await paidPlacement();
+    await state(client, id);
+
+    const next = await answerBoxes(client, id, ["2", "1", "3"]);
+    expect(next.done).toBe(false);
+    if (next.done) return;
+    expect(next.problem.level).toBe(1);
+  });
+
+  it("хоосон нүдийг хүлээж авахгүй", async () => {
+    await seedBoxedTopic(1);
+    const { client, id } = await paidPlacement();
+    await state(client, id);
+
+    const res = await client.post(`/api/assessment/${id}/placement/answer`, {
+      boxes: ["2", "", "2"],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("түүхэнд уншигдах хэлбэрээр хадгална", async () => {
+    await seedBoxedTopic(1);
+    const { client, id } = await paidPlacement();
+    await state(client, id);
+    await answerBoxes(client, id, ["2", "1", "2"]);
+
+    const { data } = await testDb()
+      .from("placement_steps")
+      .select("given_answer, is_correct")
+      .eq("assessment_id", id)
+      .not("is_correct", "is", null);
+    const rows = (data ?? []) as { given_answer: string; is_correct: boolean }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].given_answer).toBe("2 1/2");
+    expect(rows[0].is_correct).toBe(true);
   });
 });

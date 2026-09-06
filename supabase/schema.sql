@@ -1258,3 +1258,28 @@ create index if not exists placement_steps_assessment_idx
 alter table assessments drop constraint if exists assessments_track_check;
 alter table assessments add constraint assessments_track_check
   check (track in ('regular', 'advanced', 'olympiad', 'placement'));
+
+-- ЭЕШ-ын 2-р хэсгийн маягаар хариултыг нүдээр авах. Чөлөөт бичвэрийн
+-- ("text") үед answers хэвээр ажиллана; бусад төрөлд answer_boxes дэх
+-- утгууд нүд тус бүрийн зөв хариулт болно.
+--   integer  1 нүд        -24
+--   decimal  1 нүд        3.5
+--   fraction 2 нүд        7 / 2
+--   mixed    3 нүд        3 бүхэл 1 / 2
+--   radical  2 нүд        2√3
+--   list     N нүд        1; 4; 7  (нүд бүр нэрлэгдэж болно: x, y, z)
+-- Нүд бүр {"value": "3", "label": "x"} хэлбэртэй; label заавал биш.
+alter table placement_problems
+  add column if not exists answer_type text not null default 'text',
+  add column if not exists answer_boxes jsonb not null default '[]'::jsonb;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'placement_problems_answer_type_check'
+  ) then
+    alter table placement_problems
+      add constraint placement_problems_answer_type_check
+      check (answer_type in ('text', 'integer', 'decimal', 'fraction', 'mixed', 'radical', 'list'));
+  end if;
+end $$;
