@@ -167,3 +167,19 @@ export async function leaveProgramWaitlist(userId: string, programId: string): P
     .eq("program_id", programId);
   if (error) throw error;
 }
+
+/**
+ * Бүртгэл амжилттай үүсмэгц дараалал дахь мөрийг хаана.
+ *
+ * Холбогдсон хүн бүртгүүлчихээд жагсаалтад "хүлээж байгаа" мэт үлдвэл
+ * админ дахин залгана; мөр нь байхгүй бол юу ч хийхгүй. Бүртгэлийн урсгалыг
+ * унагаах ёсгүй тул дуудагч талдаа catch-тэй дуудна.
+ */
+export async function markProgramWaitlistEnrolled(userId: string, programId: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("program_waitlist")
+    .update({ status: "closed" })
+    .eq("user_id", userId)
+    .eq("program_id", programId);
+  if (error) throw error;
+}

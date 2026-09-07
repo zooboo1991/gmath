@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import Reveal from "@/components/Reveal";
 import { RegisterTriggerButton } from "./ProgramRegister";
 import WaitlistJoinButton from "./WaitlistJoinButton";
+import { getSessionUser } from "@/lib/session";
+import { findProgramWaitlistEntry } from "@/lib/programWaitlist";
 import { findYearlyProgramById, listArticlesForProgram } from "@/lib/db";
 import { IconTrophy, IconPerson, IconClock, IconPlayBox, IconCheckCircle, IconPeopleHero, IconGraduationCap, IconGrid, IconDocument } from "@/components/icons";
 import VideoEmbed from "@/components/VideoEmbed";
@@ -86,7 +88,16 @@ export default async function ProgramDetail({
   // tag mirrors what /api/enroll uses server-side for this program (its own
   // label) — see the comment on the Program type in ProgramRegister.tsx.
   const program = { id: programId, label, price, tag: label, splittable: true };
-  const enrollmentClosed = yearlyProgram.enrollmentClosed;
+
+  // Бүртгэл хаалттай ч админ хүлээлгийн жагсаалтаас "Холбогдсон" гэж
+  // тэмдэглэсэн хүнд энгийн бүртгэлийн товч нээгдэнэ — /api/enroll ч мөн
+  // яг энэ нөхцөлөөр нэвтрүүлдэг тул товч, сервер хоёр зөрөхгүй.
+  const sessionUser = yearlyProgram.enrollmentClosed ? await getSessionUser() : null;
+  const waitlistEntry = sessionUser
+    ? await findProgramWaitlistEntry(sessionUser.id, programId).catch(() => undefined)
+    : undefined;
+  const invitedFromWaitlist = waitlistEntry?.status === "notified";
+  const enrollmentClosed = yearlyProgram.enrollmentClosed && !invitedFromWaitlist;
 
   return (
     <>
@@ -131,6 +142,11 @@ export default async function ProgramDetail({
             </div>
 
             <div className="mt-6">
+              {invitedFromWaitlist && (
+                <p className="text-gold font-bold text-[.95rem] mb-3">
+                  Танд сул орон тоо гарсан тул бүртгүүлэх боломжтой боллоо.
+                </p>
+              )}
               {/* Бүртгэл хаагдсан үед хөтөлбөр хэвээрээ харагдаж, зөвхөн
                   товч нь дараалалд орох болж солигдоно. */}
               {enrollmentClosed ? (

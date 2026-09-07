@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { anonClient, signedInClient } from "../../support/client";
 import { createTestUser } from "../../support/factories";
-import { cleanupTracked, testDb } from "../../support/db";
+import { cleanupTracked, testDb, track } from "../../support/db";
 import { trackNotificationsForCreatedUsers } from "../../support/factories";
 
 /**
@@ -127,5 +127,40 @@ describe("хаагдсан бүртгэл", () => {
     });
     expect(res.status).toBe(409);
     expect(res.text).toContain("Хүлээлгийн жагсаалт");
+  });
+
+  it("дараалалд зүгээр хүлээж байгаа хүн ч орж чадахгүй", async () => {
+    const a = await joiner();
+    await a.client.post(`/api/programs/${PROGRAM_ID}/waitlist`, {});
+    const res = await a.client.post("/api/enroll", { programId: PROGRAM_ID, payMethod: "bank" });
+    expect(res.status).toBe(409);
+  });
+
+  it("Холбогдсон гэж тэмдэглэгдсэн хүн бүртгүүлж чадна, мөр нь хаагдана", async () => {
+    const a = await joiner();
+    await a.client.post(`/api/programs/${PROGRAM_ID}/waitlist`, {});
+    // Админ "Холбогдсон" дарсныг дуурайна.
+    await testDb()
+      .from("program_waitlist")
+      .update({ status: "notified" })
+      .eq("user_id", a.user.id)
+      .eq("program_id", PROGRAM_ID);
+
+    const res = await a.client.post<{ registration: { id: string } }>("/api/enroll", {
+      programId: PROGRAM_ID,
+      payMethod: "bank",
+    });
+    expect(res.status, res.text).toBe(200);
+    track("registrations", res.body.registration.id);
+
+    // Бүртгэл үүсмэгц дарааллын мөр байр эзлэхээ болино — ардынх нь
+    // дугаар урагшилж, админ дахин залгахгүй.
+    const { data } = await testDb()
+      .from("program_waitlist")
+      .select("status")
+      .eq("user_id", a.user.id)
+      .eq("program_id", PROGRAM_ID)
+      .single();
+    expect((data as { status: string }).status).toBe("closed");
   });
 });

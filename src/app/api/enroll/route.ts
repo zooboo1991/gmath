@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { findProgramWaitlistEntry, markProgramWaitlistEnrolled } from "@/lib/programWaitlist";
 import {
   addRegistration,
   countRegistrationsForProgram,
@@ -57,13 +58,18 @@ export async function POST(request: Request) {
     // солигдсон байдаг ч серверийн шалгалт байх ёстой — хуучин таб, шууд
     // дуудалт хоёулаа энд ирнэ.
     if (yearlyProgram.enrollmentClosed) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Энэ сургалтын бүртгэл хаагдсан байна. Хүлээлгийн жагсаалтад бүртгүүлнэ үү.",
-        },
-        { status: 409 }
-      );
+      // Ганц гарц: админ хүлээлгийн жагсаалтаас "Холбогдсон" гэж
+      // тэмдэглэсэн хүн. Тэр тэмдэглэгээ нь яг энэ хаалгыг нээдэг эрх.
+      const entry = await findProgramWaitlistEntry(user.id, programId).catch(() => undefined);
+      if (entry?.status !== "notified") {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Энэ сургалтын бүртгэл хаагдсан байна. Хүлээлгийн жагсаалтад бүртгүүлнэ үү.",
+          },
+          { status: 409 }
+        );
+      }
     }
     programLabel = yearlyProgram.label;
     price = yearlyProgram.price;
@@ -134,6 +140,9 @@ export async function POST(request: Request) {
         status: "pending",
         ...installment,
       });
+      // Дараалалд байсан бол мөрийг нь хаана — бүртгэл нь үүсчихсэн тул
+      // жагсаалтад дахин харагдах шаардлагагүй. Алдаа нь бүртгэлийг унагахгүй.
+      await markProgramWaitlistEnrolled(user.id, programId).catch(() => {});
       // Хүлээлт эндээс эхэлнэ: сурагчид баталгаа, админд ажил. Зөвхөн энэ
       // салаанд — QPay-ийн pending мөр (доор) нь QR уншуулж төлөх гэж байгаа
       // хүн тул "дансны шилжүүлэг хүлээгдэж байна" гэсэн мэдэгдэл буруу очно.
@@ -183,6 +192,8 @@ export async function POST(request: Request) {
         status: "pending",
         ...installment,
       });
+      // Дараалалд байсан бол мөрийг нь хаана — bank салаатай ижил шалтгаанаар.
+      await markProgramWaitlistEnrolled(user.id, programId).catch(() => {});
     } catch (err) {
       if ((err as { code?: string } | null)?.code !== "23505") throw err;
       // Two tabs raced to create the same registration — resume whichever won.
