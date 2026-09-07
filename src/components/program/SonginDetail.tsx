@@ -5,7 +5,7 @@ import CourseCard from "@/components/CourseCard";
 import { RegisterTriggerButton } from "./ProgramRegister";
 import type { RelatedCourse } from "./CourseDetail";
 import { songonProgram } from "@/lib/siteContent";
-import { parseWeeklySchedule } from "@/lib/weeklySchedule";
+import type { ScheduleBundle } from "@/lib/weeklySchedule";
 
 // Wording comes from siteContent.ts so the chatbot answers from the same
 // sentences; only the icons and colours are decided here.
@@ -57,11 +57,14 @@ export default function SonginDetail({
   related,
   seatsTaken,
   articles,
+  scheduleBundles,
 }: {
   course: Course;
   related: RelatedCourse[];
   seatsTaken: number;
   articles: ArticleSummary[];
+  /** Бүх сонгон ангийн хуваарийн багцууд — өөрийнх нь биш. */
+  scheduleBundles: ScheduleBundle[];
 }) {
   // Same shape the ordinary course page builds — /api/enroll reads `tag`
   // server-side for the payment description.
@@ -72,8 +75,6 @@ export default function SonginDetail({
     tag: course.tag,
     splittable: true,
   };
-  const slots = parseWeeklySchedule(course.weeklySchedule);
-
   const capacity = course.capacity;
   const full = capacity !== undefined && seatsTaken >= capacity;
   const seatsLeft = capacity !== undefined ? Math.max(0, capacity - seatsTaken) : null;
@@ -179,24 +180,42 @@ export default function SonginDetail({
                   on this page matters. */}
               <div>
                 <span className="inline-flex items-center gap-2 text-[.76rem] font-extrabold tracking-[.14em] uppercase text-blue-strong before:content-[''] before:w-[22px] before:h-[2px] before:rounded-sm before:bg-gold-strong">
-                  Хичээлийн хуваарь
+                  Боломжит хуваариуд
                 </span>
                 <h2 className="text-[clamp(1.4rem,2.6vw,1.8rem)] font-extrabold leading-[1.14] text-ink mt-3.5">
                   {course.title}
                 </h2>
 
-                {slots.length > 0 ? (
-                  <ul className="flex flex-col gap-2 mt-5">
-                    {slots.map((slot) => (
-                      <li
-                        key={`${slot.day}-${slot.time}`}
-                        className="flex items-center justify-between gap-4 bg-surface border border-line rounded-md px-4 py-3"
-                      >
-                        <b className="font-extrabold text-ink text-[.95rem]">{slot.day}</b>
-                        <span className="font-bold text-blue-strong text-[.95rem]">{slot.time}</span>
-                      </li>
+                {/* Энэ ангийн биш, бүх ангид сонгож болох багцууд: цагийг
+                    түвшин тогтоосны дараа уулзалтаар тохирдог. */}
+                <p className="text-ink-2 font-medium text-[.95rem] leading-[1.7] mt-3">
+                  Ирж уулзан шалгалт өгч түвшнээ тогтоолгосны дараа, доорх хуваариудаас тохирох
+                  цагаа хамтдаа сонгоно.
+                </p>
+
+                {scheduleBundles.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+                    {scheduleBundles.map((bundle) => (
+                      <div key={bundle.number} className="bg-surface border border-line rounded-md px-4 py-3.5">
+                        <b className="block text-[.76rem] font-extrabold tracking-[.08em] uppercase text-blue-strong mb-1.5">
+                          {`Хуваарь №${bundle.number}`}
+                        </b>
+                        <ul className="flex flex-col">
+                          {bundle.slots.map((slot, i) => (
+                            <li
+                              key={i}
+                              className="flex items-center justify-between gap-4 border-b border-line last:border-0 py-1.5"
+                            >
+                              <b className="font-extrabold text-ink text-[.9rem]">{slot.day}</b>
+                              <span className="font-bold text-blue-strong text-[.9rem] tabular-nums">
+                                {slot.time}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 ) : (
                   <p className="text-ink-3 font-semibold mt-5">
                     Хуваарь удахгүй зарлагдана. Бүртгүүлсэн сурагчдад тусад нь мэдэгдэнэ.

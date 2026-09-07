@@ -11,9 +11,11 @@ import {
   listArticlesForProgram,
   listPublishedCourseSummaries,
   listYearlyPrograms,
+  listSongonClasses,
 } from "@/lib/db";
 import { toIsoDate } from "@/lib/courseDate";
 import { courseHref } from "@/lib/courseHref";
+import { buildScheduleBundles } from "@/lib/weeklySchedule";
 
 export const dynamic = "force-dynamic";
 
@@ -34,12 +36,15 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
 
   // Four, so dropping the current course still leaves three to show.
   // The seat count is only read for a course that actually has a limit.
-  const [otherCourses, yearlyPrograms, seatsTaken, articles] = await Promise.all([
+  const [otherCourses, yearlyPrograms, seatsTaken, articles, songonClasses] = await Promise.all([
     listPublishedCourseSummaries(4),
     listYearlyPrograms(),
     course.capacity !== undefined ? countRegistrationsForProgram(course.id) : Promise.resolve(0),
     listArticlesForProgram(course.id),
+    // Сонгоны хуудас өөрийн бус, бүх ангийн хуваарийн багцыг үзүүлдэг.
+    course.template === "songon" ? listSongonClasses().catch(() => []) : Promise.resolve([]),
   ]);
+  const scheduleBundles = buildScheduleBundles(songonClasses);
   const otherDbCourses = otherCourses.filter((c) => c.id !== course.id);
   const related: RelatedCourse[] = [
     ...otherDbCourses.map((c) => ({
@@ -88,7 +93,13 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
         {/* `template` picks the layout; every course without one keeps the
             page it has always had. */}
         {course.template === "songon" ? (
-          <SonginDetail course={course} related={related} seatsTaken={seatsTaken} articles={articles} />
+          <SonginDetail
+            course={course}
+            related={related}
+            seatsTaken={seatsTaken}
+            articles={articles}
+            scheduleBundles={scheduleBundles}
+          />
         ) : (
           <CourseDetail course={course} related={related} articles={articles} />
         )}

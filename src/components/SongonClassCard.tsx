@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Reveal from "@/components/Reveal";
 import { IconClock } from "@/components/icons";
-import type { WeeklySlot } from "@/lib/weeklySchedule";
 
 /**
  * One classroom class in the "Сонгон бэлтгэл" row.
@@ -12,12 +11,13 @@ import type { WeeklySlot } from "@/lib/weeklySchedule";
  * parent scans for — their child's year, then whether the hours clash with
  * school — was the smallest text on the card.
  *
- * So: the grade is the headline, the timetable is the body, and the price
- * (the same in all four) is a quiet line above the button.
+ * So: the grade is the headline and the price (the same in all four) is a
+ * quiet line above the button. The timetable left the card when time slots
+ * became a shared menu — the band above the cards lists every option once,
+ * and the actual hours are agreed at the placement meeting.
  */
 export default function SongonClassCard({
   grade,
-  slots,
   price,
   period,
   href,
@@ -25,7 +25,6 @@ export default function SongonClassCard({
   capacity,
 }: {
   grade: string;
-  slots: WeeklySlot[];
   price: string;
   period: string;
   href: string;
@@ -58,21 +57,9 @@ export default function SongonClassCard({
         ) : null}
       </div>
 
-      {/* The timetable, not a summary of it: a parent checks these three rows
-          against their child's school shift before anything else matters. */}
-      {slots.length > 0 && (
-        <ul className="flex flex-col gap-1 mt-4">
-          {slots.map((slot) => (
-            <li
-              key={`${slot.day}-${slot.time}`}
-              className="flex items-center justify-between gap-2 text-[.85rem] border-b border-line last:border-0 py-1.5"
-            >
-              <span className="font-bold text-ink-2">{slot.day}</span>
-              <span className="font-extrabold text-ink tabular-nums">{slot.time}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <p className="text-[.85rem] font-semibold text-ink-2 leading-[1.6] mt-4">
+        Цагийг түвшин тогтоосны дараа дээрх хуваариудаас хамтдаа сонгоно.
+      </p>
 
       {/* Kept to one line: at this card width the longer phrasing wrapped and
           turned a footnote into a paragraph. */}

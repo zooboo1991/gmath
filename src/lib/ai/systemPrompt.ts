@@ -9,7 +9,7 @@ import {
 import { courseAboutItems, siteAchievements, siteFaqs, siteFeatures, songonProgram } from "../siteContent";
 import { SITE_URL } from "../siteUrl";
 import { courseHref } from "../courseHref";
-import { parseWeeklySchedule } from "../weeklySchedule";
+import { buildScheduleBundles } from "../weeklySchedule";
 import { isAssessmentOpen } from "@/lib/assessment/db";
 
 const BASE_PROMPT = `Та бол gmath.mn сайтын туслах чатбот. gmath.mn нь Б.Ганбат багшийн олимпиадын математикийн онлайн сургалтын сайт бөгөөд 4–12-р ангийн сурагчид болон багш нарт зориулсан сургалт, түвшин тогтоох үнэлгээ, сертификатын үйлчилгээ үзүүлдэг.
@@ -144,10 +144,17 @@ export async function buildSystemPrompt({
   // one-line catalogue entry above.
   if (songon.length > 0) {
     const p = songonProgram;
+    // Цагийг анги бүрд биш, нэг жагсаалтаар: аль цагт хичээллэхийг эцэг эх
+    // ирж уулзан, хүүхэд түвшин тогтоох шалгалт өгсний ДАРАА хамт сонгодог.
+    // Ботод ангийн хажууд цаг өгвөл "5-р анги Даваад ордог" гэж хуучин
+    // маягаар хариулна — тиймээс өгөхгүй.
+    const bundles = buildScheduleBundles(songon)
+      .map(
+        (b) =>
+          `  Хуваарь №${b.number}: ${b.slots.map((s) => `${s.day} ${s.time}`).join(", ")}`
+      )
+      .join("\n");
     const rows = songon.map((c) => {
-      const days = parseWeeklySchedule(c.weeklySchedule)
-        .map((s) => `${s.day} ${s.time}`)
-        .join(", ");
       // Spelled out, not "18/18": the first phrasing tried was read by the
       // model as eighteen seats *taken*, and it told a parent the class was
       // full when every seat was free.
@@ -157,7 +164,7 @@ export async function buildSystemPrompt({
           : c.seatsLeft <= 0
             ? ` Бүртгэл ДҮҮРСЭН (${c.capacity} суудал бүгд дүүрсэн) — шинээр бүртгэхгүй.`
             : ` Нийт ${c.capacity} суудлаас ${c.seatsLeft} нь сул байна, бүртгэл нээлттэй.`;
-      return `- ${c.title}: ${days || "хуваарь тодорхойгүй"}. Төлбөр ${c.price}${c.period}.${seats} Хуудас: ${base}${courseHref(c)}`;
+      return `- ${c.title}: Төлбөр ${c.price}${c.period}.${seats} Хуудас: ${base}${courseHref(c)}`;
     });
     sections.push(
       [
@@ -170,6 +177,8 @@ export async function buildSystemPrompt({
         `Байршил: ${p.location}`,
         p.scheduleNote,
         `Багш нар: ${p.teachers.map((t) => `${t.name} (${t.role})`).join(", ")}.`,
+        "Цаг сонголт: аль цагт хичээллэхийг урьдчилан хэлэхгүй. Эцэг эх ирж уулзан, хүүхэд түвшин тогтоох шалгалт өгсний дараа доорх хуваариудаас тохирохыг нь хамтдаа сонгоно. Аль анги аль хуваариар хичээллэдгийг бүү хэл — мэдэхгүй гэж үз.",
+        bundles ? `Боломжит хуваариуд:\n${bundles}` : "",
         "",
         ...rows,
       ].join("\n")

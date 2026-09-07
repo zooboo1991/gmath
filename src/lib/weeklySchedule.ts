@@ -27,3 +27,23 @@ export function parseWeeklySchedule(value: string | undefined | null): WeeklySlo
       return { day: line.slice(0, gap), time: line.slice(gap + 1).trim() };
     });
 }
+
+/**
+ * Нэг «Боломжит хуваариуд №N» багц: аль нэг ангийн долоо хоногийн хуваарь.
+ *
+ * Сонгоны цаг сонголт уулзалтаар шийдэгддэг болсноос хойш анги бүрийн
+ * хуваарь нь тухайн ангийнх биш, сонгож болох багцуудын нэг гэж нийтэд
+ * харагдана. Дугаар нь ангиудын нэрийн дарааллаар тогтдог тул шинэ анги
+ * нэмэгдэхгүй л бол тогтвортой.
+ */
+export type ScheduleBundle = { number: number; slots: WeeklySlot[] };
+
+export function buildScheduleBundles(
+  courses: { title: string; weeklySchedule?: string }[]
+): ScheduleBundle[] {
+  return [...courses]
+    .sort((a, b) => a.title.localeCompare(b.title, "mn"))
+    .map((c) => parseWeeklySchedule(c.weeklySchedule))
+    .filter((slots) => slots.length > 0)
+    .map((slots, i) => ({ number: i + 1, slots }));
+}

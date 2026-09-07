@@ -8,7 +8,8 @@ import CourseBrowser from "@/components/CourseBrowser";
 import { countRegistrationsForProgram, listCourses, listYearlyPrograms } from "@/lib/db";
 import WaitlistCard from "@/components/WaitlistCard";
 import { getSessionUser } from "@/lib/session";
-import { parseWeeklySchedule } from "@/lib/weeklySchedule";
+import { buildScheduleBundles } from "@/lib/weeklySchedule";
+import ScheduleBundles from "@/components/ScheduleBundles";
 import { courseHref } from "@/lib/courseHref";
 
 export const metadata: Metadata = {
@@ -34,7 +35,12 @@ export default async function CoursesPage() {
   // The classroom groups get their own band rather than sitting in the
   // filtered list: they are one offering split across four grades, and a
   // parent picks by their child's grade, not by filtering.
-  const songon = allUpcoming.filter((c) => c.template === "songon");
+  // Нэрээр нь эрэмбэлнэ: PostgREST-ийн анхдагч дараалал 5, 8, 6, 7 гэж
+  // гаргадаг байсан — багцын дугаарлалт ч мөн нэрийн дарааллыг дагадаг.
+  const songon = allUpcoming
+    .filter((c) => c.template === "songon")
+    .sort((a, b) => a.title.localeCompare(b.title, "mn"));
+  const songonBundles = buildScheduleBundles(songon);
   const upcomingCourses = allUpcoming.filter((c) => c.template !== "songon");
 
   const songonSeats = await Promise.all(
@@ -90,8 +96,15 @@ export default async function CoursesPage() {
                 </h2>
                 <p className="text-ink-2 font-medium mt-2.5 leading-[1.7]">
                   Стандарт ангид сурдаг ч сонгоны ангийн түвшинд суралцах боломж. 7 хоногт 3 удаа,
-                  дээд тал нь 18 сурагчтай группээр. Хүүхдийнхээ ангийг сонгоно уу.
+                  дээд тал нь 18 сурагчтай группээр. Ирж уулзан шалгалт өгч түвшнээ тогтоолгосны
+                  дараа, доорх хуваариудаас тохирох цагаа хамтдаа сонгоно.
                 </p>
+              </div>
+
+              {/* Цагийг уулзалтаар тохирдог тул хуваариуд анги бүрийн картад
+                  биш, нэг дор — эдгээр нь бүх ангид сонгож болох багцууд. */}
+              <div className="mt-[26px]">
+                <ScheduleBundles bundles={songonBundles} />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 nav:grid-cols-4 gap-5 mt-[30px]">
@@ -104,7 +117,6 @@ export default async function CoursesPage() {
                     <SongonClassCard
                       key={c.id}
                       grade={grade}
-                      slots={parseWeeklySchedule(c.weeklySchedule)}
                       price={c.price}
                       period={c.period}
                       href={courseHref(c)}
