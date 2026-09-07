@@ -2,6 +2,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import Reveal from "@/components/Reveal";
 import { RegisterTriggerButton } from "./ProgramRegister";
+import WaitlistJoinButton from "./WaitlistJoinButton";
 import { findYearlyProgramById, listArticlesForProgram } from "@/lib/db";
 import { IconTrophy, IconPerson, IconClock, IconPlayBox, IconCheckCircle, IconPeopleHero, IconGraduationCap, IconGrid, IconDocument } from "@/components/icons";
 import VideoEmbed from "@/components/VideoEmbed";
@@ -85,6 +86,7 @@ export default async function ProgramDetail({
   // tag mirrors what /api/enroll uses server-side for this program (its own
   // label) — see the comment on the Program type in ProgramRegister.tsx.
   const program = { id: programId, label, price, tag: label, splittable: true };
+  const enrollmentClosed = yearlyProgram.enrollmentClosed;
 
   return (
     <>
@@ -129,9 +131,15 @@ export default async function ProgramDetail({
             </div>
 
             <div className="mt-6">
-              <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
-                Сургалтанд бүртгүүлэх <span>→</span>
-              </RegisterTriggerButton>
+              {/* Бүртгэл хаагдсан үед хөтөлбөр хэвээрээ харагдаж, зөвхөн
+                  товч нь дараалалд орох болж солигдоно. */}
+              {enrollmentClosed ? (
+                <WaitlistJoinButton programId={programId} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong" />
+              ) : (
+                <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
+                  Сургалтанд бүртгүүлэх <span>→</span>
+                </RegisterTriggerButton>
+              )}
             </div>
           </div>
 
@@ -278,9 +286,13 @@ export default async function ProgramDetail({
             Б.Ганбат багшийн удирдлаган дор ажилладаг <b className="text-gold">VIP Хаалттай групп</b>
             -т хамрагдаж, нэг жилийн турш тогтмол хөгжинө.
           </div>
-          <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
-            Сургалтанд бүртгүүлэх <span>→</span>
-          </RegisterTriggerButton>
+          {enrollmentClosed ? (
+            <WaitlistJoinButton programId={programId} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong" />
+          ) : (
+            <RegisterTriggerButton program={program} className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full bg-gold text-gold-ink shadow-gold px-[34px] py-[19px] text-[1.075rem] transition-transform hover:-translate-y-0.5 hover:bg-gold-strong">
+              Сургалтанд бүртгүүлэх <span>→</span>
+            </RegisterTriggerButton>
+          )}
         </div>
       </section>
       <RelatedArticles articles={articles} />

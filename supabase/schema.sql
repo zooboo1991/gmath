@@ -1298,3 +1298,34 @@ alter table placement_problems
 alter table placement_problems drop constraint if exists placement_problems_answer_type_check;
 alter table placement_problems add constraint placement_problems_answer_type_check
   check (answer_type in ('text', 'integer', 'decimal', 'fraction', 'mixed', 'radical', 'list', 'template'));
+
+-- Хөтөлбөрийн бүртгэл хаагдсан үеийн дараалал.
+--
+-- waitlist_requests-ээс өөр зорилготой: тэр нь "манай ангид хичээл алга"
+-- гэсэн ерөнхий хүсэлт, энэ нь "яг энэ хөтөлбөр дүүрсэн, сул орон гармагц
+-- намайг дууд" гэсэн дараалал. Тиймээс program_id-аар холбогдож, сурагчид
+-- дугаараа хэлж өгдөг.
+--
+-- Дугаарыг хадгалдаггүй: өмнөх мөрүүдийг тоолж уншихдаа гаргана. Хэн нэг нь
+-- жагсаалтаас гармагц ардчуудынх нь дугаар өөрөө урагшилна — дахин дугаарлах
+-- ажил гарахгүй.
+create table if not exists program_waitlist (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  program_id text not null,
+  /** Хөтөлбөрийн нэр — хөтөлбөр устсан ч жагсаалт уншигдахуйц үлдэнэ. */
+  program_label text not null,
+  status text not null default 'waiting' check (status in ('waiting', 'notified', 'closed')),
+  created_at timestamptz not null default now(),
+  notified_at timestamptz,
+  -- Нэг хүн нэг хөтөлбөрт нэг л удаа: давхар дарах, хоёр таб зэрэг нээх
+  -- зэргээс болж дараалалд хоёр удаа орохоос сэргийлнэ.
+  unique (user_id, program_id)
+);
+create index if not exists program_waitlist_program_idx
+  on program_waitlist (program_id, created_at);
+
+-- Бүртгэл хаах унтраалга. Хаалттай үед хөтөлбөр хэвээрээ харагдаж, зөвхөн
+-- товч нь "Хүлээлгийн жагсаалтад бүртгүүлэх" болж солигдоно.
+alter table yearly_programs
+  add column if not exists enrollment_closed boolean not null default false;

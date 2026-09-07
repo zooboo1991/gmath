@@ -53,6 +53,18 @@ export async function POST(request: Request) {
 
   const yearlyProgram = await findYearlyProgramById(programId);
   if (yearlyProgram) {
+    // Бүртгэл хаагдсан бол хүлээлгийн жагсаалт руу. Товч нь аль хэдийн
+    // солигдсон байдаг ч серверийн шалгалт байх ёстой — хуучин таб, шууд
+    // дуудалт хоёулаа энд ирнэ.
+    if (yearlyProgram.enrollmentClosed) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Энэ сургалтын бүртгэл хаагдсан байна. Хүлээлгийн жагсаалтад бүртгүүлнэ үү.",
+        },
+        { status: 409 }
+      );
+    }
     programLabel = yearlyProgram.label;
     price = yearlyProgram.price;
     courseTag = yearlyProgram.tag;

@@ -53,6 +53,7 @@ const TABLES = [
   "registration_payment_intents",
   "registration_payments",
   "registrations",
+  "program_waitlist",
   "sessions",
   "solutions",
   "users",

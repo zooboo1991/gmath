@@ -17,13 +17,17 @@ import { parseYouTubeId } from "@/lib/youtube";
 import ProgramArticlesEditor, { type ArticleOption } from "@/components/admin/ProgramArticlesEditor";
 import PendingRegistrationActions from "@/components/admin/PendingRegistrationActions";
 
+import ProgramWaitlistPanel from "./ProgramWaitlistPanel";
+import type { ProgramWaitlistEntryWithUser } from "@/lib/programWaitlist";
+
 type RegistrationWithUser = Registration & { user?: PublicUser };
-type SectionTab = "info" | "roster" | "confirm" | "report";
+type SectionTab = "info" | "roster" | "confirm" | "waitlist" | "report";
 
 export default function YearlyProgramObjectPage({
   program,
   initialRegistrations,
   initialPayments,
+  initialWaitlist,
   articleOptions,
   initialArticleIds,
   canEdit,
@@ -33,6 +37,7 @@ export default function YearlyProgramObjectPage({
   program: YearlyProgram;
   initialRegistrations: RegistrationWithUser[];
   initialPayments: RegistrationPayment[];
+  initialWaitlist: ProgramWaitlistEntryWithUser[];
   articleOptions: ArticleOption[];
   initialArticleIds: string[];
   /** False for the read-only admin — see CourseObjectPage for the reasoning. */
@@ -46,6 +51,8 @@ export default function YearlyProgramObjectPage({
   const [tab, setTab] = useState<SectionTab>("info");
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [payments, setPayments] = useState(initialPayments);
+  const waitlist = initialWaitlist;
+  const waitingCount = waitlist.filter((e) => e.status === "waiting").length;
 
   const [form, setForm] = useState({
     tag: program.tag,
@@ -61,6 +68,7 @@ export default function YearlyProgramObjectPage({
     lessons: program.lessons ?? ([] as Lesson[]),
     showOnHomepage: program.showOnHomepage,
     introVideoUrl: program.introVideoUrl ?? "",
+    enrollmentClosed: program.enrollmentClosed,
     articleIds: initialArticleIds,
   });
   const [saving, setSaving] = useState(false);
@@ -201,6 +209,11 @@ export default function YearlyProgramObjectPage({
                 active={tab === "confirm"}
                 onClick={() => setTab("confirm")}
               />
+              <AnchorTab
+                label={`Хүлээлгийн жагсаалт${waitingCount ? ` (${waitingCount})` : ""}`}
+                active={tab === "waitlist"}
+                onClick={() => setTab("waitlist")}
+              />
               <AnchorTab label="Тайлан" active={tab === "report"} onClick={() => setTab("report")} />
             </>
           )}
@@ -238,6 +251,20 @@ export default function YearlyProgramObjectPage({
                     onChange={(e) => setForm((f) => ({ ...f, showOnHomepage: e.target.checked }))}
                   />
                   <span className="text-[.87rem] font-bold text-ink-2">Нүүр хуудсанд харуулах</span>
+                </label>
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.enrollmentClosed}
+                    onChange={(e) => setForm((f) => ({ ...f, enrollmentClosed: e.target.checked }))}
+                    className="mt-1"
+                  />
+                  <span className="text-[.87rem] font-bold text-ink-2">
+                    Бүртгэл хаах
+                    <span className="block text-[.8rem] font-semibold text-ink-3 mt-0.5 leading-[1.5]">
+                      Сургалт хэвээрээ харагдаж, бүртгүүлэх товч нь хүлээлгийн жагсаалт болно.
+                    </span>
+                  </span>
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <AdminField label="Үнэ">
@@ -452,6 +479,12 @@ export default function YearlyProgramObjectPage({
               </div>
             </Card>
           </div>
+        )}
+
+        {tab === "waitlist" && (
+          <Card title={`Хүлээлгийн жагсаалт (${waitingCount})`}>
+            <ProgramWaitlistPanel initialEntries={waitlist} canEdit={canEdit} />
+          </Card>
         )}
 
         {tab === "report" && (

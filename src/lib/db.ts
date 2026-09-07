@@ -179,6 +179,11 @@ export type YearlyProgram = {
   showOnHomepage: boolean;
   /** Public YouTube link for this programme page's intro video. */
   introVideoUrl?: string;
+  /**
+   * Бүртгэл хаагдсан эсэх. Хаалттай үед хөтөлбөр хэвээрээ харагдаж,
+   * бүртгүүлэх товч нь хүлээлгийн жагсаалт руу шилжинэ.
+   */
+  enrollmentClosed: boolean;
 };
 
 export type Article = {
@@ -303,6 +308,7 @@ type YearlyProgramRow = {
   lessons: Lesson[] | null;
   show_on_homepage: boolean;
   intro_video_url: string | null;
+  enrollment_closed: boolean | null;
 };
 
 type ArticleRow = {
@@ -415,6 +421,7 @@ function yearlyProgramFromRow(row: YearlyProgramRow): YearlyProgram {
     lessons: row.lessons ?? [],
     showOnHomepage: row.show_on_homepage,
     introVideoUrl: row.intro_video_url ?? undefined,
+    enrollmentClosed: row.enrollment_closed ?? false,
   };
 }
 
@@ -947,6 +954,7 @@ export async function updateYearlyProgram(
   if (input.lessons !== undefined) patch.lessons = input.lessons;
   if (input.showOnHomepage !== undefined) patch.show_on_homepage = input.showOnHomepage;
   if (input.introVideoUrl !== undefined) patch.intro_video_url = input.introVideoUrl || null;
+  if (input.enrollmentClosed !== undefined) patch.enrollment_closed = input.enrollmentClosed;
   patch.updated_at = new Date().toISOString();
 
   const { data, error } = await getSupabase()

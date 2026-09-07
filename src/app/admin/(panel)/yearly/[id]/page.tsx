@@ -8,6 +8,7 @@ import {
   listPaymentsForRegistrations,
   listRegistrationsByProgram,
 } from "@/lib/db";
+import { listProgramWaitlist } from "@/lib/programWaitlist";
 import { requireAdminSection } from "@/lib/adminAccess";
 import { can } from "@/lib/adminSections";
 
@@ -26,10 +27,12 @@ export default async function EditYearlyProgramPage({ params }: { params: Promis
   if (!program) notFound();
 
   const registrations = await listRegistrationsByProgram(id);
-  const [payments, articleIds, articles] = await Promise.all([
+  const [payments, articleIds, articles, waitlist] = await Promise.all([
     listPaymentsForRegistrations(registrations.map((r) => r.id)),
     listArticleIdsForProgram(id),
     listArticles({ includeScheduled: true }),
+    // Дараалал уншигдахгүй байх нь хөтөлбөрийн хуудсыг унагах шалтгаан биш.
+    listProgramWaitlist(id).catch(() => []),
   ]);
 
   return (
@@ -37,6 +40,7 @@ export default async function EditYearlyProgramPage({ params }: { params: Promis
       program={program}
       initialRegistrations={registrations}
       initialPayments={payments}
+      initialWaitlist={waitlist}
       articleOptions={articles.map((a) => ({ id: a.id, title: a.title, createdAt: a.createdAt }))}
       initialArticleIds={articleIds}
       canEdit={can(role, "courseInfo")}

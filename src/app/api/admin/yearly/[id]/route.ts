@@ -82,6 +82,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     introVideoUrl: data.introVideoUrl !== undefined ? data.introVideoUrl?.trim() || "" : undefined,
     lessons,
     showOnHomepage: data.showOnHomepage !== undefined ? data.showOnHomepage === true : undefined,
+    enrollmentClosed:
+      data.enrollmentClosed !== undefined ? data.enrollmentClosed === true : undefined,
   });
 
   if (!program) {
