@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useProgramRegister } from "./ProgramRegister";
-import { IconCheckCircle, IconClock } from "@/components/icons";
+import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
 
 /**
  * Бүртгэл хаагдсан хөтөлбөрийн "Хүлээлгийн жагсаалтад бүртгүүлэх" товч.
@@ -23,6 +23,7 @@ export default function WaitlistJoinButton({
   const [position, setPosition] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   // Аль хэдийн дараалалд байгаа эсэх — нэвтэрсэн хүнд л асууна.
   useEffect(() => {
@@ -42,11 +43,18 @@ export default function WaitlistJoinButton({
     };
   }, [sessionUser, programId]);
 
-  const join = async () => {
+  // Товч дарах нь өөрөө бүртгэл байхаа больсон: санамсаргүй дарж
+  // өөрийнхөө сургалтын дараалалд зогссон тохиолдол бодитоор гарсан.
+  const start = () => {
     if (!sessionUser) {
       openLogin();
       return;
     }
+    setError(null);
+    setConfirming(true);
+  };
+
+  const join = async () => {
     setBusy(true);
     setError(null);
     try {
@@ -57,6 +65,7 @@ export default function WaitlistJoinButton({
         return;
       }
       setPosition(json.position ?? null);
+      setConfirming(false);
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
@@ -81,11 +90,56 @@ export default function WaitlistJoinButton({
 
   return (
     <div>
-      <button type="button" onClick={join} disabled={busy || !sessionLoaded} className={className}>
+      <button type="button" onClick={start} disabled={!sessionLoaded} className={className}>
         <IconClock className="w-5 h-5" />
-        {busy ? "Бүртгэж байна…" : "Хүлээлгийн жагсаалтад бүртгүүлэх"}
+        Хүлээлгийн жагсаалтад бүртгүүлэх
       </button>
-      {error && <p className="text-gold font-bold text-[.88rem] mt-2">{error}</p>}
+      {error && !confirming && <p className="text-gold font-bold text-[.88rem] mt-2">{error}</p>}
+
+      {confirming && (
+        <div className="fixed inset-0 z-[100] bg-navy-deep/55 grid place-items-center px-4 py-8 overflow-y-auto">
+          <div className="bg-surface rounded-lg shadow-lg w-full max-w-[460px] px-6 py-6 relative text-left">
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              aria-label="Хаах"
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-bg-soft grid place-items-center"
+            >
+              <IconClose className="w-4 h-4 text-ink-3" />
+            </button>
+
+            <h3 className="text-[1.25rem] font-extrabold text-ink">Хүлээлгийн жагсаалтад орох уу?</h3>
+            <p className="text-ink-2 font-medium text-[.92rem] mt-2 leading-[1.65]">
+              Энэ сургалтын бүртгэл түр хаагдсан байна. Жагсаалтад орсноор сул орон тоо гармагц
+              бид дарааллын дагуу тантай холбогдоно.
+            </p>
+            <p className="text-ink-3 font-semibold text-[.86rem] mt-2.5 leading-[1.6]">
+              Энэ нь сургалтад бүртгүүлсэн гэсэн үг биш — төлбөр төлөхгүй, суудал баталгаажихгүй.
+            </p>
+
+            {error && <p className="text-red-soft font-bold text-[.88rem] mt-3">{error}</p>}
+
+            <div className="flex items-center gap-2.5 mt-5">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={join}
+                className="flex-1 h-12 rounded-full bg-navy text-white font-extrabold disabled:opacity-50"
+              >
+                {busy ? "Бүртгэж байна…" : "Тийм, жагсаалтад орно"}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setConfirming(false)}
+                className="h-12 px-5 rounded-full border border-line font-extrabold text-ink-2 disabled:opacity-50"
+              >
+                Болих
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
