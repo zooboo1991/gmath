@@ -28,7 +28,9 @@ import {
 } from "@/lib/courseTag";
 import { getLessonStates } from "@/lib/lessonSchedule";
 
-type Tab = "active" | "pending" | "certificates" | "tests";
+import type { ProgramWaitlistEntry } from "@/lib/programWaitlist";
+
+type Tab = "active" | "pending" | "waitlist" | "certificates" | "tests";
 type AudienceFilter = "all" | CourseAudience;
 type CategoryFilter = "all" | CourseCategory;
 
@@ -56,6 +58,7 @@ export default function ProfileClient({
   certificates,
   tests = [],
   onboarding = {},
+  waitlist = [],
   nowIso,
 }: {
   user: PublicUser;
@@ -70,9 +73,13 @@ export default function ProfileClient({
   nowIso: string;
   /** Finished tests, newest first — see src/lib/tests. */
   tests?: { slug: string; title: string; archetype: string; tag: string; takenAt: string }[];
+  /** Хүлээлгийн жагсаалтууд, дараалал дахь байртай нь. */
+  waitlist?: (ProgramWaitlistEntry & { position: number })[];
 }) {
   const [user, setUser] = useState(initialUser);
   const [tab, setTab] = useState<Tab>("active");
+  const [queue, setQueue] = useState(waitlist);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [audience, setAudience] = useState<AudienceFilter>("all");
   const [category, setCategory] = useState<CategoryFilter>("all");
@@ -82,6 +89,14 @@ export default function ProfileClient({
   // Read in an effect, not useSearchParams, so this stays a plain client
   // detail with no Suspense contract on the page.
   const [focusCourseId, setFocusCourseId] = useState<string | null>(null);
+
+  // Жагсаалтад орсны дараа ?tab=waitlist гэж энд шиддэг — тэр таб нээгдэнэ.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("tab");
+    if (wanted !== "waitlist") return;
+    const timer = setTimeout(() => setTab("waitlist"), 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const courseId = new URLSearchParams(window.location.search).get("course");
@@ -100,6 +115,21 @@ export default function ProfileClient({
     });
     return () => cancelAnimationFrame(frame);
   }, [focusCourseId]);
+
+  /** Жагсаалтаас гарах — мөр нь устаж, ардчуудын дугаар урагшилна. */
+  async function leaveQueue(programId: string) {
+    setLeavingId(programId);
+    try {
+      const res = await fetch(`/api/programs/${programId}/waitlist`, { method: "DELETE" });
+      // Мөрөө хасахад л хангалттай: хүн нэг хөтөлбөрт нэг л удаа байдаг тул
+      // үлдсэн мөрүүд нь өөр хөтөлбөрийнх — тэдний байр хөдлөхгүй.
+      if (res.ok) setQueue((list) => list.filter((e) => e.programId !== programId));
+    } catch {
+      // Сүлжээ тасарвал мөр байрандаа үлдэнэ — дахин оролдоно.
+    } finally {
+      setLeavingId(null);
+    }
+  }
 
   function clearFilters() {
     setAudience("all");
@@ -218,6 +248,11 @@ export default function ProfileClient({
           <TabButton active={tab === "pending"} onClick={() => selectTab("pending")}>
             Хүлээгдэж буй{pending.length > 0 && ` (${pending.length})`}
           </TabButton>
+          {queue.length > 0 && (
+            <TabButton active={tab === "waitlist"} onClick={() => selectTab("waitlist")}>
+              {`Хүлээлгийн жагсаалт (${queue.length})`}
+            </TabButton>
+          )}
           <TabButton active={tab === "certificates"} onClick={() => selectTab("certificates")}>
             Сертификат{certificates.length > 0 && ` (${certificates.length})`}
           </TabButton>
@@ -309,6 +344,56 @@ export default function ProfileClient({
                       Дүгнэлт харах →
                     </span>
                   </Link>
+                ))}
+              </div>
+            )
+          ) : tab === "waitlist" ? (
+            queue.length === 0 ? (
+              <p className="text-ink-2 font-medium bg-bg-soft border border-line rounded-md px-6 py-8 text-center">
+                Та ямар ч хүлээлгийн жагсаалтад бүртгүүлээгүй байна.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {queue.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="bg-surface border border-line rounded-md shadow-xs px-6 py-5"
+                  >
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div>
+                        <b className="block font-extrabold text-[1.02rem]">{entry.programLabel}</b>
+                        <span className="text-[.85rem] font-semibold text-ink-3">
+                          {`Бүртгүүлсэн: ${new Date(entry.createdAt).toLocaleDateString("mn-MN")}`}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center px-4 py-2 rounded-full bg-blue-soft shrink-0">
+                        <b className="font-extrabold text-blue-strong">{`Жагсаалтын №${entry.position}`}</b>
+                      </span>
+                    </div>
+
+                    <p className="text-ink-2 font-medium text-[.92rem] leading-[1.65] mt-3">
+                      {entry.status === "notified"
+                        ? "Танд сул орон тоо гарсан тул одоо бүртгүүлэх боломжтой боллоо."
+                        : "Сургалтад сул орон тоо гарвал жагсаалтын дагуу тантай холбогдоно."}
+                    </p>
+
+                    <div className="flex items-center gap-3 mt-4 flex-wrap">
+                      <Link
+                        href={`/courses/${entry.programId.replace("program-", "")}`}
+                        className="font-extrabold text-[.9rem] text-blue-strong"
+                      >
+                        Сургалтыг харах →
+                      </Link>
+                      <button
+                        type="button"
+                        disabled={leavingId === entry.programId}
+                        onClick={() => leaveQueue(entry.programId)}
+                        className="h-10 px-4 rounded-full border border-line font-extrabold text-[.85rem] text-ink-3 disabled:opacity-50"
+                      >
+                        {leavingId === entry.programId ? "Гарч байна…" : "Жагсаалтаас гарах"}
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             )

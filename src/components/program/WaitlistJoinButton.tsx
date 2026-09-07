@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useProgramRegister } from "./ProgramRegister";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
@@ -19,6 +20,7 @@ export default function WaitlistJoinButton({
   programId: string;
   className: string;
 }) {
+  const router = useRouter();
   const { sessionUser, sessionLoaded, openLogin } = useProgramRegister();
   const [position, setPosition] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -64,8 +66,10 @@ export default function WaitlistJoinButton({
         setError(json?.error ?? "Бүртгэж чадсангүй. Дахин оролдоно уу.");
         return;
       }
-      setPosition(json.position ?? null);
-      setConfirming(false);
+      // Профайл руу: байр, гарах товч, бусад дараалал бүгд тэнд нэг дор.
+      // refresh нь профайлын серверийн өгөгдлийг шинэ мөртэй нь дахин татна.
+      router.push("/profile?tab=waitlist");
+      router.refresh();
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {

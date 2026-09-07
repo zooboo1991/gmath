@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import ProfileClient from "@/components/profile/ProfileClient";
 import { listCertificatesByPhone, listRegistrationsByUser, toPublicUser } from "@/lib/db";
+import { listProgramWaitlistByUser } from "@/lib/programWaitlist";
 import { getSessionUser } from "@/lib/session";
 import { TESTS } from "@/lib/tests";
 import { listTestResults } from "@/lib/tests/db";
@@ -48,7 +49,7 @@ export default async function ProfilePage() {
     );
   }
 
-  const [registrations, certificates, testResults, onboarding] = await Promise.all([
+  const [registrations, certificates, testResults, onboarding, waitlist] = await Promise.all([
     listRegistrationsByUser(user.id),
     // certificates is a newer table — a site that hasn't run the latest
     // schema.sql yet shouldn't have its whole profile page go down over it.
@@ -58,6 +59,8 @@ export default async function ProfilePage() {
     // Эхлэлийн чеклистийн төлөв. Хүснэгт нь шинэ — schema.sql-ээ ажиллуулаагүй
     // орчинд профайл бүхэлдээ унах ёсгүй.
     listOnboardingByProgram(user.id).catch(() => ({})),
+    // Хүлээлгийн жагсаалт: хүснэгт нь шинэ тул профайл үүнээс болж унахгүй.
+    listProgramWaitlistByUser(user.id).catch(() => []),
   ]);
 
   const tests = testResults
@@ -86,6 +89,7 @@ export default async function ProfilePage() {
           certificates={certificates}
           tests={tests}
           onboarding={onboarding}
+          waitlist={waitlist}
           nowIso={new Date().toISOString()}
         />
       </main>

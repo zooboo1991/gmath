@@ -190,6 +190,29 @@ export async function findProgramWaitlistEntryById(
   return data ? fromRow(data as Row) : undefined;
 }
 
+/**
+ * Нэг хүний бүх дараалал, байртай нь — профайлд харуулахад.
+ *
+ * Байрыг мөр тус бүрд тоолно: хүн ихдээ хоёр хөтөлбөрт байх тул
+ * дуудлагын тоо асуудалгүй.
+ */
+export async function listProgramWaitlistByUser(
+  userId: string
+): Promise<(ProgramWaitlistEntry & { position: number })[]> {
+  const { data, error } = await getSupabase()
+    .from("program_waitlist")
+    .select("*")
+    .eq("user_id", userId)
+    .in("status", QUEUED)
+    .order("created_at");
+  if (error) throw error;
+
+  const entries = ((data ?? []) as Row[]).map(fromRow);
+  return Promise.all(
+    entries.map(async (entry) => ({ ...entry, position: await positionInProgramWaitlist(entry) }))
+  );
+}
+
 export async function setProgramWaitlistStatus(
   id: string,
   status: ProgramWaitlistStatus
