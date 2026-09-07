@@ -26,6 +26,7 @@ export function PlacementQuestionCard({
   answerHint,
   answerType,
   answerBoxes,
+  answerDisplay,
   answer,
   onAnswerChange,
   boxValues,
@@ -42,6 +43,7 @@ export function PlacementQuestionCard({
   answerHint: string;
   answerType: AnswerType;
   answerBoxes: PublicAnswerBox[];
+  answerDisplay: string;
   answer: string;
   onAnswerChange: (value: string) => void;
   boxValues: string[];
@@ -113,6 +115,7 @@ export function PlacementQuestionCard({
             values={boxValues}
             onChange={onBoxesChange}
             onSubmit={onSubmit}
+            display={answerDisplay}
           />
           <button
             type="button"

@@ -1283,3 +1283,18 @@ begin
       check (answer_type in ('text', 'integer', 'decimal', 'fraction', 'mixed', 'radical', 'list'));
   end if;
 end $$;
+
+-- Үсэгт илэрхийлэлд зориулсан "template" төрөл. Хэлбэр нь бодлого бүрт
+-- өөр тул тогтмол нүдний тоо тохирохгүй: багш хариултаа LaTeX-ээр бичихдээ
+-- нөхөгдөх хэсгүүдээ [ ] дотор хийнэ.
+--   [9]a^{[10]}b^{[6]}       →  ⬚a^⬚b^⬚   (түлхүүр: 9, 10, 6)
+--   -\frac{[4]}{[5]}x^{[4]}  →  -⬚/⬚·x^⬚
+--   c^{[n]}                  →  c^⬚
+-- Түлхүүр нь загвартаа л амьдарна: хаалтан доторх утгуудыг уншихдаа
+-- answer_template-ийг задалж авна (answer_boxes энэ төрөлд хоосон үлдэнэ).
+alter table placement_problems
+  add column if not exists answer_template text not null default '';
+
+alter table placement_problems drop constraint if exists placement_problems_answer_type_check;
+alter table placement_problems add constraint placement_problems_answer_type_check
+  check (answer_type in ('text', 'integer', 'decimal', 'fraction', 'mixed', 'radical', 'list', 'template'));

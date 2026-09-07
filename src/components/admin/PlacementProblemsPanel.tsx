@@ -10,6 +10,11 @@ import type { PlacementProblem } from "@/lib/assessment/placementDb";
 import PlacementPreview from "@/components/admin/PlacementPreview";
 import AnswerBoxes from "@/components/assessment/AnswerBoxes";
 import {
+  filledTemplate,
+  parseAnswerTemplate,
+  validateAnswerTemplate,
+} from "@/lib/assessment/answerTemplate";
+import {
   ANSWER_TYPES,
   ANSWER_TYPE_SPECS,
   boxCountFor,
@@ -25,10 +30,11 @@ import {
  * тул ямар ч сурагч таарахгүй — үүнийг чимээгүй өнгөрөөж болохгүй.
  */
 export function hasAnswer(problem: PlacementProblem): boolean {
-  // Чөлөөт бичвэрт хариултын жагсаалт, нүдэн төрөлд нүд бүр бөглөгдсөн байх ёстой.
-  return problem.answerType === "text"
-    ? problem.answers.length > 0
-    : boxesAreComplete(problem.answerType, problem.answerBoxes);
+  // Гурван төрөл гурван газар хариултаа хадгална: чөлөөт бичвэр answers-д,
+  // нүдэн төрөл answerBoxes-д, загвар answerTemplate-д.
+  if (problem.answerType === "text") return problem.answers.length > 0;
+  if (problem.answerType === "template") return validateAnswerTemplate(problem.answerTemplate).ok;
+  return boxesAreComplete(problem.answerType, problem.answerBoxes);
 }
 
 export function suspiciousAnswer(answer: string): string | null {
@@ -251,6 +257,7 @@ function ProblemModal({
     answerBoxes: problem?.answerBoxes?.length
       ? problem.answerBoxes.map((b) => ({ value: b.value, label: b.label ?? "" }))
       : [{ value: "", label: "" }, { value: "", label: "" }],
+    answerTemplate: problem?.answerTemplate ?? "",
     active: problem?.active ?? false,
   });
   const [busy, setBusy] = useState(false);
@@ -274,6 +281,9 @@ function ProblemModal({
     (_, i) => form.answerBoxes[i] ?? { value: "", label: "" }
   );
 
+  const templateCheck = validateAnswerTemplate(form.answerTemplate);
+  const templateParts = parseAnswerTemplate(form.answerTemplate);
+
   const save = async () => {
     setBusy(true);
     setError(null);
@@ -281,8 +291,9 @@ function ProblemModal({
       ...form,
       answers: form.answers.split(";").map((a) => a.trim()).filter(Boolean),
       answerType: form.answerType,
+      answerTemplate: form.answerType === "template" ? form.answerTemplate.trim() : "",
       answerBoxes:
-        form.answerType === "text"
+        form.answerType === "text" || form.answerType === "template"
           ? []
           : form.answerBoxes
               .slice(0, boxCountFor(form.answerType, form.answerBoxes.length))
@@ -412,7 +423,47 @@ function ProblemModal({
           </select>
         </label>
 
-        {form.answerType === "text" ? (
+        {form.answerType === "template" ? (
+          <div className="mb-3">
+            <label className="block">
+              <span className="block text-[.72rem] font-extrabold text-ink-3 uppercase mb-1">
+                Хариултын загвар — нөхөгдөх хэсгээ [ ] дотор бич
+              </span>
+              <input
+                value={form.answerTemplate}
+                onChange={(e) => setForm((f) => ({ ...f, answerTemplate: e.target.value }))}
+                className={`${INPUT_CLASS} font-mono`}
+                placeholder="[9]a^{[10]}b^{[6]}"
+              />
+            </label>
+            {form.answerTemplate.trim() && (
+              <div className="bg-bg-soft rounded-sm px-4 py-3.5 mt-2">
+                {templateCheck.ok ? (
+                  <>
+                    <span className="block text-[.72rem] font-extrabold text-ink-3 uppercase mb-1.5">
+                      Сурагчид ийм харагдана
+                    </span>
+                    <div className="text-[1.2rem] leading-[2]">
+                      <MathText source={`$${templateParts.display}$`} />
+                    </div>
+                    <span className="block text-[.78rem] font-semibold text-ink-3 mt-2">
+                      {`Зөв хариулт: ${filledTemplate(form.answerTemplate)} · нүд ${templateParts.values.length}`}
+                    </span>
+                  </>
+                ) : (
+                  <span className="block text-[.82rem] font-bold text-red-soft">
+                    {templateCheck.error}
+                  </span>
+                )}
+              </div>
+            )}
+            <span className="block text-[.76rem] font-semibold text-ink-3 mt-2 leading-[1.5]">
+              Жишээ: <code className="font-mono">[9]a^{"{[10]}"}b^{"{[6]}"}</code> нь 9a¹⁰b⁶,{" "}
+              <code className="font-mono">[3]n+[5]</code> нь 3n+5. Сурагч илэрхийлэл дэх
+              дугаарласан хоосон нүдийг доороос нь бөглөнө.
+            </span>
+          </div>
+        ) : form.answerType === "text" ? (
           <label className="block mb-3">
             <span className="block text-[.72rem] font-extrabold text-ink-3 uppercase mb-1">
               Зөв хариултууд (цэг таслалаар тусгаарлана: 13/20; 0.65)

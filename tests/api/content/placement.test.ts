@@ -80,6 +80,7 @@ type View =
         answerHint: string;
         answerType: string;
         answerBoxes: { label?: string }[];
+        answerDisplay: string;
       };
       position: number;
       total: number;
@@ -334,6 +335,91 @@ describe("нүдэн хариулт", () => {
     const rows = (data ?? []) as { given_answer: string; is_correct: boolean }[];
     expect(rows).toHaveLength(1);
     expect(rows[0].given_answer).toBe("2 1/2");
+    expect(rows[0].is_correct).toBe(true);
+  });
+});
+
+
+describe("үсэгт илэрхийллийн загвар", () => {
+  /** Гурван түвшин нь загвар хэлбэрийн нэг сэдэв. */
+  async function seedTemplateTopic(topicOrder: number): Promise<void> {
+    const rows = [1, 2, 3].map((level) => ({
+      grade: GRADE,
+      topic: `Илэрхийлэл ${topicOrder}`,
+      topic_order: topicOrder,
+      level,
+      body_latex: `Илэрхийлэл ${level}`,
+      answers: [],
+      answer_type: "template",
+      // Түлхүүрүүд нүдний дугаартай (1, 2) давхцахгүй байхаар сонгосон —
+      // ингэж байж "задарсан уу" гэдгийг найдвартай шалгана.
+      answer_template: `[${level * 11}]a^{[47]}`,
+      answer_boxes: [],
+      active: true,
+    }));
+    const { error } = await testDb().from("placement_problems").insert(rows);
+    if (error) throw new Error(`seedTemplateTopic failed: ${error.message}`);
+  }
+
+  it("загварын зөв утга сурагч руу хэзээ ч явахгүй", async () => {
+    await seedTemplateTopic(1);
+    const { client, id } = await paidPlacement();
+
+    const first = await state(client, id);
+    expect(first.done).toBe(false);
+    if (first.done) return;
+    expect(first.problem.answerType).toBe("template");
+    // Хоосон дөрвөлжинтэй илэрхийлэл ирнэ, түлхүүр нь ирэхгүй.
+    // Тэмдэглэгээ бүлэгт ороосон — "x^[2]" мэт бичлэгт дугаар нь салахгүй.
+    expect(first.problem.answerDisplay).toBe("{\\square_{1}}a^{{\\square_{2}}}");
+    expect(first.problem.answerDisplay).not.toMatch(/[[\]]/);
+    expect(first.problem.answerBoxes).toHaveLength(2);
+
+    const raw = await client.get(`/api/assessment/${id}/placement`);
+    expect(raw.text).not.toContain("answer_template");
+    expect(raw.text).not.toContain("answerTemplate");
+    // 2-р түвшний түлхүүр нь 22 ба 47 — аль нь ч хаана ч гарах ёсгүй.
+    expect(raw.text).not.toContain("22");
+    expect(raw.text).not.toContain("47");
+  });
+
+  it("нүд бүр таарвал зөв, зөрвөл буруу", async () => {
+    await seedTemplateTopic(1);
+    const { client, id } = await paidPlacement();
+    await state(client, id);
+
+    // 2-р түвшин: [22]a^{[47]}
+    const up = await answerBoxes(client, id, ["22", "47"]);
+    expect(up.done).toBe(false);
+    if (up.done) return;
+    expect(up.problem.level).toBe(3);
+  });
+
+  it("нэг нүд зөрвөл доод түвшин рүү буулгана", async () => {
+    await seedTemplateTopic(1);
+    const { client, id } = await paidPlacement();
+    await state(client, id);
+
+    const down = await answerBoxes(client, id, ["22", "48"]);
+    expect(down.done).toBe(false);
+    if (down.done) return;
+    expect(down.problem.level).toBe(1);
+  });
+
+  it("түүхэнд нүдний утгуудыг хадгална", async () => {
+    await seedTemplateTopic(1);
+    const { client, id } = await paidPlacement();
+    await state(client, id);
+    await answerBoxes(client, id, ["22", "47"]);
+
+    const { data } = await testDb()
+      .from("placement_steps")
+      .select("given_answer, is_correct")
+      .eq("assessment_id", id)
+      .not("is_correct", "is", null);
+    const rows = (data ?? []) as { given_answer: string; is_correct: boolean }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].given_answer).toBe("22; 47");
     expect(rows[0].is_correct).toBe(true);
   });
 });

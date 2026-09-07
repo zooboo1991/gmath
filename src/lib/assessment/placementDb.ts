@@ -1,5 +1,6 @@
 import { getSupabase } from "../supabase";
 import { answerFormatHint } from "./placement";
+import { parseAnswerTemplate } from "./answerTemplate";
 import {
   ANSWER_TYPE_SPECS,
   toPublicBoxes,
@@ -29,6 +30,8 @@ export type PlacementProblem = {
   answerType: AnswerType;
   /** Нүд бүрийн зөв утга — зөвхөн сервер талд. */
   answerBoxes: AnswerBox[];
+  /** Үсэгт илэрхийллийн загвар, [ ] дотор зөв утгуудтай — зөвхөн сервер талд. */
+  answerTemplate: string;
   active: boolean;
   createdAt: string;
 };
@@ -36,11 +39,13 @@ export type PlacementProblem = {
 /** Сурагч руу явдаг хэлбэр: хариултгүй, харин бичих зааврыг хэлбэрээс нь гаргаж дагуулна. */
 export type PublicPlacementProblem = Omit<
   PlacementProblem,
-  "answers" | "answerBoxes" | "active" | "createdAt"
+  "answers" | "answerBoxes" | "answerTemplate" | "active" | "createdAt"
 > & {
   answerHint: string;
   /** Нүдний байрлал ба нэр — зөв утгагүй. */
   answerBoxes: PublicAnswerBox[];
+  /** Загвар төрөлд: дугаарласан хоосон нүдтэй LaTeX. Бусад төрөлд хоосон. */
+  answerDisplay: string;
 };
 
 export function toPublicPlacementProblem(problem: PlacementProblem): PublicPlacementProblem {
@@ -52,7 +57,13 @@ export function toPublicPlacementProblem(problem: PlacementProblem): PublicPlace
     level: problem.level,
     bodyLatex: problem.bodyLatex,
     answerType: problem.answerType,
-    answerBoxes: toPublicBoxes(problem.answerBoxes),
+    answerBoxes:
+      problem.answerType === "template"
+        ? // Загварын нүд дугаараараа нэрлэгдэнэ — илэрхийлэл дэх ⬚₁, ⬚₂-той таарна.
+          parseAnswerTemplate(problem.answerTemplate).values.map((_, i) => ({ label: String(i + 1) }))
+        : toPublicBoxes(problem.answerBoxes),
+    answerDisplay:
+      problem.answerType === "template" ? parseAnswerTemplate(problem.answerTemplate).display : "",
     answerHint:
       problem.answerType === "text"
         ? answerFormatHint(problem.answers)
@@ -70,6 +81,7 @@ type ProblemRow = {
   answers: string[];
   answer_type: AnswerType;
   answer_boxes: AnswerBox[];
+  answer_template: string;
   active: boolean;
   created_at: string;
 };
@@ -85,6 +97,7 @@ function problemFromRow(row: ProblemRow): PlacementProblem {
     answers: row.answers ?? [],
     answerType: row.answer_type ?? "text",
     answerBoxes: row.answer_boxes ?? [],
+    answerTemplate: row.answer_template ?? "",
     active: row.active,
     createdAt: row.created_at,
   };
@@ -126,6 +139,7 @@ export async function createPlacementProblem(input: {
   answers: string[];
   answerType: AnswerType;
   answerBoxes: AnswerBox[];
+  answerTemplate: string;
   active: boolean;
 }): Promise<PlacementProblem> {
   const { data, error } = await getSupabase()
@@ -139,6 +153,7 @@ export async function createPlacementProblem(input: {
       answers: input.answers,
       answer_type: input.answerType,
       answer_boxes: input.answerBoxes,
+      answer_template: input.answerTemplate,
       active: input.active,
     })
     .select("*")
@@ -152,7 +167,15 @@ export async function updatePlacementProblem(
   input: Partial<
     Pick<
       PlacementProblem,
-      "topic" | "topicOrder" | "level" | "bodyLatex" | "answers" | "answerType" | "answerBoxes" | "active"
+      | "topic"
+      | "topicOrder"
+      | "level"
+      | "bodyLatex"
+      | "answers"
+      | "answerType"
+      | "answerBoxes"
+      | "answerTemplate"
+      | "active"
     >
   >
 ): Promise<PlacementProblem | undefined> {
@@ -164,6 +187,7 @@ export async function updatePlacementProblem(
   if (input.answers !== undefined) patch.answers = input.answers;
   if (input.answerType !== undefined) patch.answer_type = input.answerType;
   if (input.answerBoxes !== undefined) patch.answer_boxes = input.answerBoxes;
+  if (input.answerTemplate !== undefined) patch.answer_template = input.answerTemplate;
   if (input.active !== undefined) patch.active = input.active;
 
   const { data, error } = await getSupabase()

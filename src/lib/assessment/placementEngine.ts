@@ -19,6 +19,7 @@ import {
 } from "./placementDb";
 import { getPlacementMinutes, setQuizRecommendation } from "./db";
 import { isBoxedAnswerCorrect, renderBoxedAnswer } from "./answerShape";
+import { parseAnswerTemplate } from "./answerTemplate";
 import { writePlacementRecommendation } from "./placementRecommendation";
 
 /**
@@ -251,13 +252,18 @@ export async function placementAnswer(
   // нэг мөр болгож хадгална ("3 1/2"), тусдаа багана нэмэх шаардлагагүй.
   const boxes = Array.isArray(given) ? given : [given];
   const isBoxed = problem.answerType !== "text";
+  // Загварын зөв утгууд загвартаа л амьдарна — answer_boxes хоосон байна.
+  const expected =
+    problem.answerType === "template"
+      ? parseAnswerTemplate(problem.answerTemplate).values.map((value) => ({ value }))
+      : problem.answerBoxes;
   const record = isBoxed ? renderBoxedAnswer(problem.answerType, boxes) : boxes[0] ?? "";
 
   await answerPlacementStep({
     stepId: open.id,
     givenAnswer: record.slice(0, 200),
     isCorrect: isBoxed
-      ? isBoxedAnswerCorrect(problem.answerBoxes, boxes)
+      ? isBoxedAnswerCorrect(expected, boxes)
       : isAnswerCorrect(record, problem.answers),
   });
   return placementState(assessment);

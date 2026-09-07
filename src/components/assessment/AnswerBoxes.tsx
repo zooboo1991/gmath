@@ -1,5 +1,6 @@
 "use client";
 
+import MathText from "@/components/assessment/MathText";
 import type { AnswerType, PublicAnswerBox } from "@/lib/assessment/answerShape";
 
 /**
@@ -46,12 +47,15 @@ export default function AnswerBoxes({
   values,
   onChange,
   onSubmit,
+  display,
 }: {
   type: AnswerType;
   boxes: PublicAnswerBox[];
   values: string[];
   onChange: (values: string[]) => void;
   onSubmit: () => void;
+  /** Загвар төрөлд: дугаарласан хоосон нүдтэй илэрхийлэл. */
+  display?: string;
 }) {
   const set = (i: number, v: string) => {
     const next = [...values];
@@ -59,6 +63,37 @@ export default function AnswerBoxes({
     onChange(next);
   };
   const at = (i: number) => values[i] ?? "";
+
+  if (type === "template") {
+    // Нүд нь зэрэг, бутархай дотор ч орж болох тул илэрхийллийн дотор
+    // жинхэнэ input байрлуулах боломжгүй — ЭЕШ-ийн адилаар илэрхийлэлд
+    // дугаарласан хоосон нүд харуулж, доор нь дугаараар нь бөглүүлнэ.
+    return (
+      <div>
+        {display && (
+          <div className="text-[1.25rem] leading-[2] mb-3">
+            <MathText source={`$${display}$`} />
+          </div>
+        )}
+        <div className="flex items-end gap-2.5 flex-wrap">
+          {boxes.map((box, i) => (
+            <div key={i} className="flex flex-col gap-1">
+              <span className="text-[.76rem] font-extrabold text-ink-3 text-center">
+                {box.label ?? String(i + 1)}
+              </span>
+              <Box
+                value={at(i)}
+                onChange={(v) => set(i, v)}
+                onSubmit={onSubmit}
+                label={`${box.label ?? i + 1}-р нүд`}
+                autoFocus={i === 0}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (type === "fraction" || type === "mixed") {
     const offset = type === "mixed" ? 1 : 0;

@@ -925,6 +925,7 @@ type PlacementViewPayload =
         answerHint: string;
         answerType: AnswerType;
         answerBoxes: PublicAnswerBox[];
+        answerDisplay: string;
       };
       position: number;
       total: number;
@@ -1062,6 +1063,7 @@ function PlacementStep({
       answerHint={view.problem.answerHint}
       answerType={view.problem.answerType}
       answerBoxes={view.problem.answerBoxes}
+      answerDisplay={view.problem.answerDisplay}
       answer={answer}
       onAnswerChange={setAnswer}
       boxValues={boxValues}

@@ -20,6 +20,7 @@ export const ANSWER_TYPES = [
   "mixed",
   "radical",
   "list",
+  "template",
 ] as const;
 
 export type AnswerType = (typeof ANSWER_TYPES)[number];
@@ -82,6 +83,11 @@ export const ANSWER_TYPE_SPECS: Record<AnswerType, TypeSpec> = {
     boxes: null,
     hint: "Нүд бүрд харгалзах тоог бич.",
   },
+  template: {
+    label: "Үсэгт илэрхийлэл (загвараар)",
+    boxes: null,
+    hint: "Илэрхийллийн дугаарласан хоосон нүд бүрд харгалзах утгыг доор бич.",
+  },
 };
 
 /** Тухайн төрөлд байх ёстой нүдний тоо; хувьсах бол өгөгдсөн тоог хүлээнэ. */
@@ -94,7 +100,7 @@ export function boxesAreComplete(type: AnswerType, boxes: AnswerBox[]): boolean 
   if (type === "text") return true;
   const expected = ANSWER_TYPE_SPECS[type].boxes;
   if (expected !== null && boxes.length !== expected) return false;
-  if (expected === null && boxes.length < 2) return false; // list — дор хаяж хоёр
+  if (expected === null && boxes.length < (type === "template" ? 1 : 2)) return false;
   return boxes.every((b) => b.value.trim() !== "");
 }
 
@@ -112,6 +118,7 @@ export function renderBoxedAnswer(type: AnswerType, values: string[]): string {
     case "radical":
       return `${v[0] ?? ""}√${v[1] ?? ""}`;
     case "list":
+    case "template":
       return v.join("; ");
     default:
       return v.join(" ");

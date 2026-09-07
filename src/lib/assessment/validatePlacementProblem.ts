@@ -6,6 +6,7 @@ import {
   type AnswerBox,
   type AnswerType,
 } from "./answerShape";
+import { validateAnswerTemplate } from "./answerTemplate";
 
 /**
  * Бодлогын оролтын нэг шалгагч — POST/PUT хоёулаа үүгээр орно.
@@ -23,6 +24,7 @@ export type PlacementProblemInput = {
   answers: string[];
   answerType: AnswerType;
   answerBoxes: AnswerBox[];
+  answerTemplate: string;
   active: boolean;
 };
 
@@ -33,6 +35,7 @@ const MAX_ANSWERS = 8;
 const MAX_BOXES = 6;
 const MAX_BOX_VALUE = 20;
 const MAX_BOX_LABEL = 24;
+const MAX_TEMPLATE = 300;
 
 export function validatePlacementProblemInput(
   data: unknown
@@ -85,7 +88,18 @@ export function validatePlacementProblemInput(
         })
     : [];
 
-  if (answerType !== "text") {
+  const answerTemplate = typeof d.answerTemplate === "string" ? d.answerTemplate.trim() : "";
+
+  if (answerType === "template") {
+    // Хоосон загварыг ноорог байдлаар зөвшөөрнө — идэвхжүүлэхэд л шаардана.
+    if (answerTemplate) {
+      const check = validateAnswerTemplate(answerTemplate);
+      if (!check.ok) return { ok: false, error: check.error };
+    }
+    if (isTooLong(answerTemplate, MAX_TEMPLATE)) {
+      return { ok: false, error: "Загвар хэт урт байна" };
+    }
+  } else if (answerType !== "text") {
     const expected = ANSWER_TYPE_SPECS[answerType].boxes;
     if (expected !== null && answerBoxes.length !== expected) {
       return { ok: false, error: `Энэ төрөлд ${expected} нүд байх ёстой` };
@@ -105,7 +119,12 @@ export function validatePlacementProblemInput(
   // Идэвхжихийн тулд шалгах юмтай байх ёстой: чөлөөт бичвэрт хариулт,
   // нүдэн төрөлд нүд бүр бөглөгдсөн байна.
   if (active) {
-    const ready = answerType === "text" ? answers.length > 0 : boxesAreComplete(answerType, answerBoxes);
+    const ready =
+      answerType === "text"
+        ? answers.length > 0
+        : answerType === "template"
+          ? validateAnswerTemplate(answerTemplate).ok
+          : boxesAreComplete(answerType, answerBoxes);
     if (!ready) {
       return {
         ok: false,
@@ -116,6 +135,17 @@ export function validatePlacementProblemInput(
 
   return {
     ok: true,
-    value: { grade, topic, topicOrder, level, bodyLatex, answers, answerType, answerBoxes, active },
+    value: {
+      grade,
+      topic,
+      topicOrder,
+      level,
+      bodyLatex,
+      answers,
+      answerType,
+      answerBoxes,
+      answerTemplate,
+      active,
+    },
   };
 }

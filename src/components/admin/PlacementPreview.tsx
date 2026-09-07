@@ -6,6 +6,7 @@ import {
   PlacementResultCard,
 } from "@/components/assessment/PlacementCards";
 import { IconCheckCircle, IconClose } from "@/components/icons";
+import { filledTemplate, parseAnswerTemplate } from "@/lib/assessment/answerTemplate";
 import {
   ANSWER_TYPE_SPECS,
   isBoxedAnswerCorrect,
@@ -57,7 +58,10 @@ export default function PlacementPreview({
           p.level === level &&
           (p.answerType === "text"
             ? p.answers.length > 0
-            : p.answerBoxes.length > 0 && p.answerBoxes.every((b) => b.value.trim() !== ""))
+            : p.answerType === "template"
+              ? parseAnswerTemplate(p.answerTemplate).values.every((v) => v !== "") &&
+                parseAnswerTemplate(p.answerTemplate).values.length > 0
+              : p.answerBoxes.length > 0 && p.answerBoxes.every((b) => b.value.trim() !== ""))
       )
     );
     if (complete) topics.set(order, list);
@@ -91,15 +95,29 @@ export default function PlacementPreview({
   }
 
   const boxed = current !== undefined && current.answerType !== "text";
+  const expectedBoxes =
+    current === undefined
+      ? []
+      : current.answerType === "template"
+        ? parseAnswerTemplate(current.answerTemplate).values.map((value) => ({ value }))
+        : current.answerBoxes;
+
+  // Сурагчийн урсгал шинэ бодлого бүрд нүдээ шинэчилдэг; энд төлөв хоосон
+  // үлдэж болох тул харуулж буй массиваараа шалгана — эс бөгөөс хоосон
+  // Enter нь [] илгээгээд "буруу" гэж бүртгэгдэнэ.
+  const shownValues =
+    boxValues.length === expectedBoxes.length ? boxValues : expectedBoxes.map(() => "");
 
   const submit = () => {
     if (!current || remaining === 0) return;
-    if (boxed ? boxValues.some((v) => !v.trim()) : !answer.trim()) return;
+    if (boxed ? shownValues.some((v) => !v.trim()) : !answer.trim()) return;
     const correct = boxed
-      ? isBoxedAnswerCorrect(current.answerBoxes, boxValues)
+      ? isBoxedAnswerCorrect(expectedBoxes, shownValues)
       : isAnswerCorrect(answer, current.answers);
     const expected = boxed
-      ? renderBoxedAnswer(current.answerType, current.answerBoxes.map((b) => b.value))
+      ? current.answerType === "template"
+        ? filledTemplate(current.answerTemplate)
+        : renderBoxedAnswer(current.answerType, current.answerBoxes.map((b) => b.value))
       : current.answers.join("; ");
     setFeedback({ correct, expected });
     setSteps((s) => [...s, { topicOrder: current.topicOrder, level: current.level, isCorrect: correct }]);
@@ -212,14 +230,19 @@ export default function PlacementPreview({
                   : ANSWER_TYPE_SPECS[current.answerType].hint
               }
               answerType={current.answerType}
-              answerBoxes={toPublicBoxes(current.answerBoxes)}
+              answerBoxes={
+                current.answerType === "template"
+                  ? expectedBoxes.map((_, i) => ({ label: String(i + 1) }))
+                  : toPublicBoxes(current.answerBoxes)
+              }
+              answerDisplay={
+                current.answerType === "template"
+                  ? parseAnswerTemplate(current.answerTemplate).display
+                  : ""
+              }
               answer={answer}
               onAnswerChange={setAnswer}
-              boxValues={
-                boxValues.length === current.answerBoxes.length
-                  ? boxValues
-                  : current.answerBoxes.map(() => "")
-              }
+              boxValues={shownValues}
               onBoxesChange={setBoxValues}
               onSubmit={submit}
               busy={false}

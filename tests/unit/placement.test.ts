@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { suspiciousAnswer } from "@/components/admin/PlacementProblemsPanel";
+import { hasAnswer, suspiciousAnswer } from "@/components/admin/PlacementProblemsPanel";
+import type { PlacementProblem } from "@/lib/assessment/placementDb";
 import { answerFormatHint, isAnswerCorrect,
   nextLevelForTopic,
   normalizeAnswer,
@@ -243,5 +244,29 @@ describe("админы хариултын анхааруулга", () => {
     for (const clean of ["24", "-4", "13/20", "0.65", "3 1/2", "17 11/12", "тийм"]) {
       expect(suspiciousAnswer(clean), clean).toBeNull();
     }
+  });
+});
+
+
+describe("хариулт бэлэн эсэх (админы жагсаалт)", () => {
+  const base = {
+    id: "x", grade: 8, topic: "Сэдэв", topicOrder: 1, level: 2,
+    bodyLatex: "x", active: false, createdAt: "",
+  };
+  const problem = (over: Partial<PlacementProblem>): PlacementProblem =>
+    ({ ...base, answers: [], answerType: "text", answerBoxes: [], answerTemplate: "", ...over }) as PlacementProblem;
+
+  it("төрөл бүр хариултаа өөр газраас олно", () => {
+    expect(hasAnswer(problem({ answerType: "text", answers: ["24"] }))).toBe(true);
+    expect(hasAnswer(problem({ answerType: "text", answers: [] }))).toBe(false);
+
+    expect(hasAnswer(problem({ answerType: "mixed", answerBoxes: [{ value: "3" }, { value: "1" }, { value: "2" }] }))).toBe(true);
+    expect(hasAnswer(problem({ answerType: "mixed", answerBoxes: [{ value: "3" }] }))).toBe(false);
+
+    // Загварын түлхүүр answerBoxes-д биш, answerTemplate-д амьдардаг —
+    // үүнийг мартвал бүрэн бодлого "хариултгүй" гэж заагдана.
+    expect(hasAnswer(problem({ answerType: "template", answerTemplate: "[9]a^{[10]}" }))).toBe(true);
+    expect(hasAnswer(problem({ answerType: "template", answerTemplate: "" }))).toBe(false);
+    expect(hasAnswer(problem({ answerType: "template", answerTemplate: "9a^{10}" }))).toBe(false);
   });
 });
