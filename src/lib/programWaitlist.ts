@@ -141,6 +141,18 @@ export async function listProgramWaitlist(
   });
 }
 
+export async function findProgramWaitlistEntryById(
+  id: string
+): Promise<ProgramWaitlistEntry | undefined> {
+  const { data, error } = await getSupabase()
+    .from("program_waitlist")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? fromRow(data as Row) : undefined;
+}
+
 export async function setProgramWaitlistStatus(
   id: string,
   status: ProgramWaitlistStatus

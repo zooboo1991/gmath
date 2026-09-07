@@ -1,5 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { anonClient, signedInClient } from "../../support/client";
+import { adminClient, anonClient, signedInClient } from "../../support/client";
+import { mockCalls } from "../../support/mockControl";
+import { notificationsFor } from "../../support/factories";
 import { createTestUser } from "../../support/factories";
 import { cleanupTracked, testDb, track } from "../../support/db";
 import { trackNotificationsForCreatedUsers } from "../../support/factories";
@@ -162,5 +164,56 @@ describe("хаагдсан бүртгэл", () => {
       .eq("program_id", PROGRAM_ID)
       .single();
     expect((data as { status: string }).status).toBe("closed");
+  });
+});
+
+
+describe("Холбогдсон гэж тэмдэглэхэд мэдэгдэнэ", () => {
+  it("SMS болон мэдэгдэл нэг л удаа очно", async () => {
+    const a = await joiner();
+    await a.client.post(`/api/programs/${PROGRAM_ID}/waitlist`, {});
+    const { data } = await testDb()
+      .from("program_waitlist")
+      .select("id")
+      .eq("user_id", a.user.id)
+      .eq("program_id", PROGRAM_ID)
+      .single();
+    const entryId = (data as { id: string }).id;
+
+    const admin = await adminClient("full");
+    const smsBefore = (await mockCalls("skytel")).filter((c) => c.query.sendto === a.user.phone).length;
+
+    const res = await admin.put(`/api/admin/program-waitlist`, { id: entryId, status: "notified" });
+    expect(res.status, res.text).toBe(200);
+
+    // Утасны амлалтын баталгаа: SMS латинаар, бүртгүүлэх газраа заасан байна.
+    const smsCalls = (await mockCalls("skytel")).filter((c) => c.query.sendto === a.user.phone);
+    expect(smsCalls.length).toBe(smsBefore + 1);
+    expect(String(smsCalls[smsCalls.length - 1].query.message ?? "")).toContain("burtguuleh");
+
+    const titles = (await notificationsFor(a.user.id)).map((n) => n.title);
+    expect(titles).toContain("Танд сул орон тоо гарлаа");
+
+    // Давхар дарахад дахин илгээхгүй — төлөв аль хэдийн notified.
+    await admin.put(`/api/admin/program-waitlist`, { id: entryId, status: "notified" });
+    const smsAgain = (await mockCalls("skytel")).filter((c) => c.query.sendto === a.user.phone).length;
+    expect(smsAgain).toBe(smsBefore + 1);
+  });
+
+  it("Хаах дарахад SMS очихгүй", async () => {
+    const a = await joiner();
+    await a.client.post(`/api/programs/${PROGRAM_ID}/waitlist`, {});
+    const { data } = await testDb()
+      .from("program_waitlist")
+      .select("id")
+      .eq("user_id", a.user.id)
+      .eq("program_id", PROGRAM_ID)
+      .single();
+
+    const admin = await adminClient("full");
+    const before = (await mockCalls("skytel")).filter((c) => c.query.sendto === a.user.phone).length;
+    await admin.put(`/api/admin/program-waitlist`, { id: (data as { id: string }).id, status: "closed" });
+    const after = (await mockCalls("skytel")).filter((c) => c.query.sendto === a.user.phone).length;
+    expect(after).toBe(before);
   });
 });
