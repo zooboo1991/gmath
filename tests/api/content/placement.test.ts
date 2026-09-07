@@ -378,9 +378,19 @@ describe("үсэгт илэрхийллийн загвар", () => {
     const raw = await client.get(`/api/assessment/${id}/placement`);
     expect(raw.text).not.toContain("answer_template");
     expect(raw.text).not.toContain("answerTemplate");
-    // 2-р түвшний түлхүүр нь 22 ба 47 — аль нь ч хаана ч гарах ёсгүй.
-    expect(raw.text).not.toContain("22");
-    expect(raw.text).not.toContain("47");
+    // 2-р түвшний түлхүүр нь 22 ба 47. Substring-ээр хайж болохгүй — "22"
+    // нь UUID, үлдсэн секундэд санамсаргүй таардаг. Тиймээс бүх УТГЫГ
+    // задалж, аль нь ч түлхүүртэй яг тэнцэхгүйг шалгана.
+    const values: string[] = [];
+    const collect = (node: unknown): void => {
+      if (node === null || node === undefined) return;
+      if (typeof node === "string" || typeof node === "number") values.push(String(node));
+      else if (Array.isArray(node)) node.forEach(collect);
+      else if (typeof node === "object") Object.values(node).forEach(collect);
+    };
+    collect(JSON.parse(raw.text));
+    expect(values).not.toContain("22");
+    expect(values).not.toContain("47");
   });
 
   it("нүд бүр таарвал зөв, зөрвөл буруу", async () => {
