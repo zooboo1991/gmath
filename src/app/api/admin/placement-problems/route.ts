@@ -5,12 +5,12 @@ import {
   listPlacementProblems,
 } from "@/lib/assessment/placementDb";
 import { validatePlacementProblemInput } from "@/lib/assessment/validatePlacementProblem";
-import { isFullAdmin } from "@/lib/session";
+import { REFUSED, requireCapability } from "@/lib/adminAccess";
 
 /** Шаталсан түвшин тогтоолтын бодлогын сан. Зөвхөн эзний эрх. */
 export async function GET(request: Request) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("placementBank")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const gradeParam = new URL(request.url).searchParams.get("grade");
   const grade = gradeParam ? Number(gradeParam) : undefined;
@@ -21,8 +21,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("placementBank")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const data = await request.json().catch(() => ({}));
   const result = validatePlacementProblemInput(data);

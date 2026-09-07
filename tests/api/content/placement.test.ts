@@ -7,7 +7,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { anonClient, signedInClient, TestClient } from "../../support/client";
+import { anonClient, signedInClient, TestClient, staffClient, adminClient } from "../../support/client";
 import { cleanupTracked, testDb, track } from "../../support/db";
 import { createTestUser, trackNotificationsForCreatedUsers } from "../../support/factories";
 
@@ -421,5 +421,79 @@ describe("үсэгт илэрхийллийн загвар", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].given_answer).toBe("22; 47");
     expect(rows[0].is_correct).toBe(true);
+  });
+});
+
+
+describe("багшийн эрх", () => {
+  it("багш бодлого нэмж, засаж, устгаж чадна; тохиргоонд хүрэхгүй", async () => {
+    const owner = await adminClient("full");
+    const suffix = Date.now().toString().slice(-6);
+    const { client: teacher, id: staffId } = await staffClient(owner, {
+      name: "Багш Тест",
+      username: `bagsh${suffix}`,
+      password: "nuuts-ug-123",
+      role: "teacher",
+    });
+    track("admin_users", staffId);
+
+    // Нэмэх
+    const created = await teacher.post<{ problem: { id: string } }>("/api/admin/placement-problems", {
+      grade: GRADE,
+      topic: "Багшийн сэдэв",
+      topicOrder: 25,
+      level: 2,
+      bodyLatex: "Багшийн бодлого",
+      answers: ["7"],
+      answerType: "text",
+      answerBoxes: [],
+      answerTemplate: "",
+      active: false,
+    });
+    expect(created.status, created.text).toBe(200);
+    const problemId = created.body.problem.id;
+
+    // Засах
+    const updated = await teacher.put(`/api/admin/placement-problems/${problemId}`, {
+      grade: GRADE,
+      topic: "Багшийн сэдэв",
+      topicOrder: 25,
+      level: 2,
+      bodyLatex: "Засварласан бодлого",
+      answers: ["8"],
+      answerType: "text",
+      answerBoxes: [],
+      answerTemplate: "",
+      active: false,
+    });
+    expect(updated.status, updated.text).toBe(200);
+
+    // Мөнгө ба нийтлэлтийн тохиргоо хаалттай хэвээр.
+    const settings = await teacher.put("/api/admin/settings", {
+      key: "placement_minutes",
+      value: "50",
+    });
+    expect(settings.status).toBe(401);
+
+    // Устгах
+    const removed = await teacher.del(`/api/admin/placement-problems/${problemId}`);
+    expect(removed.status, removed.text).toBe(200);
+  });
+
+  it("viewer бодлогод хүрэхгүй", async () => {
+    const viewer = await adminClient("viewer");
+    const res = await viewer.post("/api/admin/placement-problems", {
+      grade: GRADE,
+      topic: "Х",
+      topicOrder: 26,
+      level: 2,
+      bodyLatex: "х",
+      answers: ["1"],
+      answerType: "text",
+      answerBoxes: [],
+      answerTemplate: "",
+      active: false,
+    });
+    expect(res.status).toBe(401);
   });
 });

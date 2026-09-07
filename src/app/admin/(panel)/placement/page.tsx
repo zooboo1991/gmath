@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Шаталсан шалгалтын сан — Админ" };
 
 export default async function AdminPlacementPage() {
-  await requireAdminSection("assessment");
+  const role = await requireAdminSection("placement");
   // Хүснэгт шинэ — schema.sql-ээ ажиллуулаагүй орчинд хуудас унахгүй.
   const [problems, fee, minutes, openGrades] = await Promise.all([
     listPlacementProblems({}).catch(() => []),
@@ -24,6 +24,7 @@ export default async function AdminPlacementPage() {
         initialFee={fee}
         initialMinutes={minutes}
         initialOpenGrades={openGrades}
+        canManageSettings={role === "full"}
       />
     </div>
   );

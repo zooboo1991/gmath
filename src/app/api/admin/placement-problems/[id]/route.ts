@@ -6,11 +6,11 @@ import {
   updatePlacementProblem,
 } from "@/lib/assessment/placementDb";
 import { validatePlacementProblemInput } from "@/lib/assessment/validatePlacementProblem";
-import { isFullAdmin } from "@/lib/session";
+import { REFUSED, requireCapability } from "@/lib/adminAccess";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("placementBank")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const { id } = await params;
   const existing = await findPlacementProblem(id);
@@ -49,8 +49,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
  * тэр үед 409 гарна.
  */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isFullAdmin())) {
-    return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
+  if (!(await requireCapability("placementBank")).ok) {
+    return NextResponse.json(REFUSED, { status: 401 });
   }
   const { id } = await params;
   try {

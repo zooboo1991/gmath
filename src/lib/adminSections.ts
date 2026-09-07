@@ -31,6 +31,9 @@ export type AdminSection =
   /** Marking what students submitted. Split from the above so a teacher gets
    *  the queue without the fee settings and the problem bank. */
   | "grading"
+  /** Шаталсан шалгалтын сан: багш бодлого зохиож, турших. Үнэ, хугацаа,
+   *  ангиудын тохиргоо нь энд харагддаг ч эзэн л өөрчилнө. */
+  | "placement"
   /** Ирц бүртгэх: the teacher's register for classroom lessons. */
   | "attendance"
   | "notifications"
@@ -50,7 +53,7 @@ export type AdminSection =
  * either: taking attendance was what took them there, and it now has a screen
  * of its own built for the job.
  */
-export const TEACHER_SECTIONS = ["attendance", "grading"] as const;
+export const TEACHER_SECTIONS = ["attendance", "grading", "placement"] as const;
 
 export function canView(role: AdminRole, section: AdminSection): boolean {
   if (role === "full") return true;
@@ -75,12 +78,14 @@ export type AdminCapability =
   | "grading"
   /** The problem bank, exams, levels, fees. */
   | "assessmentSetup"
+  /** Шаталсан шалгалтын бодлого нэмэх, засах, устгах — мөнгөний тохиргоогүй. */
+  | "placementBank"
   /** Articles, notifications, certificates, chat, settings, staff accounts. */
   | "siteAdmin";
 
 const CAPABILITIES: Record<AdminRole, readonly AdminCapability[]> = {
-  full: ["lessons", "courseInfo", "registrations", "grading", "assessmentSetup", "siteAdmin"],
-  teacher: ["lessons", "grading"],
+  full: ["lessons", "courseInfo", "registrations", "grading", "assessmentSetup", "placementBank", "siteAdmin"],
+  teacher: ["lessons", "grading", "placementBank"],
   viewer: [],
 };
 

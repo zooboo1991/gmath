@@ -9,6 +9,7 @@ import type { IconProps } from "@/components/icons";
 import {
   IconBell,
   IconBook,
+  IconGraduationCap,
   IconChat,
   IconCheck,
   IconCheckCircle,
@@ -42,6 +43,7 @@ const MENU: { href: string; label: string; icon: (p: IconProps) => React.ReactNo
   { href: "/admin/certificates", label: "Сертификат", icon: IconMedal, section: "certificates" },
   { href: "/admin/assessment", label: "Үнэлгээ", icon: IconTarget, section: "assessment" },
   { href: "/admin/attendance", label: "Ирц бүртгэх", icon: IconCheckCircle, section: "attendance" },
+  { href: "/admin/placement", label: "Шаталсан шалгалт", icon: IconGraduationCap, section: "placement" },
   { href: "/admin/grading", label: "Шалгах", icon: IconCheck, section: "grading" },
   { href: "/admin/waitlist", label: "Хүлээлгийн жагсаалт", icon: IconCalendar, section: "waitlist" },
   { href: "/admin/notifications", label: "Мэдэгдэл", icon: IconBell, section: "notifications" },

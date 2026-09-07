@@ -60,11 +60,14 @@ export default function PlacementProblemsPanel({
   initialFee,
   initialMinutes,
   initialOpenGrades,
+  canManageSettings,
 }: {
   initialProblems: PlacementProblem[];
   initialFee: string;
   initialMinutes: number;
   initialOpenGrades: number[];
+  /** Үнэ, хугацаа, нээлттэй ангиуд — мөнгө ба нийтлэлт тул эзэн л өөрчилнө. */
+  canManageSettings: boolean;
 }) {
   const [problems, setProblems] = useState(initialProblems);
   const grades = useMemo(
@@ -95,12 +98,15 @@ export default function PlacementProblemsPanel({
 
   return (
     <>
-      <Link
-        href="/admin/assessment"
-        className="inline-flex items-center gap-1.5 text-ink-3 font-bold text-[.85rem] hover:text-ink"
-      >
-        <IconArrowLeft className="w-4 h-4" /> Үнэлгээ
-      </Link>
+      {/* Багшид Үнэлгээ хэсэг харагддаггүй тул линк нь мухарладаг — нуана. */}
+      {canManageSettings && (
+        <Link
+          href="/admin/assessment"
+          className="inline-flex items-center gap-1.5 text-ink-3 font-bold text-[.85rem] hover:text-ink"
+        >
+          <IconArrowLeft className="w-4 h-4" /> Үнэлгээ
+        </Link>
+      )}
 
       <div className="flex items-end justify-between gap-4 flex-wrap mt-3 mb-5">
         <div>
@@ -137,13 +143,15 @@ export default function PlacementProblemsPanel({
         </div>
       </div>
 
-      <PlacementSettings
-        initialFee={initialFee}
-        initialMinutes={initialMinutes}
-        initialOpenGrades={initialOpenGrades}
-        gradesWithProblems={grades}
-        onMinutesSaved={setSavedMinutes}
-      />
+      {canManageSettings && (
+        <PlacementSettings
+          initialFee={initialFee}
+          initialMinutes={initialMinutes}
+          initialOpenGrades={initialOpenGrades}
+          gradesWithProblems={grades}
+          onMinutesSaved={setSavedMinutes}
+        />
+      )}
 
       {missingAnswers > 0 && (
         <p className="text-[.88rem] font-bold text-gold-strong bg-gold-soft rounded-sm px-4 py-3 mb-4 leading-[1.6]">
