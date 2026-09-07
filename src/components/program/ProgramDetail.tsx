@@ -5,6 +5,7 @@ import { RegisterTriggerButton } from "./ProgramRegister";
 import WaitlistJoinButton from "./WaitlistJoinButton";
 import { getSessionUser } from "@/lib/session";
 import { findProgramWaitlistEntry } from "@/lib/programWaitlist";
+import { findRegistrationByUserAndProgram } from "@/lib/db";
 import { findYearlyProgramById, listArticlesForProgram } from "@/lib/db";
 import { IconTrophy, IconPerson, IconClock, IconPlayBox, IconCheckCircle, IconPeopleHero, IconGraduationCap, IconGrid, IconDocument } from "@/components/icons";
 import VideoEmbed from "@/components/VideoEmbed";
@@ -93,11 +94,18 @@ export default async function ProgramDetail({
   // тэмдэглэсэн хүнд энгийн бүртгэлийн товч нээгдэнэ — /api/enroll ч мөн
   // яг энэ нөхцөлөөр нэвтрүүлдэг тул товч, сервер хоёр зөрөхгүй.
   const sessionUser = yearlyProgram.enrollmentClosed ? await getSessionUser() : null;
-  const waitlistEntry = sessionUser
-    ? await findProgramWaitlistEntry(sessionUser.id, programId).catch(() => undefined)
-    : undefined;
+  const [waitlistEntry, ownRegistration] = sessionUser
+    ? await Promise.all([
+        findProgramWaitlistEntry(sessionUser.id, programId).catch(() => undefined),
+        findRegistrationByUserAndProgram(sessionUser.id, programId).catch(() => undefined),
+      ])
+    : [undefined, undefined];
   const invitedFromWaitlist = waitlistEntry?.status === "notified";
-  const enrollmentClosed = yearlyProgram.enrollmentClosed && !invitedFromWaitlist;
+  // Аль хэдийн бүртгэлтэй хүнд хүлээлгийн товч огт гарах ёсгүй — нэг сурагч
+  // өөрийнхөө сургалтын дарааллаар зогсчихсон тохиолдол бодитоор гарсан.
+  const alreadyRegistered = ownRegistration !== undefined;
+  const enrollmentClosed =
+    yearlyProgram.enrollmentClosed && !invitedFromWaitlist && !alreadyRegistered;
 
   return (
     <>

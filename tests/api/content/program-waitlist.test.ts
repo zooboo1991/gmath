@@ -120,6 +120,58 @@ describe("хүлээлгийн жагсаалтад орох", () => {
   });
 });
 
+describe("бүртгэлтэй хүн дараалалд орохгүй", () => {
+  it("идэвхтэй бүртгэлтэй сурагчийг жагсаалт няцаана", async () => {
+    // Бодит тохиолдол: C-д идэвхтэй сурагч хичээлдээ орох гэж байгаад
+    // хүлээлгийн товч дараад өөрийнхөө сургалтын дарааллаар зогссон.
+    const a = await joiner();
+    const { data: reg } = await testDb()
+      .from("registrations")
+      .insert({
+        user_id: a.user.id,
+        program_id: PROGRAM_ID,
+        program_label: "Тестийн жилийн хөтөлбөр",
+        price: "1,000,000₮",
+        pay_method: "bank",
+        status: "active",
+      })
+      .select("id")
+      .single();
+    track("registrations", (reg as { id: string }).id);
+
+    const res = await a.client.post(`/api/programs/${PROGRAM_ID}/waitlist`, {});
+    expect(res.status).toBe(409);
+    expect(res.text).toContain("аль хэдийн бүртгэлтэй");
+
+    // Мөр огт үүсээгүй байх ёстой.
+    const { count } = await testDb()
+      .from("program_waitlist")
+      .select("id", { count: "exact", head: true })
+      .eq("program_id", PROGRAM_ID)
+      .eq("user_id", a.user.id);
+    expect(count).toBe(0);
+  });
+
+  it("хүлээгдэж буй (pending) бүртгэлтэйг ч няцаана", async () => {
+    const a = await joiner();
+    const { data: reg } = await testDb()
+      .from("registrations")
+      .insert({
+        user_id: a.user.id,
+        program_id: PROGRAM_ID,
+        program_label: "Тестийн жилийн хөтөлбөр",
+        price: "1,000,000₮",
+        pay_method: "bank",
+        status: "pending",
+      })
+      .select("id")
+      .single();
+    track("registrations", (reg as { id: string }).id);
+
+    expect((await a.client.post(`/api/programs/${PROGRAM_ID}/waitlist`, {})).status).toBe(409);
+  });
+});
+
 describe("хаагдсан бүртгэл", () => {
   it("хаалттай хөтөлбөрт шууд бүртгүүлэхийг сервер няцаана", async () => {
     const a = await joiner();

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findYearlyProgramById } from "@/lib/db";
+import { findRegistrationByUserAndProgram, findYearlyProgramById } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import {
@@ -48,6 +48,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const program = await findYearlyProgramById(id);
   if (!program) {
     return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
+  }
+  // Бүртгэлтэй хүн өөрийнхөө сургалтын дарааллаар зогсох ёсгүй. Товч талдаа
+  // мөн нуугдсан ч сервер эцсийн хаалт нь байна — хуучин таб, шууд дуудалт.
+  const existing = await findRegistrationByUserAndProgram(user.id, id).catch(() => undefined);
+  if (existing) {
+    return NextResponse.json(
+      { ok: false, error: "Та энэ сургалтад аль хэдийн бүртгэлтэй байна" },
+      { status: 409 }
+    );
   }
   // Нээлттэй хөтөлбөрт дараалал утгагүй — шууд бүртгүүлнэ.
   if (!program.enrollmentClosed) {
