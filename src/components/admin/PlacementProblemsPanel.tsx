@@ -61,6 +61,7 @@ export default function PlacementProblemsPanel({
   initialMinutes,
   initialOpenGrades,
   canManageSettings,
+  sittingsCount,
 }: {
   initialProblems: PlacementProblem[];
   initialFee: string;
@@ -68,6 +69,8 @@ export default function PlacementProblemsPanel({
   initialOpenGrades: number[];
   /** Үнэ, хугацаа, нээлттэй ангиуд — мөнгө ба нийтлэлт тул эзэн л өөрчилнө. */
   canManageSettings: boolean;
+  /** Өгсөн шалгалтын тоо — жагсаалт руу хөтлөх товчинд. */
+  sittingsCount: number;
 }) {
   const [problems, setProblems] = useState(initialProblems);
   const grades = useMemo(
@@ -126,6 +129,12 @@ export default function PlacementProblemsPanel({
               <option key={g} value={g}>{`${g}-р анги`}</option>
             ))}
           </select>
+          <Link
+            href="/admin/placement/results"
+            className="inline-flex items-center h-11 px-4 rounded-md border border-line font-extrabold text-[.88rem] text-ink-2"
+          >
+            {`Өгсөн шалгалтууд${sittingsCount ? ` (${sittingsCount})` : ""}`}
+          </Link>
           <button
             type="button"
             onClick={() => setPreviewing(true)}

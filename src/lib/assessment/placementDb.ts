@@ -313,3 +313,77 @@ export async function answerPlacementStep(input: {
   if (error) throw error;
   return data ? stepFromRow(data as StepRow) : undefined;
 }
+
+/** Админы "Өгсөн шалгалтууд" жагсаалтын нэг мөр. */
+export type PlacementSitting = {
+  id: string;
+  status: string;
+  quizGrade?: number;
+  estimatedLevel?: number;
+  createdAt: string;
+  updatedAt: string;
+  user?: { lastName: string; firstName: string; phone: string; grade?: string };
+};
+
+/**
+ * Шаталсан шалгалт өгсөн бүх суулт, шинэ нь эхэндээ.
+ *
+ * Бүтэн Assessment биш — жагсаалтад хэрэгтэй талбарууд л. Хязгаар 300:
+ * үүнээс олон болоход хуудаслалт нэмэх нь зөв, чимээгүй тасалж болохгүй
+ * тул дуудагч талдаа мэднэ гэж энд тэмдэглэв.
+ */
+export async function listPlacementSittings(): Promise<PlacementSitting[]> {
+  const { data, error } = await getSupabase()
+    .from("assessments")
+    .select("id, status, quiz_grade, estimated_level, created_at, updated_at, users(last_name, first_name, phone, grade)")
+    .eq("track", "placement")
+    .order("created_at", { ascending: false })
+    .limit(300);
+  if (error) throw error;
+  type Row = {
+    id: string;
+    status: string;
+    quiz_grade: number | null;
+    estimated_level: number | null;
+    created_at: string;
+    updated_at: string;
+    users: { last_name: string; first_name: string; phone: string; grade: string | null } | null;
+  };
+  return ((data ?? []) as unknown as Row[]).map((row) => ({
+    id: row.id,
+    status: row.status,
+    quizGrade: row.quiz_grade ?? undefined,
+    estimatedLevel: row.estimated_level ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    user: row.users
+      ? {
+          lastName: row.users.last_name,
+          firstName: row.users.first_name,
+          phone: row.users.phone,
+          grade: row.users.grade ?? undefined,
+        }
+      : undefined,
+  }));
+}
+
+/** Нийт хэдэн суулт байгааг сангийн хуудасны товчинд харуулна. */
+export async function countPlacementSittings(): Promise<number> {
+  const { count, error } = await getSupabase()
+    .from("assessments")
+    .select("id", { count: "exact", head: true })
+    .eq("track", "placement");
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** Алхмуудад дурдагдсан бодлогуудыг нэг дор татна — идэвхгүй болсныг ч. */
+export async function listPlacementProblemsByIds(ids: string[]): Promise<PlacementProblem[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await getSupabase()
+    .from("placement_problems")
+    .select("*")
+    .in("id", ids);
+  if (error) throw error;
+  return (data as ProblemRow[]).map(problemFromRow);
+}

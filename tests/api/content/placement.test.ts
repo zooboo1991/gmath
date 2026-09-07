@@ -549,3 +549,86 @@ describe("туршилтын AI дүгнэлт", () => {
     expect((await viewer.post("/api/admin/placement-preview", { grade: 8, topics: [{ topic: "х", score: 1 }] })).status).toBe(401);
   });
 });
+
+
+describe("өгсөн шалгалтуудын харагдац", () => {
+  /** Дууссан нэг суулт: бодлого, алхам, дүгнэлттэй нь шууд санд тарина. */
+  async function seedCompletedSitting() {
+    await seedTopic(1, "Харагдацын сэдэв");
+    const { data: problems } = await testDb()
+      .from("placement_problems")
+      .select("id, level")
+      .eq("grade", GRADE)
+      .eq("topic_order", 1);
+    const byLevel = new Map((problems ?? []).map((p: { id: string; level: number }) => [p.level, p.id]));
+
+    const student = await createTestUser({ firstName: "Харагдац", lastName: "Тест" });
+    const { data: a } = await testDb()
+      .from("assessments")
+      .insert({
+        user_id: student.id,
+        track: "placement",
+        status: "completed",
+        quiz_grade: GRADE,
+        estimated_level: 2,
+        ai_recommendation: "Туршилтын дүгнэлт — харагдацын тест.",
+      })
+      .select("id")
+      .single();
+    const assessmentId = (a as { id: string }).id;
+    track("assessments", assessmentId);
+
+    await testDb().from("placement_steps").insert([
+      { assessment_id: assessmentId, problem_id: byLevel.get(2), topic_order: 1, level: 2, shown_order: 1, given_answer: "12", is_correct: true, answered_at: new Date().toISOString() },
+      { assessment_id: assessmentId, problem_id: byLevel.get(3), topic_order: 1, level: 3, shown_order: 2, given_answer: "99", is_correct: false, answered_at: new Date().toISOString() },
+    ]);
+    return { assessmentId, student };
+  }
+
+  it("багш жагсаалт болон дэлгэрэнгүйг харна", async () => {
+    const { assessmentId } = await seedCompletedSitting();
+    const owner = await adminClient("full");
+    const suffix = Date.now().toString().slice(-6);
+    const { client: teacher, id: staffId } = await staffClient(owner, {
+      name: "Багш Харагдац",
+      username: `bagshhr${suffix}`,
+      password: "nuuts-ug-123",
+      role: "teacher",
+    });
+    track("admin_users", staffId);
+
+    const list = await teacher.get("/admin/placement/results");
+    expect(list.status).toBe(200);
+    expect(list.text).toContain("Өгсөн шалгалтууд");
+    expect(list.text).toContain("Харагдац");
+
+    const detail = await teacher.get(`/admin/placement/results/${assessmentId}`);
+    expect(detail.status).toBe(200);
+    // Хариултууд зөв/буруугаараа, AI дүгнэлт нь хамт харагдана.
+    expect(detail.text).toContain("Хариултууд (2)");
+    expect(detail.text).toContain("Туршилтын дүгнэлт");
+    expect(detail.text).toContain("99");
+  });
+
+  it("нэвтрээгүй хүнд сурагчийн мэдээлэл задрахгүй", async () => {
+    const { student } = await seedCompletedSitting();
+    const res = await anonClient().get("/admin/placement/results");
+    // Metadata title алдааны хуудсанд ч орох тул гарчгаар биш, жинхэнэ
+    // хамгаалагдах зүйлээр нь шалгана: нэр, утас аль нь ч гарч болохгүй.
+    expect(res.text).not.toContain("Харагдац");
+    expect(res.text).not.toContain(student.phone);
+  });
+
+  it("өөр төрлийн шалгалтын id-гаар 404", async () => {
+    const student = await createTestUser();
+    const { data: a } = await testDb()
+      .from("assessments")
+      .insert({ user_id: student.id, track: "regular", status: "completed" })
+      .select("id")
+      .single();
+    track("assessments", (a as { id: string }).id);
+    const owner = await adminClient("full");
+    const res = await owner.get(`/admin/placement/results/${(a as { id: string }).id}`);
+    expect(res.status).toBe(404);
+  });
+});
