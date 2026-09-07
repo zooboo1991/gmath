@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { apiError, readJson } from "@/lib/fetchJson";
 import type {
@@ -81,13 +82,31 @@ export default function ProgramWaitlistPanel({
               {entry.position > 0 ? `№${entry.position}` : "—"}
             </span>
             <div className="flex-1 min-w-[180px]">
-              <b className="font-extrabold text-[.92rem] block">
-                {[entry.user?.lastName, entry.user?.firstName].filter(Boolean).join(" ") ||
-                  "Нэр тодорхойгүй"}
-              </b>
+              {entry.user ? (
+                <Link
+                  href={`/admin/users/${entry.user.id}`}
+                  className="font-extrabold text-[.92rem] block hover:text-blue-strong hover:underline"
+                >
+                  {[entry.user.lastName, entry.user.firstName].filter(Boolean).join(" ") ||
+                    "Нэр тодорхойгүй"}
+                </Link>
+              ) : (
+                <b className="font-extrabold text-[.92rem] block">Нэр тодорхойгүй</b>
+              )}
               <span className="text-[.82rem] font-semibold text-ink-3">
                 {[entry.user?.phone, entry.user?.grade].filter(Boolean).join(" · ") || "—"}
               </span>
+              {/* Өөрийнхөө сургалтын дараалалд зогссон хүн рүү "суудал
+                  гарлаа" гэж залгах нь эвгүй — мөрөн дээр нь шууд хэлнэ. */}
+              {entry.registrations.some((r) => r.sameProgram) ? (
+                <span className="inline-flex items-center gap-1 text-[.78rem] font-extrabold text-red-soft bg-red-soft/12 rounded-full px-2.5 py-0.5 mt-1">
+                  ⚠ Энэ сургалтад аль хэдийн бүртгэлтэй
+                </span>
+              ) : entry.registrations.length > 0 ? (
+                <span className="inline-flex items-center gap-1 text-[.78rem] font-bold text-gold-strong bg-gold-soft rounded-full px-2.5 py-0.5 mt-1">
+                  {`Өөр сургалтад бүртгэлтэй: ${entry.registrations.map((r) => r.programLabel).join(", ")}`}
+                </span>
+              ) : null}
             </div>
             <span className="text-[.78rem] font-bold text-ink-3 tabular-nums">
               {new Date(entry.createdAt).toLocaleDateString("mn-MN")}

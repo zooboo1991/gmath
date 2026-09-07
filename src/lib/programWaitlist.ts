@@ -26,6 +26,14 @@ export type ProgramWaitlistEntryWithUser = ProgramWaitlistEntry & {
   /** Дараалал дахь байр — зөвхөн хүлээж буй мөрүүдийг тооцно. */
   position: number;
   user?: PublicUser;
+  /**
+   * Энэ хүн аль хэдийн бүртгэлтэй сургалтууд (цуцлагдсанаас бусад).
+   *
+   * Дарааллын мөр өөрөө буруу байж болохыг админд шууд хэлэх зорилготой:
+   * өөрийнхөө сургалтын дараалалд зогссон хүн рүү "суудал гарлаа" гэж
+   * залгах нь эвгүй. sameProgram нь энэ хөтөлбөрийнх мөн эсэх.
+   */
+  registrations: { programId: string; programLabel: string; status: string; sameProgram: boolean }[];
 };
 
 type Row = {
@@ -129,14 +137,43 @@ export async function listProgramWaitlist(
     .order("created_at", { ascending: true });
   if (error) throw error;
 
+  const rows = (data ?? []) as (Row & { users: UserRow | null })[];
+
+  // Дарааллынхны бүртгэлийг нэг дуудалтаар: мөр бүрд асуувал жагсаалт
+  // урсах тусам дуудлага өснө.
+  const userIds = [...new Set(rows.map((r) => r.user_id))];
+  const { data: regs } = userIds.length
+    ? await getSupabase()
+        .from("registrations")
+        .select("user_id, program_id, program_label, status")
+        .in("user_id", userIds)
+        .neq("status", "cancelled")
+    : { data: [] };
+  const byUser = new Map<string, { programId: string; programLabel: string; status: string }[]>();
+  for (const r of (regs ?? []) as {
+    user_id: string;
+    program_id: string;
+    program_label: string;
+    status: string;
+  }[]) {
+    byUser.set(r.user_id, [
+      ...(byUser.get(r.user_id) ?? []),
+      { programId: r.program_id, programLabel: r.program_label, status: r.status },
+    ]);
+  }
+
   let position = 0;
-  return ((data ?? []) as (Row & { users: UserRow | null })[]).map((row) => {
+  return rows.map((row) => {
     const entry = fromRow(row);
     if (QUEUED.includes(entry.status)) position += 1;
     return {
       ...entry,
       position: QUEUED.includes(entry.status) ? position : 0,
       user: row.users ? toPublicUser(userFromRow(row.users)) : undefined,
+      registrations: (byUser.get(row.user_id) ?? []).map((r) => ({
+        ...r,
+        sameProgram: r.programId === programId,
+      })),
     };
   });
 }
