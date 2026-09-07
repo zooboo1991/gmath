@@ -73,6 +73,9 @@ export default function PlacementPreview({
   const [boxValues, setBoxValues] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<{ correct: boolean; expected: string } | null>(null);
   const [deadlineAt, setDeadlineAt] = useState(() => Date.now() + minutes * 60_000);
+  const [recommendation, setRecommendation] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   // Тоолуур — сурагчийнхтай адил секунд тутам.
@@ -125,6 +128,31 @@ export default function PlacementPreview({
     setBoxValues([]);
   };
 
+  const fetchRecommendation = async () => {
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const res = await fetch("/api/admin/placement-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          grade,
+          topics: scores.map((s) => ({ topic: s.topic, score: s.score })),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setAiError(json?.error ?? "Дүгнэлт гаргаж чадсангүй");
+        return;
+      }
+      setRecommendation(json.recommendation);
+    } catch {
+      setAiError("Сүлжээний алдаа — дахин оролдоно уу");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   const scores = [...topics.entries()].map(([order, list]) => ({
     topicOrder: order,
     topic: list[0].topic,
@@ -165,6 +193,7 @@ export default function PlacementPreview({
             <PlacementResultCard
               levelLabel={PLACEMENT_LEVEL_LABELS[overallLevel(scores.map((s) => s.score))]}
               topics={scores}
+              recommendation={recommendation ?? undefined}
               footer={
                 <button
                   type="button"
@@ -173,6 +202,8 @@ export default function PlacementPreview({
                     setAnswer("");
                     setBoxValues([]);
                     setFeedback(null);
+                    setRecommendation(null);
+                    setAiError(null);
                     setDeadlineAt(Date.now() + minutes * 60_000);
                   }}
                   className="h-11 px-6 rounded-full bg-navy text-white font-extrabold text-[.9rem]"
@@ -211,9 +242,25 @@ export default function PlacementPreview({
                   </div>
                 ))}
               </div>
-              <p className="text-[.8rem] font-semibold text-ink-3 mt-2 leading-[1.55]">
-                Бодит шалгалтад энд AI дүгнэлт нэмж бичигдэнэ — туршилтад дуудагдахгүй.
-              </p>
+              {recommendation === null && (
+                <div className="mt-2.5">
+                  <button
+                    type="button"
+                    disabled={aiBusy}
+                    onClick={fetchRecommendation}
+                    className="h-10 px-4 rounded-md border border-line font-extrabold text-[.85rem] text-blue-strong disabled:opacity-50"
+                  >
+                    {aiBusy ? "Бичиж байна…" : "AI дүгнэлт гаргаж үзэх"}
+                  </button>
+                  <p className="text-[.8rem] font-semibold text-ink-3 mt-1.5 leading-[1.55]">
+                    Бодит шалгалтад автоматаар бичигддэг дүгнэлтийг яг ижил үүсгэгчээр гаргаж
+                    үзүүлнэ — дээрх үр дүнгийн картад сурагчийн харах хэлбэрээр орно.
+                  </p>
+                  {aiError && (
+                    <p className="text-red-soft font-bold text-[.82rem] mt-1.5">{aiError}</p>
+                  )}
+                </div>
+              )}
             </div>
           </>
         ) : current ? (

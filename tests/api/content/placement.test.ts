@@ -497,3 +497,45 @@ describe("багшийн эрх", () => {
     expect(res.status).toBe(401);
   });
 });
+
+
+describe("туршилтын AI дүгнэлт", () => {
+  it("багш дүгнэлт гаргаж чадна — бодит үүсгэгчийн ижил зам", async () => {
+    const owner = await adminClient("full");
+    const suffix = Date.now().toString().slice(-6);
+    const { client: teacher, id: staffId } = await staffClient(owner, {
+      name: "Багш AI",
+      username: `bagshai${suffix}`,
+      password: "nuuts-ug-123",
+      role: "teacher",
+    });
+    track("admin_users", staffId);
+
+    const res = await teacher.post<{ recommendation: string }>("/api/admin/placement-preview", {
+      grade: 8,
+      topics: [
+        { topic: "Бутархай", score: 3 },
+        { topic: "Тэгшитгэл", score: 1 },
+        { topic: "Магадлал", score: 2 },
+      ],
+    });
+    expect(res.status, res.text).toBe(200);
+    // Мок орчинд Anthropic-ийн хариу тогтмол — үүсгэгч дуудагдсаны баталгаа.
+    expect(res.body.recommendation).toContain("Mock AI");
+  });
+
+  it("оноогүй хүсэлтийг няцаана", async () => {
+    const owner = await adminClient("full");
+    expect((await owner.post("/api/admin/placement-preview", { grade: 8, topics: [] })).status).toBe(400);
+    expect((await owner.post("/api/admin/placement-preview", { grade: 3, topics: [{ topic: "х", score: 1 }] })).status).toBe(400);
+    expect(
+      (await owner.post("/api/admin/placement-preview", { grade: 8, topics: [{ topic: "х", score: 5 }] })).status
+    ).toBe(400);
+  });
+
+  it("нэвтрээгүй болон viewer-ийг няцаана", async () => {
+    expect((await anonClient().post("/api/admin/placement-preview", {})).status).toBe(401);
+    const viewer = await adminClient("viewer");
+    expect((await viewer.post("/api/admin/placement-preview", { grade: 8, topics: [{ topic: "х", score: 1 }] })).status).toBe(401);
+  });
+});
