@@ -1776,24 +1776,31 @@ export async function settleRegistrationPayment(id: string): Promise<Registratio
   if (!data) return findRegistrationById(id);
   const updated = registrationFromRow(data as RegistrationRow);
 
-  // A 50/50 registration paid only its first half through QPay. Recording it
-  // here is what makes the roster's "Үлдэгдэл" the truth — the admin would
-  // otherwise have to type in money the gateway already took. Guarded by the
-  // status transition above, so this runs once.
-  if (updated.totalDue !== undefined && updated.installmentDueDate) {
-    const { now } = splitHalves(updated.totalDue);
-    await addRegistrationPayment({
-      registrationId: updated.id,
-      amount: now,
-      paidAt: new Date().toISOString().slice(0, 10),
-    }).catch((err) => {
-      // The seat is granted either way; a missing payment row is something
-      // the admin can add, a refused enrollment is not. It must not vanish
-      // without a trace though: money that really arrived would otherwise be
-      // invisible to every screen with nothing to say it went missing.
-      console.error("[qpay] installment payment row failed", updated.id, err);
-    });
-  }
+  // QPay-ээр орсон мөнгийг ҮРГЭЛЖ бичнэ — хуваасан хагасыг ч, бүтэн үнийг ч.
+  //
+  // Өмнө нь зөвхөн хуваасан үед бичдэг байсан: бүтэн төлсөн бүртгэлийг
+  // "QPay-ээр төлсөн, төлөх дүн тохируулаагүй бол бүтэн" гэсэн дүрэм
+  // (registrationBalance-ийн settledByGateway) нөхдөг байв. Тэр дүрэм
+  // "Төлөх дүн" тавимагц унтардаг тул админ тэр талбарыг хүрэхэд бүтэн
+  // төлсөн сурагч 0₮ болж харагддаг байсан — бодитоор тохиолдсон.
+  //
+  // Дүнг QPay-ийн бүртгэснээр авна: нэхэмжилсэнтэй зөрвөл дэвтэрт бодитыг
+  // нь бичих ёстой. Байхгүй бол өөрсдийн тооцоолол нөхөнө.
+  const expectedAmount =
+    updated.totalDue !== undefined && updated.installmentDueDate
+      ? splitHalves(updated.totalDue).now
+      : parsePriceToNumber(updated.price);
+  await addRegistrationPayment({
+    registrationId: updated.id,
+    amount: result.amount ?? expectedAmount,
+    paidAt: result.paidAt.slice(0, 10),
+  }).catch((err) => {
+    // The seat is granted either way; a missing payment row is something
+    // the admin can add, a refused enrollment is not. It must not vanish
+    // without a trace though: money that really arrived would otherwise be
+    // invisible to every screen with nothing to say it went missing.
+    console.error("[qpay] payment row failed", updated.id, err);
+  });
 
   await notifyRegistrationActive(updated);
   return updated;

@@ -115,6 +115,30 @@ describe("splitting a classroom group's fee", () => {
     expect(row.installment_due_date).toBeNull();
   });
 
+  it("бүтэн төлсөн QPay төлбөрийг ч дэвтэрт бичнэ", async () => {
+    // Өмнө нь зөвхөн хуваасан үед бичдэг байсан: бүтэн төлсөн бүртгэлийг
+    // "QPay-ээр төлсөн бол бүтэн" гэсэн дүрэм нөхдөг байв. Тэр дүрэм
+    // "Төлөх дүн" тавимагц унтардаг тул бүтэн төлсөн сурагч 0₮ болж
+    // харагддаг байсан — бодитоор тохиолдсон.
+    const course = await createTestCourse({ price: "1,200,000₮", template: "songon" });
+    const user = await createTestUser();
+    const client = await signedInClient(user.phone, user.password);
+
+    const res = await enroll(client, { programId: course.id, payMethod: "qpay", plan: "full" });
+    const id = res.body.registration!.id;
+
+    const invoice = await findMockInvoice(senderInvoiceNoForRegistration(id));
+    await payMockInvoice(invoice!.invoiceId);
+    expect((await client.post(`/api/enroll/${id}/check`)).status).toBe(200);
+
+    expect((await readRegistration(id))!.status).toBe("active");
+    expect(await paymentsFor(id)).toEqual([1_200_000]);
+
+    // "Төлөх дүн" тавьсан ч мөр байгаа тул үнэн хэвээр — энэ бол гол ач холбогдол.
+    await testDb().from("registrations").update({ total_due: 1_200_000 }).eq("id", id);
+    expect(await paymentsFor(id)).toEqual([1_200_000]);
+  });
+
   it("quotes the same half when the payer reopens the QR", async () => {
     const course = await createTestCourse({ price: "1,200,000₮", template: "songon" });
     const user = await createTestUser();
