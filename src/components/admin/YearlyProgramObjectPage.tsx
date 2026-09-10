@@ -52,7 +52,9 @@ export default function YearlyProgramObjectPage({
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [payments, setPayments] = useState(initialPayments);
   const waitlist = initialWaitlist;
-  const waitingCount = waitlist.filter((e) => e.status === "waiting").length;
+  // Дарааллын байр эзэлдэг бүх мөр — "Холбогдсон" гэж тэмдэглэгдсэн хүн
+  // бүртгүүлтлээ дарааллаас гараагүй тул тоололд үлдэнэ.
+  const waitingCount = waitlist.filter((e) => e.status !== "closed").length;
 
   const [form, setForm] = useState({
     tag: program.tag,
