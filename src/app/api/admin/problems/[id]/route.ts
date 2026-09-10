@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { deactivateProblem, listProblems, updateProblem } from "@/lib/assessment/db";
+import { deactivateProblem, findProblemById, updateProblem } from "@/lib/assessment/db";
 import { hasProblemContent, validateProblemInput } from "@/lib/assessment/validateProblem";
 import { isFullAdmin } from "@/lib/session";
 
@@ -17,7 +17,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   // A partial edit could empty the last remaining field, so check the merged
   // result rather than only what was sent.
-  const existing = (await listProblems({ includeInactive: true })).find((p) => p.id === id);
+  const existing = await findProblemById(id);
   if (!existing) {
     return NextResponse.json({ ok: false, error: "Бодлого олдсонгүй" }, { status: 404 });
   }

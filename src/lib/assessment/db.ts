@@ -1,5 +1,6 @@
 import { getPaymentProvider } from "../payment";
 import { getSupabase } from "../supabase";
+import { fetchAllRows } from "../fetchAll";
 import { publicUserFromJoin, type PublicUser } from "../db";
 import {
   DEFAULT_ASSESSMENT_FEE,
@@ -352,12 +353,34 @@ export async function updateLevel(
 export async function listProblems(
   opts: { includeInactive?: boolean; category?: ProblemCategory } = {}
 ): Promise<Problem[]> {
-  let query = getSupabase().from("problems").select("*").order("created_at");
-  if (!opts.includeInactive) query = query.eq("active", true);
-  if (opts.category) query = query.eq("category", opts.category);
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data as ProblemRow[]).map(problemFromRow);
+  // PostgREST stops at 1000 rows and says nothing about the rest, so the
+  // newest problems used to fall off the end: a child could sit an exam whose
+  // problem read as blank, and grading showed the same hole. Paged, ordered
+  // by id as well so no row can slip between pages.
+  const rows = await fetchAllRows<ProblemRow>(() => {
+    let query = getSupabase().from("problems").select("*").order("created_at").order("id");
+    if (!opts.includeInactive) query = query.eq("active", true);
+    if (opts.category) query = query.eq("category", opts.category);
+    return query;
+  });
+  return rows.map(problemFromRow);
+}
+
+/**
+ * One problem by id. Editing used to scan the whole bank to find it, which
+ * the 1000-row cap turned into a false "not found" for anything newly added.
+ */
+export async function findProblemById(id: string): Promise<Problem | undefined> {
+  const { data, error } = await getSupabase()
+    .from("problems")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    if (isInvalidUuidError(error)) return undefined;
+    throw error;
+  }
+  return data ? problemFromRow(data as ProblemRow) : undefined;
 }
 
 export type ProblemInput = Omit<Problem, "id" | "createdAt">;
