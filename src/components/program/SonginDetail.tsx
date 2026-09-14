@@ -186,11 +186,13 @@ export default function SonginDetail({
                   {course.title}
                 </h2>
 
-                {/* Энэ ангийн биш, бүх ангид сонгож болох багцууд: цагийг
-                    түвшин тогтоосны дараа уулзалтаар тохирдог. */}
+                {/* Not this class's own slots but the ones every class picks from.
+                    Registration comes first; the slot is agreed at the meeting
+                    afterwards. Parents read the old wording as "you cannot sign up
+                    until you have passed a test" and stopped at the button. */}
                 <p className="text-ink-2 font-medium text-[.95rem] leading-[1.7] mt-3">
-                  Ирж уулзан шалгалт өгч түвшнээ тогтоолгосны дараа, доорх хуваариудаас тохирох
-                  цагаа хамтдаа сонгоно.
+                  Эхлээд бүртгүүлээрэй — цагаа одоо сонгох шаардлагагүй. Бүртгүүлсний дараа уулзаж
+                  түвшнээ тогтоогоод, доорх хуваариудаас тохирох цагаа хамтдаа сонгоно.
                 </p>
 
                 {scheduleBundles.length > 0 ? (

@@ -58,7 +58,7 @@ export default function SongonClassCard({
       </div>
 
       <p className="text-[.85rem] font-semibold text-ink-2 leading-[1.6] mt-4">
-        Цагийг түвшин тогтоосны дараа дээрх хуваариудаас хамтдаа сонгоно.
+        Бүртгүүлсний дараа уулзаж, дээрх хуваариудаас цагаа хамтдаа сонгоно.
       </p>
 
       {/* Kept to one line: at this card width the longer phrasing wrapped and
