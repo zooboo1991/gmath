@@ -1329,3 +1329,68 @@ create index if not exists program_waitlist_program_idx
 -- товч нь "Хүлээлгийн жагсаалтад бүртгүүлэх" болж солигдоно.
 alter table yearly_programs
   add column if not exists enrollment_closed boolean not null default false;
+
+-- ---------------------------------------------------------------------------
+-- Бодлого хувилах систем (bodlogo)-оос ирсэн бодлогууд
+-- ---------------------------------------------------------------------------
+-- Тусдаа систем сурах бичгээс бодлого уншиж, загвар болгож, нэг загвараас
+-- олон хувилбар үүсгэдэг. Багш загварыг нэг удаа батлахад түүний бүх хувилбар
+-- батлагдсанд тооцогдож, энэ хүснэгт рүү илгээгддэг.
+--
+-- ШУУД бодлогын банк руу ОРДОГГҮЙ. Хоёр шалтгаан: (1) нэг загвараас 20
+-- хувилбар гардаг тул банк хормын дотор мянгаар нэмэгдэнэ, (2) гаднаас
+-- ирдэг зам тул түлхүүр алдагдсан ч хүүхдийн шалгалтад юу ч оруулж
+-- чадахгүй байх ёстой. Багш эндээс харж, сонгож байж `problems` руу татна.
+create table if not exists bodlogo_problems (
+  id uuid primary key default gen_random_uuid(),
+  -- Идемпотент түлхүүр (var_000123). Дахин илгээхэд шинэ мөр үүсэхгүй,
+  -- байгаа нь шинэчлэгдэнэ — publish командыг олон удаа ажиллуулж болно.
+  external_id text not null unique,
+  -- Аль загвараас гарсан (tpl_000045). Нэг загварын хувилбарууд үүгээр нийлнэ.
+  template_id text not null,
+  -- Үр бодлого ба түүний хялбар/хүнд ах дүү нар нэг гэр бүл (fam_000012).
+  -- Нэг шалгалтад нэг гэр бүлээс НЭГ л хувилбар орох ёстой — bodlogo тал
+  -- энэ дүрмийг зориуд gmath-д даалгасан.
+  family_id text not null,
+  grade smallint not null check (grade between 1 and 12),
+  topic text,
+  -- 1 хялбар, 2 үрийн түвшин, 3 хүнд. `problems.level` (1-10) -тэй өөр утгатай.
+  level smallint not null check (level between 1 and 3),
+  body_latex text not null,
+  -- Бодолтын бүрэн текст. `problems`-д хадгалах газар байхгүй тул зөвхөн
+  -- энд үлдэнэ — багш админаас хардаг, хүүхэд хардаггүй.
+  solution_mn text not null,
+  answer_type text not null
+    check (answer_type in ('integer', 'decimal', 'fraction', 'int_set', 'quantity')),
+  -- Хэвийн хэлбэрт орсон утга (12/5, 2.4, 2;5;8) — сурагчийн бичих зүйл.
+  answer_value text not null,
+  -- Харуулах LaTeX бичлэг.
+  answer_display text not null,
+  -- Нэгж (%, цаг, км). Хариултын утганд ОРДОГГҮЙ — асуултын нэг хэсэг.
+  answer_unit text,
+  -- Зөвхөн аравтын хариултад утгатай.
+  answer_tolerance numeric,
+  tags text[] not null default '{}',
+  -- AI багшийн өгөгдөл: алхмууд, түгээмэл алдаа, чиглүүлэг. Одоохондоо
+  -- хадгалаад л байна — ашиглах хэсэг хараахан бичигдээгүй.
+  tutor jsonb,
+  -- Багш банк руу татсан бол тэр мөрийг заана. Хоосон бол хүлээж байна.
+  taken_problem_id uuid references problems(id) on delete set null,
+  taken_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+-- Хүлээж байгаа бодлогыг анги, түвшингээр нь эрэмбэлэн жагсаана.
+create index if not exists bodlogo_problems_pending_idx
+  on bodlogo_problems (grade, level, created_at)
+  where taken_problem_id is null;
+-- Нэг гэр бүлээс аль хэдийн татсан эсэхийг шалгахад.
+create index if not exists bodlogo_problems_family_idx
+  on bodlogo_problems (family_id);
+
+-- Банкны мөр аль bodlogo хувилбараас гарснаа санана: давхар татахаас
+-- сэргийлж, дараа нь тухайн бодлогын бодолт, AI багшийн өгөгдлийг олох зам.
+alter table problems add column if not exists bodlogo_external_id text;
+create unique index if not exists problems_bodlogo_external_id_idx
+  on problems (bodlogo_external_id)
+  where bodlogo_external_id is not null;
