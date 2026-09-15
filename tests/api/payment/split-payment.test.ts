@@ -30,8 +30,16 @@ type EnrollResponse = {
   qrImage?: string;
 };
 
-/** A date the picker would allow: inside the window, before the deadline. */
-const NEXT_PAYMENT = "2026-09-15";
+/**
+ * A date the picker would allow: tomorrow, the earliest the rule accepts
+ * (isValidInstallmentDate wants >= now + 24h).
+ *
+ * Computed, not written down. A fixed date reads fine until the day it
+ * arrives — then every test in this file fails with "огноог зөв сонгоно уу"
+ * for a reason that has nothing to do with split payments, which is exactly
+ * what happened on 2026-09-15.
+ */
+const NEXT_PAYMENT = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 async function enroll(client: TestClient, body: Record<string, unknown>) {
   const res = await client.post<EnrollResponse>("/api/enroll", body);
