@@ -41,6 +41,13 @@ type EnrollResponse = {
  */
 const NEXT_PAYMENT = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
+/**
+ * Past the window's far edge. 70 days, not a written-down date: the limit is
+ * now "a month from today", so the only date guaranteed to be outside it is
+ * one measured from today — and a fixed one would come due, as 2026-10-02 did.
+ */
+const TOO_LATE = new Date(Date.now() + 70 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
 async function enroll(client: TestClient, body: Record<string, unknown>) {
   const res = await client.post<EnrollResponse>("/api/enroll", body);
   if (res.body?.registration?.id) track("registrations", res.body.registration.id);
@@ -187,7 +194,7 @@ describe("splitting a classroom group's fee", () => {
     const user = await createTestUser();
     const client = await signedInClient(user.phone, user.password);
 
-    for (const nextPaymentDate of ["", "2026-10-02", "2020-01-01", "маргааш"]) {
+    for (const nextPaymentDate of ["", TOO_LATE, "2020-01-01", "маргааш"]) {
       const res = await enroll(client, {
         programId: course.id,
         payMethod: "qpay",

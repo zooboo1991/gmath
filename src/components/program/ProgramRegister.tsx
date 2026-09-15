@@ -17,7 +17,7 @@ import {
 import { extractCourseCategories, getCourseAudience } from "@/lib/courseTag";
 import {
   earliestInstallmentDate,
-  INSTALLMENT_DEADLINE,
+  latestInstallmentDate,
   splitHalves,
 } from "@/lib/installment";
 import { DISTRICTS_BY_PROVINCE, PROVINCES, type Province } from "@/lib/mongoliaRegions";
@@ -1255,12 +1255,13 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                             type="date"
                             value={nextPaymentDate}
                             min={earliestInstallmentDate()}
-                            max={INSTALLMENT_DEADLINE}
+                            max={latestInstallmentDate()}
                             onChange={(e) => setNextPaymentDate(e.target.value)}
                             className="w-full bg-surface border border-line rounded-sm px-4 py-3 font-semibold text-[.95rem]"
                           />
                           <span className="text-[.78rem] font-semibold text-ink-3">
-                            {INSTALLMENT_DEADLINE.replaceAll("-", ".")}-ээс өмнөх өдөр сонгоно уу.
+                            Бүртгүүлснээс хойш 1 сарын дотор —{" "}
+                            {latestInstallmentDate().replaceAll("-", ".")} хүртэл сонгоно уу.
                           </span>
                         </label>
                       </div>

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   canSplitPayment,
   earliestInstallmentDate,
-  INSTALLMENT_DEADLINE,
+  latestInstallmentDate,
   isValidInstallmentDate,
   splitHalves,
 } from "@/lib/installment";
@@ -37,9 +37,44 @@ describe("the promised date", () => {
     expect(isValidInstallmentDate(earliestInstallmentDate(now), now)).toBe(true);
   });
 
-  it("cannot be after the deadline", () => {
-    expect(isValidInstallmentDate(INSTALLMENT_DEADLINE, now)).toBe(true);
-    expect(isValidInstallmentDate("2026-10-02", now)).toBe(false);
+  it("reaches exactly one month out, and no further", () => {
+    // Бүртгүүлсэн өдрөөс хойш 1 сар: 08.25-нд бүртгүүлбэл 09.25 хүртэл.
+    expect(latestInstallmentDate(now)).toBe("2026-09-25");
+    expect(isValidInstallmentDate("2026-09-25", now)).toBe(true);
+    expect(isValidInstallmentDate("2026-09-26", now)).toBe(false);
+  });
+
+  it("lands on a real day when the month is shorter", () => {
+    // 1-р сарын 31-нээс хойш 1 сар гэдэг нь 2-р сарын 31 биш — сарын сүүлээр
+    // таслана, эс бөгөөс 3-р сар руу хальж, амласан хугацаа уртасна.
+    expect(latestInstallmentDate(new Date("2026-01-31T04:00:00Z"))).toBe("2026-02-28");
+    expect(latestInstallmentDate(new Date("2024-01-30T04:00:00Z"))).toBe("2024-02-29");
+    expect(latestInstallmentDate(new Date("2026-08-31T04:00:00Z"))).toBe("2026-09-30");
+  });
+
+  it("carries over the year", () => {
+    expect(latestInstallmentDate(new Date("2026-12-15T04:00:00Z"))).toBe("2027-01-15");
+  });
+
+  it("өдрийг Улаанбаатарын хуанлиар тоолно", () => {
+    // Шөнө дунд–08:00 хооронд бүртгүүлсэн хүн UTC-ээр бол өчигдөр байна.
+    // UTC-ээр тоолвол тэр хүнд хугацаа нэг өдрөөр богиносч, эзний дүрэмтэй
+    // зөрнө. Тиймээс 09.14-ний бүх цаг ижил хариу өгөх ёстой.
+    const morning = new Date("2026-09-14T01:00:00Z"); // 09.14 09:00 УБ
+    const smallHours = new Date("2026-09-13T18:00:00Z"); // 09.14 02:00 УБ
+    const lateNight = new Date("2026-09-14T15:59:00Z"); // 09.14 23:59 УБ
+    for (const moment of [morning, smallHours, lateNight]) {
+      expect(latestInstallmentDate(moment), moment.toISOString()).toBe("2026-10-14");
+    }
+    // Улаанбаатарын шинэ өдөр эхлэхэд л шилжинэ.
+    expect(latestInstallmentDate(new Date("2026-09-14T16:01:00Z"))).toBe("2026-10-15");
+  });
+
+  it("эзний жишээ: 09.14-нд бүртгүүлбэл 10.14 хүртэл", () => {
+    const enrolled = new Date("2026-09-14T04:00:00Z");
+    expect(latestInstallmentDate(enrolled)).toBe("2026-10-14");
+    expect(isValidInstallmentDate("2026-10-14", enrolled)).toBe(true);
+    expect(isValidInstallmentDate("2026-10-15", enrolled)).toBe(false);
   });
 
   it("refuses anything that is not a date", () => {
