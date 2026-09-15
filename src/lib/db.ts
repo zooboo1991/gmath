@@ -1362,7 +1362,7 @@ export async function updateCertificate(
  * holds a certificate for this course is skipped, so pressing the button
  * twice does not issue a second one.
  */
-export async function issueCertificatesForProgram(input: {
+export type CertificateBatchInput = {
   programId: string;
   /** Written onto a student's certificate — usually the programme's class. */
   studentCategory: string;
@@ -1371,7 +1371,21 @@ export async function issueCertificatesForProgram(input: {
   /** The course as it should read on the certificate ("I", "II"). */
   course: string;
   issuedDate: string;
-}): Promise<{ created: Certificate[]; skipped: number }> {
+};
+
+/** A certificate that WOULD be issued, with who it is for. */
+export type PlannedCertificate = CertificateImportRow & { holder: "student" | "teacher" };
+
+/**
+ * Works out exactly what an issuing run would create, WITHOUT writing anything.
+ *
+ * Split out so the preview and the real run can never drift: the screen that
+ * says "these nine people, these numbers" is reading the same function that
+ * then inserts them. A preview computed a second way would eventually lie.
+ */
+export async function planCertificatesForProgram(
+  input: CertificateBatchInput
+): Promise<{ rows: PlannedCertificate[]; skipped: number }> {
   const registrations = (await listRegistrationsByProgram(input.programId)).filter(
     (r) => r.status === "active" && r.user
   );
@@ -1385,10 +1399,10 @@ export async function issueCertificatesForProgram(input: {
 
   const pending = registrations.filter((r) => !takenForCourse.has(r.user!.phone));
   const skipped = registrations.length - pending.length;
-  if (pending.length === 0) return { created: [], skipped };
+  if (pending.length === 0) return { rows: [], skipped };
 
   const numbers = all.map((c) => c.certificateNumber);
-  const rows: CertificateImportRow[] = [];
+  const rows: PlannedCertificate[] = [];
   for (const holder of ["teacher", "student"] as const) {
     const group = pending.filter((r) =>
       holder === "teacher" ? r.user!.role === "teacher" : r.user!.role !== "teacher"
@@ -1397,6 +1411,7 @@ export async function issueCertificatesForProgram(input: {
     const issued = nextCertificateNumbers(numbers, holder, input.issuedDate, group.length);
     group.forEach((registration, i) => {
       rows.push({
+        holder,
         certificateNumber: issued[i],
         lastName: registration.user!.lastName,
         firstName: registration.user!.firstName,
@@ -1407,6 +1422,14 @@ export async function issueCertificatesForProgram(input: {
       });
     });
   }
+  return { rows, skipped };
+}
+
+export async function issueCertificatesForProgram(
+  input: CertificateBatchInput
+): Promise<{ created: Certificate[]; skipped: number }> {
+  const { rows, skipped } = await planCertificatesForProgram(input);
+  if (rows.length === 0) return { created: [], skipped };
 
   const { data, error } = await getSupabase()
     .from("certificates")

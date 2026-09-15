@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { findCourseById, findYearlyProgramById, issueCertificatesForProgram } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
-import { isTooLong, MAX_LEN } from "@/lib/validate";
+import { parseCertificateBatch } from "@/lib/certificateBatch";
 import { isFullAdmin } from "@/lib/session";
 
 /**
@@ -24,27 +24,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
   }
 
-  const data = await request.json().catch(() => ({}));
-  const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
-  const course = text(data.course);
-  const studentCategory = text(data.studentCategory);
-  const teacherCategory = text(data.teacherCategory);
-  const issuedDate = text(data.issuedDate);
-
-  if (!course || !studentCategory || !teacherCategory) {
-    return NextResponse.json(
-      { ok: false, error: "Курс болон ангиллыг бөглөнө үү" },
-      { status: 400 }
-    );
+  const parsed = parseCertificateBatch(await request.json().catch(() => ({})));
+  if (!parsed.ok) {
+    return NextResponse.json({ ok: false, error: parsed.error }, { status: 400 });
   }
-  for (const value of [course, studentCategory, teacherCategory]) {
-    if (isTooLong(value, MAX_LEN.certificateNumber)) {
-      return NextResponse.json({ ok: false, error: "Талбар хэт урт байна" }, { status: 400 });
-    }
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(issuedDate)) {
-    return NextResponse.json({ ok: false, error: "Огноог сонгоно уу" }, { status: 400 });
-  }
+  const { course, studentCategory, teacherCategory, issuedDate } = parsed.value;
 
   const { created, skipped } = await issueCertificatesForProgram({
     programId: id,

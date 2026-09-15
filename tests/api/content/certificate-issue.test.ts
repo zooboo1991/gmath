@@ -155,3 +155,109 @@ describe("issuing a course's certificates", () => {
     expect(res.status).toBe(401);
   });
 });
+
+/**
+ * Туршилтаар харах.
+ *
+ * Гол амлалт нэг: харуулсан зүйл нь дараа нь үүсэх зүйлтэй ЯГ таарна. Хоёр
+ * тал өөр өөрөөр тоолдог байсан бол урьдчилан харагдац хэзээ нэгэн цагт худал
+ * хэлж, түүнд итгэхээ болино.
+ */
+describe("сертификатыг туршилтаар харах", () => {
+  type PreviewResult = {
+    rows: { certificateNumber: string; phone: string; holder: string; category: string }[];
+    skipped: number;
+  };
+
+  it("харуулсан дугаарууд нь дараа нь үүсэх дугаартай яг таарна", async () => {
+    const admin = await adminClient("full");
+    const { course } = await courseWithRoster();
+    const courseName = `TEST-${course.id.slice(0, 8)}`;
+
+    const preview = await admin.post<PreviewResult>(
+      `/api/admin/courses/${course.id}/certificates/preview`,
+      body(courseName)
+    );
+    expect(preview.status, preview.text).toBe(200);
+    expect(preview.body.rows).toHaveLength(3);
+
+    const issued = await admin.post<IssueResult>(
+      `/api/admin/courses/${course.id}/certificates`,
+      body(courseName)
+    );
+    expect(issued.status, issued.text).toBe(200);
+    await trackIssued(issued.body.certificates.map((c) => c.certificateNumber));
+
+    const shown = preview.body.rows.map((r) => `${r.phone}:${r.certificateNumber}`).sort();
+    const real = issued.body.certificates.map((c) => `${c.phone}:${c.certificateNumber}`).sort();
+    expect(shown).toEqual(real);
+  });
+
+  it("юу ч бичихгүй — харсны дараа ч сертификат нэмэгдэхгүй", async () => {
+    const admin = await adminClient("full");
+    const { course } = await courseWithRoster();
+    const courseName = `TEST-${course.id.slice(0, 8)}`;
+
+    const before = await testDb().from("certificates").select("id", { count: "exact", head: true });
+    const res = await admin.post<PreviewResult>(
+      `/api/admin/courses/${course.id}/certificates/preview`,
+      body(courseName)
+    );
+    expect(res.status, res.text).toBe(200);
+    expect(res.body.rows.length).toBeGreaterThan(0);
+
+    const after = await testDb().from("certificates").select("id", { count: "exact", head: true });
+    expect(after.count).toBe(before.count);
+  });
+
+  it("өмнө нь авсан хүнийг алгасахаа урьдчилж хэлнэ", async () => {
+    const admin = await adminClient("full");
+    const { course } = await courseWithRoster();
+    const courseName = `TEST-${course.id.slice(0, 8)}`;
+
+    const first = await admin.post<IssueResult>(
+      `/api/admin/courses/${course.id}/certificates`,
+      body(courseName)
+    );
+    expect(first.status, first.text).toBe(200);
+    await trackIssued(first.body.certificates.map((c) => c.certificateNumber));
+
+    const preview = await admin.post<PreviewResult>(
+      `/api/admin/courses/${course.id}/certificates/preview`,
+      body(courseName)
+    );
+    expect(preview.status, preview.text).toBe(200);
+    expect(preview.body.rows).toHaveLength(0);
+    expect(preview.body.skipped).toBe(3);
+  });
+
+  it("жишээ батламж PDF-ээр буцна", async () => {
+    const admin = await adminClient("full");
+    const { course } = await courseWithRoster();
+    const res = await admin.post(`/api/admin/courses/${course.id}/certificates/preview/pdf`, {
+      ...body(`TEST-${course.id.slice(0, 8)}`),
+      holder: "student",
+    });
+    expect(res.status, res.text).toBe(200);
+    // PDF-ийн эхний дөрвөн тэмдэгт — файл үнэхээр зурагдсаны баталгаа.
+    expect(res.text.slice(0, 4)).toBe("%PDF");
+  });
+
+  it("багшийн эрхэд урьдчилан харах ч хаалттай", async () => {
+    const owner = await adminClient("full");
+    const { course } = await courseWithRoster();
+    const { client, id } = await staffClient(owner, {
+      name: "Тест багш",
+      username: `cert-preview-${randomUUID().slice(0, 8)}`,
+      password: "TeacherPass-2026",
+      role: "teacher",
+    });
+    staffAccounts.push(id);
+
+    const res = await client.post(
+      `/api/admin/courses/${course.id}/certificates/preview`,
+      body(`TEST-${course.id.slice(0, 8)}`)
+    );
+    expect(res.status).toBe(401);
+  });
+});
