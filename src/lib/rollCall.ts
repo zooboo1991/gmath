@@ -1,4 +1,5 @@
 import { getSupabase } from "./supabase";
+import { fetchAllRows } from "./fetchAll";
 import {
   findCourseById,
   findYearlyProgramById,
@@ -110,11 +111,21 @@ export async function listRollCallLessons(opts: {
 
   // Marks and rosters for the lessons we are about to show, in two queries.
   const courseIds = [...new Set(lessons.map((l) => l.courseId))];
-  const { data } = await getSupabase()
-    .from("lesson_roll_call")
-    .select("course_id, lesson_index, present")
-    .in("course_id", courseIds);
-  const marks = (data ?? []) as { course_id: string; lesson_index: number; present: boolean }[];
+  const lessonIndexes = [...new Set(lessons.map((l) => l.lessonIndex))];
+  // Narrowed to the lesson numbers on screen, and paged besides. The filter was
+  // course_id alone, which fetched every register ever taken on those courses —
+  // roster times every lesson, so one course-year is about a thousand marks on
+  // its own. Truncated, an old lesson shows fewer present and absent, or drops
+  // to none at all, which the screen renders as "this register was never
+  // taken".
+  const marks = await fetchAllRows<{ course_id: string; lesson_index: number; present: boolean }>(() =>
+    getSupabase()
+      .from("lesson_roll_call")
+      .select("course_id, lesson_index, present")
+      .in("course_id", courseIds)
+      .in("lesson_index", lessonIndexes)
+      .order("id")
+  );
 
   const rosterSizes = new Map<string, number>();
   for (const courseId of courseIds) {

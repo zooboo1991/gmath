@@ -728,13 +728,23 @@ export async function setUserIsTest(id: string, isTest: boolean): Promise<User |
   return data ? userFromRow(data as UserRow) : undefined;
 }
 
+/**
+ * Every account, newest first.
+ *
+ * Paged, and ordered by id as well as date — created_at is not unique, so two
+ * accounts made in the same second could swap places between pages. This list
+ * is not only a screen: the notification recipient picker joins against it, so
+ * a dropped row is somebody the admin can no longer reach.
+ */
 export async function listUsers(): Promise<PublicUser[]> {
-  const { data, error } = await getSupabase()
-    .from("users")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data as UserRow[]).map((row) => toPublicUser(userFromRow(row)));
+  const rows = await fetchAllRows<UserRow>(() =>
+    getSupabase()
+      .from("users")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .order("id")
+  );
+  return rows.map((row) => toPublicUser(userFromRow(row)));
 }
 
 /**
@@ -1238,10 +1248,15 @@ export async function recordArticleShare(input: {
 
 /** articleId → share count, grouped in JS the same way getPageViewCountsByPrefix does. */
 export async function getArticleShareCounts(): Promise<Record<string, number>> {
-  const { data, error } = await getSupabase().from("article_shares").select("article_id");
-  if (error) throw error;
+  // Paged. One row per share-button press, nothing prunes it, and the count is
+  // built here rather than in the database — the shape fetchAll.ts describes as
+  // a number that quietly stops growing. The query had no ORDER BY at all, so
+  // paging needed one added.
+  const rows = await fetchAllRows<{ article_id: string }>(() =>
+    getSupabase().from("article_shares").select("article_id").order("id")
+  );
   const counts: Record<string, number> = {};
-  for (const row of data as { article_id: string }[]) {
+  for (const row of rows) {
     counts[row.article_id] = (counts[row.article_id] ?? 0) + 1;
   }
   return counts;
@@ -1262,13 +1277,25 @@ export async function findCertificateByNumber(number: string): Promise<Certifica
   return data ? certificateFromRow(data as CertificateRow) : undefined;
 }
 
+/**
+ * Every certificate ever issued.
+ *
+ * Paged, ordered by id as well as date. This list is not only a screen: an
+ * issuing run reads it to find the last number in each series and to see who
+ * already holds one for this course. Truncated, a batch would restart the
+ * numbering over numbers already in use and hand a second certificate to
+ * people who have one — and the unique index on certificate_number would fail
+ * the whole insert, so nobody would get theirs.
+ */
 export async function listCertificates(): Promise<Certificate[]> {
-  const { data, error } = await getSupabase()
-    .from("certificates")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data as CertificateRow[]).map(certificateFromRow);
+  const rows = await fetchAllRows<CertificateRow>(() =>
+    getSupabase()
+      .from("certificates")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .order("id")
+  );
+  return rows.map(certificateFromRow);
 }
 
 /** For the profile page's own "Сертификат" section — matched by the signed-in user's phone. */
@@ -2086,13 +2113,19 @@ export async function listRegistrationsByUser(
 }
 
 export async function listAllRegistrations(): Promise<(Registration & { user?: PublicUser })[]> {
-  const { data, error } = await getSupabase()
-    .from("registrations")
-    .select("*, users(*)")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
+  // Paged. Four admin screens count and group this list, and its ids are what
+  // listPaymentsForRegistrations resolves balances from — a dropped row would
+  // be a registration AND its instalments missing from every total. created_at
+  // is not unique, so id is appended as the tiebreaker.
+  const rows = await fetchAllRows<RegistrationRow & { users: UserRow | null }>(() =>
+    getSupabase()
+      .from("registrations")
+      .select("*, users(*)")
+      .order("created_at", { ascending: false })
+      .order("id")
+  );
 
-  return (data as (RegistrationRow & { users: UserRow | null })[]).map((row) => {
+  return rows.map((row) => {
     const { users, ...regRow } = row;
     return {
       ...registrationFromRow(regRow),
@@ -2245,15 +2278,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       countRows("articles"),
     ]);
 
-  const { data, error } = await getSupabase()
-    .from("registrations")
-    .select("id, user_id, program_label, price, total_due, pay_method, status, users(role, is_test)");
-  if (error) throw error;
-
   // A registration belongs to exactly one user, but the client types an
   // embedded relation as an array, so accept either shape.
   type JoinedUser = { role: Role; is_test?: boolean | null } | { role: Role; is_test?: boolean | null }[] | null;
-  const rows = data as unknown as {
+  type StatsRow = {
     id: string;
     user_id: string;
     program_label: string;
@@ -2262,7 +2290,19 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     pay_method: PayMethod;
     status: RegistrationStatus;
     users: JoinedUser;
-  }[];
+  };
+
+  // Every figure below is a sum or a Set over these rows, so a truncated read
+  // would be a dashboard that is plausibly, permanently too low with nothing
+  // logged anywhere. registrations is append-only — cancelling marks a row
+  // rather than deleting it — so it crosses 1000 on ordinary growth. There was
+  // no ORDER BY at all, and paging without one shuffles rows between pages.
+  const rows = await fetchAllRows<StatsRow>(() =>
+    getSupabase()
+      .from("registrations")
+      .select("id, user_id, program_label, price, total_due, pay_method, status, users(role, is_test)")
+      .order("id")
+  );
   const joined = (users: JoinedUser) => (Array.isArray(users) ? users[0] : users);
   const roleOf = (users: JoinedUser): Role | undefined => joined(users)?.role;
   /** The school's own test accounts sign up and pay for real — and must not move the numbers. */
@@ -2387,12 +2427,25 @@ export async function logPageView(input: { path: string; referrer: string | null
   if (error) throw error;
 }
 
-/** Total pageview count per exact path, for paths starting with `prefix` — e.g. per-course "Харсан" counts on the admin course list. */
+/**
+ * Total pageview count per exact path, for paths starting with `prefix` — the
+ * per-course and per-article "Харсан" numbers on the admin lists.
+ *
+ * Paged, and ordered by id. Unpaged this read took the first 1000 rows of the
+ * 2,781 that matched "/courses/", so every number on the screen was about a
+ * third of the truth — and with no ORDER BY at all, *which* thousand came back
+ * could change between two loads of the same page.
+ *
+ * page_views grows without bound (17,535 rows today), so this is one request
+ * per thousand matching rows. Fine at this size; if the table reaches six
+ * figures this wants to become a grouped count in the database instead.
+ */
 export async function getPageViewCountsByPrefix(prefix: string): Promise<Record<string, number>> {
-  const { data, error } = await getSupabase().from("page_views").select("path").like("path", `${prefix}%`);
-  if (error) throw error;
+  const rows = await fetchAllRows<{ path: string }>(() =>
+    getSupabase().from("page_views").select("path").like("path", `${prefix}%`).order("id")
+  );
   const counts: Record<string, number> = {};
-  for (const row of data as { path: string }[]) {
+  for (const row of rows) {
     counts[row.path] = (counts[row.path] ?? 0) + 1;
   }
   return counts;
@@ -2492,6 +2545,12 @@ export async function getAnalyticsStatsForRange(fromDate: string, toDate: string
   const toIso = `${toDate}T23:59:59.999Z`;
 
   type ViewRow = { path: string; referrer: string | null; visitor_id: string; created_at: string };
+  type RegRow = {
+    price: string;
+    status: RegistrationStatus;
+    created_at: string;
+    users: { is_test?: boolean | null } | { is_test?: boolean | null }[] | null;
+  };
 
   const [viewRows, earlierVisitorRows, regRows, newUsers] = await Promise.all([
     fetchAllRows<ViewRow>(() =>
@@ -2509,20 +2568,20 @@ export async function getAnalyticsStatsForRange(fromDate: string, toDate: string
     fetchAllRows<{ visitor_id: string }>(() =>
       getSupabase().from("page_views").select("visitor_id").lt("created_at", fromIso).order("id")
     ),
-    getSupabase()
-      .from("registrations")
-      .select("price, status, created_at, users(is_test)")
-      .gte("created_at", fromIso)
-      .lte("created_at", toIso)
-      .then(({ data, error }) => {
-        if (error) throw error;
-        return data as {
-          price: string;
-          status: RegistrationStatus;
-          created_at: string;
-          users: { is_test?: boolean | null } | { is_test?: boolean | null }[] | null;
-        }[];
-      }),
+    // The admin picks the range and nothing caps its width, so "all time" is
+    // one click and this collapses to the whole table. Paged like the two
+    // page_views reads above — otherwise the registration count and revenue
+    // plateau while the pageview figures beside them keep climbing, which
+    // nobody reads as a bug.
+    fetchAllRows<RegRow>(() =>
+      getSupabase()
+        .from("registrations")
+        .select("price, status, created_at, users(is_test)")
+        .gte("created_at", fromIso)
+        .lte("created_at", toIso)
+        .order("created_at")
+        .order("id")
+    ),
     getSupabase()
       .from("users")
       .select("*", { count: "exact", head: true })
@@ -2682,20 +2741,32 @@ type NotificationTarget = {
   userIds?: string[];
 };
 
+/**
+ * Who a broadcast reaches.
+ *
+ * The whole-audience branches are paged and the hand-picked one is chunked. A
+ * truncated recipient list is the worst shape this bug takes: the send
+ * succeeds, `recipient_count` is written as exactly 1000, nothing is logged as
+ * an error, and the families past the cut simply never hear about the lesson.
+ * There are 287 accounts today, so the cap is not yet reached — which is
+ * precisely why it was worth fixing before it was.
+ *
+ * The "course" branch is left as a single read on purpose: it is bounded by
+ * one course's active roster, which is a classroom, not a mailing list.
+ */
 async function resolveNotificationRecipients(target: NotificationTarget): Promise<{ id: string; phone: string }[]> {
   const supabase = getSupabase();
+  type Recipient = { id: string; phone: string };
 
   if (target.targetType === "all") {
-    const { data, error } = await supabase.from("users").select("id, phone");
-    if (error) throw error;
-    return data as { id: string; phone: string }[];
+    return fetchAllRows<Recipient>(() => supabase.from("users").select("id, phone").order("id"));
   }
 
   if (target.targetType === "students" || target.targetType === "teachers") {
     const role = target.targetType === "students" ? "student" : "teacher";
-    const { data, error } = await supabase.from("users").select("id, phone").eq("role", role);
-    if (error) throw error;
-    return data as { id: string; phone: string }[];
+    return fetchAllRows<Recipient>(() =>
+      supabase.from("users").select("id, phone").eq("role", role).order("id")
+    );
   }
 
   if (target.targetType === "course") {
@@ -2715,11 +2786,20 @@ async function resolveNotificationRecipients(target: NotificationTarget): Promis
     return [...seen.entries()].map(([id, phone]) => ({ id, phone }));
   }
 
-  // "users" — explicit selection
+  // "users" — explicit selection. Chunked: the id list travels in the URL, so
+  // a few hundred uuids is a request that stops fitting.
   if (!target.userIds || target.userIds.length === 0) return [];
-  const { data, error } = await supabase.from("users").select("id, phone").in("id", target.userIds);
-  if (error) throw error;
-  return data as { id: string; phone: string }[];
+  // De-duplicated before chunking: one `.in(...)` returns a user once however
+  // many times their id appears, but split across batches the same id in two
+  // batches comes back twice — and the recipient rows are written under a
+  // unique (notification_id, user_id), so the insert would fail outright.
+  const picked: Recipient[] = [];
+  for (const batch of chunk([...new Set(target.userIds)])) {
+    const { data, error } = await supabase.from("users").select("id, phone").in("id", batch);
+    if (error) throw error;
+    picked.push(...(data as Recipient[]));
+  }
+  return picked;
 }
 
 export async function createNotification(input: {
@@ -2863,15 +2943,21 @@ export async function notifyNewCourseForPastStudents(course: Course): Promise<vo
     .map((c) => c.id);
   if (sameLevelIds.length === 0) return;
 
-  const { data, error } = await getSupabase()
-    .from("registrations")
-    .select("user_id")
-    .in("program_id", sameLevelIds)
-    .eq("status", "active")
-    .not("user_id", "is", null);
-  if (error) throw error;
+  // Paged: this list becomes the recipients of a notification, and a row lost
+  // here is a family that never hears the course opened. Bounded by the active
+  // rosters of the matching courses today, but that is the kind of bound that
+  // stops holding quietly.
+  const rows = await fetchAllRows<{ user_id: string }>(() =>
+    getSupabase()
+      .from("registrations")
+      .select("user_id")
+      .in("program_id", sameLevelIds)
+      .eq("status", "active")
+      .not("user_id", "is", null)
+      .order("id")
+  );
 
-  const userIds = [...new Set((data as { user_id: string }[]).map((r) => r.user_id))];
+  const userIds = [...new Set(rows.map((r) => r.user_id))];
   if (userIds.length === 0) return;
 
   await createNotification({
@@ -2891,10 +2977,23 @@ export async function notifyNewCourseForPastStudents(course: Course): Promise<vo
 // two consecutive cron ticks.
 // ---------------------------------------------------------------------------
 
+/**
+ * Which lesson reminders have already gone out.
+ *
+ * Paged. This set is the only thing standing between a family and a second
+ * SMS about the same lesson: a key missing from it reads as "not sent yet".
+ * Ordered by the table's own composite key, which is unique — there is no id
+ * column here.
+ */
 export async function listSentReminderKeys(): Promise<Set<string>> {
-  const { data, error } = await getSupabase().from("lesson_reminders_sent").select("program_id, lesson_index");
-  if (error) throw error;
-  return new Set((data as { program_id: string; lesson_index: number }[]).map((r) => `${r.program_id}#${r.lesson_index}`));
+  const rows = await fetchAllRows<{ program_id: string; lesson_index: number }>(() =>
+    getSupabase()
+      .from("lesson_reminders_sent")
+      .select("program_id, lesson_index")
+      .order("program_id")
+      .order("lesson_index")
+  );
+  return new Set(rows.map((r) => `${r.program_id}#${r.lesson_index}`));
 }
 
 export async function markLessonReminderSent(programId: string, lessonIndex: number): Promise<void> {
@@ -2941,26 +3040,66 @@ export async function listNotificationsForAdmin(limit = 50): Promise<Notificatio
 
 export type NotificationForUser = Notification & { readAt?: string };
 
+/**
+ * One user's bell.
+ *
+ * Reads all of that user's rows, then sorts and cuts. The cut used to be a
+ * `.limit(30)` on an UNORDERED query, so PostgREST handed back an arbitrary
+ * thirty and the sort below could only reorder whatever happened to arrive —
+ * a user past thirty notifications could have the newest one missing from
+ * their bell entirely. Three accounts are past thirty today.
+ *
+ * Cutting after the sms filter rather than before also matters: sms-only
+ * sends still materialise a recipient row, and under the old order they ate
+ * into the thirty without ever being shown.
+ *
+ * Bounded by one person's notifications (108 at the most today), so paging
+ * here is one request in practice.
+ */
 export async function listNotificationsForUser(userId: string, limit = 30): Promise<NotificationForUser[]> {
   const supabase = getSupabase();
-  const { data: recipientRows, error } = await supabase
-    .from("notification_recipients")
-    .select("notifications(*)")
-    .eq("user_id", userId)
-    .limit(limit);
-  if (error) throw error;
 
-  type Row = { notifications: NotificationRow | NotificationRow[] | null };
-  const notifications = (recipientRows as unknown as Row[])
-    .map((r) => (Array.isArray(r.notifications) ? r.notifications[0] : r.notifications))
-    .filter((n): n is NotificationRow => Boolean(n))
+  // Ids first — one narrow row per notification this user was sent, no bodies.
+  // The join table carries no timestamp, so it cannot be ordered by recency;
+  // reading the ids and then the notifications themselves is what lets the
+  // newest-first cut happen in the DATABASE rather than here. Reading whole
+  // notifications and slicing afterwards would drag a person's entire history,
+  // bodies and all, across on every 45-second poll of the bell.
+  const recipientRows = await fetchAllRows<{ notification_id: string }>(() =>
+    supabase
+      .from("notification_recipients")
+      .select("notification_id")
+      .eq("user_id", userId)
+      // One row per (notification, user), so notification_id is unique within
+      // this user's rows — a safe tiebreaker for paging.
+      .order("notification_id")
+  );
+  if (recipientRows.length === 0) return [];
+
+  // Newest first, sms excluded and the cut applied per batch, so at most
+  // `limit` rows come back from each. The old query put `.limit(30)` on an
+  // UNORDERED read of the join table: PostgREST returned an arbitrary thirty
+  // and the sort could only reorder what arrived, so a user past thirty could
+  // be missing the newest notification entirely. Filtering sms in the query
+  // also stops sms-only sends eating into the thirty.
+  const picked: NotificationRow[] = [];
+  for (const batch of chunk(recipientRows.map((r) => r.notification_id))) {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .in("id", batch)
+      .neq("channel", "sms")
+      .order("created_at", { ascending: false })
+      .order("id")
+      .limit(limit);
+    if (error) throw error;
+    picked.push(...(data as NotificationRow[]));
+  }
+
+  const notifications = picked
     .map(notificationFromRow)
-    // "sms" channel means the admin picked SMS only — the site/bell list is
-    // only for "site" and "both". Recipients are still materialized for
-    // sms-only sends (that's how the phone list gets resolved), they just
-    // don't surface here.
-    .filter((n) => n.channel !== "sms")
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit);
 
   if (notifications.length === 0) return [];
 
@@ -3250,13 +3389,24 @@ export type AdminChatMessage = { role: ChatRole; content: string; modelUsed?: st
 
 /** Full transcript with timestamps — listChatMessages above intentionally drops them for the model's context window. */
 export async function listChatMessagesForAdmin(conversationId: string): Promise<AdminChatMessage[]> {
-  const { data, error } = await getSupabase()
-    .from("chat_messages")
-    .select("role, content, model_used, created_at")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return (data as { role: ChatRole; content: string; model_used: string | null; created_at: string }[]).map((m) => ({
+  // One conversation is a few messages, so this is insurance rather than a
+  // fix — but the sort is ASCENDING, so a long thread would show the admin the
+  // OLDEST thousand and hide the newest, which is the wrong half of a support
+  // transcript to lose.
+  const rows = await fetchAllRows<{
+    role: ChatRole;
+    content: string;
+    model_used: string | null;
+    created_at: string;
+  }>(() =>
+    getSupabase()
+      .from("chat_messages")
+      .select("role, content, model_used, created_at")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true })
+      .order("id")
+  );
+  return rows.map((m) => ({
     role: m.role,
     content: m.content,
     modelUsed: m.model_used ?? undefined,

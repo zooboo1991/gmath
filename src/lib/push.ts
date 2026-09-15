@@ -1,5 +1,6 @@
 import webpush, { WebPushError } from "web-push";
 import { getSupabase } from "./supabase";
+import { chunk, fetchAllRows } from "./fetchAll";
 
 /**
  * Web Push transport — piggybacks admin notifications onto whatever device
@@ -39,16 +40,27 @@ export async function sendPushToUsers(
 ): Promise<void> {
   if (userIds.length === 0 || !configureVapid()) return;
 
-  const { data, error } = await getSupabase()
-    .from("push_subscriptions")
-    .select("endpoint, p256dh, auth")
-    .in("user_id", userIds);
-  if (error) {
+  // Chunked and paged: the id list travels in the URL, and one family can have
+  // several devices, so "every subscription of everyone we are notifying" is
+  // not bounded by the number of people. A truncated list here loses pushes
+  // silently — the send simply reaches fewer phones.
+  const subscriptions: SubscriptionRow[] = [];
+  try {
+    for (const batch of chunk([...new Set(userIds)])) {
+      const rows = await fetchAllRows<SubscriptionRow>(() =>
+        getSupabase()
+          .from("push_subscriptions")
+          .select("endpoint, p256dh, auth")
+          .in("user_id", batch)
+          .order("id")
+      );
+      subscriptions.push(...rows);
+    }
+  } catch (error) {
     console.error("[push] failed to load subscriptions:", error);
     return;
   }
 
-  const subscriptions = data as SubscriptionRow[];
   if (subscriptions.length === 0) return;
 
   const body = JSON.stringify(payload);
@@ -82,10 +94,20 @@ export async function sendPushToUsers(
   });
 
   if (staleEndpoints.length > 0) {
-    const { error: deleteError } = await getSupabase()
-      .from("push_subscriptions")
-      .delete()
-      .in("endpoint", staleEndpoints);
-    if (deleteError) console.error("[push] failed to clean up stale subscriptions:", deleteError);
+    // Chunked like the read above: endpoint URLs are ~200 characters each and
+    // travel in the request URL, so a mass revocation (a browser update, a key
+    // rotation) would otherwise build one request too long to send — and the
+    // dead rows would then be retried on every future broadcast forever.
+    // 25, not chunk()'s default of 150: that default is sized for uuids, and a
+    // push endpoint is a ~200-character URL, so 150 of them would build a
+    // request line of about 30 KB — past what a server will accept, which
+    // would leave the dead rows to be retried on every future broadcast.
+    for (const batch of chunk(staleEndpoints, 25)) {
+      const { error: deleteError } = await getSupabase()
+        .from("push_subscriptions")
+        .delete()
+        .in("endpoint", batch);
+      if (deleteError) console.error("[push] failed to clean up stale subscriptions:", deleteError);
+    }
   }
 }

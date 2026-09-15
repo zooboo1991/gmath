@@ -1,4 +1,5 @@
 import { getSupabase } from "./supabase";
+import { fetchAllRows } from "./fetchAll";
 import { listCourses, listYearlyPrograms } from "./db";
 import { parseScheduleString } from "./lessonSchedule";
 
@@ -95,17 +96,35 @@ async function findTodayLessons(now: Date): Promise<TodayLesson[]> {
   const meetings = (meetingRows ?? []) as { id: string; course_id: string; lesson_index: number }[];
   if (meetings.length === 0) return found;
 
-  const { data: attendanceRows } = await supabase
-    .from("lesson_attendance")
-    .select("lesson_meeting_id, user_id, users(is_test)")
-    .in("lesson_meeting_id", meetings.map((m) => m.id));
-  const seen = new Map<string, Set<string>>();
   type AttendanceRow = {
     lesson_meeting_id: string;
     user_id: string;
     users?: { is_test?: boolean | null } | null;
   };
-  for (const row of ((attendanceRows ?? []) as AttendanceRow[]).filter((r) => !r.users?.is_test)) {
+
+  // Only the meetings that match a lesson running today. `meetings` above is
+  // every meeting of every course that has a lesson today, which for a yearly
+  // programme is a whole year of attendance rows fetched to describe one
+  // afternoon. Paged as well: a rejoin writes a second row, so even one day's
+  // rows are not bounded by the roster, and a truncated read just holds fewer
+  // users — `attended` reads low with nothing logged.
+  const todayMeetings = meetings.filter((m) =>
+    found.some((l) => l.courseId === m.course_id && l.lessonIndex === m.lesson_index)
+  );
+  if (todayMeetings.length === 0) return found;
+
+  const attendanceRows = await fetchAllRows<AttendanceRow>(() =>
+    supabase
+      .from("lesson_attendance")
+      .select("lesson_meeting_id, user_id, users(is_test)")
+      .in(
+        "lesson_meeting_id",
+        todayMeetings.map((m) => m.id)
+      )
+      .order("id")
+  );
+  const seen = new Map<string, Set<string>>();
+  for (const row of attendanceRows.filter((r) => !r.users?.is_test)) {
     const set = seen.get(row.lesson_meeting_id) ?? new Set<string>();
     set.add(row.user_id);
     seen.set(row.lesson_meeting_id, set);
