@@ -19,14 +19,25 @@ export const DEFAULT_PASSWORD = "Test1234";
 let phoneCounter = 0;
 
 /**
- * A phone number no real person has: the 7000–7009 range is reserved for
- * this test suite by convention, and each call adds a counter so two
- * accounts in one run can never collide.
+ * Three digits identifying this RUN, fixed once per process.
+ *
+ * Phone numbers here are `70` + run + position, and no real person has one.
+ *
+ * The old form was `70` + (counter % 100) + four random digits, under a
+ * comment promising that "each call adds a counter so two accounts in one run
+ * can never collide". It did not: every hundredth user landed in the same
+ * bucket with only ten thousand tails to choose from, and at the eight
+ * hundred-odd users one suite creates that collides roughly a quarter of the
+ * time. The run then dies on "duplicate key value violates unique constraint
+ * users_phone_key" — an error that reads like a product bug and is not one.
  */
+const PHONE_RUN = String(Math.floor(Math.random() * 1000)).padStart(3, "0");
+
 export function makePhone(): string {
   phoneCounter += 1;
-  const suffix = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
-  return `70${String(phoneCounter % 100).padStart(2, "0")}${suffix}`;
+  // 70 + run + position. No collisions within a run until the thousandth user,
+  // and one run in a thousand brushes against another run's leftovers.
+  return `70${PHONE_RUN}${String(phoneCounter % 1000).padStart(3, "0")}`;
 }
 
 export type TestUser = {
