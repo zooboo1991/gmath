@@ -299,12 +299,17 @@ export default function TestRunner({
                 Элсэлт
               </span>
               <h3 className="text-[1.3rem] font-extrabold text-ink mt-2 leading-[1.25]">
-                Б.Ганбат багшийн сургалтууд элсэлтээ авч байна
+                Танхимын сонгон бэлтгэл элсэлтээ авч байна
               </h3>
+              {/* Named specifically, because it is the part that is actually
+                  open: both yearly programmes are closed and taking a waiting
+                  list. "Сургалтууд элсэлтээ авч байна" would have been half
+                  true, and the half that is not is the expensive one. No seat
+                  counts here — they move, and the courses page shows them. */}
               <p className="text-ink-2 font-medium text-[.95rem] mt-2.5 leading-[1.7]">
-                Улсын олимпиадын аварга багш нарын хамтарсан сургалт. Танхимын
-                сонгон бэлтгэл, 1 жилийн хөтөлбөр — хүүхдийнхээ түвшинд тохирохыг
-                нь хамтдаа сонгоорой.
+                Улсын олимпиадын аварга багш нарын хамтарсан танхимын сургалт —
+                7 хоногт 3 удаа, жижиг группээр. 1 жилийн хөтөлбөрийн бүртгэл
+                түр хаалттай ч хүлээлгийн жагсаалтад орж болно.
               </p>
 
               <div className="flex items-center gap-2.5 mt-6 flex-wrap">
