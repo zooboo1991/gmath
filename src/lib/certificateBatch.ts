@@ -20,9 +20,17 @@ export function parseCertificateBatch(data: unknown): ParsedBatch {
   const teacherCategory = text(source.teacherCategory);
   const issuedDate = text(source.issuedDate);
 
-  if (!course || !studentCategory || !teacherCategory) {
-    return { ok: false, error: "Курс болон ангиллыг бөглөнө үү" };
+  // Name the field that is actually empty. "Курс болон ангиллыг бөглөнө үү"
+  // sent the person looking at the two boxes they had already filled in.
+  const missing: string[] = [];
+  if (!course) missing.push("Курс");
+  if (!studentCategory) missing.push("Сурагчийн ангилал");
+  if (missing.length > 0) {
+    return { ok: false, error: `${missing.join(", ")} талбарыг бөглөнө үү` };
   }
+  // The teacher's category is deliberately NOT required: leaving it empty is
+  // how the admin says "no teacher certificates in this batch", and everyone
+  // then gets the student's wording. See planCertificatesForProgram.
   for (const value of [course, studentCategory, teacherCategory]) {
     if (isTooLong(value, MAX_LEN.certificateNumber)) {
       return { ok: false, error: "Талбар хэт урт байна" };

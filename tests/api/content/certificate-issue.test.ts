@@ -261,3 +261,75 @@ describe("сертификатыг туршилтаар харах", () => {
     expect(res.status).toBe(401);
   });
 });
+
+/**
+ * Дутуу талбарын мессеж.
+ *
+ * Эзэн "Курс" болон "Сурагчийн ангилал"-аа бөглөөд туршилтаар харахад
+ * "Курс болон ангиллыг бөглөнө үү" гэсэн алдаа авсан — дутуу байсан нь
+ * "Багшийн ангилал" байв. Аль талбар дутууг нэрлэж хэлэх ёстой.
+ */
+describe("дутуу талбарыг нэрлэж хэлэх", () => {
+  it("курс дутуу бол курсийг нэрлэнэ", async () => {
+    const admin = await adminClient("full");
+    const { course } = await courseWithRoster();
+    const res = await admin.post<{ error: string }>(
+      `/api/admin/courses/${course.id}/certificates/preview`,
+      { ...body(""), course: "" }
+    );
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Курс");
+    expect(res.body.error).not.toContain("Сурагчийн ангилал");
+  });
+
+  it("багшийн ангилал хоосон бол бүгд сурагчаар гарна", async () => {
+    // Багшийн эрхтэй хүн хүүхдийн сургалтад суусан байж болно — тэр бол
+    // оролцогч, ажилтан биш. Талбарыг хоосон орхих нь "энэ багцад багшийн
+    // батламж байхгүй" гэсэн үг.
+    const admin = await adminClient("full");
+    const { course, teacher } = await courseWithRoster();
+    const res = await admin.post<{
+      rows: { holder: string; phone: string; category: string; certificateNumber: string }[];
+    }>(
+      `/api/admin/courses/${course.id}/certificates/preview`,
+      { ...body(`TEST-${course.id.slice(0, 8)}`), teacherCategory: "" }
+    );
+    expect(res.status, res.text).toBe(200);
+    expect(res.body.rows).toHaveLength(3);
+    expect(res.body.rows.every((r) => r.holder === "student")).toBe(true);
+    // Багшийн эрхтэй хүн ч сурагчийн ангиллыг авна.
+    const his = res.body.rows.find((r) => r.phone === teacher.phone);
+    expect(his?.category).toBe("Тест ангилал");
+    expect(his?.certificateNumber ?? "").toMatch(/^S/);
+  });
+
+  it("багшийн ангилал бөглөвөл багш тусдаа цувралаар гарна", async () => {
+    const admin = await adminClient("full");
+    const { course, teacher } = await courseWithRoster();
+    const res = await admin.post<{ rows: { holder: string; phone: string }[] }>(
+      `/api/admin/courses/${course.id}/certificates/preview`,
+      body(`TEST-${course.id.slice(0, 8)}`)
+    );
+    expect(res.status, res.text).toBe(200);
+    const his = res.body.rows.find((r) => r.phone === teacher.phone);
+    expect(his?.holder).toBe("teacher");
+  });
+
+  it("багшгүй сургалтад багшийн ангилал шаардахгүй", async () => {
+    const admin = await adminClient("full");
+    // Зөвхөн сурагчтай — багшийн батламж үүсэхгүй тул тэр талбар хэрэггүй.
+    const course = await createTestCourse();
+    for (const _ of [0, 1]) {
+      const student = await createTestUser();
+      await createTestRegistration({ userId: student.id, programId: course.id, status: "active" });
+    }
+
+    const res = await admin.post<{ rows: { holder: string }[] }>(
+      `/api/admin/courses/${course.id}/certificates/preview`,
+      { ...body(`TEST-${course.id.slice(0, 8)}`), teacherCategory: "" }
+    );
+    expect(res.status, res.text).toBe(200);
+    expect(res.body.rows).toHaveLength(2);
+    expect(res.body.rows.every((r) => r.holder === "student")).toBe(true);
+  });
+});

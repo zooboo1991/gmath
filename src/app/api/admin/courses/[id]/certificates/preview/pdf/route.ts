@@ -33,6 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const wanted = (body as { holder?: unknown }).holder === "teacher" ? "teacher" : "student";
   const { rows } = await planCertificatesForProgram({ programId: id, ...parsed.value });
+
   // That holder may not be on this roster at all — fall back rather than 404,
   // since the point is to see the wording.
   const row = rows.find((one) => one.holder === wanted) ?? rows[0];

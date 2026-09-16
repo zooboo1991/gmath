@@ -196,6 +196,10 @@ export default function IssueCertificatesCard({
             onChange={(e) => edited(setTeacherCategory)(e.target.value)}
             className={INPUT_CLASS}
           />
+          <span className="text-[.76rem] font-semibold text-ink-3">
+            Хоосон орхивол бүгд сурагчийн батламж авна — багшийн эрхтэй хүн ч
+            гэсэн.
+          </span>
         </label>
       </div>
 

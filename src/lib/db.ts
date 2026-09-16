@@ -1430,10 +1430,20 @@ export async function planCertificatesForProgram(
 
   const numbers = all.map((c) => c.certificateNumber);
   const rows: PlannedCertificate[] = [];
+
+  // An empty teacher category means "no teacher certificates in this batch" —
+  // everyone on the roster gets the student's wording, whatever their account
+  // role says. A teacher's account sitting in a children's course is a
+  // participant, not staff, and their certificate should read like everyone
+  // else's. The preview screen shows the wording each person will get, so this
+  // is visible before anything is written.
+  const teacherWanted = input.teacherCategory.trim().length > 0;
+
   for (const holder of ["teacher", "student"] as const) {
-    const group = pending.filter((r) =>
-      holder === "teacher" ? r.user!.role === "teacher" : r.user!.role !== "teacher"
-    );
+    const group = pending.filter((r) => {
+      if (!teacherWanted) return holder === "student";
+      return holder === "teacher" ? r.user!.role === "teacher" : r.user!.role !== "teacher";
+    });
     if (group.length === 0) continue;
     const issued = nextCertificateNumbers(numbers, holder, input.issuedDate, group.length);
     group.forEach((registration, i) => {
