@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { useProgramRegister } from "@/components/program/ProgramRegister";
+import { IconClose } from "@/components/icons";
 import { axisPositions, scoreTest, type PersonalityTest } from "@/lib/tests";
 
 /** How far a stranger gets before the site asks who they are. */
@@ -51,6 +52,15 @@ export default function TestRunner({
   const [index, setIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  /**
+   * The courses note, shown once over a freshly finished result.
+   *
+   * Only on a fresh finish: someone opening the page to re-read a result they
+   * already have starts on the result screen without `finish` running, and
+   * being advertised at every time they look is how a note like this stops
+   * being read at all.
+   */
+  const [promo, setPromo] = useState(false);
 
   // What this browser remembers from a run that stopped at the gate. Read
   // through useSyncExternalStore rather than an effect: the server has no
@@ -107,6 +117,7 @@ export default function TestRunner({
 
   const finish = async (sheet: number[]) => {
     setScreen("result");
+    setPromo(true);
     window.scrollTo(0, 0);
     if (!signedIn) return;
     setSaving(true);
@@ -272,6 +283,49 @@ export default function TestRunner({
 
     return (
       <section className="section-pad">
+        {promo && (
+          <div className="fixed inset-0 z-[100] bg-navy-deep/60 grid place-items-center px-4 py-8 overflow-y-auto">
+            <div className="bg-surface rounded-lg shadow-lg w-full max-w-[480px] px-6 py-7 relative text-left">
+              <button
+                type="button"
+                onClick={() => setPromo(false)}
+                aria-label="Хаах"
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-bg-soft grid place-items-center"
+              >
+                <IconClose className="w-4 h-4 text-ink-3" />
+              </button>
+
+              <span className="text-[.72rem] font-extrabold tracking-[.14em] uppercase text-blue-strong">
+                Элсэлт
+              </span>
+              <h3 className="text-[1.3rem] font-extrabold text-ink mt-2 leading-[1.25]">
+                Б.Ганбат багшийн сургалтууд элсэлтээ авч байна
+              </h3>
+              <p className="text-ink-2 font-medium text-[.95rem] mt-2.5 leading-[1.7]">
+                Улсын олимпиадын аварга багш нарын хамтарсан сургалт. Танхимын
+                сонгон бэлтгэл, 1 жилийн хөтөлбөр — хүүхдийнхээ түвшинд тохирохыг
+                нь хамтдаа сонгоорой.
+              </p>
+
+              <div className="flex items-center gap-2.5 mt-6 flex-wrap">
+                <Link
+                  href="/courses"
+                  className="flex-1 min-w-[160px] h-12 rounded-full bg-gold text-gold-ink shadow-gold font-extrabold grid place-items-center transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+                >
+                  Сургалтууд харах →
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setPromo(false)}
+                  className="h-12 px-5 rounded-full border border-line font-extrabold text-ink-2"
+                >
+                  Үр дүнгээ харах
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="wrap max-w-[640px] mx-auto">
           <svg viewBox="0 0 96 96" className="w-[96px] h-[96px] mb-5 test-glyph" aria-hidden="true">
             <g dangerouslySetInnerHTML={{ __html: primary.glyph }} />
