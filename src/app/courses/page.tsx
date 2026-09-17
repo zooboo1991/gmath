@@ -88,26 +88,34 @@ export default async function CoursesPage() {
         {songon.length > 0 && (
           <section className="pt-[clamp(48px,7vw,72px)]">
             <div className="wrap">
-              <div className="max-w-[680px]">
-                <span className="inline-flex items-center gap-2 text-[.76rem] font-extrabold tracking-[.14em] uppercase text-blue-strong before:content-[''] before:w-[22px] before:h-[2px] before:rounded-sm before:bg-gold-strong">
-                  Танхимын сургалт
-                </span>
-                <h2 className="text-[clamp(1.5rem,2.8vw,2rem)] font-extrabold leading-[1.14] tracking-[-.02em] text-ink mt-3.5 text-balance">
-                  Сонгон бэлтгэлийн ангиуд
-                </h2>
-                <p className="text-ink-2 font-medium mt-2.5 leading-[1.7]">
-                  Стандарт ангид сурдаг ч сонгоны ангийн түвшинд суралцах боломж. 7 хоногт 3 удаа,
-                  дээд тал нь 18 сурагчтай группээр. Эхлээд ангидаа бүртгүүлээрэй — дараа нь уулзаж
-                  түвшнээ тогтоогоод, доорх хуваариудаас тохирох цагаа хамтдаа сонгоно.
-                </p>
-
-                {/* Бүртгэлээс тусдаа зам: заримд нь ангиа сонгохоос өмнө
-                    уулзаж түвшнээ мэдэх нь эхлэх цэг болдог. */}
-                <div className="mt-5">
-                  <PlacementBookingButton className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full border-2 border-blue text-blue-strong px-[26px] py-[13px] text-[.98rem] transition-colors hover:bg-blue-soft" />
-                  <p className="text-ink-3 font-semibold text-[.86rem] mt-2 leading-[1.6] max-w-[52ch]">
-                    Танхимд ирж түвшин тогтоолгож, аль ангид орохоо багштай ярилцана.
+              {/* Танилцуулга зүүн талд, түвшин тогтоох урилга баруун талд —
+                  өмнө нь текст хагас өргөнд зогсоод баруун тал хоосон
+                  үлддэг байсан. Бүртгэлээс тусдаа зам гэдэг нь ингэснээр
+                  бүр тодорхой болно. */}
+              <div className="grid grid-cols-1 nav:grid-cols-[minmax(0,1fr)_330px] gap-6 nav:gap-12 items-start">
+                <div>
+                  <span className="inline-flex items-center gap-2 text-[.76rem] font-extrabold tracking-[.14em] uppercase text-blue-strong before:content-[''] before:w-[22px] before:h-[2px] before:rounded-sm before:bg-gold-strong">
+                    Танхимын сургалт
+                  </span>
+                  <h2 className="text-[clamp(1.5rem,2.8vw,2rem)] font-extrabold leading-[1.14] tracking-[-.02em] text-ink mt-3.5 text-balance">
+                    Сонгон бэлтгэлийн ангиуд
+                  </h2>
+                  <p className="text-ink-2 font-medium mt-2.5 leading-[1.7] max-w-[58ch]">
+                    Стандарт ангид сурдаг ч сонгоны ангийн түвшинд суралцах боломж. 7 хоногт 3 удаа,
+                    дээд тал нь 15 сурагчтай группээр. Эхлээд ангидаа бүртгүүлээрэй — дараа нь уулзаж
+                    түвшнээ тогтоогоод, доорх хуваариудаас тохирох цагаа хамтдаа сонгоно.
                   </p>
+                </div>
+
+                <div className="rounded-lg border border-blue-soft-2 bg-blue-soft/50 px-[22px] py-[20px]">
+                  <b className="block text-[1rem] font-extrabold leading-[1.35]">
+                    Аль ангид орохоо мэдэхгүй байна уу?
+                  </b>
+                  <p className="text-[.88rem] text-ink-2 font-medium mt-1.5 leading-[1.6]">
+                    Танхимд ирж түвшин тогтоолгож, аль ангид орохоо багштай ярилцана. Төлбөр
+                    төлөхгүй, суудал баталгаажихгүй.
+                  </p>
+                  <PlacementBookingButton className="w-full mt-4 inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full border-2 border-blue text-blue-strong bg-surface px-[20px] py-[12px] text-[.95rem] transition-colors hover:bg-blue hover:text-white" />
                 </div>
               </div>
 
