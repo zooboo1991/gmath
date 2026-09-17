@@ -46,6 +46,7 @@ const MENU: { href: string; label: string; icon: (p: IconProps) => React.ReactNo
   { href: "/admin/bodlogo", label: "Бодлогын сан", icon: IconCopy, section: "bodlogo" },
   { href: "/admin/attendance", label: "Ирц бүртгэх", icon: IconCheckCircle, section: "attendance" },
   { href: "/admin/placement", label: "Шаталсан шалгалт", icon: IconGraduationCap, section: "placement" },
+  { href: "/admin/bookings", label: "Түвшин тогтоох цаг", icon: IconCalendar, section: "bookings" },
   { href: "/admin/grading", label: "Шалгах", icon: IconCheck, section: "grading" },
   { href: "/admin/waitlist", label: "Хүлээлгийн жагсаалт", icon: IconCalendar, section: "waitlist" },
   { href: "/admin/notifications", label: "Мэдэгдэл", icon: IconBell, section: "notifications" },

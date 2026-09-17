@@ -10,6 +10,7 @@ import WaitlistCard from "@/components/WaitlistCard";
 import { getSessionUser } from "@/lib/session";
 import { buildScheduleBundles } from "@/lib/weeklySchedule";
 import ScheduleBundles from "@/components/ScheduleBundles";
+import PlacementBookingButton from "@/components/program/PlacementBookingButton";
 import { courseHref } from "@/lib/courseHref";
 
 export const metadata: Metadata = {
@@ -99,6 +100,15 @@ export default async function CoursesPage() {
                   дээд тал нь 18 сурагчтай группээр. Эхлээд ангидаа бүртгүүлээрэй — дараа нь уулзаж
                   түвшнээ тогтоогоод, доорх хуваариудаас тохирох цагаа хамтдаа сонгоно.
                 </p>
+
+                {/* Бүртгэлээс тусдаа зам: заримд нь ангиа сонгохоос өмнө
+                    уулзаж түвшнээ мэдэх нь эхлэх цэг болдог. */}
+                <div className="mt-5">
+                  <PlacementBookingButton className="inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full border-2 border-blue text-blue-strong px-[26px] py-[13px] text-[.98rem] transition-colors hover:bg-blue-soft" />
+                  <p className="text-ink-3 font-semibold text-[.86rem] mt-2 leading-[1.6] max-w-[52ch]">
+                    Танхимд ирж түвшин тогтоолгож, аль ангид орохоо багштай ярилцана.
+                  </p>
+                </div>
               </div>
 
               {/* Цагийг уулзалтаар тохирдог тул хуваариуд анги бүрийн картад

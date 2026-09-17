@@ -1394,3 +1394,38 @@ alter table problems add column if not exists bodlogo_external_id text;
 create unique index if not exists problems_bodlogo_external_id_idx
   on problems (bodlogo_external_id)
   where bodlogo_external_id is not null;
+
+-- ---------------------------------------------------------------------------
+-- Түвшин тогтоолгох цаг (танхимд ирж уулзах)
+-- ---------------------------------------------------------------------------
+-- Сонгоны ангид орохын өмнө хүүхэд танхимд ирж түвшнээ тогтоолгож, аль ангид
+-- орохоо багштай ярилцана. Энэ нь сургалтад бүртгүүлэх биш — төлбөр ч алга,
+-- суудал ч баталгаажихгүй.
+--
+-- Цагийн нүд нь тусдаа тохиргоо биш: сонгоны ангиудын долоо хоногийн
+-- хуваариас нэг цагийн нүд болж гардаг (src/lib/placementBooking.ts).
+-- Хуваарь өөрчлөгдвөл нүд өөрөө дагана.
+create table if not exists placement_bookings (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  -- Гараг биш, тодорхой огноо: багш аль өдөр хэн ирэхийг мэдэх хэрэгтэй, мөн
+  -- өнгөрсөн цаг жагсаалтаас өөрөө арилна.
+  booked_date date not null,
+  -- "10:30–11:30". Хуваариас гардаг тул тексээр хадгална — цагийн жагсаалт
+  -- өөрчлөгдөхөд хуучин захиалга уншигдахуйц үлдэнэ.
+  slot text not null,
+  status text not null default 'booked'
+    check (status in ('booked', 'came', 'missed', 'cancelled')),
+  /** Багшийн тэмдэглэл: ямар түвшин, аль ангид тохирох вэ. */
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+-- Нэг хүүхэд нэг л удаа хүлээгдэж болно. Цагаа солих бол хуучнаа болиод
+-- шинээр захиална — давхар дарах, хоёр таб нээхээс ч сэргийлнэ.
+create unique index if not exists placement_bookings_one_active_idx
+  on placement_bookings (user_id)
+  where status = 'booked';
+-- Багшийн жагсаалт өдрөөр эрэмблэгддэг.
+create index if not exists placement_bookings_date_idx
+  on placement_bookings (booked_date, slot);
