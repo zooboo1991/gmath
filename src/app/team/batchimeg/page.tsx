@@ -181,26 +181,38 @@ export default function BatchimegPage() {
               <h3 className="flex items-center gap-2.5 text-[1.2rem] font-extrabold">
                 <IconMedal className="w-5 h-5 text-blue-strong" /> Хичээлийн жил тус бүрээр
               </h3>
-              <div className="grid grid-cols-1 xs:grid-cols-2 nav:grid-cols-3 gap-[14px] mt-5">
+              {/* 21 жилийг карт болгоход хайрцаг нь агуулгаасаа их болдог —
+                  нэг босоо шугам дээр он, тоо хоёрыг эгнүүлэв. */}
+              {/* Босоо шугам нь мөр бүрийн зүүн хүрээнээс тогтдог тул өргөн
+                  дэлгэцэд хоёр багана болгоход ч тасалдахгүй. Багана нь
+                  дээрээс доош урсдаг учир он дарааллаа хадгална. */}
+              <ol className="mt-6 max-w-[920px] columns-1 nav:columns-2 gap-x-[52px]">
                 {batchimegMedalsByYear.map((one) => (
-                  <div key={one.label} className="card-flat px-[18px] py-[15px]">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <small className="text-[.85rem] text-ink-3 font-bold tabular-nums">
+                  <li
+                    key={one.label}
+                    className="relative break-inside-avoid border-l border-line-2 pl-[26px] py-[9px]"
+                  >
+                    <span
+                      aria-hidden
+                      className="absolute left-[-5px] top-[15px] w-[9px] h-[9px] rounded-full bg-blue ring-4 ring-bg-soft"
+                    />
+                    <div className="flex items-baseline justify-between gap-4 border-b border-line pb-[7px]">
+                      <span className="text-[.92rem] font-bold text-ink-2 tabular-nums">
                         {one.label}
-                      </small>
-                      <b className="text-[1.02rem] font-extrabold tabular-nums shrink-0">
+                      </span>
+                      <b className="text-[1rem] font-extrabold tabular-nums shrink-0">
                         {one.count} медаль
                       </b>
                     </div>
                     {one.note && (
-                      <span className="block text-[.84rem] text-ink-2 font-medium mt-1.5 leading-[1.5]">
+                      <p className="text-[.84rem] text-ink-3 font-medium mt-1.5 leading-[1.5]">
                         {one.note}
-                      </span>
+                      </p>
                     )}
-                  </div>
+                  </li>
                 ))}
-              </div>
-              <p className="text-[.85rem] text-ink-3 font-semibold mt-4 leading-[1.6]">
+              </ol>
+              <p className="text-[.85rem] text-ink-3 font-semibold mt-5 leading-[1.6]">
                 1998–2007 онд эзэлсэн I, II, III байрыг медальд тооцов.
               </p>
             </div>
