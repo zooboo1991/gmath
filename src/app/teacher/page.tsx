@@ -7,7 +7,12 @@ import Reveal from "@/components/Reveal";
 import JsonLd, { SITE_URL } from "@/components/JsonLd";
 import TeacherTimeline from "@/components/teacher/TeacherTimeline";
 import { IconCrown, IconGraduationCap, IconBriefcase, IconBook } from "@/components/icons";
-import { teacherBooks, teacherEducation, teacherExperience } from "@/lib/teacherTimeline";
+import {
+  teacherBooks,
+  teacherEducation,
+  teacherExperience,
+  teacherTimeline,
+} from "@/lib/teacherTimeline";
 
 export const metadata: Metadata = {
   title: "Багшийн танилцуулга",
@@ -125,7 +130,7 @@ export default function TeacherPage() {
             </div>
 
             <div className="mt-[44px]">
-              <TeacherTimeline />
+              <TeacherTimeline groups={teacherTimeline} />
             </div>
           </div>
         </section>

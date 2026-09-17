@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { IconMedal } from "@/components/icons";
-import { teacherTimeline, timelineFilters, type TimelineCategory, type TimelineTone } from "@/lib/teacherTimeline";
+import {
+  timelineFilters,
+  type TimelineCategory,
+  type TimelineGroup,
+  type TimelineTone,
+} from "@/lib/teacherTimeline";
 
 const TONE_CLASSES: Record<TimelineTone, string> = {
   gold: "bg-gold-soft text-gold-strong",
@@ -20,7 +25,7 @@ const BORDER_CLASSES: Record<TimelineTone, string> = {
   plain: "border-l-line",
 };
 
-export default function TeacherTimeline() {
+export default function TeacherTimeline({ groups }: { groups: TimelineGroup[] }) {
   const [filter, setFilter] = useState<"all" | TimelineCategory>("all");
 
   return (
@@ -43,7 +48,7 @@ export default function TeacherTimeline() {
       </div>
 
       <div className="flex flex-col gap-10">
-        {teacherTimeline.map((group) => {
+        {groups.map((group) => {
           const items = group.items.filter((item) => filter === "all" || item.cat === filter);
           if (items.length === 0) return null;
           return (
