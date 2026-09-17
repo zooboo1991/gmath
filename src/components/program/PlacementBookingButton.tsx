@@ -193,6 +193,11 @@ export default function PlacementBookingButton({ className }: { className: strin
                     {days.find((one) => one.date === pickedDate)?.label}
                   </span>
                 </div>
+                {/* Цагууд нь ангиудын хуваариас гардгийг хэлж өгнө — эс бөгөөс
+                    баасан гараг шиг өдөр "ажлын цаг бүхэлдээ" мэт харагдана. */}
+                <p className="text-ink-3 font-semibold text-[.8rem] mb-2">
+                  Хичээл орж байгаа цагуудаас сонгоно
+                </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {(days.find((one) => one.date === pickedDate)?.slots ?? []).map((slot) => (
                     <button
