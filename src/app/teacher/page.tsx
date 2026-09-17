@@ -95,7 +95,7 @@ export default function TeacherPage() {
 
         <section className="pt-10 md:pt-12 pb-10 md:pb-14">
           <div className="wrap">
-            <Reveal className="relative rounded-lg bg-[linear-gradient(150deg,var(--color-green),oklch(0.42_0.1_158))] text-white flex items-start gap-5 px-[26px] py-[26px] max-w-[840px] mx-auto shadow-md overflow-hidden">
+            <Reveal className="relative rounded-lg bg-[linear-gradient(150deg,var(--color-green),oklch(0.42_0.1_158))] text-white flex flex-col xs:flex-row items-start gap-4 xs:gap-5 px-[26px] py-[26px] max-w-[840px] mx-auto shadow-md overflow-hidden">
               <span className="w-[54px] h-[54px] rounded-[15px] bg-gold-soft text-gold-strong grid place-items-center shrink-0">
                 <IconCrown className="w-6 h-6" />
               </span>

@@ -23,10 +23,11 @@ export const metadata: Metadata = {
   description:
     "Б.Батчимэг — 1991 оноос хойш математикийн багшаар ажиллаж буй, Төрийн «Алтан гадас» болон «Хөдөлмөрийн гавьяаны улаан туг» одонт багш. Шавь нар нь 1998–2019 онд 772 медаль хүртсэн.",
   alternates: { canonical: "/team/batchimeg" },
+  // Багш өөрөө танилцуулгаа баталгаажуулах хүртэл нуув: "Манай баг"-аас
+  // холбоосыг авч, sitemap-аас хасаж, индекслэхийг хориглов. Хаягаар нь
+  // шууд орвол харагдана — багшид үзүүлэхэд ингэх нь хэрэгтэй.
+  robots: { index: false, follow: false },
 };
-
-/** Хамгийн өндөр жил — баганын өргөнийг үүнтэй харьцуулна. */
-const PEAK_MEDALS = Math.max(...batchimegMedalsByYear.map((one) => one.count));
 
 export default function BatchimegPage() {
   const years = batchimegTeachingYear();
@@ -66,11 +67,10 @@ export default function BatchimegPage() {
                 олимпиадад алт, мөнгө, хүрэл медальт шавь бэлтгэсэн. Төрийн «Алтан гадас», «Хөдөлмөрийн
                 гавьяаны улаан туг» одонгоор шагнагдсан.
               </p>
-              <div className="grid grid-cols-3 gap-[10px] mt-[26px] max-w-[440px]">
+              <div className="grid grid-cols-2 gap-[10px] mt-[26px] max-w-[340px]">
                 {[
                   { value: `${years}`, label: "дахь жилдээ багшилж байна" },
                   { value: `${BATCHIMEG_TOTAL_MEDALS}`, label: "шавь нарын медаль (1998–2019)" },
-                  { value: "2", label: "төрийн одон" },
                 ].map((m) => (
                   <div
                     key={m.label}
@@ -115,7 +115,7 @@ export default function BatchimegPage() {
 
         <section className="pt-10 md:pt-12 pb-10 md:pb-14">
           <div className="wrap">
-            <Reveal className="relative rounded-lg bg-[linear-gradient(150deg,var(--color-green),oklch(0.42_0.1_158))] text-white flex items-start gap-5 px-[26px] py-[26px] max-w-[840px] mx-auto shadow-md overflow-hidden">
+            <Reveal className="relative rounded-lg bg-[linear-gradient(150deg,var(--color-green),oklch(0.42_0.1_158))] text-white flex flex-col xs:flex-row items-start gap-4 xs:gap-5 px-[26px] py-[26px] max-w-[840px] mx-auto shadow-md overflow-hidden">
               <span className="w-[54px] h-[54px] rounded-[15px] bg-gold-soft text-gold-strong grid place-items-center shrink-0">
                 <IconMedal className="w-6 h-6" />
               </span>
@@ -149,59 +149,60 @@ export default function BatchimegPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 nav:grid-cols-[1.15fr_.85fr] gap-[36px] mt-[44px] items-start">
-              <div className="card-flat px-[20px] py-[22px]">
-                <ul className="flex flex-col gap-2.5">
-                  {batchimegMedalsByYear.map((one) => (
-                    <li key={one.label} className="flex items-center gap-3">
-                      <span className="w-[62px] shrink-0 text-[.82rem] font-bold text-ink-3 tabular-nums">
-                        {one.label}
-                      </span>
-                      <span className="flex-1 h-[14px] rounded-full bg-surface-2 overflow-hidden">
-                        <span
-                          className="block h-full rounded-full bg-[linear-gradient(90deg,var(--color-blue),var(--color-blue-strong))]"
-                          style={{ width: `${Math.max((one.count / PEAK_MEDALS) * 100, 3)}%` }}
-                        />
-                      </span>
-                      <span className="w-[42px] shrink-0 text-right text-[.86rem] font-extrabold tabular-nums">
-                        {one.count}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-[.82rem] text-ink-3 font-semibold mt-4 leading-[1.5]">
-                  1998–2007 онд эзэлсэн I, II, III байрыг медальд тооцов. Дэлгэрэнгүйг он цагийн
-                  хэлхээсээс харна уу.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="flex items-center gap-2.5 text-[1.2rem] font-extrabold">
-                  <IconTrophy className="w-5 h-5 text-blue-strong" /> Олон улсын олимпиад
-                </h3>
-                <div className="flex flex-col gap-3 mt-5">
-                  {batchimegInternational.map((one) => (
-                    <div key={one.title} className="card-flat px-[18px] py-[15px]">
-                      <small className="text-[.8rem] text-ink-3 font-bold">{one.range}</small>
-                      <b className="block text-[.98rem] font-extrabold mt-0.5 leading-[1.3]">
-                        {one.title}
-                      </b>
-                      <span className="block text-[.88rem] text-ink-2 font-medium mt-0.5">
-                        {one.result}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="card-flat px-[18px] py-[15px] border-l-[3px] border-l-gold">
-                    <small className="text-[.8rem] text-ink-3 font-bold">2019</small>
+            <div className="mt-[44px]">
+              <h3 className="flex items-center gap-2.5 text-[1.2rem] font-extrabold">
+                <IconTrophy className="w-5 h-5 text-blue-strong" /> Олон улсын олимпиад
+              </h3>
+              <div className="grid grid-cols-1 xs:grid-cols-2 nav:grid-cols-4 gap-[18px] mt-5">
+                {batchimegInternational.map((one) => (
+                  <Reveal key={one.title} className="card-flat px-[20px] py-[18px]">
+                    <small className="text-[.8rem] text-ink-3 font-bold">{one.range}</small>
                     <b className="block text-[.98rem] font-extrabold mt-0.5 leading-[1.3]">
-                      Математикийн ЭЕШ — хоёр шавь 800 оноо
+                      {one.title}
                     </b>
-                    <span className="block text-[.88rem] text-ink-2 font-medium mt-0.5">
-                      СБД-ийн тэр оны шилдэг аргазүйтэй багшийн өргөмжлөл хүртсэн
+                    <span className="block text-[.88rem] text-ink-2 font-medium mt-1">
+                      {one.result}
                     </span>
-                  </div>
-                </div>
+                  </Reveal>
+                ))}
+                <Reveal className="card-flat px-[20px] py-[18px] border-l-[3px] border-l-gold">
+                  <small className="text-[.8rem] text-ink-3 font-bold">2019</small>
+                  <b className="block text-[.98rem] font-extrabold mt-0.5 leading-[1.3]">
+                    Математикийн ЭЕШ — хоёр шавь 800 оноо
+                  </b>
+                  <span className="block text-[.88rem] text-ink-2 font-medium mt-1">
+                    СБД-ийн тэр оны шилдэг аргазүйтэй багшийн өргөмжлөл хүртсэн
+                  </span>
+                </Reveal>
               </div>
+            </div>
+
+            <div className="mt-[52px]">
+              <h3 className="flex items-center gap-2.5 text-[1.2rem] font-extrabold">
+                <IconMedal className="w-5 h-5 text-blue-strong" /> Хичээлийн жил тус бүрээр
+              </h3>
+              <div className="grid grid-cols-1 xs:grid-cols-2 nav:grid-cols-3 gap-[14px] mt-5">
+                {batchimegMedalsByYear.map((one) => (
+                  <div key={one.label} className="card-flat px-[18px] py-[15px]">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <small className="text-[.85rem] text-ink-3 font-bold tabular-nums">
+                        {one.label}
+                      </small>
+                      <b className="text-[1.02rem] font-extrabold tabular-nums shrink-0">
+                        {one.count} медаль
+                      </b>
+                    </div>
+                    {one.note && (
+                      <span className="block text-[.84rem] text-ink-2 font-medium mt-1.5 leading-[1.5]">
+                        {one.note}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[.85rem] text-ink-3 font-semibold mt-4 leading-[1.6]">
+                1998–2007 онд эзэлсэн I, II, III байрыг медальд тооцов.
+              </p>
             </div>
           </div>
         </section>
