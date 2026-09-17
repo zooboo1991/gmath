@@ -22,18 +22,16 @@ export function batchimegTeachingYear(now = new Date()): number {
  * 1998–2007 онд багш нь медалийн тоог биш байрыг тэмдэглэсэн тул I, II, III
  * байрыг медальд тооцов (IV байр, тусгай байр медаль биш). Ингэж тоолоход
  * нийлбэр нь намтарт бичсэн 772-той яг таарна — `batchimegProfile.test.ts`
- * үүнийг шалгана.
+ * үүнийг шалгана. Жишээ нь 2004–05 бол "4 сурагч 9 олимпиадад I байр 5,
+ * II байр 2, III байр 6" = 13. Байрын задаргааг хуудсанд харуулахгүй —
+ * тоо нь өөрөө яриад байгаа, задаргаа нь жагсаалтыг л бөглөрүүлнэ.
  */
-export const batchimegMedalsByYear: { label: string; count: number; note?: string }[] = [
+export const batchimegMedalsByYear: { label: string; count: number }[] = [
   { label: "2018–19", count: 13 },
   { label: "2017–18", count: 35 },
   { label: "2016–17", count: 83 },
   { label: "2015–16", count: 82 },
-  {
-    label: "2014–15",
-    count: 107,
-    note: "Шинэ-Үе сургуулийн нэрэмжит олимпиадад ангийн 18 сурагч 27 медаль хүртсэн.",
-  },
+  { label: "2014–15", count: 107 },
   { label: "2013–14", count: 76 },
   { label: "2012–13", count: 67 },
   { label: "2011–12", count: 93 },
@@ -41,15 +39,15 @@ export const batchimegMedalsByYear: { label: string; count: number; note?: strin
   { label: "2009–10", count: 31 },
   { label: "2008–09", count: 18 },
   { label: "2007–08", count: 10 },
-  { label: "2006–07", count: 4, note: "5 олимпиадад I байр 2, II байр 1, III байр 1." },
-  { label: "2005–06", count: 7, note: "6 сурагч 6 олимпиадад I байр 1, II байр 3, III байр 3." },
-  { label: "2004–05", count: 13, note: "4 сурагч 9 олимпиадад I байр 5, II байр 2, III байр 6." },
-  { label: "2003–04", count: 17, note: "5 сурагч 12 олимпиадад I байр 8, II байр 4, III байр 5." },
-  { label: "2002–03", count: 12, note: "12 сурагч 9 олимпиадад I байр 4, II байр 5, III байр 3." },
-  { label: "2001–02", count: 15, note: "4 сурагч 7 олимпиадад I байр 7, II байр 6, III байр 2." },
-  { label: "2000–01", count: 9, note: "9 сурагч 4 олимпиадад I байр 2, II байр 4, III байр 3." },
-  { label: "1999–00", count: 10, note: "14 сурагч 5 олимпиадад I байр 4, II байр 4, III байр 2." },
-  { label: "1998–99", count: 2, note: "1 сурагч математикийн 2 олимпиадад III байр эзэлсэн." },
+  { label: "2006–07", count: 4 },
+  { label: "2005–06", count: 7 },
+  { label: "2004–05", count: 13 },
+  { label: "2003–04", count: 17 },
+  { label: "2002–03", count: 12 },
+  { label: "2001–02", count: 15 },
+  { label: "2000–01", count: 9 },
+  { label: "1999–00", count: 10 },
+  { label: "1998–99", count: 2 },
 ];
 
 /** Намтарт бичсэн нийт дүн — дээрх жагсаалтын нийлбэртэй таарах ёстой. */

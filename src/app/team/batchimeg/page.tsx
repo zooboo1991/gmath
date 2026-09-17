@@ -149,7 +149,27 @@ export default function BatchimegPage() {
               </p>
             </div>
 
-            <div className="mt-[44px]">
+            {/* Он, тоо хоёрыг цэглэсэн зураасаар холбов — 21 мөрийг хайрцаг,
+                зураас, цэгээр чимэхээс тоо нь өөрөө уншигдаж байх нь чухал.
+                Хоёр багана нь мөрөөрөө урсдаг тул он дараалал хадгалагдана. */}
+            <div className="mt-[40px] max-w-[880px] mx-auto grid grid-cols-1 nav:grid-cols-2 gap-x-[52px]">
+              {batchimegMedalsByYear.map((one) => (
+                <div key={one.label} className="flex items-baseline gap-3 py-[11px]">
+                  <span className="text-[.92rem] font-bold text-ink-3 tabular-nums shrink-0">
+                    {one.label}
+                  </span>
+                  <span
+                    aria-hidden
+                    className="flex-1 border-b border-dotted border-line-2 -translate-y-[5px]"
+                  />
+                  <b className="w-[38px] text-right text-[1.05rem] font-extrabold tabular-nums shrink-0">
+                    {one.count}
+                  </b>
+                  <span className="text-[.82rem] font-semibold text-ink-3 shrink-0">медаль</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-[56px]">
               <h3 className="flex items-center gap-2.5 text-[1.2rem] font-extrabold">
                 <IconTrophy className="w-5 h-5 text-blue-strong" /> Олон улсын олимпиад
               </h3>
@@ -177,45 +197,6 @@ export default function BatchimegPage() {
               </div>
             </div>
 
-            <div className="mt-[52px]">
-              <h3 className="flex items-center gap-2.5 text-[1.2rem] font-extrabold">
-                <IconMedal className="w-5 h-5 text-blue-strong" /> Хичээлийн жил тус бүрээр
-              </h3>
-              {/* 21 жилийг карт болгоход хайрцаг нь агуулгаасаа их болдог —
-                  нэг босоо шугам дээр он, тоо хоёрыг эгнүүлэв. */}
-              {/* Босоо шугам нь мөр бүрийн зүүн хүрээнээс тогтдог тул өргөн
-                  дэлгэцэд хоёр багана болгоход ч тасалдахгүй. Багана нь
-                  дээрээс доош урсдаг учир он дарааллаа хадгална. */}
-              <ol className="mt-6 max-w-[920px] columns-1 nav:columns-2 gap-x-[52px]">
-                {batchimegMedalsByYear.map((one) => (
-                  <li
-                    key={one.label}
-                    className="relative break-inside-avoid border-l border-line-2 pl-[26px] py-[9px]"
-                  >
-                    <span
-                      aria-hidden
-                      className="absolute left-[-5px] top-[15px] w-[9px] h-[9px] rounded-full bg-blue ring-4 ring-bg-soft"
-                    />
-                    <div className="flex items-baseline justify-between gap-4 border-b border-line pb-[7px]">
-                      <span className="text-[.92rem] font-bold text-ink-2 tabular-nums">
-                        {one.label}
-                      </span>
-                      <b className="text-[1rem] font-extrabold tabular-nums shrink-0">
-                        {one.count} медаль
-                      </b>
-                    </div>
-                    {one.note && (
-                      <p className="text-[.84rem] text-ink-3 font-medium mt-1.5 leading-[1.5]">
-                        {one.note}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ol>
-              <p className="text-[.85rem] text-ink-3 font-semibold mt-5 leading-[1.6]">
-                1998–2007 онд эзэлсэн I, II, III байрыг медальд тооцов.
-              </p>
-            </div>
           </div>
         </section>
 
