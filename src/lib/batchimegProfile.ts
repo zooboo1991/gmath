@@ -56,11 +56,6 @@ export const BATCHIMEG_TOTAL_MEDALS = 772;
 /** Олон улсын олимпиадын дүн — намтрын товч дүгнэлтээр. */
 export const batchimegInternational: { range: string; title: string; result: string }[] = [
   {
-    range: "2019",
-    title: "Олон улсын Физикийн олимпиад",
-    result: "1 хүрэл медаль",
-  },
-  {
     range: "2018",
     title: "EGMO — Олон улсын охидын математикийн олимпиад, Итали",
     result: "1 хүрэл медаль",
@@ -143,12 +138,6 @@ export const batchimegTimeline: TimelineGroup[] = [
         note: "1 сурагч 800 (100%), 1 сурагч 800 (97%). Үүний төлөө СБД-ийн 2019 оны шилдэг аргазүйтэй багшийн өргөмжлөл хүртсэн.",
         badge: "800 оноо",
         tone: "gold",
-        cat: "student",
-      },
-      {
-        title: "Олон улсын Физикийн олимпиад — 1 сурагч хүрэл медаль",
-        badge: "Хүрэл",
-        tone: "bronze",
         cat: "student",
       },
     ],

@@ -23,10 +23,6 @@ export const metadata: Metadata = {
   description:
     "Б.Батчимэг — 1991 оноос хойш математикийн багшаар ажиллаж буй, Төрийн «Алтан гадас» болон «Хөдөлмөрийн гавьяаны улаан туг» одонт багш. Шавь нар нь 1998–2019 онд 772 медаль хүртсэн.",
   alternates: { canonical: "/team/batchimeg" },
-  // Багш өөрөө танилцуулгаа баталгаажуулах хүртэл нуув: "Манай баг"-аас
-  // холбоосыг авч, sitemap-аас хасаж, индекслэхийг хориглов. Хаягаар нь
-  // шууд орвол харагдана — багшид үзүүлэхэд ингэх нь хэрэгтэй.
-  robots: { index: false, follow: false },
 };
 
 export default function BatchimegPage() {
@@ -173,7 +169,7 @@ export default function BatchimegPage() {
               <h3 className="flex items-center gap-2.5 text-[1.2rem] font-extrabold">
                 <IconTrophy className="w-5 h-5 text-blue-strong" /> Олон улсын олимпиад
               </h3>
-              <div className="grid grid-cols-1 xs:grid-cols-2 nav:grid-cols-4 gap-[18px] mt-5">
+              <div className="grid grid-cols-1 xs:grid-cols-2 nav:grid-cols-3 gap-[18px] mt-5">
                 {batchimegInternational.map((one) => (
                   <Reveal key={one.title} className="card-flat px-[20px] py-[18px]">
                     <small className="text-[.8rem] text-ink-3 font-bold">{one.range}</small>
