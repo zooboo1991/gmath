@@ -66,6 +66,7 @@ export default function CourseDetail({
     tag: course.tag,
     // Only the classroom groups split their fee; an ordinary course does not.
     splittable: course.template === "songon",
+    songon: course.template === "songon",
   };
 
   return (

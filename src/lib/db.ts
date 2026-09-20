@@ -2,7 +2,7 @@ import { getPaymentProvider } from "./payment";
 import { getSupabase } from "./supabase";
 import { hashPassword, verifyPassword as verifyPasswordHash } from "./password";
 import { parsePriceToNumber } from "./price";
-import { splitHalves } from "./installment";
+import { installmentAmounts, splitHalves } from "./installment";
 import { nextCertificateNumbers } from "./certificateNumber";
 import { registrationBalance } from "./registration";
 import { chunk, fetchAllRows } from "./fetchAll";
@@ -225,6 +225,13 @@ export type Registration = {
   totalDue?: number;
   /** The 50/50 plan's promised date for the second half. Unset means paid in one go. */
   installmentDueDate?: string;
+  /**
+   * Түвшин тогтоох төлбөрөөс орж ирсэн хөнгөлөлт, төгрөгөөр. Эхний
+   * төлөлтөөс хасагдана — тэгэхээр төлөх ёстой дүн нь `price`/`totalDue`
+   * хасах энэ тоо. Мөр бүрд утгатай (өгөгдмөл 0); шинэ бүртгэл үүсгэхэд
+   * заахгүй байж болно.
+   */
+  placementCredit?: number;
 };
 
 /**
@@ -339,6 +346,7 @@ type RegistrationRow = {
   qpay_short_url: string | null;
   total_due: number | null;
   installment_due_date: string | null;
+  placement_credit: number | null;
 };
 
 type CertificateRow = {
@@ -456,6 +464,7 @@ function registrationFromRow(row: RegistrationRow): Registration {
     qpayShortUrl: row.qpay_short_url ?? undefined,
     totalDue: row.total_due ?? undefined,
     installmentDueDate: row.installment_due_date ?? undefined,
+    placementCredit: row.placement_credit ?? 0,
   };
 }
 
@@ -1846,10 +1855,12 @@ export async function settleRegistrationPayment(id: string): Promise<Registratio
   //
   // Дүнг QPay-ийн бүртгэснээр авна: нэхэмжилсэнтэй зөрвөл дэвтэрт бодитыг
   // нь бичих ёстой. Байхгүй бол өөрсдийн тооцоолол нөхөнө.
+  // Түвшин тогтоох төлбөр эхний төлөлтөөс хасагдсан байдаг тул дэвтэрт
+  // бичих дүн нь хагас биш, хагас хасах хөнгөлөлт.
   const expectedAmount =
     updated.totalDue !== undefined && updated.installmentDueDate
-      ? splitHalves(updated.totalDue).now
-      : parsePriceToNumber(updated.price);
+      ? installmentAmounts(updated.totalDue, updated.placementCredit ?? 0).now
+      : Math.max(0, parsePriceToNumber(updated.price) - (updated.placementCredit ?? 0));
   await addRegistrationPayment({
     registrationId: updated.id,
     amount: result.amount ?? expectedAmount,

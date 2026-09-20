@@ -4,8 +4,10 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  amountAfterCredit,
   canSplitPayment,
   earliestInstallmentDate,
+  installmentAmounts,
   latestInstallmentDate,
   isValidInstallmentDate,
   splitHalves,
@@ -81,5 +83,44 @@ describe("the promised date", () => {
     for (const value of ["", "маргааш", "2026-9-1", "2026-10-01T00:00:00Z"]) {
       expect(isValidInstallmentDate(value, now), value).toBe(false);
     }
+  });
+});
+
+describe("түвшин тогтоох төлбөрийн хөнгөлөлт", () => {
+  it("хөнгөлөлт эхний төлөлтөөс бүхэлдээ хасагдана", () => {
+    // Эзний жишээ: 20,000₮ төлж түвшнээ тогтоолгосон хүн 1,200,000₮-ийн
+    // ангид 580,000₮ урьдчилгаа өгч, 600,000₮ үлдээнэ.
+    expect(installmentAmounts(1_200_000, 20_000)).toEqual({ now: 580_000, later: 600_000 });
+  });
+
+  it("хоёр төлөлтийн нийлбэр нь хөнгөлсөн үнэтэй таарна", () => {
+    for (const price of [1_200_000, 1_000_000, 950_000, 350_001]) {
+      const { now, later } = installmentAmounts(price, 20_000);
+      expect(now + later, String(price)).toBe(price - 20_000);
+    }
+  });
+
+  it("хөнгөлөлтгүй бол хуучнаараа тэн хагас", () => {
+    expect(installmentAmounts(1_200_000)).toEqual(splitHalves(1_200_000));
+    expect(installmentAmounts(1_200_000, 0)).toEqual({ now: 600_000, later: 600_000 });
+  });
+
+  it("хөнгөлөлт эхний төлөлтөөс их бол үлдэгдэл нь хоёр дахь руу шилжинэ", () => {
+    // 15,000 + 15,000 байсан нь 0 + 10,000 болно — нийлбэр нь 10,000.
+    expect(installmentAmounts(30_000, 20_000)).toEqual({ now: 0, later: 10_000 });
+    expect(installmentAmounts(10_000, 20_000)).toEqual({ now: 0, later: 0 });
+    expect(amountAfterCredit(10_000, 20_000)).toBe(0);
+  });
+
+  it("жижиг үнэ дээр ч нийлбэрийн дүрэм эвдрэхгүй", () => {
+    for (const price of [30_000, 40_001, 19_999]) {
+      const { now, later } = installmentAmounts(price, 20_000);
+      expect(now + later, String(price)).toBe(Math.max(0, price - 20_000));
+    }
+  });
+
+  it("бүтнээр төлөхөд хөнгөлөлт үнээс хасагдана", () => {
+    expect(amountAfterCredit(1_200_000, 20_000)).toBe(1_180_000);
+    expect(amountAfterCredit(1_200_000)).toBe(1_200_000);
   });
 });

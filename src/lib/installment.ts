@@ -24,6 +24,29 @@ export function splitHalves(total: number): { now: number; later: number } {
 }
 
 /**
+ * Хуваан төлөх хоёр дүн, түвшин тогтоох төлбөрийг хассаны дараа.
+ *
+ * Хөнгөлөлт ЭХНИЙ төлөлтөөс бүхэлдээ хасагдана, хоёр тал руу тарахгүй:
+ * 20,000₮ төлж түвшнээ тогтоолгосон хүн 1,200,000₮-ийн ангид 580,000₮
+ * урьдчилгаа өгөөд, үлдсэн 600,000₮-ийг дараа нь төлнө. Тарааж хуваавал
+ * 590,000 + 590,000 болох ба эзний зарласан дүнтэй таарахгүй.
+ */
+export function installmentAmounts(total: number, credit = 0): { now: number; later: number } {
+  const { now, later } = splitHalves(total);
+  // Эхний төлөлтөд багтахгүй үлдэгдэл нь хоёр дахь төлөлт рүү шилжинэ —
+  // ингэснээр "хоёр төлөлтийн нийлбэр = үнэ хасах хөнгөлөлт" гэсэн дүрэм
+  // ямар ч үнэ дээр эвдрэхгүй. Бодит үнэ дээр (1.2 сая ба 20 мянга) хэзээ ч
+  // хүрэхгүй салаа ч дүрмээ зөрчихөөс хамгаалах нь дээр.
+  const fromNow = Math.min(now, credit);
+  return { now: now - fromNow, later: Math.max(0, later - (credit - fromNow)) };
+}
+
+/** Бүтнээр төлөх дүн — түвшин тогтоох төлбөр хасагдсан. */
+export function amountAfterCredit(total: number, credit = 0): number {
+  return Math.max(0, total - credit);
+}
+
+/**
  * Only the long, expensive commitments split: the year-long programmes and
  * the classroom groups. A recorded course bought for 350,000₮ is not what
  * this is for.

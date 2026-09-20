@@ -1429,3 +1429,42 @@ create unique index if not exists placement_bookings_one_active_idx
 -- Багшийн жагсаалт өдрөөр эрэмблэгддэг.
 create index if not exists placement_bookings_date_idx
   on placement_bookings (booked_date, slot);
+
+-- ---------------------------------------------------------------------------
+-- Түвшин тогтоох төлбөр (20,000₮)
+--
+-- Цаг захиалахад төлж баталгаажуулна: төлөгдөөгүй бол захиалга
+-- `awaiting_payment` төлөвт байх ба багшийн жагсаалтад гарахгүй. Дараа нь
+-- сонгоны ангид бүртгүүлэхэд тэр 20,000₮ эхний төлөлтөөс хасагдана.
+-- ---------------------------------------------------------------------------
+
+alter table placement_bookings
+  add column if not exists fee_amount integer not null default 20000,
+  add column if not exists paid_at timestamptz,
+  add column if not exists qpay_invoice_id text,
+  add column if not exists qpay_qr_image text,
+  add column if not exists qpay_short_url text,
+  -- Хөнгөлөлт аль бүртгэлд орсон. Бүртгэл уствал хөнгөлөлт чөлөөлөгдөнө.
+  add column if not exists credited_registration_id uuid
+    references registrations(id) on delete set null;
+
+alter table placement_bookings drop constraint if exists placement_bookings_status_check;
+alter table placement_bookings add constraint placement_bookings_status_check
+  check (status in ('awaiting_payment', 'booked', 'came', 'missed', 'cancelled'));
+
+-- Нэг хүн нэг л идэвхтэй захиалгатай. Төлөгдөөгүйг ч хамруулна — эс бөгөөс
+-- төлбөрийн цонх дарах бүрт шинэ мөр үүсч, нэхэмжлэх хуримтлагдана.
+drop index if exists placement_bookings_one_active_idx;
+create unique index if not exists placement_bookings_one_active_idx
+  on placement_bookings (user_id)
+  where status in ('awaiting_payment', 'booked');
+
+-- Нэг захиалга нэг л бүртгэлд хөнгөлөлт өгнө.
+create unique index if not exists placement_bookings_credit_idx
+  on placement_bookings (credited_registration_id)
+  where credited_registration_id is not null;
+
+-- Тухайн бүртгэлд орсон түвшин тогтоох төлбөр. Төлөх ёстой дүнг бодоход
+-- үнээс хасагдана: 1,200,000₮-ийн анги 20,000₮ хөнгөлөлттэй бол 1,180,000₮.
+alter table registrations
+  add column if not exists placement_credit integer not null default 0;

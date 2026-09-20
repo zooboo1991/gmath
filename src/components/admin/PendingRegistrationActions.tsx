@@ -4,7 +4,7 @@ import { useState } from "react";
 import { IconBank, IconCheck, IconClock, IconQrCode } from "@/components/icons";
 import { INPUT_CLASS } from "@/components/admin/panels/shared";
 import { apiError, readJson } from "@/lib/fetchJson";
-import { splitHalves } from "@/lib/installment";
+import { amountAfterCredit, installmentAmounts } from "@/lib/installment";
 import { parsePriceToNumber } from "@/lib/price";
 import type { Registration, RegistrationPayment } from "@/lib/db";
 
@@ -89,8 +89,8 @@ export default function PendingRegistrationActions({
    * болгоно. Админ засаж болно — банкны хуулга л эцсийн үг.
    */
   const suggestedAmount = registration.totalDue
-    ? splitHalves(registration.totalDue).now
-    : parsePriceToNumber(registration.price);
+    ? installmentAmounts(registration.totalDue, registration.placementCredit).now
+    : amountAfterCredit(parsePriceToNumber(registration.price), registration.placementCredit);
 
   const openManualForm = () => {
     const next = !manualOpen;

@@ -27,10 +27,16 @@ export function registrationBalance(
     totalDue?: number;
     status: RegistrationStatus;
     payMethod: PayMethod;
+    /** Түвшин тогтоох төлбөрөөс орсон хөнгөлөлт — төлөх дүнгээс хасагдана. */
+    placementCredit?: number;
   },
   paidRecorded: number
 ): { due: number; paid: number; balance: number; settledByGateway: boolean } {
-  const due = registration.totalDue ?? parsePriceToNumber(registration.price);
+  // Хөнгөлөлт нь аль хэдийн төлөгдсөн мөнгө тул төлөх ёстой дүнгээс
+  // хасагдана: 1,200,000₮-ийн анги 20,000₮-ийн хөнгөлөлттэй бол
+  // 1,180,000₮ төлж байж бүрэн төлсөнд тооцогдоно.
+  const full = registration.totalDue ?? parsePriceToNumber(registration.price);
+  const due = Math.max(0, full - (registration.placementCredit ?? 0));
   const settledByGateway =
     registration.totalDue === undefined &&
     registration.status === "active" &&

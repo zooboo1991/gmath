@@ -74,6 +74,7 @@ export default function SonginDetail({
     price: course.price,
     tag: course.tag,
     splittable: true,
+    songon: true,
   };
   const capacity = course.capacity;
   const full = capacity !== undefined && seatsTaken >= capacity;

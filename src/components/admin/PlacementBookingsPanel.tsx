@@ -13,6 +13,9 @@ import type { BookingStatus, PlacementBookingWithUser } from "@/lib/placementBoo
  */
 
 const STATUS_LABEL: Record<BookingStatus, string> = {
+  // Төлбөр хүлээж буй захиалга жагсаалтад ирдэггүй — багш зөвхөн
+  // баталгаажсаныг хардаг. Бүрэн байлгахын тулд энд бичив.
+  awaiting_payment: "Төлбөр хүлээж байна",
   booked: "Хүлээгдэж байна",
   came: "Ирсэн",
   missed: "Ирээгүй",
@@ -20,6 +23,7 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
 };
 
 const STATUS_CLASS: Record<BookingStatus, string> = {
+  awaiting_payment: "bg-gold-soft text-gold-strong",
   booked: "bg-blue-soft text-blue-strong",
   came: "bg-green-soft/20 text-green",
   missed: "bg-red-soft/12 text-red-soft",
@@ -106,6 +110,12 @@ export default function PlacementBookingsPanel({
                       {one.note && (
                         <span className="block text-[.82rem] text-ink-2 font-medium mt-1">
                           {one.note}
+                        </span>
+                      )}
+                      {one.paidAt && (
+                        <span className="block text-[.78rem] text-green font-bold mt-0.5">
+                          Түвшин тогтоох төлбөр төлсөн
+                          {one.creditedRegistrationId ? " · сургалтдаа хасуулсан" : ""}
                         </span>
                       )}
                     </div>

@@ -16,9 +16,10 @@ import {
 } from "@/components/icons";
 import { extractCourseCategories, getCourseAudience } from "@/lib/courseTag";
 import {
+  amountAfterCredit,
   earliestInstallmentDate,
+  installmentAmounts,
   latestInstallmentDate,
-  splitHalves,
 } from "@/lib/installment";
 import { DISTRICTS_BY_PROVINCE, PROVINCES, type Province } from "@/lib/mongoliaRegions";
 import { formatMnt, parsePriceToNumber } from "@/lib/price";
@@ -39,6 +40,8 @@ type Program = {
   tag: string;
   /** Whether this programme may be paid in two halves (yearly + songon). */
   splittable?: boolean;
+  /** Сонгоны танхимын анги — түвшин тогтоох төлбөрийн хөнгөлөлт зөвхөн энд орно. */
+  songon?: boolean;
 };
 
 export type SessionUser = {
@@ -187,6 +190,14 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   // Бүтэн / хувааж. Only offered on the programmes that allow it; the server
   // checks again, so this only decides what the screen shows.
   const [plan, setPlan] = useState<"full" | "split">("full");
+  /**
+   * Түвшин тогтоох төлбөрөөс орж ирэх хөнгөлөлт, төгрөгөөр.
+   *
+   * Серверээс асууна: эцэг эх аль хэдийн өөр ангид ашигласан байж болно,
+   * тэгвэл 0 ирнэ. Энэ тоог зөвхөн ХАРУУЛАХ зорилгоор хэрэглэнэ — бодит
+   * нэхэмжлэхийн дүнг /api/enroll өөрөө дахин тооцдог.
+   */
+  const [fetchedCredit, setFetchedCredit] = useState(0);
   const [nextPaymentDate, setNextPaymentDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -661,6 +672,31 @@ export default function ProgramRegisterProvider({ children }: { children: React.
     }
   };
 
+  /**
+   * Сонгоны ангид түвшин тогтоох төлбөрийн хөнгөлөлт байгаа эсэхийг асууна.
+   *
+   * Цонх нээгдэх бүрт асуух нь зориудынх: эцэг эх өөр таб дээр цагаа
+   * төлчихөөд ирсэн байж магадгүй, мөн хөнгөлөлтөө өөр ангид ашиглачихсан
+   * байж ч магадгүй.
+   */
+  useEffect(() => {
+    if (!isOpen || !program?.songon || !sessionUser) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/placement-booking");
+        const json = await res.json();
+        if (!cancelled && json?.ok) setFetchedCredit(json.credit ?? 0);
+      } catch {
+        // Хөнгөлөлтөө харуулж чадаагүй нь бүртгэл зогсоох шалтгаан биш —
+        // нэхэмжлэхийн дүнг сервер ямар ч байсан зөв тооцно.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, program?.songon, sessionUser]);
+
   // Escape to close, and stop the page behind from scrolling while open —
   // on mobile the background used to scroll away under the modal.
   useEffect(() => {
@@ -693,9 +729,14 @@ export default function ProgramRegisterProvider({ children }: { children: React.
   const bankAudienceLabel = program && getCourseAudience(program.tag) === "teacher" ? "Багш" : "Сурагч";
   // What this screen is actually asking for right now — half under the split
   // plan, the whole price otherwise.
+  // Цонх хаалттай, эсвэл сонгоны анги биш бол хөнгөлөлт байхгүй. Утгыг
+  // энд гаргаж авна — effect дотор тэглэх нь шаардлагагүй дахин рендер.
+  const placementCredit = isOpen && program?.songon && sessionUser ? fetchedCredit : 0;
   const fullAmount = program ? parsePriceToNumber(program.price) : 0;
   const splitting = Boolean(program?.splittable) && plan === "split";
-  const amountNow = splitting ? splitHalves(fullAmount).now : fullAmount;
+  const amountNow = splitting
+    ? installmentAmounts(fullAmount, placementCredit).now
+    : amountAfterCredit(fullAmount, placementCredit);
   // A split with no date is not a plan — the second half would be owed by
   // nobody knows when, so the payment buttons wait for it.
   const planIncomplete = splitting && !nextPaymentDate;
@@ -1191,11 +1232,14 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                     <span className="font-bold text-ink-2 text-[.95rem]">{program.label}</span>
                     <span className="shrink-0 text-right">
                       <b className="text-[1.5rem] font-extrabold text-blue-strong block leading-none">
-                        {splitting ? formatMnt(amountNow) : program.price}
+                        {/* Хөнгөлөлттэй бол зарласан үнэ биш, бодитоор төлөх дүн. */}
+                        {splitting || placementCredit > 0 ? formatMnt(amountNow) : program.price}
                       </b>
                       {splitting && (
                         <small className="text-ink-3 font-bold text-[.78rem]">
-                          нийт {program.price}-ийн 50%
+                          {placementCredit > 0
+                            ? `нийт ${formatMnt(fullAmount - placementCredit)}-ийн урьдчилгаа`
+                            : `нийт ${program.price}-ийн 50%`}
                         </small>
                       )}
                     </span>
@@ -1214,7 +1258,11 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                       >
                         <b className="text-[.95rem] block">Бүтэн төлөх</b>
                         <small className="block text-ink-3 font-semibold text-[.82rem]">
-                          {program.price}
+                          {placementCredit > 0
+                            ? formatMnt(
+                                amountAfterCredit(parsePriceToNumber(program.price), placementCredit)
+                              )
+                            : program.price}
                         </small>
                       </button>
                       <button
@@ -1226,25 +1274,40 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                       >
                         <b className="text-[.95rem] block">Хувааж төлөх</b>
                         <small className="block text-ink-3 font-semibold text-[.82rem]">
-                          50% + 50%
+                          {placementCredit > 0 ? "Урьдчилгаа + үлдэгдэл" : "50% + 50%"}
                         </small>
                       </button>
                     </div>
 
+                    {placementCredit > 0 && (
+                      <p className="flex items-center justify-between gap-4 bg-green-soft/15 text-green rounded-md px-[18px] py-3 mt-3 font-bold text-[.88rem]">
+                        <span>Түвшин тогтоох төлбөр хасагдсан</span>
+                        <b className="font-extrabold shrink-0">−{formatMnt(placementCredit)}</b>
+                      </p>
+                    )}
+
                     {plan === "split" && (
                       <div className="bg-bg-soft rounded-md px-[18px] py-4 mt-3">
                         <div className="flex items-center justify-between gap-4 py-1">
-                          <span className="font-bold text-ink-2 text-[.92rem]">Одоо төлөх 50%</span>
+                          <span className="font-bold text-ink-2 text-[.92rem]">
+                            {placementCredit > 0 ? "Одоо төлөх" : "Одоо төлөх 50%"}
+                          </span>
                           <b className="font-extrabold text-[1.05rem] text-blue-strong">
-                            {formatMnt(splitHalves(parsePriceToNumber(program.price)).now)}
+                            {formatMnt(
+                              installmentAmounts(parsePriceToNumber(program.price), placementCredit)
+                                .now
+                            )}
                           </b>
                         </div>
                         <div className="flex items-center justify-between gap-4 py-1 border-t border-line mt-1 pt-2">
                           <span className="font-bold text-ink-2 text-[.92rem]">
-                            Дараагийн төлөлт 50%
+                            Дараагийн төлөлт
                           </span>
                           <b className="font-extrabold text-[1.05rem]">
-                            {formatMnt(splitHalves(parsePriceToNumber(program.price)).later)}
+                            {formatMnt(
+                              installmentAmounts(parsePriceToNumber(program.price), placementCredit)
+                                .later
+                            )}
                           </b>
                         </div>
                         <label className="flex flex-col gap-1.5 mt-3.5">
@@ -1308,7 +1371,15 @@ export default function ProgramRegisterProvider({ children }: { children: React.
                       ["bank", "Банк", BANK_NAME],
                       ["account", "Дансны дугаар", BANK_ACCOUNT],
                       ["recipient", "Хүлээн авагч", BANK_RECIPIENT],
-                      ["amount", splitting ? "Одоо шилжүүлэх дүн (50%)" : "Шилжүүлэх дүн", formatMnt(amountNow)],
+                      [
+                        "amount",
+                        splitting
+                          ? placementCredit > 0
+                            ? "Одоо шилжүүлэх дүн (урьдчилгаа)"
+                            : "Одоо шилжүүлэх дүн (50%)"
+                          : "Шилжүүлэх дүн",
+                        formatMnt(amountNow),
+                      ],
                       ["description", "Гүйлгээний утга", bankDescription],
                     ].map(([key, k, v]) => (
                       // Label above value at every width. Side by side, the

@@ -87,6 +87,11 @@ export function senderInvoiceNoForRegistration(registrationId: string): string {
   return `gm-c-${registrationId.replace(/-/g, "")}`;
 }
 
+/** Түвшин тогтоох цагийн захиалгын sender_invoice_no — placement-booking/route.ts. */
+export function senderInvoiceNoForPlacement(bookingId: string): string {
+  return `gm-p-${bookingId.replace(/-/g, "")}`;
+}
+
 export function senderInvoiceNoForAssessment(assessmentId: string): string {
   return `gm-a-${assessmentId.replace(/-/g, "")}`;
 }

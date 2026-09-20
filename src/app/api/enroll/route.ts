@@ -4,6 +4,7 @@ import {
   addRegistration,
   countRegistrationsForProgram,
   findCourseById,
+  findRegistrationById,
   findRegistrationByUserAndProgram,
   findYearlyProgramById,
   notifyBankTransferPending,
@@ -12,11 +13,17 @@ import {
 } from "@/lib/db";
 import { extractCourseCategories, getCourseAudience } from "@/lib/courseTag";
 import {
+  amountAfterCredit,
   canSplitPayment,
+  installmentAmounts,
   isPaymentPlan,
   isValidInstallmentDate,
-  splitHalves,
 } from "@/lib/installment";
+import {
+  claimBookingCredit,
+  findPaidBooking,
+  releaseBookingCredit,
+} from "@/lib/placementBookingDb";
 import { getPaymentProvider, stubPaymentsEnabled } from "@/lib/payment";
 import { parsePriceToNumber } from "@/lib/price";
 import { getSessionUser } from "@/lib/session";
@@ -51,6 +58,8 @@ export async function POST(request: Request) {
   let courseTag: string;
   /** Whether this particular programme may be paid in two halves. */
   let splittable: boolean;
+  /** Түвшин тогтоох төлбөрийн хөнгөлөлт зөвхөн сонгоны танхимын ангид орно. */
+  let isSongon = false;
 
   const yearlyProgram = await findYearlyProgramById(programId);
   if (yearlyProgram) {
@@ -97,6 +106,7 @@ export async function POST(request: Request) {
     facebookGroup = course.facebookGroup;
     courseTag = course.tag;
     splittable = canSplitPayment({ isYearlyProgram: false, template: course.template });
+    isSongon = course.template === "songon";
   } else {
     return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
   }
@@ -120,13 +130,36 @@ export async function POST(request: Request) {
   }
 
   const fullAmount = parsePriceToNumber(price);
-  const halves = splitHalves(fullAmount);
-  const amountNow = wantsSplit ? halves.now : fullAmount;
   // Only a split registration carries a total to reach and a promised date;
   // a registration paid in one go leaves both unset, as before.
   const installment = wantsSplit
     ? { totalDue: fullAmount, installmentDueDate: dueDate }
     : {};
+
+  /**
+   * Түвшин тогтоох төлбөрийн хөнгөлөлтийг ЭНЭ бүртгэлд эзэмшүүлнэ.
+   *
+   * Эзэмшүүлэх нь атомын нөхцөлт UPDATE: хоёр өөр ангид зэрэг бүртгүүлэх
+   * гэвэл зөвхөн нэг нь 20,000₮-оо авна. Мөнгө ороогүй хуучин оролдлого
+   * хөнгөлөлтийг барьж үлдэх ёсгүй тул түүнийг эхлээд чөлөөлнө — эцэг эх
+   * төлөхөөсөө өмнө өөр анги сонгох нь бодит явдал.
+   */
+  const claimCredit = async (registrationId: string): Promise<number> => {
+    if (!isSongon) return 0;
+    const paid = await findPaidBooking(user.id).catch(() => undefined);
+    if (!paid) return 0;
+    if (paid.creditedRegistrationId === registrationId) return paid.feeAmount;
+    if (paid.creditedRegistrationId) {
+      const holder = await findRegistrationById(paid.creditedRegistrationId).catch(() => undefined);
+      // Нэхэмжлэх үүссэн бүртгэлийг хүрэхгүй: мөнгө замдаа явж байж магадгүй.
+      if (!holder || holder.status !== "pending" || holder.qpayInvoiceId) return 0;
+      await releaseBookingCredit(holder.id).catch(() => {});
+    }
+    const claimed = await claimBookingCredit(user.id, registrationId).catch(() => undefined);
+    if (!claimed) return 0;
+    await updateRegistration(registrationId, { placement_credit: claimed.feeAmount }).catch(() => {});
+    return claimed.feeAmount;
+  };
 
   if (payMethod === "bank") {
     // Stays pending until an admin confirms receipt in /admin — unchanged.
@@ -147,12 +180,16 @@ export async function POST(request: Request) {
       // салаанд — QPay-ийн pending мөр (доор) нь QR уншуулж төлөх гэж байгаа
       // хүн тул "дансны шилжүүлэг хүлээгдэж байна" гэсэн мэдэгдэл буруу очно.
       await notifyBankTransferPending(registration);
+      const credit = await claimCredit(registration.id);
       return NextResponse.json({
         ok: true,
-        registration,
+        registration: { ...registration, placementCredit: credit },
         paid: false,
         facebookGroup: undefined,
-        amountDue: amountNow,
+        amountDue: wantsSplit
+          ? installmentAmounts(fullAmount, credit).now
+          : amountAfterCredit(fullAmount, credit),
+        placementCredit: credit,
       });
     } catch (err) {
       if ((err as { code?: string } | null)?.code === "23505") {
@@ -245,12 +282,14 @@ export async function POST(request: Request) {
         paid: false,
         qrImage: current.qpayQrImage,
         shortUrl: current.qpayShortUrl,
-        // What this QR will collect — half under a split plan. The screen
-        // showing it must not quote the full price.
+        // What this QR will collect — half under a split plan, less any
+        // placement credit. The screen showing it must not quote the full
+        // price.
         amountDue:
           current.totalDue !== undefined && current.installmentDueDate
-            ? splitHalves(current.totalDue).now
-            : fullAmount,
+            ? installmentAmounts(current.totalDue, current.placementCredit ?? 0).now
+            : amountAfterCredit(fullAmount, current.placementCredit ?? 0),
+        placementCredit: current.placementCredit ?? 0,
       });
     }
 
@@ -262,11 +301,13 @@ export async function POST(request: Request) {
     const audienceLabel = getCourseAudience(courseTag) === "teacher" ? "Багш" : "Сурагч";
     const description = `${user.phone} ${categoryLabel} ${audienceLabel}`;
 
-    // Half for a split plan — the invoice is the money actually being taken.
+    // Half for a split plan, less the placement credit — the invoice is the
+    // money actually being taken.
+    const credit = await claimCredit(registration.id);
     const invoicedAmount =
       registration.totalDue !== undefined && registration.installmentDueDate
-        ? splitHalves(registration.totalDue).now
-        : amountNow;
+        ? installmentAmounts(registration.totalDue, credit).now
+        : amountAfterCredit(fullAmount, credit);
 
     const start = await provider.createPayment({
       amountMnt: invoicedAmount,
@@ -302,6 +343,7 @@ export async function POST(request: Request) {
       qrImage: start.qrImage,
       shortUrl: start.shortUrl,
       amountDue: invoicedAmount,
+      placementCredit: credit,
     });
   } catch (err) {
     console.error("enroll payment failed", registration.id, err);

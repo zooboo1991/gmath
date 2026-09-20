@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useProgramRegister } from "./ProgramRegister";
 import { IconCheckCircle, IconClose } from "@/components/icons";
 import type { BookableDay } from "@/lib/placementBooking";
+import { formatMnt } from "@/lib/price";
 
 /**
  * «Түвшин тогтоолгох» — танхимд ирж уулзах цаг захиалах.
@@ -15,7 +16,16 @@ import type { BookableDay } from "@/lib/placementBooking";
  * багш хуваариа өөрчлөхөд цаг нь өөрөө дагана.
  */
 
-type Booking = { id: string; bookedDate: string; slot: string };
+type Booking = {
+  id: string;
+  bookedDate: string;
+  slot: string;
+  /** Төлөх ёстой дүн, төгрөгөөр. */
+  feeAmount: number;
+  paid: boolean;
+  qrImage?: string;
+  shortUrl?: string;
+};
 
 export default function PlacementBookingButton({ className }: { className: string }) {
   const { sessionUser, sessionLoaded, openLogin } = useProgramRegister();
@@ -26,6 +36,18 @@ export default function PlacementBookingButton({ className }: { className: strin
   const [pickedDate, setPickedDate] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fee, setFee] = useState(0);
+
+  const refresh = useCallback(async (): Promise<Booking | null> => {
+    const res = await fetch("/api/placement-booking");
+    const json = await res.json();
+    if (!json?.ok) return null;
+    setDays(json.days ?? []);
+    setFee(json.fee ?? 0);
+    const next = (json.booking ?? null) as Booking | null;
+    setBooking(next);
+    return next;
+  }, []);
 
   // Цагийн жагсаалт нэвтрээгүй хүнд ч хэрэгтэй: юу сонгож болохыг харуулахын
   // өмнө нэвтрүүл гэж шаардвал хүн цааш явахаа болино.
@@ -33,11 +55,7 @@ export default function PlacementBookingButton({ className }: { className: strin
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/placement-booking");
-        const json = await res.json();
-        if (cancelled || !json?.ok) return;
-        setDays(json.days ?? []);
-        setBooking(json.booking ?? null);
+        if (!cancelled) await refresh();
       } catch {
         // Цагаа харуулж чадахгүй байх нь товчийг нуух шалтгаан биш.
       } finally {
@@ -47,7 +65,26 @@ export default function PlacementBookingButton({ className }: { className: strin
     return () => {
       cancelled = true;
     };
-  }, [sessionUser]);
+  }, [sessionUser, refresh]);
+
+  /**
+   * QR харагдаж байхад төлбөрийг өөрсдөө асууна.
+   *
+   * QPay-ийн webhook маань сервер рүү ирдэг ч эцэг эхийн дэлгэц түүнийг
+   * мэдэхгүй. Асуулгүй бол хүн төлчихөөд хуудсаа дахин ачаалах хүртэл
+   * "төлөгдөөгүй" гэж харагдана.
+   */
+  useEffect(() => {
+    if (!open || !booking || booking.paid || !booking.qrImage) return;
+    const timer = setInterval(() => {
+      refresh()
+        .then((next) => {
+          if (next?.paid) setOpen(false);
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [open, booking, refresh]);
 
   const start = () => {
     setError(null);
@@ -74,7 +111,8 @@ export default function PlacementBookingButton({ className }: { className: strin
         return;
       }
       setBooking(json.booking);
-      setOpen(false);
+      // Төлөгдсөн бол (stub орчин) шууд хаана; үгүй бол QR энэ цонхонд гарна.
+      if (json.booking?.paid) setOpen(false);
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
@@ -106,8 +144,11 @@ export default function PlacementBookingButton({ className }: { className: strin
     }
   };
 
-  // Аль хэдийн цаг захиалсан бол товчны оронд захиалгаа харуулна.
-  if (loaded && sessionLoaded && booking) {
+  /** Мөр үүссэн ч мөнгө ороогүй — QR нь хүлээж байна. */
+  const awaitingPayment = Boolean(booking && !booking.paid);
+
+  // Төлөгдсөн цагтай бол товчны оронд захиалгаа харуулна.
+  if (loaded && sessionLoaded && booking?.paid) {
     return (
       <div className="bg-surface border border-line rounded-md px-5 py-4 max-w-[420px]">
         <p className="flex items-center gap-2 font-extrabold text-[.95rem] text-ink">
@@ -118,7 +159,11 @@ export default function PlacementBookingButton({ className }: { className: strin
           {booking.bookedDate.slice(5).replace("-", ".")} · {booking.slot}
         </p>
         <p className="text-ink-3 font-semibold text-[.84rem] mt-1.5 leading-[1.6]">
-          Чонон бүрт төв дээр ирж уулзана. Хүүхдээ дагуулж ирээрэй.
+          Төв дээр ирж уулзана. Хүүхдээ дагуулж ирээрэй.
+        </p>
+        <p className="text-green font-bold text-[.84rem] mt-1.5 leading-[1.6]">
+          Төлсөн {formatMnt(booking.feeAmount)} нь сонгоны ангид бүртгүүлэхэд эхний төлөлтөөс
+          хасагдана.
         </p>
         {error && <p className="text-red-soft font-bold text-[.85rem] mt-2">{error}</p>}
         <button
@@ -136,7 +181,7 @@ export default function PlacementBookingButton({ className }: { className: strin
   return (
     <>
       <button type="button" onClick={start} className={className}>
-        Түвшин тогтоолгох
+        {awaitingPayment ? "Төлбөрөө төлөх" : "Түвшин тогтоолгох"}
       </button>
 
       {open && (
@@ -153,11 +198,58 @@ export default function PlacementBookingButton({ className }: { className: strin
 
             <h3 className="text-[1.25rem] font-extrabold text-ink pr-8">Түвшин тогтоолгох</h3>
             <p className="text-ink-2 font-medium text-[.92rem] mt-2 leading-[1.65]">
-              Танхимд ирж түвшин тогтоолгож, аль ангид орохоо багштай ярилцана. Энэ нь
-              сургалтад бүртгүүлсэн гэсэн үг биш — төлбөр төлөхгүй, суудал баталгаажихгүй.
+              Танхимд ирж түвшин тогтоолгож, аль ангид орохоо багштай ярилцана. Цаг захиалахад{" "}
+              <b className="text-ink">{formatMnt(booking?.feeAmount ?? fee)}</b> төлнө — тэр мөнгө
+              нь сонгоны ангид бүртгүүлэхэд эхний төлөлтөөс хасагдана. Энэ нь сургалтад
+              бүртгүүлсэн гэсэн үг биш, суудал баталгаажихгүй.
             </p>
 
-            {days.length === 0 ? (
+            {awaitingPayment && booking ? (
+              <div className="mt-5 text-center">
+                <p className="text-[.9rem] font-extrabold text-ink">
+                  {booking.bookedDate.slice(5).replace("-", ".")} · {booking.slot}
+                </p>
+                <p className="text-[.86rem] font-semibold text-ink-2 mt-1">
+                  Төлөх дүн <b className="text-ink">{formatMnt(booking.feeAmount)}</b>
+                </p>
+                {booking.qrImage ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`data:image/png;base64,${booking.qrImage}`}
+                      alt="QPay QR код"
+                      className="w-[210px] h-[210px] mx-auto rounded-sm border border-line mt-3"
+                    />
+                    {/* Эцэг эх QR-ыг нээгээд банкны аппаараа гараар шилжүүлдэг
+                        тохиолдол бодитоор гарсан — тийм гүйлгээг QPay мэдэхгүй. */}
+                    <p className="text-[.8rem] font-semibold text-ink-3 mt-3 leading-[1.6]">
+                      Гараар хийсэн дансны гүйлгээ энэ QR-т холбогдохгүй. Төлөгдмөгц энэ цонх
+                      өөрөө хаагдана.
+                    </p>
+                    {booking.shortUrl && (
+                      <a
+                        href={booking.shortUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block mt-2 text-[.88rem] font-bold text-blue-strong"
+                      >
+                        Эсвэл богино холбоосоор нээх →
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-ink-3 font-semibold text-[.9rem] mt-4">QR-ыг уншиж байна…</p>
+                )}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={cancel}
+                  className="block mx-auto text-[.84rem] font-extrabold text-ink-3 hover:text-ink mt-4 disabled:opacity-50"
+                >
+                  Захиалгаа цуцлах
+                </button>
+              </div>
+            ) : days.length === 0 ? (
               <p className="text-ink-3 font-semibold text-[.9rem] mt-5">
                 {loaded ? "Одоогоор сул цаг алга байна." : "Цагийг уншиж байна…"}
               </p>

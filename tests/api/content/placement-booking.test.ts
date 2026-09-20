@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
 import { adminClient, anonClient, signedInClient, staffClient } from "../../support/client";
 import { createTestUser } from "../../support/factories";
 import { cleanupTracked, testDb, track } from "../../support/db";
+import { findMockInvoice, payMockInvoice, senderInvoiceNoForPlacement } from "../../support/mockControl";
 
 const staffAccounts: string[] = [];
 
@@ -20,6 +21,17 @@ afterAll(async () => {
 });
 
 type Days = { days: { date: string; day: string; label: string; slots: string[] }[] };
+type BookingBody = {
+  booking: { id: string; bookedDate: string; slot: string; feeAmount: number; paid: boolean };
+};
+
+/** "Эцэг эх QR-аа уншуулж төлөв" — дараа нь сервер өөрөө шалгана. */
+async function payFor(bookingId: string) {
+  const invoice = await findMockInvoice(senderInvoiceNoForPlacement(bookingId));
+  if (!invoice) throw new Error(`placement invoice missing for ${bookingId}`);
+  await payMockInvoice(invoice.invoiceId);
+  return invoice;
+}
 
 /** Сонгоны анги байхгүй орчинд цаг гарахгүй тул нэгийг үүсгэнэ. */
 async function songonClass(schedule: string) {
@@ -107,48 +119,107 @@ describe("цаг захиалах", () => {
     expect(wrongDay.status).toBe(400);
   });
 
-  it("захиалсан цаг хадгалагдаж, дахин харагдана", async () => {
+  it("төлөх хүртэл захиалга баталгаажихгүй", async () => {
     await songonClass("Даваа 10:30–12:30");
     const { user, client } = await booker();
     const days = (await client.get<Days>("/api/placement-booking")).body.days;
     const pick = { date: days[0].date, slot: days[0].slots[0] };
 
-    const res = await client.post<{ booking: { id: string } }>("/api/placement-booking", pick);
+    const res = await client.post<BookingBody>("/api/placement-booking", pick);
     expect(res.status, res.text).toBe(200);
     track("placement_bookings", res.body.booking.id);
+    expect(res.body.booking.paid).toBe(false);
+    expect(res.body.booking.feeAmount).toBe(20000);
 
-    const again = await client.get<{ booking: { bookedDate: string; slot: string } | null }>(
+    const { data: before } = await testDb()
+      .from("placement_bookings")
+      .select("user_id, status, paid_at, fee_amount")
+      .eq("id", res.body.booking.id)
+      .single();
+    expect((before as { user_id: string }).user_id).toBe(user.id);
+    expect((before as { status: string }).status).toBe("awaiting_payment");
+    expect((before as { paid_at: string | null }).paid_at).toBeNull();
+
+    // Нэхэмжлэх нь яг 20,000₮.
+    const invoice = await payFor(res.body.booking.id);
+    expect(invoice.amount).toBe(20000);
+
+    const again = await client.get<{ booking: { bookedDate: string; slot: string; paid: boolean } | null }>(
       "/api/placement-booking"
     );
+    expect(again.body.booking?.paid).toBe(true);
     expect(again.body.booking?.bookedDate).toBe(pick.date);
     expect(again.body.booking?.slot).toBe(pick.slot);
 
-    const { data } = await testDb()
+    const { data: after } = await testDb()
       .from("placement_bookings")
-      .select("user_id, status")
+      .select("status")
       .eq("id", res.body.booking.id)
       .single();
-    expect((data as { user_id: string; status: string }).user_id).toBe(user.id);
-    expect((data as { status: string }).status).toBe("booked");
+    expect((after as { status: string }).status).toBe("booked");
   });
 
-  it("нэг хүүхэд хоёр цаг барьж чадахгүй", async () => {
+  it("ижил цагийг дахин сонгоход шинэ нэхэмжлэх үүсгэхгүй", async () => {
+    await songonClass("Даваа 10:30–12:30");
+    const { client } = await booker();
+    const days = (await client.get<Days>("/api/placement-booking")).body.days;
+    const pick = { date: days[0].date, slot: days[0].slots[0] };
+
+    const first = await client.post<BookingBody>("/api/placement-booking", pick);
+    track("placement_bookings", first.body.booking.id);
+    const second = await client.post<BookingBody>("/api/placement-booking", pick);
+    expect(second.status, second.text).toBe(200);
+    // QPay-ийн sender_invoice_no дахин ашиглагдаж болохгүй тул мөр нь ч нэг.
+    expect(second.body.booking.id).toBe(first.body.booking.id);
+  });
+
+  it("төлсөн хүн хоёр цаг барьж чадахгүй", async () => {
     await songonClass("Даваа 10:30–12:30");
     const { client } = await booker();
     const days = (await client.get<Days>("/api/placement-booking")).body.days;
 
-    const first = await client.post<{ booking: { id: string } }>("/api/placement-booking", {
+    const first = await client.post<BookingBody>("/api/placement-booking", {
       date: days[0].date,
       slot: days[0].slots[0],
     });
     expect(first.status, first.text).toBe(200);
     track("placement_bookings", first.body.booking.id);
+    await payFor(first.body.booking.id);
+    await client.get("/api/placement-booking");
 
     const second = await client.post("/api/placement-booking", {
       date: days[0].date,
       slot: days[0].slots[1] ?? days[0].slots[0],
     });
     expect(second.status).toBe(409);
+  });
+
+  it("төлөхөөсөө өмнө өөр цаг сонгож болно", async () => {
+    await songonClass("Даваа 10:30–12:30");
+    const { client } = await booker();
+    const days = (await client.get<Days>("/api/placement-booking")).body.days;
+
+    const first = await client.post<BookingBody>("/api/placement-booking", {
+      date: days[0].date,
+      slot: days[0].slots[0],
+    });
+    track("placement_bookings", first.body.booking.id);
+
+    const second = await client.post<BookingBody>("/api/placement-booking", {
+      date: days[0].date,
+      slot: days[0].slots[1],
+    });
+    expect(second.status, second.text).toBe(200);
+    track("placement_bookings", second.body.booking.id);
+    expect(second.body.booking.slot).toBe(days[0].slots[1]);
+
+    // Хуучин мөр нь болисон — нэг хүн нэг идэвхтэй захиалгатай.
+    const { data } = await testDb()
+      .from("placement_bookings")
+      .select("status")
+      .eq("id", first.body.booking.id)
+      .single();
+    expect((data as { status: string }).status).toBe("cancelled");
   });
 
   it("болисны дараа дахин захиалж болно", async () => {
@@ -162,6 +233,8 @@ describe("цаг захиалах", () => {
     });
     track("placement_bookings", first.body.booking.id);
 
+    await payFor(first.body.booking.id);
+    await client.get("/api/placement-booking");
     const cancelled = await client.del(`/api/placement-booking`, { id: first.body.booking.id });
     expect(cancelled.status, cancelled.text).toBe(200);
 
@@ -179,11 +252,13 @@ describe("цаг захиалах", () => {
     const stranger = await booker();
     const days = (await owner.client.get<Days>("/api/placement-booking")).body.days;
 
-    const mine = await owner.client.post<{ booking: { id: string } }>("/api/placement-booking", {
+    const mine = await owner.client.post<BookingBody>("/api/placement-booking", {
       date: days[0].date,
       slot: days[0].slots[0],
     });
     track("placement_bookings", mine.body.booking.id);
+    await payFor(mine.body.booking.id);
+    await owner.client.get("/api/placement-booking");
 
     const res = await stranger.client.del("/api/placement-booking", { id: mine.body.booking.id });
     expect(res.status).toBe(404);
@@ -203,11 +278,13 @@ describe("багшийн жагсаалт", () => {
     await songonClass("Даваа 10:30–12:30");
     const { client } = await booker();
     const days = (await client.get<Days>("/api/placement-booking")).body.days;
-    const made = await client.post<{ booking: { id: string } }>("/api/placement-booking", {
+    const made = await client.post<BookingBody>("/api/placement-booking", {
       date: days[0].date,
       slot: days[0].slots[0],
     });
     track("placement_bookings", made.body.booking.id);
+    await payFor(made.body.booking.id);
+    await client.get("/api/placement-booking");
 
     const owner = await adminClient("full");
     const { client: teacher, id } = await staffClient(owner, {

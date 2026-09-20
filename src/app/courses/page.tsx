@@ -12,6 +12,8 @@ import { buildScheduleBundles } from "@/lib/weeklySchedule";
 import ScheduleBundles from "@/components/ScheduleBundles";
 import PlacementBookingButton from "@/components/program/PlacementBookingButton";
 import { courseHref } from "@/lib/courseHref";
+import { PLACEMENT_FEE } from "@/lib/placementBooking";
+import { formatMnt } from "@/lib/price";
 
 export const metadata: Metadata = {
   title: "Сургалтууд",
@@ -112,8 +114,9 @@ export default async function CoursesPage() {
                     Аль ангид орохоо мэдэхгүй байна уу?
                   </b>
                   <p className="text-[.88rem] text-ink-2 font-medium mt-1.5 leading-[1.6]">
-                    Танхимд ирж түвшин тогтоолгож, аль ангид орохоо багштай ярилцана. Төлбөр
-                    төлөхгүй, суудал баталгаажихгүй.
+                    Танхимд ирж түвшин тогтоолгож, аль ангид орохоо багштай ярилцана. Цаг
+                    захиалахад {formatMnt(PLACEMENT_FEE)} төлнө — ангидаа бүртгүүлэхэд тэр мөнгө
+                    эхний төлөлтөөс хасагдана.
                   </p>
                   <PlacementBookingButton className="w-full mt-4 inline-flex items-center justify-center gap-[10px] font-extrabold rounded-full border-2 border-blue text-blue-strong bg-surface px-[20px] py-[12px] text-[.95rem] transition-colors hover:bg-blue hover:text-white" />
                 </div>
