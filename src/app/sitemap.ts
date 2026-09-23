@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { listArticles, listPublishedCourseSummaries, listYearlyPrograms } from "@/lib/db";
+import { listArticles, listListedCourseSummaries, listYearlyPrograms } from "@/lib/db";
 import { isAssessmentOpen } from "@/lib/assessment/db";
 import { SITE_URL } from "@/lib/siteUrl";
 import { courseHref } from "@/lib/courseHref";
@@ -45,7 +45,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const [courses, yearly, articles] = await Promise.all([
-      listPublishedCourseSummaries(),
+      listListedCourseSummaries(),
       listYearlyPrograms(),
       listArticles(),
     ]);

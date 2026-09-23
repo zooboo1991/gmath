@@ -9,7 +9,8 @@ import {
   countRegistrationsForProgram,
   findCourseById,
   listArticlesForProgram,
-  listPublishedCourseSummaries,
+  isListedCourse,
+  listListedCourseSummaries,
   listYearlyPrograms,
   listSongonClasses,
 } from "@/lib/db";
@@ -26,6 +27,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title: `${course.title} — ${course.tag}`,
     description: course.topics,
+    // Хаанаас ч холбоосгүй сургалт бол линкээр нь хуваалцах нуугдмал хуудас
+    // — хайлтын системд гаргахгүй. Дүрмийг isListedCourse барина.
+    ...(isListedCourse(course) ? {} : { robots: { index: false, follow: false } }),
   };
 }
 
@@ -37,7 +41,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   // Four, so dropping the current course still leaves three to show.
   // The seat count is only read for a course that actually has a limit.
   const [otherCourses, yearlyPrograms, seatsTaken, articles, songonClasses] = await Promise.all([
-    listPublishedCourseSummaries(4),
+    listListedCourseSummaries(4),
     listYearlyPrograms(),
     course.capacity !== undefined ? countRegistrationsForProgram(course.id) : Promise.resolve(0),
     listArticlesForProgram(course.id),

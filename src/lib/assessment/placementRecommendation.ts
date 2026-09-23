@@ -1,6 +1,6 @@
 import { claudeChat } from "../ai/providers/claude";
 import { deepseekChat } from "../ai/providers/deepseek";
-import { listPublishedCourseSummaries, listYearlyPrograms } from "../db";
+import { listListedCourseSummaries, listYearlyPrograms } from "../db";
 import { SITE_URL } from "../siteUrl";
 import { courseHref } from "@/lib/courseHref";
 import type { PlacementResult } from "./placementEngine";
@@ -21,7 +21,7 @@ export async function writePlacementRecommendation(input: {
   const { result } = input;
   try {
     const [courses, programs] = await Promise.all([
-      listPublishedCourseSummaries().catch(() => []),
+      listListedCourseSummaries().catch(() => []),
       listYearlyPrograms().catch(() => []),
     ]);
     const catalogue = [

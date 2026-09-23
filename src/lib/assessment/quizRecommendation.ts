@@ -1,6 +1,6 @@
 import { claudeChat } from "../ai/providers/claude";
 import { deepseekChat } from "../ai/providers/deepseek";
-import { listPublishedCourseSummaries, listYearlyPrograms } from "../db";
+import { listListedCourseSummaries, listYearlyPrograms } from "../db";
 import { SITE_URL } from "../siteUrl";
 import { TRACK_LABELS, type QuizTrack } from "./types";
 import { courseHref } from "@/lib/courseHref";
@@ -25,7 +25,7 @@ export async function writeQuizRecommendation(input: {
 }): Promise<string> {
   try {
     const [courses, programs] = await Promise.all([
-      listPublishedCourseSummaries().catch(() => []),
+      listListedCourseSummaries().catch(() => []),
       listYearlyPrograms().catch(() => []),
     ]);
 

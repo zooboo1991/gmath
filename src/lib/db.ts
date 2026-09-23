@@ -797,16 +797,33 @@ export type CourseSummary = Pick<Course, "id" | "tag" | "title" | "topics" | "pr
   slug?: string | null;
 };
 
-/** Used by the "related courses" strip, which never renders lessons. */
-export async function listPublishedCourseSummaries(limit?: number): Promise<CourseSummary[]> {
+/**
+ * Нийтэд ЖАГСААГДСАН сургалтууд — sitemap, "бусад сургалт", чатбот.
+ *
+ * /courses хуудас сонгоны анги ба жилийн хөтөлбөрийг л харуулдаг болсноос
+ * хойш бусад сургалтын цорын ганц холбоос нь нүүр хуудасны "Сургалтууд"
+ * хэсэг. Админ тэндээс нь ч авбал тэр сургалт хаанаас ч холбоосгүй үлдэнэ —
+ * зөвхөн линкээр нь хуваалцах нуугдмал хуудас. Тийм хуудсыг Google-д өгөх,
+ * эсвэл чатботоор санал болгуулах нь нуусан гэдгийг утгагүй болгоно.
+ *
+ * Дүрэм: сонгоны анги ЭСВЭЛ "нүүрэнд харуулах" тэмдэглэгээтэй бол
+ * жагсаагдсан. Өөрөөр хэлбэл нуух товч нь тэр л checkbox.
+ */
+export async function listListedCourseSummaries(limit?: number): Promise<CourseSummary[]> {
   let query = getSupabase()
     .from("courses")
     .select("id, tag, title, topics, price, period, slug")
-    .eq("status", "published");
+    .eq("status", "published")
+    .or("template.eq.songon,show_on_homepage.is.true");
   if (limit) query = query.limit(limit);
   const { data, error } = await query;
   if (error) throw error;
   return data as CourseSummary[];
+}
+
+/** Сургалт нийтэд жагсаагдах эсэх — дээрх дүрмийн нэг мөр хувилбар. */
+export function isListedCourse(course: { template?: string; showOnHomepage: boolean }): boolean {
+  return course.template === "songon" || course.showOnHomepage;
 }
 
 /**

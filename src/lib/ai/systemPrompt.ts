@@ -1,7 +1,7 @@
 import type { ChatChannel } from "../db";
 import {
   listArticles,
-  listPublishedCourseSummaries,
+  listListedCourseSummaries,
   listRegistrationsByUser,
   listSongonClasses,
   listYearlyPrograms,
@@ -107,7 +107,7 @@ export async function buildSystemPrompt({
   channel = "website",
 }: { userId?: string; channel?: ChatChannel } = {}): Promise<string> {
   const [courses, yearly, articles, songon, assessmentOpen] = await Promise.all([
-    listPublishedCourseSummaries(),
+    listListedCourseSummaries(),
     listYearlyPrograms(),
     listArticles(),
     listSongonClasses(),

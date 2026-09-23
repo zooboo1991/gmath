@@ -431,3 +431,46 @@ describe("courses cannot be deleted through the API", () => {
     expect(listed.body.courses.map((c) => c.id)).toContain(created.body.course!.id);
   });
 });
+
+/**
+ * Нуугдмал сургалт — линкээр нь хуваалцах боловч хайлтад гаргахгүй.
+ *
+ * Нуух товч нь тусдаа тохиргоо биш: "нүүрэнд харуулах" тэмдэглэгээ.
+ * /courses жагсаалт сонгон, жилийн хөтөлбөрийг л харуулдаг болсон тул
+ * нүүрэнд байхгүй энгийн сургалт хаанаас ч холбоосгүй үлддэг.
+ */
+describe("нуугдмал сургалт", () => {
+  async function publish(showOnHomepage: boolean) {
+    const admin = await adminClient("full");
+    const created = await createCourse(admin, { status: "published", showOnHomepage });
+    return created.body.course!;
+  }
+
+  it("нүүрэнд байхгүй сургалт sitemap-д орохгүй", async () => {
+    const hidden = await publish(false);
+    const listed = await publish(true);
+
+    const sitemap = await anonClient().get("/sitemap.xml");
+    expect(sitemap.status).toBe(200);
+    expect(sitemap.text).not.toContain(hidden.id);
+    // Нүүрэнд харагддаг сургалт хэвээрээ ордог — шүүлтүүр хэт өргөн биш.
+    expect(sitemap.text).toContain(listed.id);
+  });
+
+  it("нуугдмал сургалтын хуудас нээгдэх ч индекслэгдэхгүй", async () => {
+    const hidden = await publish(false);
+
+    const page = await anonClient().get(`/courses/${hidden.id}`);
+    expect(page.status, page.text.slice(0, 200)).toBe(200);
+    expect(page.text).toContain(hidden.title);
+    expect(page.text).toContain("noindex");
+  });
+
+  it("нүүрэнд харуулсан сургалтыг индекслэхийг хориглохгүй", async () => {
+    const listed = await publish(true);
+
+    const page = await anonClient().get(`/courses/${listed.id}`);
+    expect(page.status).toBe(200);
+    expect(page.text).not.toContain("noindex");
+  });
+});
