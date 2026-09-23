@@ -4,7 +4,6 @@ import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import CourseCard from "@/components/CourseCard";
 import SongonClassCard from "@/components/SongonClassCard";
-import CourseBrowser from "@/components/CourseBrowser";
 import { countRegistrationsForProgram, listCourses, listYearlyPrograms } from "@/lib/db";
 import WaitlistCard from "@/components/WaitlistCard";
 import { getSessionUser } from "@/lib/session";
@@ -17,7 +16,8 @@ import { formatMnt } from "@/lib/price";
 
 export const metadata: Metadata = {
   title: "Сургалтууд",
-  description: "Б.Ганбат багшийн бүх сургалтын хөтөлбөрүүд — 1 жилийн хөтөлбөр, удахгүй эхлэх сургалтууд, бичлэгээр үзэх сургалтууд.",
+  description:
+    "Б.Ганбат багшийн сургалтын хөтөлбөрүүд — сонгон бэлтгэлийн танхимын ангиуд, 1 жилийн гүнзгийрүүлсэн хөтөлбөр.",
 };
 
 // Course list is admin-editable (see /admin) and stored in Supabase, so this
@@ -26,9 +26,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function CoursesPage() {
-  const [allUpcoming, vodCourses, yearlyPrograms, user] = await Promise.all([
+  const [allUpcoming, yearlyPrograms, user] = await Promise.all([
     listCourses("upcoming"),
-    listCourses("vod"),
     listYearlyPrograms(),
     // Only to decide whether the waiting-list form can be filled in — the
     // list is for families the school can actually call back.
@@ -44,7 +43,6 @@ export default async function CoursesPage() {
     .filter((c) => c.template === "songon")
     .sort((a, b) => a.title.localeCompare(b.title, "mn"));
   const songonBundles = buildScheduleBundles(songon);
-  const upcomingCourses = allUpcoming.filter((c) => c.template !== "songon");
 
   const songonSeats = await Promise.all(
     songon.map((c) => (c.capacity !== undefined ? countRegistrationsForProgram(c.id) : Promise.resolve(0)))
@@ -56,39 +54,8 @@ export default async function CoursesPage() {
       <main>
         <PageHero eyebrow="Сургалтууд" title="Бүх сургалтын хөтөлбөрүүд" />
 
-        {/* Above the list on purpose: the parent who does not find their
-            child's grade below is exactly the one this is for. */}
-        <section className="pt-[34px]">
-          <div className="wrap">
-            <WaitlistCard signedIn={Boolean(user)} grade={user?.grade ?? ""} />
-          </div>
-        </section>
-
-        {/* The yearly programmes are hand-written pages, not `courses` rows,
-            so they sit outside the filtered list rather than appearing and
-            disappearing as the visitor changes filters. */}
-        <section className="bg-gold-soft py-[44px]">
-          <div className="wrap">
-            <div className="grid grid-cols-1 nav:grid-cols-2 gap-5 max-w-[900px] mx-auto">
-              {yearlyPrograms.map((p) => (
-                <CourseCard
-                  key={p.id}
-                  tag={p.tag}
-                  title={p.title}
-                  topics={p.topics}
-                  price={p.price}
-                  period={p.period}
-                  featured
-                  ctaHref={`/courses/${p.id.replace("program-", "")}`}
-                  ctaLabel="Дэлгэрэнгүй"
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-
         {songon.length > 0 && (
-          <section className="pt-[clamp(48px,7vw,72px)]">
+          <section className="pt-[clamp(40px,6vw,60px)]">
             <div className="wrap">
               {/* Танилцуулга зүүн талд, түвшин тогтоох урилга баруун талд —
                   өмнө нь текст хагас өргөнд зогсоод баруун тал хоосон
@@ -151,9 +118,34 @@ export default async function CoursesPage() {
           </section>
         )}
 
-        <section className="pt-[44px] pb-[clamp(64px,9vw,116px)]">
+        {/* Сонгоны ангиудын доор: дөрвөн ангийг хараад хүүхдийнхээ
+            ангийг олоогүй эцэг эх яг энэ мөчид энэ картыг хэрэгтэй. */}
+        <section className="pt-[clamp(36px,5vw,52px)]">
           <div className="wrap">
-            <CourseBrowser upcoming={upcomingCourses} vod={vodCourses} />
+            <WaitlistCard signedIn={Boolean(user)} grade={user?.grade ?? ""} />
+          </div>
+        </section>
+
+        {/* The yearly programmes are hand-written pages, not `courses` rows,
+            so they sit outside the filtered list rather than appearing and
+            disappearing as the visitor changes filters. */}
+        <section className="bg-gold-soft py-[clamp(48px,7vw,72px)] mt-[clamp(40px,6vw,64px)]">
+          <div className="wrap">
+            <div className="grid grid-cols-1 nav:grid-cols-2 gap-5 max-w-[900px] mx-auto">
+              {yearlyPrograms.map((p) => (
+                <CourseCard
+                  key={p.id}
+                  tag={p.tag}
+                  title={p.title}
+                  topics={p.topics}
+                  price={p.price}
+                  period={p.period}
+                  featured
+                  ctaHref={`/courses/${p.id.replace("program-", "")}`}
+                  ctaLabel="Дэлгэрэнгүй"
+                />
+              ))}
+            </div>
           </div>
         </section>
       </main>

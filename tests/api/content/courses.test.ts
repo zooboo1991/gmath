@@ -82,22 +82,64 @@ describe("creating a course", () => {
     expect(res.body.course?.status).toBe("draft");
   });
 
-  it("keeps a draft off the public course list", async () => {
+  /**
+   * Сургалтын нийтийн хаяг нь өөрийнх нь хуудас.
+   *
+   * Өмнө нь /courses дээрх жагсаалтаас хардаг байсан ч тэр жагсаалт
+   * («Удахгүй эхлэх», «Бичлэгээр үзэх») хуудаснаас хасагдсан — одоо
+   * /courses нь сонгоны ангиуд ба жилийн хөтөлбөрийг л харуулна.
+   */
+  it("keeps a draft off the public site", async () => {
     const admin = await adminClient("full");
     const created = await createCourse(admin);
-    const title = created.body.course!.title;
 
-    const page = await anonClient().get("/courses");
-    expect(page.status).toBe(200);
-    expect(page.text).not.toContain(title);
+    const page = await anonClient().get(`/courses/${created.body.course!.id}`);
+    expect(page.status).toBe(404);
+
+    // Жагсаалтад ч гарахгүй.
+    const list = await anonClient().get("/courses");
+    expect(list.status).toBe(200);
+    expect(list.text).not.toContain(created.body.course!.title);
   });
 
   it("shows it publicly once published", async () => {
     const admin = await adminClient("full");
     const created = await createCourse(admin, { status: "published" });
 
-    const page = await anonClient().get("/courses");
+    const page = await anonClient().get(`/courses/${created.body.course!.id}`);
+    expect(page.status, page.text.slice(0, 200)).toBe(200);
     expect(page.text).toContain(created.body.course!.title);
+  });
+
+  /**
+   * Хасагдсан хоёр жагсаалтын дараа /courses-ийн бүх агуулга нь сонгоны
+   * анги ба жилийн хөтөлбөр хоёр болсон тул сонгон нь гарч байгаа эсэхийг
+   * шалгах нь чухал. `template`-ыг админы API хүлээж авдаггүй учир мөрийг
+   * шууд суулгана — placement-booking.test.ts-тэй ижил арга.
+   */
+  it("shows the classroom groups on /courses", async () => {
+    const title = `Сонгон тест ${randomUUID().slice(0, 8)}`;
+    const { data, error } = await testDb()
+      .from("courses")
+      .insert({
+        kind: "upcoming",
+        tag: "ТАНХИМ",
+        title,
+        topics: "Туршилт",
+        price: "1,200,000₮",
+        period: "/ улирал",
+        status: "published",
+        template: "songon",
+        weekly_schedule: "Даваа 10:30–12:30",
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(`songon seed failed: ${error.message}`);
+    track("courses", (data as { id: string }).id);
+
+    const page = await anonClient().get("/courses");
+    expect(page.status).toBe(200);
+    expect(page.text).toContain(title);
   });
 
   describe("required fields", () => {
