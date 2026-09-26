@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   title: "Багшийн танилцуулга",
   description:
     "Б.Ганбат — Монголын математикийн олимпиадын «Дархан аварга» багш. 2013 оноос багшилж, 4 удаа Алтан медаль хүртсэн туршлага, шавь нарын амжилт, хэвлүүлсэн номууд.",
-  alternates: { canonical: "/teacher" },
+  alternates: { canonical: "/ganbat" },
 };
 
 export default function TeacherPage() {
@@ -33,7 +33,7 @@ export default function TeacherPage() {
           description:
             "Монголын математикийн олимпиадын «Дархан аварга» багш, 4 удаагийн Алтан медальт.",
           image: `${SITE_URL}/images/teacher-photo.jpg`,
-          url: `${SITE_URL}/teacher`,
+          url: `${SITE_URL}/ganbat`,
           worksFor: { "@type": "EducationalOrganization", name: "Б.Ганбат багшийн математикийн сургалт" },
         }}
       />

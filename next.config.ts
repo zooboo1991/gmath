@@ -28,11 +28,15 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      // /team/ganbat is gone: the founder already had a fuller page at
-      // /teacher, written before /team existed, and two pages about the same
-      // person only compete with each other in search. A permanent redirect
-      // rather than a 404 so links already shared keep landing somewhere.
-      { source: "/team/ganbat", destination: "/teacher", permanent: true },
+      // The founder's page moved from /teacher to /ganbat — a name reads
+      // better in a shared link than a job title, and it matches
+      // /team/batchimeg. Both old addresses keep working: Facebook posts and
+      // Google's index still point at them.
+      { source: "/teacher", destination: "/ganbat", permanent: true },
+      // /team/ganbat never had its own page; it used to send people to
+      // /teacher, so it now goes straight to the new address rather than
+      // hopping through the redirect above.
+      { source: "/team/ganbat", destination: "/ganbat", permanent: true },
     ];
   },
 };

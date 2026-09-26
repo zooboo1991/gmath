@@ -49,7 +49,7 @@ function persistentMenu() {
             { type: "web_url", title: "Түвшин тодорхойлох", url: `${SITE_URL}/assessment`, webview_height_ratio: "full" },
             { type: "web_url", title: "Сертификат шалгах", url: `${SITE_URL}/certificate`, webview_height_ratio: "full" },
             { type: "web_url", title: "Нийтлэлүүд", url: `${SITE_URL}/articles`, webview_height_ratio: "full" },
-            { type: "web_url", title: "Багшийн тухай", url: `${SITE_URL}/teacher`, webview_height_ratio: "full" },
+            { type: "web_url", title: "Багшийн тухай", url: `${SITE_URL}/ganbat`, webview_height_ratio: "full" },
           ],
         },
       ],

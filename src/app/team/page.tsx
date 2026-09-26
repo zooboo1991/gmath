@@ -21,8 +21,8 @@ type TeamMember = {
 
 const team: TeamMember[] = [
   {
-    // The founder's own page is /teacher, written long before /team existed.
-    href: "/teacher",
+    // The founder's own page is /ganbat, written long before /team existed.
+    href: "/ganbat",
     photo: "/images/teacher-photo.jpg",
     name: "Б.ГАНБАТ",
     achievements: [
