@@ -10,7 +10,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { adminClient, anonClient, signedInClient, staffClient, TestClient } from "../../support/client";
-import { createTestRegistration, createTestUser } from "../../support/factories";
+import { createTestAssessment, createTestRegistration, createTestUser } from "../../support/factories";
 import { cleanupTracked, testDb, track } from "../../support/db";
 import { mockCalls } from "../../support/mockControl";
 
@@ -48,8 +48,17 @@ async function openDay(owner: TestClient): Promise<string> {
   return date;
 }
 
-/** 1 жилийн хөтөлбөрт идэвхтэй бүртгэлтэй сурагч — уулзалт захиалах эрхтэй. */
-async function yearlyStudent() {
+/**
+ * 1 жилийн хөтөлбөрт идэвхтэй бүртгэлтэй сурагч.
+ *
+ * Өгөгдмөлөөр түвшин тогтоох шалгалтын бодолтоо илгээсэн — уулзалт
+ * захиалах бүрэн эрхтэй. `exam` нь шалгалтгүй, эсвэл эхлүүлсэн төлөвийг
+ * шалгахад.
+ */
+async function yearlyStudent(
+  opts: { exam?: "handed_in" | "none" | "started" | "cancelled" | "quiz_only" } = {}
+) {
+  const exam = opts.exam ?? "handed_in";
   const user = await createTestUser();
   const reg = await createTestRegistration({
     userId: user.id,
@@ -57,6 +66,19 @@ async function yearlyStudent() {
     status: "active",
   });
   track("registrations", reg.id);
+
+  if (exam === "handed_in") {
+    await createTestAssessment({ userId: user.id, track: "olympiad", status: "problems_submitted" });
+  } else if (exam === "started") {
+    await createTestAssessment({ userId: user.id, track: "olympiad", status: "questionnaire_done" });
+  } else if (exam === "cancelled") {
+    const made = await createTestAssessment({ userId: user.id, track: "olympiad", status: "completed" });
+    await testDb().from("assessments").update({ status: "cancelled" }).eq("id", made.id);
+  } else if (exam === "quiz_only") {
+    // "Сонгон ангийн тест" — түвшин тогтоох шалгалт биш.
+    await createTestAssessment({ userId: user.id, track: "advanced", status: "completed" });
+  }
+
   const client = await signedInClient(user.phone, user.password);
   return { user, client };
 }
@@ -103,6 +125,103 @@ describe("уулзалтын цаг харах эрх", () => {
     expect(day!.slots).toHaveLength(16);
     expect(day!.slots[0]).toBe("09:00–09:20");
     expect(day!.slots).not.toContain("13:00–13:20");
+  });
+});
+
+/**
+ * Уулзалт шалгалтын дүнг ярилцах зорилготой тул шалгалтаа өгөөгүй хүнд цаг
+ * биш, шалгалт руу чиглүүлэх мэдээлэл очно.
+ */
+describe("түвшин тогтоох шалгалт", () => {
+  type Gate = Body & { examRequired?: boolean; examState?: string; examHref?: string; hasOpenDays?: boolean };
+
+  it("шалгалт өгөөгүй бол цаг харуулахгүй, шалгалт руу чиглүүлнэ", async () => {
+    const owner = await adminClient("full");
+    await openDay(owner);
+    const { client } = await yearlyStudent({ exam: "none" });
+
+    const res = await client.get<Gate>("/api/parent-meeting");
+    expect(res.body.eligible).toBe(true);
+    expect(res.body.examRequired).toBe(true);
+    expect(res.body.examState).toBe("none");
+    expect(res.body.days).toEqual([]);
+    expect(res.body.hasOpenDays).toBe(true);
+    // Сургалтын хуудасны "Түвшин тогтоох" таб руу.
+    expect(res.body.examHref).toBe("/profile/course/program-c?tab=assessment");
+  });
+
+  it("эхлүүлсэн ч илгээгээгүй бол үргэлжлүүлэхийг сануулна", async () => {
+    const owner = await adminClient("full");
+    await openDay(owner);
+    const { client } = await yearlyStudent({ exam: "started" });
+
+    const res = await client.get<Gate>("/api/parent-meeting");
+    expect(res.body.examRequired).toBe(true);
+    expect(res.body.examState).toBe("started");
+  });
+
+  it("шалгалтгүй хүн гараар хүсэлт илгээсэн ч захиалж чадахгүй", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    const { user, client } = await yearlyStudent({ exam: "none" });
+
+    const res = await client.post<{ error: string; examHref: string }>("/api/parent-meeting", {
+      date,
+      slot: "09:00–09:20",
+    });
+    expect(res.status).toBe(403);
+    expect(res.body.error).toContain("түвшин тогтоох шалгалт");
+    expect(res.body.examHref).toBe("/profile/course/program-c?tab=assessment");
+
+    const { data } = await testDb().from("parent_meetings").select("id").eq("user_id", user.id);
+    expect(data).toEqual([]);
+  });
+
+  it("цуцлагдсан шалгалт тооцогдохгүй", async () => {
+    const owner = await adminClient("full");
+    await openDay(owner);
+    const { client } = await yearlyStudent({ exam: "cancelled" });
+    expect((await client.get<Gate>("/api/parent-meeting")).body.examRequired).toBe(true);
+  });
+
+  it("сонгон ангийн тест нь түвшин тогтоох шалгалтыг орлохгүй", async () => {
+    const owner = await adminClient("full");
+    await openDay(owner);
+    const { client } = await yearlyStudent({ exam: "quiz_only" });
+    expect((await client.get<Gate>("/api/parent-meeting")).body.examRequired).toBe(true);
+  });
+
+  it("багш дүгнээгүй ч бодолтоо илгээсэн бол цаг авна", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    const { client } = await yearlyStudent({ exam: "handed_in" });
+
+    const list = await client.get<Gate>("/api/parent-meeting");
+    expect(list.body.examRequired).toBe(false);
+    expect(list.body.days.some((d) => d.date === date)).toBe(true);
+
+    const res = await client.post<{ meeting: { id: string } }>("/api/parent-meeting", {
+      date,
+      slot: "16:30–16:50",
+    });
+    expect(res.status, res.text).toBe(200);
+    track("parent_meetings", res.body.meeting.id);
+  });
+
+  it("дүрмээс өмнө захиалсан цаг шалгалтгүй ч хэвээр харагдана", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    const { user, client } = await yearlyStudent({ exam: "none" });
+    const { data } = await testDb()
+      .from("parent_meetings")
+      .insert({ user_id: user.id, meeting_date: date, slot: "15:30–15:50" })
+      .select("id")
+      .single();
+    track("parent_meetings", (data as { id: string }).id);
+
+    const res = await client.get<Gate>("/api/parent-meeting");
+    expect(res.body.meeting?.slot).toBe("15:30–15:50");
+    expect(res.body.examRequired).toBe(false);
   });
 });
 

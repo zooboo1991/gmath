@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { IconCheckCircle, IconClose } from "@/components/icons";
 import { apiError, readJson } from "@/lib/fetchJson";
@@ -15,11 +16,14 @@ import { MEETING_MINUTES } from "@/lib/parentMeeting";
 
 type Day = { date: string; label: string; slots: string[]; full: boolean };
 type Meeting = { id: string; meetingDate: string; label: string; slot: string };
+/** Шалгалтаа өгөөгүй бол сервер цаг биш, чиглүүлэх мэдээлэл өгнө. */
+type ExamGate = { state: "none" | "started"; href: string; hasOpenDays: boolean };
 
 export default function ParentMeetingCard() {
   const [days, setDays] = useState<Day[]>([]);
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [eligible, setEligible] = useState(false);
+  const [exam, setExam] = useState<ExamGate | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
   const [pickedDate, setPickedDate] = useState<string | null>(null);
@@ -33,6 +37,11 @@ export default function ParentMeetingCard() {
     setEligible(Boolean(json.eligible));
     setDays(json.days ?? []);
     setMeeting(json.meeting ?? null);
+    setExam(
+      json.examRequired
+        ? { state: json.examState, href: json.examHref, hasOpenDays: Boolean(json.hasOpenDays) }
+        : null
+    );
   }, []);
 
   useEffect(() => {
@@ -103,6 +112,30 @@ export default function ParentMeetingCard() {
   };
 
   if (!loaded || !eligible) return null;
+
+  // Шалгалтаа өгөөгүй: цаг биш, шалгалт руу чиглүүлнэ. Уулзалтын ээлж
+  // явагдаагүй (нээлттэй өдөргүй) үед энэ сануулгыг ч гаргахгүй.
+  if (exam) {
+    if (!exam.hasOpenDays) return null;
+    const started = exam.state === "started";
+    return (
+      <div className="bg-gold-soft border border-gold/30 rounded-lg px-[22px] py-[20px]">
+        <h3 className="text-[1.05rem] font-extrabold">Багштай уулзах</h3>
+        <p className="text-ink-2 font-medium text-[.9rem] mt-2 leading-[1.6]">
+          {started
+            ? "Уулзалт дээр түвшин тогтоох шалгалтын дүнгээ багштай ярилцана. Эхлүүлсэн шалгалтаа дуусгаж, бодолтоо илгээсний дараа цаг сонгох боломжтой болно."
+            : "Уулзалт дээр түвшин тогтоох шалгалтын дүнгээ багштай ярилцана. Эхлээд шалгалтаа өгнө үү — бодолтоо илгээсний дараа цаг сонгох боломжтой болно."}
+        </p>
+        <Link
+          href={exam.href}
+          className="inline-flex items-center justify-center gap-2 font-extrabold text-[.9rem] rounded-full bg-gold text-gold-ink shadow-gold px-[22px] py-[11px] mt-3.5 transition-transform hover:-translate-y-0.5 hover:bg-gold-strong"
+        >
+          {started ? "Шалгалтаа үргэлжлүүлэх →" : "Түвшин тогтоох шалгалт өгөх →"}
+        </Link>
+      </div>
+    );
+  }
+
   // Захиалсан цаггүй ба нээлттэй өдөр ч алга бол харуулах зүйл байхгүй.
   if (!meeting && days.length === 0) return null;
 

@@ -41,4 +41,8 @@ yarn-error.log*
 next-env.d.ts
 
 # test build output (npm test)
-/.next-test/
+# Нэмэлт build хавтаснууд (.next-test — тестийн сервер, бусад — локал
+# preview). Tailwind v4 нь gitignore-д байхгүй бүхнийг класс хайж скан хийдэг
+# тул энд байхгүй бол шахсан кэш файлаас эвдэрсэн CSS үүсгэж, зэрэг
+# ажиллаж буй dev/тест серверийг унагадаг — 2026-09-29-нд болсон.
+/.next-*/

@@ -270,23 +270,58 @@ export async function setMeetingOutcome(
 }
 
 /**
- * Энэ хүн уулзалт захиалах эрхтэй юу — 1 жилийн хөтөлбөрт идэвхтэй
- * бүртгэлтэй эсэх.
+ * Хүүхдийн 1 жилийн хөтөлбөр — идэвхтэй бүртгэлтэй бол түүний id.
  *
  * Жилийн хөтөлбөрүүдийн id нь "program-c"/"program-d" — `courses` хүснэгтэд
  * мөргүй тул зөвхөн энэ угтвараар нь ялгана (schema.sql-ийн тайлбар).
+ * Хоёуланд нь бүртгэлтэй бол эрэмбээр эхнийх — түвшин тогтоох шалгалт руу
+ * чиглүүлэх холбоосонд л хэрэгтэй.
  */
-export async function hasYearlyProgramme(userId: string): Promise<boolean> {
+export async function findYearlyProgramme(userId: string): Promise<string | undefined> {
   const { data, error } = await getSupabase()
     .from("registrations")
-    .select("id")
+    .select("program_id")
     .eq("user_id", userId)
     .eq("status", "active")
     .like("program_id", "program-%")
+    .order("program_id")
     .limit(1);
   if (error) {
-    if (isInvalidUuidError(error)) return false;
+    if (isInvalidUuidError(error)) return undefined;
     throw error;
   }
-  return (data ?? []).length > 0;
+  return ((data ?? []) as { program_id: string }[])[0]?.program_id;
+}
+
+/**
+ * Түвшин тогтоох шалгалтыг хэр зэрэг өгсөн бэ.
+ *
+ * - `done` — бодолтоо илгээсэн. Багш дүгнэсэн эсэх хамаагүй: бодит
+ *   өгөгдлөөр (2026-09-29) илгээсэн 28 хүүхдээс багш ганцыг л дүгнэсэн тул
+ *   дүгнэлтийг шаардвал бараг хэн ч цаг авч чадахгүй. Сайт өөрөө ч
+ *   "Түвшин тогтоох өгсөн" гэдгийг ингэж тоолдог (FreeExamBox).
+ * - `started` — эхлүүлсэн ч илгээгээгүй (асуулга бөглөсөн, төлбөр төлсөн).
+ * - `none` — огт эхлээгүй.
+ *
+ * Зөвхөн түвшин тогтоох төрлүүд (олимпиад, placement): "Энгийн/Сонгон
+ * ангийн тест" нь өөр зүйл. Цуцлагдсан оролдлогыг тоохгүй.
+ */
+export type PlacementExamState = "done" | "started" | "none";
+
+const HANDED_IN = new Set(["problems_submitted", "grading", "completed"]);
+
+export async function placementExamState(userId: string): Promise<PlacementExamState> {
+  const { data, error } = await getSupabase()
+    .from("assessments")
+    .select("status")
+    .eq("user_id", userId)
+    .in("track", ["olympiad", "placement"])
+    .neq("status", "cancelled");
+  if (error) {
+    if (isInvalidUuidError(error)) return "none";
+    throw error;
+  }
+  const statuses = ((data ?? []) as { status: string }[]).map((row) => row.status);
+  if (statuses.some((status) => HANDED_IN.has(status))) return "done";
+  return statuses.length > 0 ? "started" : "none";
 }

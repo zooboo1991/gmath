@@ -3,7 +3,8 @@ import {
   bookMeeting,
   cancelOwnMeeting,
   findUpcomingMeeting,
-  hasYearlyProgramme,
+  findYearlyProgramme,
+  placementExamState,
   listMeetingDays,
   listTakenSlots,
 } from "@/lib/parentMeetingDb";
@@ -43,32 +44,60 @@ async function openDays() {
   });
 }
 
+/** Түвшин тогтоох шалгалт руу чиглүүлэх газар — сургалтын хуудасны таб. */
+function examHref(programId: string): string {
+  return `/profile/course/${programId}?tab=assessment`;
+}
+
 export async function GET() {
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ ok: true, signedIn: false, eligible: false, days: [], meeting: null });
   }
-  const eligible = await hasYearlyProgramme(user.id).catch(() => false);
-  if (!eligible) {
+  const programId = await findYearlyProgramme(user.id).catch(() => undefined);
+  if (!programId) {
     return NextResponse.json({ ok: true, signedIn: true, eligible: false, days: [], meeting: null });
   }
-  const [days, meeting] = await Promise.all([
+  const [days, meeting, examState] = await Promise.all([
     openDays(),
     findUpcomingMeeting(user.id).catch(() => undefined),
+    placementExamState(user.id).catch(() => "none" as const),
   ]);
+  const meetingView = meeting
+    ? {
+        id: meeting.id,
+        meetingDate: meeting.meetingDate,
+        label: meetingDayLabel(meeting.meetingDate),
+        slot: meeting.slot,
+      }
+    : null;
+
+  // Шалгалтаа өгөөгүй бол цаг харуулахгүй, шалгалт руу чиглүүлнэ. Гэхдээ
+  // дүрэм гарахаас өмнө захиалчихсан цаг байвал хэвээр харуулна — хүний
+  // төлөвлөгөөг чимээгүй алга болгох нь чиглүүлэхээс муу.
+  if (examState !== "done" && !meetingView) {
+    return NextResponse.json({
+      ok: true,
+      signedIn: true,
+      eligible: true,
+      examRequired: true,
+      examState,
+      examHref: examHref(programId),
+      // Уулзалтын ээлж явагдаж байгаа эсэх. Нээлттэй өдөр байхгүй бол
+      // шалгалт руу шахах карт ч гаргахгүй — профайл дээр утгагүй сануулга.
+      hasOpenDays: days.length > 0,
+      days: [],
+      meeting: null,
+    });
+  }
+
   return NextResponse.json({
     ok: true,
     signedIn: true,
     eligible: true,
+    examRequired: false,
     days,
-    meeting: meeting
-      ? {
-          id: meeting.id,
-          meetingDate: meeting.meetingDate,
-          label: meetingDayLabel(meeting.meetingDate),
-          slot: meeting.slot,
-        }
-      : null,
+    meeting: meetingView,
   });
 }
 
@@ -77,9 +106,22 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "Нэвтэрнэ үү" }, { status: 401 });
   }
-  if (!(await hasYearlyProgramme(user.id).catch(() => false))) {
+  const programId = await findYearlyProgramme(user.id).catch(() => undefined);
+  if (!programId) {
     return NextResponse.json(
       { ok: false, error: "Багштай уулзах цагийг 1 жилийн хөтөлбөрийн сурагчид захиална." },
+      { status: 403 }
+    );
+  }
+  // Уулзалт нь шалгалтын дүнг ярилцах зорилготой — шалгалтгүй бол ярих зүйл
+  // алга. Жагсаалт харуулахгүй байгаа ч гараар илгээсэн хүсэлтийг энд барина.
+  if ((await placementExamState(user.id).catch(() => "none")) !== "done") {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Эхлээд түвшин тогтоох шалгалтаа өгнө үү. Бодолтоо илгээсний дараа цаг сонгох боломжтой болно.",
+        examHref: examHref(programId),
+      },
       { status: 403 }
     );
   }
