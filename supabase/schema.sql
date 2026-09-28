@@ -1468,3 +1468,56 @@ create unique index if not exists placement_bookings_credit_idx
 -- үнээс хасагдана: 1,200,000₮-ийн анги 20,000₮ хөнгөлөлттэй бол 1,180,000₮.
 alter table registrations
   add column if not exists placement_credit integer not null default 0;
+
+-- ---------------------------------------------------------------------------
+-- Багштай хийх ганцаарчилсан уулзалт
+--
+-- 1 жилийн хөтөлбөрт суралцаж буй сурагчид эрхээрээ орж цагаа өөрсдөө
+-- сонгоно. Уулзалт 20 минут, цагууд 30 минутын алхамтай (багшид амрах зав).
+-- Нэг цагийг нэг л гэр бүл авна.
+-- ---------------------------------------------------------------------------
+
+-- Админаас нээсэн өдрүүд. Энд байхгүй өдөр сурагчдад огт харагдахгүй —
+-- багш байхгүй өдөр хүүхэд ирчихээс сэргийлнэ.
+create table if not exists parent_meeting_days (
+  meeting_date date primary key,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists parent_meetings (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  meeting_date date not null,
+  -- "09:00–09:20". Сүлжээ өөрчлөгдвөл хуучин захиалга уншигдахуйц үлдэнэ.
+  slot text not null,
+  status text not null default 'booked'
+    check (status in ('booked', 'came', 'missed', 'cancelled')),
+  /** Багшийн тэмдэглэл: юу ярьсан, юун дээр анхаарах вэ. */
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Нэг өдрийн нэг цагт нэг л уулзалт. Хоёр гэр бүл яг зэрэг дарахад нэг нь
+-- 23505 авна — тэр нь алдаа биш, "энэ цагийг сая авчихлаа" гэсэн үг.
+create unique index if not exists parent_meetings_slot_idx
+  on parent_meetings (meeting_date, slot)
+  where status <> 'cancelled';
+
+-- "Нэг хүүхэд нэг ИРЭХ уулзалттай" дүрмийг индексээр биш кодоор барина
+-- (parentMeetingDb.ts, bookMeeting). Өмнө нь энд user_id дээр unique индекс
+-- байсан ч тэр нь өнгөрсөн уулзалтыг ч тоолж, нэг удаа уулзсан хүүхдийг
+-- дараагийн ээлжид хэзээ ч захиалах боломжгүй болгодог байв. "Ирэх" гэдэг
+-- өнөөдрөөс хамаардаг — индексийн нөхцөлд өнөөдрийг ашиглаж болдоггүй.
+drop index if exists parent_meetings_one_active_idx;
+
+-- Багшийн жагсаалт өдөр, цагаар эрэмблэгддэг.
+create index if not exists parent_meetings_date_idx
+  on parent_meetings (meeting_date, slot);
+
+-- Эрх: шинэ хүснэгтүүд API-д автоматаар нээгдэхээ больсон (Supabase-ийн
+-- өгөгдмөл өөрчлөгдсөн) тул service_role-д тусгайлан олгоно. Апп бүх
+-- хандалтаа сервер талаас service_role-оор хийдэг — anon, authenticated-д
+-- ОЛГОХГҮЙ: тэдэнд өгвөл нийтийн түлхүүртэй хэн ч шууд уншиж бичнэ.
+grant all on table public.parent_meeting_days to service_role;
+grant all on table public.parent_meetings to service_role;

@@ -1,0 +1,81 @@
+/**
+ * Багштай хийх ганцаарчилсан уулзалтын цаг.
+ *
+ * Түвшин тогтоох цагаас (placementBooking.ts) гурван зүйлээр ялгаатай:
+ *
+ * 1. Уулзалт 20 минут ч цагууд 30 минутын алхамтай — багш хооронд нь
+ *    амарч, өмнөх уулзалт уртасвал дараагийнх нь хойшлохгүй.
+ * 2. Цагууд ангиудын хуваариас гардаггүй, тогтмол цонхтой: өглөө 09:00–13:00,
+ *    үдээс хойш 14:00–18:00. Дунд нь цайны цаг.
+ * 3. Нэг цагийг нэг л гэр бүл авна. Түвшин тогтоолтод нэг цагт хэд хэдэн
+ *    хүүхэд ирж болдог байсан бол энд багш нэг гэр бүлтэй ганцаарчлан ярина.
+ */
+
+/** Уулзалтын урт — эзний зарласан 20 минут. */
+export const MEETING_MINUTES = 20;
+
+/** Хоёр уулзалтын эхлэлийн хоорондох зай. Зөрүү нь багшийн амрах зав. */
+export const SLOT_STEP_MINUTES = 30;
+
+/** Уулзалт болох цонхнууд, [эхлэл, төгсгөл) минутаар. */
+const WINDOWS: [string, string][] = [
+  ["09:00", "13:00"],
+  ["14:00", "18:00"],
+];
+
+function toMinutes(value: string): number {
+  const [h, m] = value.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function toClock(value: number): string {
+  return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Өдрийн бүх цаг: "09:00–09:20", "09:30–09:50", …
+ *
+ * Шошго нь уулзалтын БОДИТ урттай — "09:00–09:30" гэвэл эцэг эх 30 минут
+ * ярина гэж ойлгоно. Дараагийнх нь 09:30-д эхэлнэ.
+ */
+export function meetingSlots(): string[] {
+  const slots: string[] = [];
+  for (const [from, to] of WINDOWS) {
+    const end = toMinutes(to);
+    for (let at = toMinutes(from); at + MEETING_MINUTES <= end; at += SLOT_STEP_MINUTES) {
+      slots.push(`${toClock(at)}–${toClock(at + MEETING_MINUTES)}`);
+    }
+  }
+  return slots;
+}
+
+/** Ирсэн цаг сүлжээнд байгаа эсэх — сервер талд шалгахад. */
+export function isMeetingSlot(slot: string): boolean {
+  return meetingSlots().includes(slot);
+}
+
+/** Улаанбаатар UTC+8, зуны цагийн шилжилтгүй. */
+const UB_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+/** Улаанбаатарын өнөөдөр, YYYY-MM-DD. */
+export function todayInUb(now = new Date()): string {
+  return new Date(now.getTime() + UB_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** "2026-10-06" → "10.06 Мягмар". */
+const DAY_NAMES = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
+
+export function meetingDayLabel(date: string): string {
+  const at = new Date(`${date}T00:00:00.000Z`);
+  return `${date.slice(5).replace("-", ".")} ${DAY_NAMES[at.getUTCDay()] ?? ""}`.trim();
+}
+
+/**
+ * Захиалж болох өдөр эсэх — өнгөрсөн өдрийг санал болгохгүй.
+ *
+ * Өнөөдрийг үлдээнэ: багш өглөө нь өдрөө нээгээд үдээс хойших цагаа
+ * дүүргэх нь бодитой хэрэгцээ.
+ */
+export function isBookableDay(date: string, now = new Date()): boolean {
+  return date >= todayInUb(now);
+}

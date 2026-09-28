@@ -46,6 +46,9 @@ export type AdminSection =
   /** Түвшин тогтоох цаг: хэн хэзээ танхимд ирж уулзахаар захиалсан бэ.
    *  Багшийн эрхэд ордог — ирсэн эсэхийг тэмдэглэдэг хүн нь тэр. */
   | "bookings"
+  /** Багштай хийх ганцаарчилсан уулзалт: 1 жилийн хөтөлбөрийн сурагчид
+   *  өөрсдөө цагаа сонгодог. Багш өдрүүдээ нээж, хэн ирэхийг хардаг. */
+  | "meetings"
   | "chat"
   /** Гэрээний загварууд: Word файл, тагийн зураглал, сургалттай холбох. */
   | "contracts"
@@ -60,7 +63,7 @@ export type AdminSection =
  * either: taking attendance was what took them there, and it now has a screen
  * of its own built for the job.
  */
-export const TEACHER_SECTIONS = ["attendance", "grading", "placement", "bookings"] as const;
+export const TEACHER_SECTIONS = ["attendance", "grading", "placement", "bookings", "meetings"] as const;
 
 export function canView(role: AdminRole, section: AdminSection): boolean {
   if (role === "full") return true;

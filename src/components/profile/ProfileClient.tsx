@@ -6,6 +6,7 @@ import FormField from "@/components/FormField";
 import SchoolAutocomplete from "@/components/SchoolAutocomplete";
 import PushSettings from "@/components/profile/PushSettings";
 import OnboardingChecklist from "@/components/profile/OnboardingChecklist";
+import ParentMeetingCard from "@/components/profile/ParentMeetingCard";
 import { useNow, LessonAction } from "@/components/profile/LessonSchedule";
 import type { Certificate, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import {
@@ -238,6 +239,9 @@ export default function ProfileClient({
           />
         )}
         <PushSettings />
+        {/* Зөвхөн 1 жилийн хөтөлбөрийн сурагчдад, нээлттэй өдөр байгаа үед
+            харагдана — эрх, өдөр хоёрыг сервер шийднэ. */}
+        <ParentMeetingCard />
       </div>
 
       <div className="wrap border-b border-line">
