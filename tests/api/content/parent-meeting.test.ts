@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 import { adminClient, anonClient, signedInClient, staffClient, TestClient } from "../../support/client";
 import { createTestRegistration, createTestUser } from "../../support/factories";
 import { cleanupTracked, testDb, track } from "../../support/db";
+import { mockCalls } from "../../support/mockControl";
 
 const staffAccounts: string[] = [];
 const openedDays: string[] = [];
@@ -317,6 +318,75 @@ describe("дараагийн ээлж", () => {
       .eq("user_id", user.id)
       .eq("status", "booked");
     expect(data).toHaveLength(1);
+  });
+});
+
+describe("эцэг эхэд SMS", () => {
+  /** Тухайн дугаар руу явсан SMS-үүд. */
+  async function smsTo(phone: string) {
+    return (await mockCalls("skytel")).filter((c) => c.query.sendto === phone);
+  }
+
+  it("цаг захиалахад аккаунтын утас руу SMS очно", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    const { user, client } = await yearlyStudent();
+    const before = (await smsTo(user.phone)).length;
+
+    const res = await client.post<{ meeting: { id: string } }>("/api/parent-meeting", {
+      date,
+      slot: "11:30–11:50",
+    });
+    expect(res.status, res.text).toBe(200);
+    track("parent_meetings", res.body.meeting.id);
+
+    const sent = await smsTo(user.phone);
+    expect(sent.length).toBe(before + 1);
+    const message = String(sent[sent.length - 1].query.message ?? "");
+    // Цаг нь энгийн зураастай, латинаар.
+    expect(message).toContain("11:30-11:50");
+    expect(message).toContain("Bagshtai uulzah");
+  });
+
+  it("эцэг эхийн утас бөглөсөн бол тийшээ очно, аккаунтын утас руу биш", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    const { user, client } = await yearlyStudent();
+    // Тестийн дугаар — factory-ийн 70-аас тусдаа мужид.
+    const parentPhone = `72${String(Date.now()).slice(-6)}`;
+    await testDb().from("users").update({ parent_phone: parentPhone }).eq("id", user.id);
+
+    const ownBefore = (await smsTo(user.phone)).length;
+    const parentBefore = (await smsTo(parentPhone)).length;
+
+    const res = await client.post<{ meeting: { id: string } }>("/api/parent-meeting", {
+      date,
+      slot: "12:00–12:20",
+    });
+    expect(res.status, res.text).toBe(200);
+    track("parent_meetings", res.body.meeting.id);
+
+    expect((await smsTo(parentPhone)).length).toBe(parentBefore + 1);
+    expect((await smsTo(user.phone)).length).toBe(ownBefore);
+  });
+
+  it("захиалга амжилтгүй бол SMS очихгүй", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    const first = await yearlyStudent();
+    const second = await yearlyStudent();
+
+    const made = await first.client.post<{ meeting: { id: string } }>("/api/parent-meeting", {
+      date,
+      slot: "14:30–14:50",
+    });
+    track("parent_meetings", made.body.meeting.id);
+
+    const before = (await smsTo(second.user.phone)).length;
+    const clash = await second.client.post("/api/parent-meeting", { date, slot: "14:30–14:50" });
+    expect(clash.status).toBe(409);
+    // Цаг авч чадаагүй хүнд "баталгаажлаа" гэсэн SMS очих ёсгүй.
+    expect((await smsTo(second.user.phone)).length).toBe(before);
   });
 });
 

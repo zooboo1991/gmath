@@ -79,3 +79,43 @@ export function meetingDayLabel(date: string): string {
 export function isBookableDay(date: string, now = new Date()): boolean {
   return date >= todayInUb(now);
 }
+
+/* -------------------------------------------------------------------------
+ * Эцэг эхэд очих SMS
+ * ---------------------------------------------------------------------- */
+
+/** Гарагийн нэр латинаар — getUTCDay()-ийн дарааллаар (Ням = 0). */
+const DAY_NAMES_LATIN = ["Nyam", "Davaa", "Myagmar", "Lhagva", "Purev", "Baasan", "Byamba"];
+
+/**
+ * Уулзалт баталгаажсаныг мэдэгдэх SMS-ийн бичвэр.
+ *
+ * Латинаар: Skytel кирилл үсгийг эвддэг (lib/otp.ts). Нэг SMS-д (160
+ * тэмдэгт) багтах ёстой. Цагийн en dash-ийг энгийн зураас болгоно — GSM-7
+ * кодчилолд en dash байхгүй тул тэр ганц тэмдэгт бүх мессежийг UCS-2 рүү
+ * шилжүүлж, 70 тэмдэгтэд хуваагдах шалтгаан болно.
+ */
+export function meetingSmsText(date: string, slot: string): string {
+  const at = new Date(`${date}T00:00:00.000Z`);
+  const day = DAY_NAMES_LATIN[at.getUTCDay()] ?? "";
+  const when = `${date.slice(5).replace("-", ".")} ${day} ${slot.replace("–", "-")}`;
+  return (
+    `Bagshtai uulzah tsag batalgaajlaa: ${when}. Chonon burt tuv, 403 toot. ` +
+    `Ireh bolomjgui bol gmath.mn-ees tsagaa tsutsalna uu.`
+  );
+}
+
+/**
+ * SMS хэнд очих вэ.
+ *
+ * Эцэг эхийн утас бөглөсөн бол тийшээ — уулзалт эцэг эхтэй хийгддэг.
+ * Бөглөөгүй бол аккаунтын утас руу: gmath-д аккаунтыг ихэвчлэн эцэг эх
+ * өөрсдөө бүртгүүлдэг тул тэр нь өөрөө эцэг эхийн утас байдаг (2026-09-29-ний
+ * байдлаар жилийн хөтөлбөрийн 83 хэрэглэгчээс 6 нь л parent_phone бөглөсөн,
+ * тэрнээс 5 нь аккаунтын утастайгаа ижил). Бөглөсөн утас 8 оронтой биш бол
+ * алдаатай гэж үзээд аккаунтын утсыг ашиглана.
+ */
+export function meetingSmsRecipient(user: { phone: string; parentPhone?: string }): string {
+  const parent = (user.parentPhone ?? "").replace(/\D/g, "");
+  return parent.length === 8 ? parent : user.phone;
+}

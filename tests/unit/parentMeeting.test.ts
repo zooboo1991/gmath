@@ -14,6 +14,8 @@ import {
   isMeetingSlot,
   meetingDayLabel,
   meetingSlots,
+  meetingSmsRecipient,
+  meetingSmsText,
 } from "@/lib/parentMeeting";
 
 describe("уулзалтын цагууд", () => {
@@ -81,5 +83,38 @@ describe("өдөр", () => {
 
   it("гарагийн нэрийг хавсаргана", () => {
     expect(meetingDayLabel("2026-10-06")).toBe("10.06 Мягмар");
+  });
+});
+
+describe("эцэг эхэд очих SMS", () => {
+  it("нэг SMS-д багтана — өдөр бүрийн хамгийн урт нэр ч", () => {
+    // Долоо хоногийн бүх гараг: 2026-10-04 Ням … 10-10 Бямба.
+    for (let d = 4; d <= 10; d += 1) {
+      const text = meetingSmsText(`2026-10-${String(d).padStart(2, "0")}`, "17:30–17:50");
+      expect(text.length, text).toBeLessThanOrEqual(160);
+    }
+  });
+
+  it("зөвхөн ASCII — кирилл, en dash байхгүй", () => {
+    // Нэг ч ASCII бус тэмдэгт мессежийг UCS-2 рүү шилжүүлж 70 тэмдэгтээр хуваана.
+    const text = meetingSmsText("2026-10-06", "10:00–10:20");
+    expect(/^[\x20-\x7e]*$/.test(text), text).toBe(true);
+  });
+
+  it("өдөр, гараг, цагийг агуулна", () => {
+    const text = meetingSmsText("2026-10-06", "10:00–10:20");
+    expect(text).toContain("10.06 Myagmar 10:00-10:20");
+  });
+
+  it("эцэг эхийн утас бөглөсөн бол тийшээ илгээнэ", () => {
+    expect(meetingSmsRecipient({ phone: "88112233", parentPhone: "99445566" })).toBe("99445566");
+    // Зай, зураастай бичсэн ч танина.
+    expect(meetingSmsRecipient({ phone: "88112233", parentPhone: "9944-5566" })).toBe("99445566");
+  });
+
+  it("эцэг эхийн утас хоосон эсвэл алдаатай бол аккаунтын утас руу", () => {
+    expect(meetingSmsRecipient({ phone: "88112233" })).toBe("88112233");
+    expect(meetingSmsRecipient({ phone: "88112233", parentPhone: "" })).toBe("88112233");
+    expect(meetingSmsRecipient({ phone: "88112233", parentPhone: "12345" })).toBe("88112233");
   });
 });

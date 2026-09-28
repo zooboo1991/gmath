@@ -7,7 +7,15 @@ import {
   listMeetingDays,
   listTakenSlots,
 } from "@/lib/parentMeetingDb";
-import { isBookableDay, isMeetingSlot, meetingDayLabel, meetingSlots } from "@/lib/parentMeeting";
+import {
+  isBookableDay,
+  isMeetingSlot,
+  meetingDayLabel,
+  meetingSlots,
+  meetingSmsRecipient,
+  meetingSmsText,
+} from "@/lib/parentMeeting";
+import { sendSms } from "@/lib/sms/skytel";
 import { getSessionUser } from "@/lib/session";
 
 /**
@@ -102,6 +110,14 @@ export async function POST(request: Request) {
           { status: 409 }
         );
   }
+  // Эцэг эхэд SMS. Алдаа нь захиалгыг унагахгүй — цаг аль хэдийн
+  // баталгаажсан, дэлгэц дээр ч харагдаж байгаа. Логт утас бичихгүй.
+  try {
+    await sendSms(meetingSmsRecipient(user), meetingSmsText(date, slot));
+  } catch (err) {
+    console.error("[parent-meeting] sms failed:", result.meeting.id, err);
+  }
+
   return NextResponse.json({
     ok: true,
     meeting: {
