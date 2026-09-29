@@ -119,3 +119,47 @@ export function meetingSmsRecipient(user: { phone: string; parentPhone?: string 
   const parent = (user.parentPhone ?? "").replace(/\D/g, "");
   return parent.length === 8 ? parent : user.phone;
 }
+
+/* -------------------------------------------------------------------------
+ * Онлайн уулзалт
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Уулзалтын хэлбэр. Онлайн уулзалт өдөр бүрийн нэг Zoom өрөөнд болно:
+ * багш тэндээ байж, гэр бүл бүр цагаараа орж ирээд гарна. Өрөө нь
+ * хүлээлгийн өрөөтэй — дараагийн гэр бүл эрт орвол өмнөх хүүхдийн дүнгийн
+ * яриаг сонсохгүй, багш нэг нэгээр нь оруулна.
+ */
+export type MeetingMode = "in_person" | "online";
+
+export function isMeetingMode(value: unknown): value is MeetingMode {
+  return value === "in_person" || value === "online";
+}
+
+/**
+ * Онлайн уулзалтын SMS.
+ *
+ * Zoom холбоос БИЧИХГҮЙ: хичээлтэй адил гэр бүл сайтад нэвтэрч "Zoom-оор
+ * орох" дарахад л сервер хувийн холбоос руу нь шилжүүлнэ. SMS-ээр явсан
+ * холбоосыг хэн ч дамжуулж болно, мөн тэр нь цагийг цуцалсан ч ажилласаар
+ * үлдэнэ.
+ */
+export function onlineMeetingSmsText(date: string, slot: string): string {
+  const at = new Date(`${date}T00:00:00.000Z`);
+  const day = DAY_NAMES_LATIN[at.getUTCDay()] ?? "";
+  const when = `${date.slice(5).replace("-", ".")} ${day} ${slot.replace("–", "-")}`;
+  return (
+    `Bagshtai online uulzalt batalgaajlaa: ${when}. ` +
+    `Tsagtaa gmath.mn-d nevtreed "Zoom-oor oroh" deer darna uu.`
+  );
+}
+
+/** Zoom өрөөний гарчиг — багшийн Zoom жагсаалтад харагдана. */
+export function meetingRoomTopic(date: string): string {
+  return `Багштай уулзалт — ${meetingDayLabel(date)}`;
+}
+
+/** Өрөө бүтэн өдөр нээлттэй: 09:00-оос 18:00 хүртэл. */
+export function meetingRoomSchedule(date: string): { startTime: string; durationMinutes: number } {
+  return { startTime: `${date}T09:00:00`, durationMinutes: 9 * 60 };
+}

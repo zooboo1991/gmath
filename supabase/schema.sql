@@ -1521,3 +1521,29 @@ create index if not exists parent_meetings_date_idx
 -- ОЛГОХГҮЙ: тэдэнд өгвөл нийтийн түлхүүртэй хэн ч шууд уншиж бичнэ.
 grant all on table public.parent_meeting_days to service_role;
 grant all on table public.parent_meetings to service_role;
+
+-- Уулзалтын хэлбэр: танхимаар эсвэл онлайнаар.
+alter table parent_meetings
+  add column if not exists mode text not null default 'in_person'
+    check (mode in ('in_person', 'online'));
+
+-- Онлайн уулзалтын Zoom өрөө — өдөр бүрд нэг. Багш өглөө нээгээд өдөржин
+-- тэндээ байна, гэр бүлүүд цагаараа орж ирээд гарна (хүлээлгийн өрөөтэй).
+-- Хичээлтэй адил систем өөрөө үүсгэнэ: анх хэрэгтэй болоход (гэр бүл
+-- "Zoom-оор орох" дарах, эсвэл багш өрөөгөө нээх үед).
+--
+-- Нээлттэй өдрүүдээс (parent_meeting_days) тусдаа: админ өдрийг хаасан ч
+-- аль хэдийн захиалсан онлайн уулзалт өрөөгүй үлдэх ёсгүй.
+create table if not exists parent_meeting_rooms (
+  meeting_date date primary key,
+  zoom_meeting_id text not null,
+  created_at timestamptz not null default now()
+);
+grant all on table public.parent_meeting_rooms to service_role;
+
+-- Гэр бүл бүрийн хувийн Zoom холбоос — анх "Zoom-оор орох" дарахад
+-- бүртгээд хадгална. Хуудсанд ч, SMS-д ч бичигдэхгүй: зөвхөн дарах үед
+-- сервер тийш нь шилжүүлнэ.
+alter table parent_meetings
+  add column if not exists zoom_registrant_id text,
+  add column if not exists zoom_join_url text;

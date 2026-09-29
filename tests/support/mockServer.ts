@@ -50,6 +50,8 @@ export type MockZoomMeeting = {
   startTime: string | null;
   duration: number | null;
   timezone: string | null;
+  /** Эцэг эхийн уулзалтын өрөө хүлээлгийн өрөөтэй үүсэх ёстойг шалгахад. */
+  waitingRoom: boolean | null;
 };
 
 const calls: RecordedCall[] = [];
@@ -312,6 +314,10 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
           startTime: input.start_time ? String(input.start_time) : null,
           duration: input.duration ? Number(input.duration) : null,
           timezone: input.timezone ? String(input.timezone) : null,
+          waitingRoom:
+            typeof (input.settings as Record<string, unknown> | undefined)?.waiting_room === "boolean"
+              ? Boolean((input.settings as Record<string, unknown>).waiting_room)
+              : null,
         });
         return json(res, 201, {
           id: Number(id),
@@ -325,6 +331,12 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
       if (meetingMatch) {
         const meeting = zoomMeetings.get(meetingMatch[1]);
         if (!meeting) return json(res, 404, { code: 3001, message: "Meeting does not exist" });
+        if (method === "DELETE") {
+          zoomMeetings.delete(meeting.id);
+          res.writeHead(204);
+          res.end();
+          return;
+        }
         if (method === "PATCH") {
           const input = (body ?? {}) as Record<string, unknown>;
           if (input.topic !== undefined) meeting.topic = String(input.topic);
@@ -339,6 +351,8 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
         return json(res, 200, {
           id: Number(meeting.id),
           topic: meeting.topic,
+          // Жинхэнэ Zoom шиг GET бүрт шинэ хостын холбоос.
+          start_url: `https://zoom.us/s/${meeting.id}?zak=${calls.length}`,
           start_time: meeting.startTime,
           duration: meeting.duration,
           timezone: meeting.timezone,

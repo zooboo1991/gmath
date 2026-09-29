@@ -33,17 +33,23 @@ export default function ParentMeetingsPanel({
   initialMeetings,
   initialDays,
   today,
+  zoomError = false,
 }: {
   initialMeetings: ParentMeetingWithUser[];
   initialDays: string[];
   /** Серверийн өнөөдөр (УБ) — өнгөрсөн өдрийг ялгахад. */
   today: string;
+  /** "Zoom өрөө нээх" амжилтгүй болж буцаж ирсэн. */
+  zoomError?: boolean;
 }) {
   const [meetings, setMeetings] = useState(initialMeetings);
   const [days, setDays] = useState(initialDays);
   const [newDate, setNewDate] = useState("");
+
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    zoomError ? "Zoom өрөөг нээж чадсангүй. Zoom-ын тохиргоог шалгаад дахин оролдоно уу." : null
+  );
 
   const changeDays = async (method: "POST" | "DELETE", date: string) => {
     setBusyId(date);
@@ -165,9 +171,26 @@ export default function ParentMeetingsPanel({
             const ofDay = meetings.filter((one) => one.meetingDate === date);
             return (
               <div key={date}>
-                <h4 className="font-extrabold text-[.86rem] text-ink-3 uppercase tracking-wide mb-1">
-                  {meetingDayLabel(date)} · {ofDay.length} уулзалт
-                </h4>
+                <div className="flex items-center gap-3 flex-wrap mb-1">
+                  <h4 className="font-extrabold text-[.86rem] text-ink-3 uppercase tracking-wide">
+                    {meetingDayLabel(date)} · {ofDay.length} уулзалт
+                    {ofDay.some((one) => one.mode === "online") &&
+                      ` (${ofDay.filter((one) => one.mode === "online").length} онлайн)`}
+                  </h4>
+                  {/* Өдрийн нэг Zoom өрөө: өглөө нээгээд өдөржин тэндээ байна.
+                      Хүлээлгийн өрөө асаалттай үүсдэг тул гэр бүлийг нэг
+                      нэгээр нь оруулна. */}
+                  {ofDay.some((one) => one.mode === "online") && (
+                    <a
+                      href={`/api/admin/parent-meetings/room?date=${date}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[.8rem] font-extrabold text-blue-strong border border-blue-soft-2 rounded-full px-3 py-1 hover:bg-blue-soft"
+                    >
+                      Zoom өрөө нээх →
+                    </a>
+                  )}
+                </div>
                 <div className="divide-y divide-line">
                   {ofDay.map((one) => (
                     <div key={one.id} className="flex items-center gap-3 py-3 flex-wrap">
@@ -195,6 +218,13 @@ export default function ParentMeetingsPanel({
                           </span>
                         )}
                       </div>
+                      <span
+                        className={`text-[.76rem] font-extrabold px-2.5 py-1 rounded-full ${
+                          one.mode === "online" ? "bg-blue-soft text-blue-strong" : "bg-bg-soft text-ink-2"
+                        }`}
+                      >
+                        {one.mode === "online" ? "Онлайн" : "Танхим"}
+                      </span>
                       <span
                         className={`text-[.76rem] font-extrabold px-2.5 py-1 rounded-full ${STATUS_CLASS[one.status]}`}
                       >

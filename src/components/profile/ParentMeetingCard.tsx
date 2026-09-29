@@ -15,7 +15,14 @@ import { MEETING_MINUTES } from "@/lib/parentMeeting";
  */
 
 type Day = { date: string; label: string; slots: string[]; full: boolean };
-type Meeting = { id: string; meetingDate: string; label: string; slot: string };
+type Mode = "in_person" | "online";
+type Meeting = {
+  id: string;
+  meetingDate: string;
+  label: string;
+  slot: string;
+  mode: Mode;
+};
 /** Шалгалтаа өгөөгүй бол сервер цаг биш, чиглүүлэх мэдээлэл өгнө. */
 type ExamGate = { state: "none" | "started"; href: string; hasOpenDays: boolean };
 
@@ -24,6 +31,8 @@ export default function ParentMeetingCard() {
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [eligible, setEligible] = useState(false);
   const [exam, setExam] = useState<ExamGate | null>(null);
+  const [onlineAvailable, setOnlineAvailable] = useState(false);
+  const [mode, setMode] = useState<Mode>("in_person");
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
   const [pickedDate, setPickedDate] = useState<string | null>(null);
@@ -37,11 +46,27 @@ export default function ParentMeetingCard() {
     setEligible(Boolean(json.eligible));
     setDays(json.days ?? []);
     setMeeting(json.meeting ?? null);
+    setOnlineAvailable(Boolean(json.onlineAvailable));
     setExam(
       json.examRequired
         ? { state: json.examState, href: json.examHref, hasOpenDays: Boolean(json.hasOpenDays) }
         : null
     );
+  }, []);
+
+  // "Zoom-оор орох" амжилтгүй бол сервер ?meeting=zoom-error-оор буцаана —
+  // хүн чимээгүй профайл руу буцчихаад юу болсныг мэдэхгүй үлдэх ёсгүй.
+  // ProfileClient-ийн ?course=, ?tab=-тэй адил: useSearchParams биш effect-ээр
+  // уншина (хуудсанд Suspense шаардахгүй), нэг tick хойшлуулна (гидрацийн
+  // дундуур дахин рендер хийхгүй).
+  const [zoomError, setZoomError] = useState<string | null>(null);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("meeting") !== "zoom-error") return;
+    const timer = setTimeout(
+      () => setZoomError("Zoom-д холбогдоход алдаа гарлаа. Хэсэг хугацааны дараа дахин дарна уу."),
+      0
+    );
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -67,7 +92,8 @@ export default function ParentMeetingCard() {
       const res = await fetch("/api/parent-meeting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, slot }),
+        // Онлайн сонголт харагдахгүй байхад (холбоос тохируулаагүй) үргэлж танхим.
+        body: JSON.stringify({ date, slot, mode: onlineAvailable ? mode : "in_person" }),
       });
       const json = await readJson(res);
       if (!res.ok) {
@@ -152,15 +178,36 @@ export default function ParentMeetingCard() {
             <IconCheckCircle className="w-[18px] h-[18px] text-green shrink-0" />
             {meeting.label} · {meeting.slot}
           </p>
-          <p className="text-ink-3 font-semibold text-[.85rem] mt-1.5 leading-[1.6]">
-            Товлосон цагтаа төв дээр ирээрэй. Уулзалт {MEETING_MINUTES} минут үргэлжилнэ.
-          </p>
-          {error && <p className="text-red-soft font-bold text-[.85rem] mt-2">{error}</p>}
+          {meeting.mode === "online" ? (
+            <>
+              <p className="text-ink-3 font-semibold text-[.85rem] mt-1.5 leading-[1.6]">
+                Онлайн уулзалт. Товлосон цагтаа Zoom-оор орно уу — багш таныг хүлээлгийн өрөөнөөс
+                оруулна. Уулзалт {MEETING_MINUTES} минут.
+              </p>
+              {/* Хичээлийн "Хичээлд орох"-той адил: сервер дарах үед бүртгээд
+                  хувийн холбоос руу шилжүүлнэ. Холбоос энэ хуудсанд байхгүй. */}
+              <a
+                href="/api/parent-meeting/join"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 font-extrabold text-[.9rem] rounded-full bg-blue text-white px-[20px] py-[10px] mt-3 hover:bg-blue-strong"
+              >
+                Zoom-оор орох →
+              </a>
+            </>
+          ) : (
+            <p className="text-ink-3 font-semibold text-[.85rem] mt-1.5 leading-[1.6]">
+              Товлосон цагтаа төв дээр ирээрэй. Уулзалт {MEETING_MINUTES} минут үргэлжилнэ.
+            </p>
+          )}
+          {(error ?? zoomError) && (
+            <p className="text-red-soft font-bold text-[.85rem] mt-2">{error ?? zoomError}</p>
+          )}
           <button
             type="button"
             disabled={busy}
             onClick={cancel}
-            className="text-[.85rem] font-extrabold text-blue-strong hover:underline mt-2.5 disabled:opacity-50"
+            className="block text-[.85rem] font-extrabold text-blue-strong hover:underline mt-2.5 disabled:opacity-50"
           >
             Цагаа болих
           </button>
@@ -201,6 +248,31 @@ export default function ParentMeetingCard() {
             <p className="text-ink-2 font-medium text-[.92rem] mt-2 leading-[1.65]">
               Нэг цагт нэг гэр бүл ордог тул сонгосон цаг тань бусдад харагдахаа болино.
             </p>
+
+            {onlineAvailable && (
+              <div className="grid grid-cols-2 gap-2 mt-4" role="radiogroup" aria-label="Уулзалтын хэлбэр">
+                {(
+                  [
+                    ["in_person", "Танхимаар", "Төв дээр ирнэ"],
+                    ["online", "Онлайнаар", "Zoom-оор орно"],
+                  ] as const
+                ).map(([value, title, hint]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={mode === value}
+                    onClick={() => setMode(value)}
+                    className={`rounded-md border-[1.5px] px-4 py-2.5 text-left transition-colors ${
+                      mode === value ? "border-blue bg-blue-soft" : "border-line-2"
+                    }`}
+                  >
+                    <b className="block text-[.92rem] font-extrabold">{title}</b>
+                    <small className="block text-ink-3 font-semibold text-[.8rem]">{hint}</small>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {openDays.length === 0 ? (
               <p className="text-ink-3 font-semibold text-[.9rem] mt-5">

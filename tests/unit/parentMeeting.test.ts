@@ -16,6 +16,7 @@ import {
   meetingSlots,
   meetingSmsRecipient,
   meetingSmsText,
+  onlineMeetingSmsText,
 } from "@/lib/parentMeeting";
 
 describe("уулзалтын цагууд", () => {
@@ -116,5 +117,23 @@ describe("эцэг эхэд очих SMS", () => {
     expect(meetingSmsRecipient({ phone: "88112233" })).toBe("88112233");
     expect(meetingSmsRecipient({ phone: "88112233", parentPhone: "" })).toBe("88112233");
     expect(meetingSmsRecipient({ phone: "88112233", parentPhone: "12345" })).toBe("88112233");
+  });
+});
+
+describe("онлайн уулзалтын SMS", () => {
+  it("Zoom холбоос агуулахгүй, сайт руу чиглүүлнэ", () => {
+    // Хичээлтэй адил: холбоосыг зөвхөн сайтаас дарахад өгнө.
+    const text = onlineMeetingSmsText("2026-10-06", "10:00–10:20");
+    expect(text).not.toMatch(/https?:|zoom\.us/);
+    expect(text).toContain("gmath.mn");
+    expect(text).toContain("10.06 Myagmar 10:00-10:20");
+  });
+
+  it("нэг SMS-д багтана, зөвхөн ASCII", () => {
+    for (let d = 4; d <= 10; d += 1) {
+      const text = onlineMeetingSmsText(`2026-10-${String(d).padStart(2, "0")}`, "17:30–17:50");
+      expect(text.length, text).toBeLessThanOrEqual(160);
+      expect(/^[\x20-\x7e]*$/.test(text), text).toBe(true);
+    }
   });
 });

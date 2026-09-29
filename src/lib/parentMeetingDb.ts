@@ -1,7 +1,14 @@
 import { getSupabase } from "./supabase";
 import { fetchAllRows } from "./fetchAll";
 import { publicUserFromJoin, type PublicUser } from "./db";
-import { isBookableDay, todayInUb } from "./parentMeeting";
+import {
+  isBookableDay,
+  meetingRoomSchedule,
+  meetingRoomTopic,
+  todayInUb,
+  type MeetingMode,
+} from "./parentMeeting";
+import { addRegistrant, createMeeting, deleteMeeting } from "./zoom/client";
 
 /**
  * Багштай хийх уулзалтын цаг — өгөгдлийн давхарга.
@@ -20,8 +27,12 @@ export type ParentMeeting = {
   /** "09:00–09:20". */
   slot: string;
   status: MeetingStatus;
+  /** Танхимаар эсвэл өдрийн Zoom өрөөнд онлайнаар. */
+  mode: MeetingMode;
   note?: string;
   createdAt: string;
+  /** Гэр бүлийн хувийн Zoom холбоос — анх "Zoom-оор орох" дарахад үүснэ. */
+  zoomJoinUrl?: string;
 };
 
 export type ParentMeetingWithUser = ParentMeeting & { user?: PublicUser };
@@ -32,8 +43,10 @@ type Row = {
   meeting_date: string;
   slot: string;
   status: MeetingStatus;
+  mode: MeetingMode | null;
   note: string | null;
   created_at: string;
+  zoom_join_url: string | null;
 };
 
 function isInvalidUuidError(err: unknown): boolean {
@@ -47,8 +60,11 @@ function fromRow(row: Row): ParentMeeting {
     meetingDate: row.meeting_date,
     slot: row.slot,
     status: row.status,
+    // Багана нэмэгдэхээс өмнөх мөрүүд танхимаар гэж тооцогдоно.
+    mode: row.mode ?? "in_person",
     note: row.note ?? undefined,
     createdAt: row.created_at,
+    zoomJoinUrl: row.zoom_join_url ?? undefined,
   };
 }
 
@@ -174,6 +190,7 @@ export async function bookMeeting(input: {
   userId: string;
   meetingDate: string;
   slot: string;
+  mode: MeetingMode;
 }): Promise<BookResult> {
   if (await findUpcomingMeeting(input.userId)) {
     return { ok: false, reason: "already_booked" };
@@ -181,7 +198,12 @@ export async function bookMeeting(input: {
 
   const { data, error } = await getSupabase()
     .from("parent_meetings")
-    .insert({ user_id: input.userId, meeting_date: input.meetingDate, slot: input.slot })
+    .insert({
+      user_id: input.userId,
+      meeting_date: input.meetingDate,
+      slot: input.slot,
+      mode: input.mode,
+    })
     .select("*")
     .single();
   if (error) {
@@ -324,4 +346,84 @@ export async function placementExamState(userId: string): Promise<PlacementExamS
   const statuses = ((data ?? []) as { status: string }[]).map((row) => row.status);
   if (statuses.some((status) => HANDED_IN.has(status))) return "done";
   return statuses.length > 0 ? "started" : "none";
+}
+
+/* -------------------------------------------------------------------------
+ * Онлайн уулзалтын Zoom өрөө
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Тухайн өдрийн Zoom өрөө — байхгүй бол үүсгэнэ.
+ *
+ * Хоёр гэр бүл яг зэрэг анх удаа дарвал хоёулаа Zoom дээр уулзалт үүсгэж
+ * магадгүй. `meeting_date` нь primary key тул нэг л мөр бичигдэнэ; ялагдсан
+ * тал нь өөрийн үүсгэснийг Zoom-оос устгаад ялагчийнхыг хэрэглэнэ — нэг
+ * өдөрт хоёр өрөө болбол багш аль нэгэнд нь хэнийг ч хүлээхгүй сууна.
+ */
+export async function ensureMeetingRoom(date: string): Promise<string> {
+  const existing = await findMeetingRoom(date);
+  if (existing) return existing;
+
+  const created = await createMeeting(meetingRoomTopic(date), meetingRoomSchedule(date), {
+    waitingRoom: true,
+  });
+  const { error } = await getSupabase()
+    .from("parent_meeting_rooms")
+    .insert({ meeting_date: date, zoom_meeting_id: created.id });
+  if (!error) return created.id;
+  if ((error as { code?: string }).code !== "23505") throw error;
+
+  await deleteMeeting(created.id).catch(() => {});
+  const winner = await findMeetingRoom(date);
+  if (!winner) throw new Error("Zoom өрөө бүртгэгдсэнгүй");
+  return winner;
+}
+
+export async function findMeetingRoom(date: string): Promise<string | undefined> {
+  const { data, error } = await getSupabase()
+    .from("parent_meeting_rooms")
+    .select("zoom_meeting_id")
+    .eq("meeting_date", date)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as { zoom_meeting_id: string } | null)?.zoom_meeting_id;
+}
+
+/**
+ * Гэр бүлийн хувийн Zoom холбоос — байхгүй бол бүртгэнэ.
+ *
+ * Хичээлийн "Хичээлд орох"-той адил: анх дарахад өдрийн өрөөнд бүртгээд
+ * хувийн холбоосыг нь хадгална, дараагийн дарахад тэр л холбоосыг өгнө.
+ * Хоёр таб зэрэг дарвал нөхцөлт UPDATE нэгийг нь л хадгална.
+ */
+export async function ensureMeetingJoinUrl(
+  meeting: ParentMeeting,
+  person: { email: string; firstName: string; lastName: string }
+): Promise<string> {
+  if (meeting.zoomJoinUrl) return meeting.zoomJoinUrl;
+
+  const roomId = await ensureMeetingRoom(meeting.meetingDate);
+  const registrant = await addRegistrant(roomId, person);
+  const { data, error } = await getSupabase()
+    .from("parent_meetings")
+    .update({
+      zoom_registrant_id: registrant.registrantId,
+      zoom_join_url: registrant.joinUrl,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", meeting.id)
+    .is("zoom_join_url", null)
+    .select("zoom_join_url")
+    .maybeSingle();
+  if (error) throw error;
+  if (data) return (data as { zoom_join_url: string }).zoom_join_url;
+
+  // Өөр таб түрүүлсэн — түүний хадгалсныг хэрэглэнэ.
+  const { data: again, error: readError } = await getSupabase()
+    .from("parent_meetings")
+    .select("zoom_join_url")
+    .eq("id", meeting.id)
+    .single();
+  if (readError) throw readError;
+  return (again as { zoom_join_url: string }).zoom_join_url;
 }

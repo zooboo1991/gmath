@@ -8,8 +8,13 @@ import { todayInUb } from "@/lib/parentMeeting";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Багштай уулзах цаг — Админ" };
 
-export default async function AdminMeetingsPage() {
+export default async function AdminMeetingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ zoom?: string }>;
+}) {
   await requireAdminSection("meetings");
+  const { zoom } = await searchParams;
   const today = todayInUb();
   // Өнөөдрөөс хойшхи нь л хэрэгтэй: багш хэн ирэхийг харахаар энд ирдэг.
   // Хүснэгт шинэ — schema.sql-ээ ажиллуулаагүй орчинд хуудас унахгүй.
@@ -20,7 +25,12 @@ export default async function AdminMeetingsPage() {
   return (
     <div className="px-6 lg:px-10 py-8">
       <AdminPageHeader title="Багштай уулзах цаг" />
-      <ParentMeetingsPanel initialMeetings={meetings} initialDays={days} today={today} />
+      <ParentMeetingsPanel
+        initialMeetings={meetings}
+        initialDays={days}
+        today={today}
+        zoomError={zoom === "error"}
+      />
     </div>
   );
 }

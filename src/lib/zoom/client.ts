@@ -91,7 +91,14 @@ export type ZoomMeeting = {
  */
 export async function createMeeting(
   topic: string,
-  schedule?: { startTime: string; durationMinutes: number }
+  schedule?: { startTime: string; durationMinutes: number },
+  /**
+   * Хичээлийн өгөгдмөл тохиргоог дарах. Одоогоор зөвхөн эцэг эхийн
+   * уулзалтад хэрэгтэй: бүх гэр бүл нэг өрөөнд ордог тул хүлээлгийн өрөө
+   * заавал асаалттай байх ёстой — эс бөгөөс дараагийн гэр бүл эрт орвол
+   * өмнөх хүүхдийн дүнгийн яриаг сонсоно.
+   */
+  options: { waitingRoom?: boolean } = {}
 ): Promise<ZoomMeeting> {
   const res = await zoomFetch("/users/me/meetings", {
     method: "POST",
@@ -104,8 +111,8 @@ export async function createMeeting(
       settings: {
         approval_type: 0,
         registration_type: 1,
-        join_before_host: true,
-        waiting_room: false,
+        join_before_host: !options.waitingRoom,
+        waiting_room: options.waitingRoom ?? false,
         registrants_email_notification: false,
         allow_multiple_devices: false,
       },
@@ -116,6 +123,32 @@ export async function createMeeting(
   }
   const json = (await res.json()) as { id: number; join_url: string; start_url: string };
   return { id: String(json.id), joinUrl: json.join_url, startUrl: json.start_url };
+}
+
+/**
+ * Хостын эхлүүлэх холбоос — ҮРГЭЛЖ шинээр авна.
+ *
+ * Zoom-ын start_url нь 2 цагийн дараа хүчингүй болдог тул уулзалт үүсэх
+ * үеийнхийг хадгалж болохгүй: багш өглөө нь хуучин холбоос дарвал
+ * нэвтрэх хуудас гарна.
+ */
+export async function getMeetingStartUrl(meetingId: string): Promise<string> {
+  const res = await zoomFetch(`/meetings/${meetingId}`);
+  if (!res.ok) {
+    if (res.status === 404) throw new ZoomMeetingGoneError(meetingId);
+    throw new ZoomUpdateError(res.status, await errorDetail(res));
+  }
+  const json = (await res.json()) as { start_url?: string };
+  if (!json.start_url) throw new ZoomUpdateError(res.status, "start_url алга");
+  return json.start_url;
+}
+
+/** Уулзалтыг устгана. Аль хэдийн байхгүй бол алдаа биш. */
+export async function deleteMeeting(meetingId: string): Promise<void> {
+  const res = await zoomFetch(`/meetings/${meetingId}`, { method: "DELETE" });
+  if (!res.ok && res.status !== 404) {
+    throw new ZoomUpdateError(res.status, await errorDetail(res));
+  }
 }
 
 /**

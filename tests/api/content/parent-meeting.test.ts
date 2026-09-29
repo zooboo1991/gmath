@@ -12,7 +12,8 @@ import { randomUUID } from "node:crypto";
 import { adminClient, anonClient, signedInClient, staffClient, TestClient } from "../../support/client";
 import { createTestAssessment, createTestRegistration, createTestUser } from "../../support/factories";
 import { cleanupTracked, testDb, track } from "../../support/db";
-import { mockCalls } from "../../support/mockControl";
+import { listMockZoomMeetings, mockCalls } from "../../support/mockControl";
+import { meetingRoomTopic } from "@/lib/parentMeeting";
 
 const staffAccounts: string[] = [];
 const openedDays: string[] = [];
@@ -506,6 +507,194 @@ describe("эцэг эхэд SMS", () => {
     expect(clash.status).toBe(409);
     // Цаг авч чадаагүй хүнд "баталгаажлаа" гэсэн SMS очих ёсгүй.
     expect((await smsTo(second.user.phone)).length).toBe(before);
+  });
+});
+
+/**
+ * Онлайн уулзалт — хичээлтэй адил систем Zoom өрөө үүсгэж, гэр бүл
+ * сайтаас "Zoom-оор орох" дарж шууд орно. Холбоос хуудсанд ч, SMS-д ч
+ * бичигдэхгүй.
+ */
+describe("онлайн уулзалт", () => {
+  /** Захиалгын хариу, GET хоёрын аль алинд Zoom холбоос байх ёсгүй. */
+  const ZOOM_URL = /zoom\.us/;
+
+  async function bookOnline(client: TestClient, date: string, slot: string) {
+    const res = await client.post<{ meeting: { id: string; mode: string } }>("/api/parent-meeting", {
+      date,
+      slot,
+      mode: "online",
+    });
+    expect(res.status, res.text).toBe(200);
+    track("parent_meetings", res.body.meeting.id);
+    return res;
+  }
+
+  /** Өдрийн өрөөг тестийн дараа цэвэрлэнэ — Zoom дээр ч, санд ч. */
+  const roomDates: string[] = [];
+  afterAll(async () => {
+    for (const date of roomDates) {
+      await testDb().from("parent_meeting_rooms").delete().eq("meeting_date", date);
+    }
+  });
+
+  it("онлайн сонголт харагдаж, захиалахад Zoom холбоос хаана ч гарахгүй", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    roomDates.push(date);
+    const { user, client } = await yearlyStudent();
+
+    const list = await client.get<Body & { onlineAvailable?: boolean }>("/api/parent-meeting");
+    expect(list.body.onlineAvailable).toBe(true);
+
+    const smsBefore = (await mockCalls("skytel")).filter((c) => c.query.sendto === user.phone).length;
+    const res = await bookOnline(client, date, "10:30–10:50");
+    expect(res.body.meeting.mode).toBe("online");
+    expect(res.text).not.toMatch(ZOOM_URL);
+    expect(JSON.stringify((await client.get("/api/parent-meeting")).body)).not.toMatch(ZOOM_URL);
+
+    const sms = (await mockCalls("skytel")).filter((c) => c.query.sendto === user.phone);
+    expect(sms.length).toBe(smsBefore + 1);
+    const text = String(sms[sms.length - 1].query.message ?? "");
+    expect(text).not.toMatch(ZOOM_URL);
+    expect(text).toContain("gmath.mn");
+  });
+
+  it("'Zoom-оор орох' дарахад хувийн холбоос руу шууд шилжинэ", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    roomDates.push(date);
+    const { client } = await yearlyStudent();
+    await bookOnline(client, date, "11:00–11:20");
+
+    const first = await client.get("/api/parent-meeting/join");
+    expect(first.status).toBe(307);
+    const joinUrl = first.headers.get("location") ?? "";
+    expect(joinUrl).toMatch(/^https:\/\/zoom\.us\/w\/mock\?tk=/);
+
+    // Дахин дарахад ижил холбоос — дахин бүртгэхгүй.
+    const again = await client.get("/api/parent-meeting/join");
+    expect(again.headers.get("location")).toBe(joinUrl);
+  });
+
+  it("нэг өдрийн гэр бүлүүд нэг өрөөнд, тус тусын холбоостой орно", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    roomDates.push(date);
+    const a = await yearlyStudent();
+    const b = await yearlyStudent();
+    await bookOnline(a.client, date, "14:00–14:20");
+    await bookOnline(b.client, date, "14:30–14:50");
+
+    const linkA = (await a.client.get("/api/parent-meeting/join")).headers.get("location");
+    const linkB = (await b.client.get("/api/parent-meeting/join")).headers.get("location");
+    expect(linkA).toBeTruthy();
+    expect(linkB).toBeTruthy();
+    expect(linkA).not.toBe(linkB);
+
+    // Өдөрт яг нэг өрөө, хүлээлгийн өрөөтэй.
+    const { data } = await testDb()
+      .from("parent_meeting_rooms")
+      .select("zoom_meeting_id")
+      .eq("meeting_date", date);
+    expect(data).toHaveLength(1);
+    const roomId = (data as { zoom_meeting_id: string }[])[0].zoom_meeting_id;
+    const room = (await listMockZoomMeetings()).find((m) => m.id === roomId);
+    expect(room?.waitingRoom).toBe(true);
+  });
+
+  it("хоёр гэр бүл яг зэрэг анх дарсан ч нэг л өрөө үүснэ", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    roomDates.push(date);
+    const a = await yearlyStudent();
+    const b = await yearlyStudent();
+    await bookOnline(a.client, date, "15:00–15:20");
+    await bookOnline(b.client, date, "15:30–15:50");
+
+    const [ra, rb] = await Promise.all([
+      a.client.get("/api/parent-meeting/join"),
+      b.client.get("/api/parent-meeting/join"),
+    ]);
+    expect(ra.status).toBe(307);
+    expect(rb.status).toBe(307);
+
+    const { data } = await testDb()
+      .from("parent_meeting_rooms")
+      .select("zoom_meeting_id")
+      .eq("meeting_date", date);
+    expect(data).toHaveLength(1);
+    const roomId = (data as { zoom_meeting_id: string }[])[0].zoom_meeting_id;
+
+    // Гол аюул нь санд хоёр мөр биш — хоёр гэр бүл ӨӨР Zoom өрөөнд
+    // бүртгэгдэх. Тэгвэл багш аль нэгэнд нь хэнийг ч хүлээхгүй сууна.
+    // Бүртгэл бүр санд бичигдсэн нэг өрөөнд очсон байх ёстой.
+    const registrations = (await mockCalls("zoom")).filter(
+      (c) => c.method === "POST" && /\/registrants$/.test(c.path) && c.path.includes(roomId)
+    );
+    const allRegistrations = (await mockCalls("zoom")).filter(
+      (c) =>
+        c.method === "POST" &&
+        /\/registrants$/.test(c.path) &&
+        [a.user.email, b.user.email].includes(String((c.body as { email?: string })?.email))
+    );
+    expect(allRegistrations).toHaveLength(2);
+    expect(registrations).toHaveLength(2);
+
+    // Ялагдсан талын үүсгэсэн илүү өрөө Zoom дээр үлдэх ёсгүй.
+    const sameDay = (await listMockZoomMeetings()).filter((m) => m.topic === meetingRoomTopic(date));
+    expect(sameDay).toHaveLength(1);
+  });
+
+  it("танхимаар захиалсан хүн Zoom-оор орж чадахгүй", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    const { client } = await yearlyStudent();
+    const res = await client.post<{ meeting: { id: string } }>("/api/parent-meeting", {
+      date,
+      slot: "16:00–16:20",
+      mode: "in_person",
+    });
+    track("parent_meetings", res.body.meeting.id);
+
+    const join = await client.get("/api/parent-meeting/join");
+    expect(join.status).toBe(307);
+    expect(join.headers.get("location")).toMatch(/\/profile$/);
+  });
+
+  it("нэвтрээгүй хүн профайл руу буцна", async () => {
+    const join = await anonClient().get("/api/parent-meeting/join");
+    expect(join.headers.get("location")).toMatch(/\/profile$/);
+  });
+
+  it("хэлбэр заагаагүй бол танхимаар, буруу утгыг татгалзана", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    const { client } = await yearlyStudent();
+
+    const bad = await client.post("/api/parent-meeting", { date, slot: "11:30–11:50", mode: "phone" });
+    expect(bad.status).toBe(400);
+
+    const res = await client.post<{ meeting: { id: string; mode: string } }>("/api/parent-meeting", {
+      date,
+      slot: "11:30–11:50",
+    });
+    expect(res.status, res.text).toBe(200);
+    track("parent_meetings", res.body.meeting.id);
+    expect(res.body.meeting.mode).toBe("in_person");
+  });
+
+  it("багш өрөөгөө хостоор нээнэ, нэвтрээгүй хүн чадахгүй", async () => {
+    const owner = await adminClient("full");
+    const date = await openDay(owner);
+    roomDates.push(date);
+
+    const res = await owner.get(`/api/admin/parent-meetings/room?date=${date}`);
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toMatch(/^https:\/\/zoom\.us\/s\//);
+
+    const anon = await anonClient().get(`/api/admin/parent-meetings/room?date=${date}`);
+    expect(anon.headers.get("location")).not.toMatch(/zoom\.us/);
   });
 });
 

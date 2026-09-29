@@ -10,13 +10,17 @@ import {
 } from "@/lib/parentMeetingDb";
 import {
   isBookableDay,
+  isMeetingMode,
   isMeetingSlot,
   meetingDayLabel,
   meetingSlots,
   meetingSmsRecipient,
   meetingSmsText,
+  onlineMeetingSmsText,
+  type MeetingMode,
 } from "@/lib/parentMeeting";
 import { sendSms } from "@/lib/sms/skytel";
+import { zoomConfigured } from "@/lib/zoom/client";
 import { getSessionUser } from "@/lib/session";
 
 /**
@@ -44,6 +48,23 @@ async function openDays() {
   });
 }
 
+/**
+ * Уулзалтыг клиент рүү явуулах хэлбэр.
+ *
+ * Zoom холбоосыг ЭНД ӨГӨХГҮЙ — хичээлтэй адил гэр бүл "Zoom-оор орох"
+ * дарахад /api/parent-meeting/join сервер талд бүртгээд хувийн холбоос руу
+ * нь шилжүүлнэ. Холбоос хуудасны кодонд ч үлдэхгүй.
+ */
+function meetingView(meeting: { id: string; meetingDate: string; slot: string; mode: MeetingMode }) {
+  return {
+    id: meeting.id,
+    meetingDate: meeting.meetingDate,
+    label: meetingDayLabel(meeting.meetingDate),
+    slot: meeting.slot,
+    mode: meeting.mode,
+  };
+}
+
 /** Түвшин тогтоох шалгалт руу чиглүүлэх газар — сургалтын хуудасны таб. */
 function examHref(programId: string): string {
   return `/profile/course/${programId}?tab=assessment`;
@@ -63,19 +84,12 @@ export async function GET() {
     findUpcomingMeeting(user.id).catch(() => undefined),
     placementExamState(user.id).catch(() => "none" as const),
   ]);
-  const meetingView = meeting
-    ? {
-        id: meeting.id,
-        meetingDate: meeting.meetingDate,
-        label: meetingDayLabel(meeting.meetingDate),
-        slot: meeting.slot,
-      }
-    : null;
+  const view = meeting ? meetingView(meeting) : null;
 
   // Шалгалтаа өгөөгүй бол цаг харуулахгүй, шалгалт руу чиглүүлнэ. Гэхдээ
   // дүрэм гарахаас өмнө захиалчихсан цаг байвал хэвээр харуулна — хүний
   // төлөвлөгөөг чимээгүй алга болгох нь чиглүүлэхээс муу.
-  if (examState !== "done" && !meetingView) {
+  if (examState !== "done" && !view) {
     return NextResponse.json({
       ok: true,
       signedIn: true,
@@ -97,7 +111,10 @@ export async function GET() {
     eligible: true,
     examRequired: false,
     days,
-    meeting: meetingView,
+    // Zoom-ын холболт (орчны хувьсагч) тохируулаагүй бол онлайн сонголт
+    // харагдахгүй — өрөө үүсгэж чадахгүй тул.
+    onlineAvailable: zoomConfigured(),
+    meeting: view,
   });
 }
 
@@ -129,6 +146,18 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const date = typeof (body as { date?: unknown }).date === "string" ? (body as { date: string }).date : "";
   const slot = typeof (body as { slot?: unknown }).slot === "string" ? (body as { slot: string }).slot : "";
+  // Хэлбэр заагаагүй бол танхимаар — өмнөх клиентүүд ингэж л захиалдаг байсан.
+  const rawMode = (body as { mode?: unknown }).mode ?? "in_person";
+  if (!isMeetingMode(rawMode)) {
+    return NextResponse.json({ ok: false, error: "Уулзалтын хэлбэр буруу байна" }, { status: 400 });
+  }
+  const mode: MeetingMode = rawMode;
+  if (mode === "online" && !zoomConfigured()) {
+    return NextResponse.json(
+      { ok: false, error: "Онлайн уулзалт одоогоор боломжгүй байна. Танхимаар сонгоно уу." },
+      { status: 400 }
+    );
+  }
 
   // Өдөр нь нээлттэй байх ба цаг нь сүлжээнд байх ёстой. Клиентээс ирсэн
   // "би энэ цагийг сонголоо" гэдэгт найдвал багш байхгүй өдөр захиалагдана.
@@ -140,7 +169,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await bookMeeting({ userId: user.id, meetingDate: date, slot });
+  const result = await bookMeeting({ userId: user.id, meetingDate: date, slot, mode });
   if (!result.ok) {
     return result.reason === "already_booked"
       ? NextResponse.json(
@@ -155,20 +184,15 @@ export async function POST(request: Request) {
   // Эцэг эхэд SMS. Алдаа нь захиалгыг унагахгүй — цаг аль хэдийн
   // баталгаажсан, дэлгэц дээр ч харагдаж байгаа. Логт утас бичихгүй.
   try {
-    await sendSms(meetingSmsRecipient(user), meetingSmsText(date, slot));
+    await sendSms(
+      meetingSmsRecipient(user),
+      mode === "online" ? onlineMeetingSmsText(date, slot) : meetingSmsText(date, slot)
+    );
   } catch (err) {
     console.error("[parent-meeting] sms failed:", result.meeting.id, err);
   }
 
-  return NextResponse.json({
-    ok: true,
-    meeting: {
-      id: result.meeting.id,
-      meetingDate: result.meeting.meetingDate,
-      label: meetingDayLabel(result.meeting.meetingDate),
-      slot: result.meeting.slot,
-    },
-  });
+  return NextResponse.json({ ok: true, meeting: meetingView(result.meeting) });
 }
 
 export async function DELETE(request: Request) {
