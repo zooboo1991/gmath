@@ -201,7 +201,12 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
     try {
       // Anything typed into a card but not saved goes out first — finishing
       // must never be the step that throws a teacher's marking away.
-      for (const solutionId of unsaved) {
+      // Pre-filled scores the teacher left as they were go out too:
+      // finishing is their approval, so those get stamped as reviewed.
+      const drafts = items
+        .filter((item) => item.solution && !item.solution.gradedAt && item.solution.graderScore !== undefined)
+        .map((item) => item.solution!.id);
+      for (const solutionId of new Set([...unsaved, ...drafts])) {
         if (!(await persistMark(solutionId, marks[solutionId] ?? EMPTY_MARK))) {
           return;
         }
@@ -482,6 +487,13 @@ function SolutionCard({
         {item.solution?.gradedAt && (
           <span className="text-[.72rem] font-extrabold text-green bg-green-soft px-2.5 py-1 rounded-full">
             Шалгасан
+          </span>
+        )}
+        {/* A score with no gradedAt was pre-filled outside this page and
+            still waits for the teacher's "Хадгалах". */}
+        {item.solution && !item.solution.gradedAt && item.solution.graderScore !== undefined && (
+          <span className="text-[.72rem] font-extrabold text-gold-ink bg-gold-soft px-2.5 py-1 rounded-full">
+            Урьдчилсан оноо
           </span>
         )}
       </div>
