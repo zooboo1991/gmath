@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { formatDate } from "@/lib/dateFormat";
 import { useState } from "react";
-import type { AssessmentWithUser } from "@/lib/assessment/db";
+import type { AssessmentWithUser, PaperTotal } from "@/lib/assessment/db";
+import { formatPaperScore } from "@/lib/assessment/scoring";
 
 const CARD = "bg-surface border border-line rounded-md shadow-xs px-[18px] py-[16px]";
 
+
+type GradingTab = "queue" | "completed" | "cancelled";
 
 /** Days a submission has been sitting in the queue. */
 function waitingDays(iso: string) {
@@ -18,14 +21,26 @@ export default function GradingQueue({
   queue,
   completed,
   cancelled,
+  totals,
 }: {
   queue: AssessmentWithUser[];
   completed: AssessmentWithUser[];
   /** Voided sittings, kept so a mistaken cancel can be put back. */
   cancelled: AssessmentWithUser[];
+  /** Total per finished paper, keyed by assessment id. */
+  totals: Record<string, PaperTotal>;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"queue" | "completed" | "cancelled">("queue");
+  // The tab lives in the address bar (?tab=completed), so a reload, a shared
+  // link or the browser's Back lands where the admin was. Switching goes
+  // through the history API, which Next keeps useSearchParams in step with,
+  // so it needs no server round trip.
+  const searchParams = useSearchParams();
+  const fromUrl = searchParams.get("tab");
+  const tab: GradingTab = fromUrl === "completed" || fromUrl === "cancelled" ? fromUrl : "queue";
+  const setTab = (next: GradingTab) => {
+    window.history.replaceState(null, "", next === "queue" ? "/admin/grading" : `/admin/grading?tab=${next}`);
+  };
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const rows = tab === "queue" ? queue : tab === "completed" ? completed : cancelled;
@@ -136,9 +151,16 @@ export default function GradingQueue({
                           </button>
                         </>
                       ) : a.status === "completed" ? (
-                        <span className="text-[.72rem] font-extrabold text-green bg-green-soft px-2.5 py-1 rounded-full">
-                          Шалгаж дууссан
-                        </span>
+                        <>
+                          {totals[a.id] && (
+                            <span className="text-[.8rem] font-extrabold text-ink whitespace-nowrap">
+                              {formatPaperScore(totals[a.id].total, totals[a.id].max)}
+                            </span>
+                          )}
+                          <span className="text-[.72rem] font-extrabold text-green bg-green-soft px-2.5 py-1 rounded-full">
+                            Шалгаж дууссан
+                          </span>
+                        </>
                       ) : a.status === "grading" ? (
                         <span className="text-[.72rem] font-extrabold text-blue-strong bg-blue-soft px-2.5 py-1 rounded-full">
                           Шалгаж байна

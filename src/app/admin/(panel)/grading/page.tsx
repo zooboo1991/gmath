@@ -5,6 +5,7 @@ import {
   listAssessmentsForGrading,
   listCancelledAssessments,
   listCompletedAssessments,
+  listPaperTotals,
 } from "@/lib/assessment/db";
 import { isAdmin } from "@/lib/session";
 import { requireAdminSection } from "@/lib/adminAccess";
@@ -27,5 +28,9 @@ export default async function AdminGradingPage() {
     listCancelledAssessments().catch(() => []),
   ]);
 
-  return <GradingQueue queue={queue} completed={completed} cancelled={cancelled} />;
+  // Only finished papers show a total: a paper still in the queue may carry
+  // pre-filled scores the teacher has not looked at yet.
+  const totals = await listPaperTotals(completed).catch(() => ({}));
+
+  return <GradingQueue queue={queue} completed={completed} cancelled={cancelled} totals={totals} />;
 }

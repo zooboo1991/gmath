@@ -3,6 +3,7 @@ import MathText from "@/components/assessment/MathText";
 import PlacementRadar from "@/components/assessment/PlacementRadar";
 import { IconCheckCircle, IconClock, IconTarget } from "@/components/icons";
 import type { AssessmentReport, ReportItem } from "@/lib/assessment/report";
+import { formatPaperScore, splitConclusion } from "@/lib/assessment/scoring";
 import { TRACK_LABELS } from "@/lib/assessment/types";
 import type { Assessment } from "@/lib/assessment/types";
 
@@ -211,7 +212,9 @@ export default function AssessmentResult({
         <h2 className="text-[1.5rem] font-extrabold mt-2.5">Багшийн дүгнэлт гарлаа</h2>
         {report && report.scoredCount > 0 && (
           <div className="flex items-baseline gap-3 mt-3 flex-wrap">
-            <b className="text-[2.6rem] font-extrabold leading-none">{report.totalScore}</b>
+            <b className="text-[2.6rem] font-extrabold leading-none">
+              {formatPaperScore(report.totalScore, report.maxScore)}
+            </b>
             <span className="text-[1.05rem] font-extrabold text-navy-ink-2">оноо</span>
           </div>
         )}
@@ -225,10 +228,24 @@ export default function AssessmentResult({
       {assessment.teacherComment && (
         <div className={CARD}>
           <h2 className="text-[1.05rem] font-extrabold mb-2.5">Эцсийн дүгнэлт</h2>
-          {/* The teacher types plain text; keep their line breaks. */}
-          <p className="text-ink-2 font-medium leading-[1.75] whitespace-pre-line">
-            {assessment.teacherComment}
-          </p>
+          {/* The teacher types plain text; keep their line breaks, and show
+              the Чадвар / Үнэлгээ / Сайжруулах зүйлс headings as titles. */}
+          <div className="flex flex-col gap-3.5">
+            {/* A heading left with nothing under it is dropped rather than
+                shown to the child as an empty title. */}
+            {splitConclusion(assessment.teacherComment)
+              .filter((block) => block.body)
+              .map((block, i) => (
+                <div key={i}>
+                  {block.heading && (
+                    <h3 className="text-[.8rem] font-extrabold tracking-[.06em] uppercase text-blue-strong mb-1">
+                      {block.heading}
+                    </h3>
+                  )}
+                  <p className="text-ink-2 font-medium leading-[1.75] whitespace-pre-line">{block.body}</p>
+                </div>
+              ))}
+          </div>
         </div>
       )}
 

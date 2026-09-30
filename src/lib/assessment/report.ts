@@ -1,5 +1,6 @@
 import { getPickingState, listProblems, listSolutions } from "./db";
 import { SIGNED_URL_TTL_SECONDS } from "./config";
+import { maxPaperScore } from "./scoring";
 import { toPublicProblem, type Assessment, type PublicProblem } from "./types";
 import { createSignedUrl, GRADED_SHEETS_BUCKET, SOLUTIONS_BUCKET } from "../storage";
 
@@ -20,6 +21,8 @@ export type AssessmentReport = {
   /** Points the teacher gave, and how many problems carry a score. */
   totalScore: number;
   scoredCount: number;
+  /** What the whole paper could earn — every problem on it, skipped ones too. */
+  maxScore: number;
 };
 
 /**
@@ -72,5 +75,9 @@ export async function buildAssessmentReport(assessment: Assessment): Promise<Ass
     gradedSheetUrls,
     totalScore: scored.reduce((sum, i) => sum + (i.score ?? 0), 0),
     scoredCount: scored.length,
+    maxScore: maxPaperScore(
+      state.shown.map((entry) => entry.action),
+      Boolean(assessment.examId)
+    ),
   };
 }

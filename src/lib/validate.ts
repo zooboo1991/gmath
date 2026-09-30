@@ -35,6 +35,8 @@ export const MAX_LEN = {
   problemBody: 4000,
   problemAnswerKey: 2000,
   problemSolution: 10000,
+  // Чадвар / Үнэлгээ / Сайжруулах зүйлс — three paragraphs, not an excerpt.
+  teacherComment: 3000,
   levelName: 80,
   levelText: 2000,
   settingValue: 200,

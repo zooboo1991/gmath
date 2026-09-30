@@ -1,6 +1,6 @@
 import { getPaymentProvider } from "../payment";
 import { getSupabase } from "../supabase";
-import { fetchAllRows } from "../fetchAll";
+import { chunk, fetchAllRows } from "../fetchAll";
 import { publicUserFromJoin, type PublicUser } from "../db";
 import {
   DEFAULT_ASSESSMENT_FEE,
@@ -11,6 +11,7 @@ import {
   QUIZ_QUESTIONS_PER_TEST,
 } from "./config";
 import { estimateLevel } from "./levelEstimator";
+import { maxPaperScore } from "./scoring";
 import { isProblemCategory } from "./types";
 import type {
   Assessment,
@@ -652,6 +653,53 @@ export async function listCompletedAssessments(): Promise<AssessmentWithUser[]> 
     const { users, ...rest } = row;
     return { ...assessmentFromRow(rest), user: publicUserFromJoin(users) };
   });
+}
+
+export type PaperTotal = { total: number; max: number };
+
+/**
+ * Points given and points possible, per assessment, for the grading lists.
+ * Two reads for the whole list rather than one per row; both are paged, since
+ * a list of finished papers times ten problems passes 1000 rows quickly.
+ * Assessments with no paper (nothing handed out) are left out.
+ */
+export async function listPaperTotals(
+  assessments: Pick<Assessment, "id" | "examId">[]
+): Promise<Record<string, PaperTotal>> {
+  const fromExam = new Map(assessments.map((a) => [a.id, Boolean(a.examId)]));
+  const totals: Record<string, PaperTotal> = {};
+  for (const ids of chunk(assessments.map((a) => a.id))) {
+    const [papers, solutions] = await Promise.all([
+      fetchAllRows<{ assessment_id: string; action: string }>(() =>
+        getSupabase()
+          .from("assessment_problems")
+          .select("id, assessment_id, action")
+          .in("assessment_id", ids)
+          .order("id")
+      ),
+      fetchAllRows<{ assessment_id: string; grader_score: number | string | null }>(() =>
+        getSupabase()
+          .from("solutions")
+          .select("id, assessment_id, grader_score")
+          .in("assessment_id", ids)
+          .order("id")
+      ),
+    ]);
+    const actions = new Map<string, string[]>();
+    for (const row of papers) {
+      actions.set(row.assessment_id, [...(actions.get(row.assessment_id) ?? []), row.action]);
+    }
+    for (const [id, list] of actions) {
+      const max = maxPaperScore(list, fromExam.get(id) ?? false);
+      if (max > 0) totals[id] = { total: 0, max };
+    }
+    for (const row of solutions) {
+      const entry = totals[row.assessment_id];
+      // Postgres numeric comes back as a string through PostgREST.
+      if (entry && row.grader_score !== null) entry.total += Number(row.grader_score);
+    }
+  }
+  return totals;
 }
 
 // ---------------------------------------------------------------------------

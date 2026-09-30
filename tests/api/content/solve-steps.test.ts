@@ -226,6 +226,8 @@ describe("the paper, step by step", () => {
     // React splits adjacent text nodes with a comment marker in server HTML,
     // so the score and its unit are not literally next to each other.
     expect(page.text).toMatch(/7(<!-- -->)?\s*оноо/);
+    // Out of the whole paper: the skipped problem still counts, as a zero.
+    expect(page.text).toContain("7 / 20");
     expect(page.text).toContain("Бодлого бүрийн үнэлгээ");
     expect(page.text).toContain("Бодож чадсангүй");
   });
@@ -276,6 +278,124 @@ describe("the paper, step by step", () => {
     expect(page.text).not.toContain(SOLUTION_MARKER);
     // Walks the whole paper, solving through marking to the report — about
     // fifteen round trips, which outlasts the default 30s on the test project.
+  }, 90_000);
+
+  it("adds the paper up and shows the conclusion in its three parts", async () => {
+    const admin = await adminClient("full");
+    const { client, assessmentId, problemIds } = await readyToSolve();
+
+    for (const problemId of problemIds) await uploadPhoto(client, assessmentId, problemId);
+    await client.post(`/api/assessment/${assessmentId}/submit`);
+
+    const { data: rows } = await testDb()
+      .from("solutions")
+      .select("id, problem_id")
+      .eq("assessment_id", assessmentId);
+    const solutionFor = (problemId: string) =>
+      (rows as { id: string; problem_id: string }[]).find((r) => r.problem_id === problemId)!.id;
+    await admin.put(`/api/admin/grading/${assessmentId}/score`, {
+      solutionId: solutionFor(problemIds[0]),
+      graderScore: "10",
+      graderComment: "",
+    });
+    await admin.put(`/api/admin/grading/${assessmentId}/score`, {
+      solutionId: solutionFor(problemIds[1]),
+      graderScore: "5.5",
+      graderComment: "",
+    });
+
+    // The headings alone are as empty as a blank box.
+    const bare = await admin.put(`/api/admin/grading/${assessmentId}/complete`, {
+      teacherComment: "Чадвар\n\nҮнэлгээ\n\nСайжруулах зүйлс\n",
+    });
+    expect(bare.status).toBe(400);
+
+    const tooLong = await admin.put(`/api/admin/grading/${assessmentId}/complete`, {
+      teacherComment: "Чадвар\n" + "а".repeat(3001),
+    });
+    expect(tooLong.status).toBe(400);
+
+    // Three real paragraphs run well past the old 500-character cap.
+    const filler = " Бодолтынхоо алхам бүрийг тайлбарлан бичсэн нь сайн байна.".repeat(8);
+    const conclusion =
+      `Чадвар\nТэгшитгэл зохиох чадвар сайн.${filler}\n\n` +
+      `Үнэлгээ\nГүйцэтгэл дундаас дээгүүр.${filler}\n\n` +
+      "Сайжруулах зүйлс\n• Хариугаа нөхцөлд орлуулж шалгах\n• Инвариантын бодлого дээр дасгал хийх";
+    expect(conclusion.length).toBeGreaterThan(500);
+    const completed = await admin.put(`/api/admin/grading/${assessmentId}/complete`, {
+      teacherComment: conclusion,
+    });
+    expect(completed.status, completed.text).toBe(200);
+
+    const page = await client.get(`/profile/assessment?a=${assessmentId}`);
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("15.5 / 20");
+    for (const heading of ["Чадвар", "Үнэлгээ", "Сайжруулах зүйлс"]) {
+      expect(page.text).toMatch(new RegExp(`<h3[^>]*>${heading}</h3>`));
+    }
+    expect(page.text).toContain("Тэгшитгэл зохиох чадвар сайн.");
+    expect(page.text).toContain("• Инвариантын бодлого дээр дасгал хийх");
+
+    // The finished list shows the same total.
+    const list = await admin.get("/admin/grading?tab=completed");
+    expect(list.status).toBe(200);
+    expect(list.text).toContain("15.5 / 20");
+  }, 90_000);
+
+  it("counts only the problems a child chose on a paper from the old adaptive walk", async () => {
+    // Before exams were composed, the walk showed card after card and the
+    // child passed over most ("too_easy", "dont_know" = "show me another").
+    // Only the ones they chose to solve were ever on their paper.
+    const problemIds: string[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      const { data } = await testDb()
+        .from("problems")
+        .insert({ category: "C", topic: "Хуучин алхам", body_latex: `${i}+${i}`, active: true })
+        .select("id")
+        .single();
+      track("problems", (data as { id: string }).id);
+      problemIds.push((data as { id: string }).id);
+    }
+    const user = await createTestUser({ grade: "6-р анги" });
+    const { data: sitting } = await testDb()
+      .from("assessments")
+      .insert({
+        user_id: user.id,
+        track: "olympiad",
+        status: "completed",
+        category: "C",
+        // Typed loosely: a heading with its text after a colon, and a
+        // section left empty.
+        teacher_comment: "чадвар: Тэгшитгэл сайн зохиодог.\nҮнэлгээ\n\nСайжруулах зүйлс\n• Дасгал хийх",
+      })
+      .select("id")
+      .single();
+    const assessmentId = (sitting as { id: string }).id;
+    track("assessments", assessmentId);
+    const actions = ["too_easy", "too_easy", "dont_know", "solving", "solving"];
+    await testDb()
+      .from("assessment_problems")
+      .insert(actions.map((action, i) => ({ assessment_id: assessmentId, problem_id: problemIds[i], action, shown_order: i })));
+    await testDb().from("solutions").insert([
+      { assessment_id: assessmentId, problem_id: problemIds[3], grader_score: 10, graded_at: new Date().toISOString() },
+      { assessment_id: assessmentId, problem_id: problemIds[4], grader_score: 5, graded_at: new Date().toISOString() },
+    ]);
+
+    const client = await signedInClient(user.phone, user.password);
+    const page = await client.get(`/profile/assessment?a=${assessmentId}`);
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("15 / 20");
+    expect(page.text).toMatch(/<h3[^>]*>Чадвар<\/h3><p[^>]*>Тэгшитгэл сайн зохиодог\.<\/p>/);
+    expect(page.text).not.toMatch(/<h3[^>]*>Үнэлгээ<\/h3>/);
+    expect(page.text).toMatch(/<h3[^>]*>Сайжруулах зүйлс<\/h3>/);
+
+    const admin = await adminClient("full");
+    const grading = await admin.get(`/admin/grading/${assessmentId}`);
+    expect(grading.status).toBe(200);
+    expect(grading.text).toContain("15 / 20");
+    const list = await admin.get("/admin/grading?tab=completed");
+    expect(list.text).toContain("15 / 20");
+    expect(list.text).not.toContain("15 / 50");
   }, 90_000);
 
   it("will not close marking while a handed-in problem has no score", async () => {

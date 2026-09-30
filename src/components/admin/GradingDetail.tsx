@@ -2,10 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import MathText from "@/components/assessment/MathText";
 import type { GradingDetail as Detail } from "@/lib/assessment/gradingDetail";
 import { INPUT_CLASS } from "@/components/admin/panels/shared";
+import {
+  CONCLUSION_TEMPLATE,
+  formatPaperScore,
+  maxPaperScore,
+  parsePoints,
+  splitConclusion,
+} from "@/lib/assessment/scoring";
+import { MAX_LEN } from "@/lib/validate";
 
 const CARD = "bg-surface border border-line rounded-md shadow-xs px-[20px] py-[18px]";
 
@@ -36,6 +44,7 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
   const [items, setItems] = useState(detail.items);
   const [sheets, setSheets] = useState(detail.gradedSheets);
   const [teacherComment, setTeacherComment] = useState(detail.assessment.teacherComment ?? "");
+  const conclusionRef = useRef<HTMLTextAreaElement>(null);
   // Every card's score and note live here rather than inside the card, so
   // "Дуусгах" can write out anything the teacher typed but did not press
   // save on. They used to be lost without a word.
@@ -101,6 +110,18 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
       item.solution &&
       item.imageUrls.length > 0 &&
       !(marks[item.solution.id]?.score ?? "").trim()
+  );
+
+  // The running total as the teacher types, over the whole paper: problems the
+  // child gave up on are on it too and simply earn nothing. Each score is taken
+  // the way the route will store it, so this matches the child's report.
+  const maxScore = maxPaperScore(
+    [...items.map(() => "solving"), ...detail.skipped.map((s) => s.action)],
+    Boolean(detail.assessment.examId)
+  );
+  const totalScore = items.reduce(
+    (sum, item) => sum + ((item.solution && parsePoints(marks[item.solution.id]?.score ?? "")) || 0),
+    0
   );
 
   /** Cards holding something the server has not been told about yet. */
@@ -195,6 +216,14 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
       }
       return;
     }
+    // Checked before the confirm: finishing cannot be undone, so it must not
+    // be the step that says the conclusion was empty.
+    const conclusion = teacherComment.trim();
+    if (!conclusion || splitConclusion(conclusion).every((block) => !block.body)) {
+      setError("Багшийн дүгнэлтийг бөглөнө үү — гарчиг бүрийн доор бичнэ үү.");
+      document.getElementById("grading-conclusion")?.focus();
+      return;
+    }
     if (!confirm("Үнэлгээг дуусгах уу? Дараа нь оноо засах боломжгүй болно.")) return;
     setCompleting(true);
     setError(null);
@@ -237,7 +266,7 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
       <header className="sticky top-0 z-10 bg-surface border-b border-line">
         <div className="wrap flex items-center justify-between h-[68px] gap-3">
           <Link
-            href="/admin/grading"
+            href={done ? "/admin/grading?tab=completed" : "/admin/grading"}
             className="inline-flex items-center gap-2 font-extrabold text-ink-2 hover:text-ink text-[.92rem] shrink-0"
           >
             ← Буцах
@@ -252,13 +281,29 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
           ) : (
             <b className="font-extrabold text-[1rem] truncate">Хэрэглэгч устсан</b>
           )}
-          {done ? (
-            <span className="text-[.75rem] font-extrabold text-green bg-green-soft px-3 py-1.5 rounded-full shrink-0">
-              Дууссан
-            </span>
-          ) : (
-            <span className="w-[70px]" />
-          )}
+          {/* On a phone the name needs the room: a finished paper says so by the
+              total turning green, and the word itself shows from sm up. */}
+          <div className="flex items-center gap-2 shrink-0">
+            {maxScore > 0 && (
+              <span
+                className={`text-[.8rem] font-extrabold px-3 py-1.5 rounded-full whitespace-nowrap ${
+                  done ? "text-green bg-green-soft" : "text-blue-strong bg-blue-soft"
+                }`}
+                title={done ? "Нийт оноо · Дууссан" : "Нийт оноо"}
+              >
+                {formatPaperScore(totalScore, maxScore)}
+              </span>
+            )}
+            {done && (
+              <span
+                className={`text-[.75rem] font-extrabold text-green bg-green-soft px-3 py-1.5 rounded-full ${
+                  maxScore > 0 ? "hidden sm:inline-block" : ""
+                }`}
+              >
+                Дууссан
+              </span>
+            )}
+          </div>
         </div>
       </header>
 
@@ -332,17 +377,63 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
             Энэ хэсэг сурагчийн профайл дээр шууд харагдана.
           </p>
 
-          <label className="flex flex-col gap-1.5 mb-3.5">
-            <span className="text-[.8rem] font-extrabold text-ink-3">Дүгнэлт, зөвлөмж</span>
+          {maxScore > 0 && (
+            <div className="flex items-baseline justify-between gap-3 flex-wrap mb-3.5 pb-3.5 border-b border-line">
+              <span className="text-[.85rem] font-extrabold text-ink-3">Нийт оноо</span>
+              <span className="text-[1.25rem] font-extrabold">
+                {formatPaperScore(totalScore, maxScore)}
+                {missing.length > 0 && (
+                  <span className="text-[.8rem] font-bold text-ink-3 ml-2">
+                    · {missing.length} бодлогод оноо тавиагүй
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {/* A div, not a label: a label wrapping the button would hand its
+              clicks to the button instead of the text box. */}
+          <div className="flex flex-col gap-1.5 mb-3.5">
+            <span className="flex items-center justify-between gap-2 flex-wrap">
+              <label htmlFor="grading-conclusion" className="text-[.8rem] font-extrabold text-ink-3">
+                Дүгнэлт — чадвар, үнэлгээ, сайжруулах зүйлс
+              </label>
+              {!done && !teacherComment.trim() && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTeacherComment(CONCLUSION_TEMPLATE);
+                    // Land on the line under "Чадвар", ready to type.
+                    requestAnimationFrame(() => {
+                      const box = conclusionRef.current;
+                      if (!box) return;
+                      const at = CONCLUSION_TEMPLATE.indexOf("\n") + 1;
+                      box.focus();
+                      box.setSelectionRange(at, at);
+                    });
+                  }}
+                  className="text-[.78rem] font-extrabold text-blue-strong bg-blue-soft px-3 py-1 rounded-full"
+                >
+                  Гарчиг оруулах
+                </button>
+              )}
+            </span>
             <textarea
+              id="grading-conclusion"
+              ref={conclusionRef}
               value={teacherComment}
               onChange={(e) => setTeacherComment(e.target.value)}
-              rows={5}
+              rows={12}
+              maxLength={MAX_LEN.teacherComment}
               disabled={done}
-              placeholder="Хүчтэй тал, сул тал, юун дээр анхаарах вэ…"
+              placeholder={
+                "Чадвар\nЯмар төрлийн бодлогыг сайн бодсон бэ? Сэтгэлгээ ямар байна вэ?\n\n" +
+                "Үнэлгээ\nНийт гүйцэтгэл ямар байна, оноо хаана алдагдсан бэ?\n\n" +
+                "Сайжруулах зүйлс\n• Юун дээр дасгал хийх вэ?"
+              }
               className={`${INPUT_CLASS} resize-y disabled:opacity-60`}
             />
-          </label>
+          </div>
 
           <div className="mb-4">
             <span className="text-[.8rem] font-extrabold text-ink-3 block mb-2">

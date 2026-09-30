@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { findAssessment, findLevel, listSolutions, updateAssessment } from "@/lib/assessment/db";
+import { splitConclusion } from "@/lib/assessment/scoring";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 import { REFUSED, requireCapability } from "@/lib/adminAccess";
 
@@ -28,10 +29,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       : undefined;
 
   const teacherComment = typeof data.teacherComment === "string" ? data.teacherComment.trim() : "";
-  if (!teacherComment) {
+  // Only the section headings ("Бүтэц оруулах" and nothing typed under them)
+  // is as empty as a blank box.
+  if (!teacherComment || splitConclusion(teacherComment).every((block) => !block.body)) {
     return NextResponse.json({ ok: false, error: "Багшийн дүгнэлтийг бөглөнө үү" }, { status: 400 });
   }
-  if (isTooLong(teacherComment, MAX_LEN.articleExcerpt)) {
+  if (isTooLong(teacherComment, MAX_LEN.teacherComment)) {
     return NextResponse.json({ ok: false, error: "Дүгнэлт хэт урт байна" }, { status: 400 });
   }
 
