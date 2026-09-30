@@ -464,6 +464,10 @@ function SolutionCard({
   onSave: (solutionId: string) => void;
 }) {
   const { score, comment } = mark;
+  // Collapsed by default so a long worked solution doesn't push the score
+  // inputs off screen on every card.
+  const [showReference, setShowReference] = useState(false);
+  const reference = item.problem?.solutionLatex;
 
   return (
     <div
@@ -509,6 +513,23 @@ function SolutionCard({
         <p className="text-[.85rem] text-ink-3 font-semibold mt-2.5">
           Зөв хариу: <span className="font-mono text-ink-2">{item.problem.answerKey}</span>
         </p>
+      )}
+      {reference && (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setShowReference((v) => !v)}
+            aria-expanded={showReference}
+            className="text-[.8rem] font-extrabold text-blue-strong bg-blue-soft px-3.5 py-1.5 rounded-full"
+          >
+            {showReference ? "Жишиг бодолт нуух" : "Жишиг бодолт харах"}
+          </button>
+          {showReference && (
+            <div className="mt-2.5 rounded-sm border border-line bg-bg-soft px-4 py-3">
+              <MathText source={reference} className="text-[.9rem] overflow-x-auto" />
+            </div>
+          )}
+        </div>
       )}
 
       <div className="mt-4 pt-4 border-t border-line">

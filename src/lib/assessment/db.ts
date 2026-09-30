@@ -64,6 +64,7 @@ export type ProblemRow = {
   body_latex: string | null;
   image_url: string | null;
   answer_key: string | null;
+  solution_latex?: string | null;
   active: boolean;
   created_at: string;
 };
@@ -151,6 +152,7 @@ export function problemFromRow(row: ProblemRow): Problem {
     bodyLatex: row.body_latex ?? undefined,
     imageUrl: row.image_url ?? undefined,
     answerKey: row.answer_key ?? undefined,
+    solutionLatex: row.solution_latex || undefined,
     category: isProblemCategory(row.category) ? row.category : undefined,
     active: row.active,
     createdAt: row.created_at,
@@ -394,6 +396,7 @@ export async function createProblem(input: ProblemInput): Promise<Problem> {
       body_latex: input.bodyLatex || null,
       image_url: input.imageUrl || null,
       answer_key: input.answerKey ?? null,
+      solution_latex: input.solutionLatex || null,
       active: input.active,
     })
     .select("*")
@@ -412,6 +415,7 @@ export async function updateProblem(
   if (input.bodyLatex !== undefined) patch.body_latex = input.bodyLatex || null;
   if (input.imageUrl !== undefined) patch.image_url = input.imageUrl || null;
   if (input.answerKey !== undefined) patch.answer_key = input.answerKey || null;
+  if (input.solutionLatex !== undefined) patch.solution_latex = input.solutionLatex || null;
   if (input.active !== undefined) patch.active = input.active;
 
   const { data, error } = await getSupabase()

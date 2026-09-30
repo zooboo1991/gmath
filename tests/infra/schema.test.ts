@@ -60,6 +60,9 @@ const TABLES = [
   "yearly_programs",
 ];
 
+/** Columns added with `alter table` after their table first shipped. */
+const COLUMNS: [string, string][] = [["problems", "solution_latex"]];
+
 const BUCKETS = ["articles", "problems", "solutions", "graded-sheets", "lesson-notes", "contracts"];
 
 describe("test database schema", () => {
@@ -71,6 +74,18 @@ describe("test database schema", () => {
       // гарахгүй өнгөрч, энэ тест хэзээ ч юу ч барихгүй болно.
       const { error } = await testDb().from(table).select("*").limit(1);
       if (error) missing.push(`${table} (${error.message})`);
+    }
+    expect(missing, "supabase/schema.sql-ыг тестийн төслийн SQL Editor дээр ажиллуулна уу").toEqual([]);
+  });
+
+  it("has the columns added to existing tables", async () => {
+    // A column added later with `alter table` is missed when only part of
+    // schema.sql is run; without this the failure shows up as PGRST204
+    // scattered across unrelated tests.
+    const missing: string[] = [];
+    for (const [table, column] of COLUMNS) {
+      const { error } = await testDb().from(table).select(column).limit(1);
+      if (error) missing.push(`${table}.${column} (${error.message})`);
     }
     expect(missing, "supabase/schema.sql-ыг тестийн төслийн SQL Editor дээр ажиллуулна уу").toEqual([]);
   });

@@ -209,7 +209,8 @@ on conflict (id) do nothing;
 -- Problem bank. A problem is written as LaTeX (body_latex, rendered with
 -- KaTeX), or supplied as a scanned image, or both — geometry problems
 -- usually need a figure alongside the text. Images live in the public
--- "problems" bucket; answer_key is never sent to a student.
+-- "problems" bucket; answer_key (and solution_latex, added below) is never
+-- sent to a student.
 create table if not exists problems (
   id uuid primary key default gen_random_uuid(),
   level smallint not null check (level between 1 and 10),
@@ -1547,3 +1548,12 @@ grant all on table public.parent_meeting_rooms to service_role;
 alter table parent_meetings
   add column if not exists zoom_registrant_id text,
   add column if not exists zoom_join_url text;
+
+-- ---------------------------------------------------------------------------
+-- Бодлогын жишиг бодолт (багшид)
+-- ---------------------------------------------------------------------------
+-- The worked solution a teacher marks against, shown under each problem on the
+-- grading page. Mongolian prose with `$...$` math like body_latex. Admin and
+-- teacher only: like answer_key it is never sent to a student — student paths
+-- go through toPublicProblem, which leaves it out.
+alter table problems add column if not exists solution_latex text;

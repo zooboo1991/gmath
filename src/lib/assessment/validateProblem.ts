@@ -45,6 +45,11 @@ export function validateProblemInput(
     if (isTooLong(answer, MAX_LEN.problemAnswerKey)) return { error: "Хариу хэт урт байна" };
     value.answerKey = answer;
   }
+  if (!partial || has("solutionLatex")) {
+    const solution = str(data.solutionLatex);
+    if (isTooLong(solution, MAX_LEN.problemSolution)) return { error: "Жишиг бодолт хэт урт байна" };
+    value.solutionLatex = solution;
+  }
   if (!partial || has("active")) {
     value.active = data.active !== false;
   }

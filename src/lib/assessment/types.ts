@@ -102,12 +102,24 @@ export type Problem = {
   imageUrl?: string;
   /** Admin-only. Never include this in a response sent to a student. */
   answerKey?: string;
+  /**
+   * The worked reference solution the teacher marks against — same format as
+   * bodyLatex. Admin/teacher-only, like answerKey. Not to be confused with a
+   * `Solution`, which is the student's own uploaded work.
+   */
+  solutionLatex?: string;
   active: boolean;
   createdAt: string;
 };
 
-/** The shape a student is allowed to see — answerKey deliberately absent. */
-export type PublicProblem = Omit<Problem, "answerKey" | "active" | "createdAt">;
+/**
+ * The shape a student is allowed to see. The `never` fields make handing a
+ * full Problem to a typed student value a compile error instead of a leak.
+ */
+export type PublicProblem = Omit<Problem, "answerKey" | "solutionLatex" | "active" | "createdAt"> & {
+  answerKey?: never;
+  solutionLatex?: never;
+};
 
 export function toPublicProblem(problem: Problem): PublicProblem {
   return {

@@ -12,7 +12,7 @@ import {
   SIGNED_URL_TTL_SECONDS,
 } from "@/lib/assessment/config";
 import { requireOwnAssessment, requireStatus } from "@/lib/assessment/guard";
-import { toPublicProblem } from "@/lib/assessment/types";
+import { toPublicProblem, type PublicProblem } from "@/lib/assessment/types";
 import { createSignedUrl, SOLUTIONS_BUCKET, uploadPrivateImage } from "@/lib/storage";
 
 /**
@@ -36,7 +36,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // `chosen` keeps its old shape for the submit check; the stepper reads
   // `steps`, which includes the ones marked "бодож чадсангүй" so it can show
   // them as done rather than silently dropping a step.
-  const describe = async (entry: { problemId: string; action: string }) => {
+  // Typed so that passing a full Problem (answerKey, solutionLatex) instead
+  // of toPublicProblem(problem) fails to compile rather than reaching a child.
+  const describe = async (entry: {
+    problemId: string;
+    action: string;
+  }): Promise<{ problem: PublicProblem | null; imageUrls: string[]; skipped: boolean }> => {
     const problem = allProblems.find((p) => p.id === entry.problemId);
     const solution = solutions.find((s) => s.problemId === entry.problemId);
     const urls = await Promise.all(

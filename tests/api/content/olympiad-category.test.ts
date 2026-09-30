@@ -180,3 +180,69 @@ describe("entering problems by category", () => {
     expect(updated.body.problem.category).toBe("C");
   });
 });
+
+describe("the reference solution", () => {
+  type Saved = { problem: { id: string; solutionLatex?: string } };
+
+  it("is stored, kept on edits that leave it out, and cleared when emptied", async () => {
+    const admin = await adminClient("full");
+    const solution = "$2+2=4$ тул\nХариу: 4";
+
+    const created = await admin.post<Saved>("/api/admin/problems", {
+      category: "C",
+      topic: "Бодолтын тест",
+      bodyLatex: "$2+2$ хэд вэ?",
+      solutionLatex: solution,
+    });
+    expect(created.status, created.text).toBe(200);
+    const id = created.body.problem.id;
+    track("problems", id);
+    expect(created.body.problem.solutionLatex).toBe(solution);
+
+    // Archiving sends only `active` — the solution must survive it.
+    const archived = await admin.put<Saved>(`/api/admin/problems/${id}`, { active: false });
+    expect(archived.status, archived.text).toBe(200);
+    expect(archived.body.problem.solutionLatex).toBe(solution);
+
+    // The edit form sends every field back; the solution comes along unchanged.
+    const edited = await admin.put<Saved>(`/api/admin/problems/${id}`, {
+      category: "C",
+      topic: "Бодолтын тест",
+      bodyLatex: "$2+2$ хэд вэ?",
+      imageUrl: "",
+      answerKey: "4",
+      solutionLatex: solution,
+      active: true,
+    });
+    expect(edited.status, edited.text).toBe(200);
+    expect(edited.body.problem.solutionLatex).toBe(solution);
+
+    const cleared = await admin.put<Saved>(`/api/admin/problems/${id}`, { solutionLatex: "  " });
+    expect(cleared.status, cleared.text).toBe(200);
+    expect(cleared.body.problem.solutionLatex).toBeUndefined();
+    const { data } = await testDb().from("problems").select("solution_latex").eq("id", id).single();
+    expect((data as { solution_latex: string | null }).solution_latex).toBeNull();
+  });
+
+  it("refuses one that is too long", async () => {
+    const admin = await adminClient("full");
+    const res = await admin.post<{ error: string }>("/api/admin/problems", {
+      category: "C",
+      topic: "Урт бодолт",
+      bodyLatex: "1+1=?",
+      solutionLatex: "x".repeat(10001),
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Жишиг бодолт");
+  });
+
+  it("does not count as the problem's content", async () => {
+    const admin = await adminClient("full");
+    const res = await admin.post("/api/admin/problems", {
+      category: "C",
+      topic: "Зөвхөн бодолт",
+      solutionLatex: "Бодолт байгаа ч бодлого алга",
+    });
+    expect(res.status).toBe(400);
+  });
+});

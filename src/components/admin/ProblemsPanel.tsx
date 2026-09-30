@@ -16,6 +16,7 @@ const emptyForm = {
   bodyLatex: "",
   imageUrl: "",
   answerKey: "",
+  solutionLatex: "",
   active: true,
 };
 
@@ -28,6 +29,9 @@ function toForm(problem: Problem): FormState {
     bodyLatex: problem.bodyLatex ?? "",
     imageUrl: problem.imageUrl ?? "",
     answerKey: problem.answerKey ?? "",
+    // save() PUTs the whole form, so leaving this out would wipe the stored
+    // solution on every edit.
+    solutionLatex: problem.solutionLatex ?? "",
     active: problem.active,
   };
 }
@@ -308,7 +312,7 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
 
             <label className="flex flex-col gap-1.5 mt-4">
               <span className="text-[.8rem] font-extrabold text-ink-3">
-                Хариу (зөвхөн админд харагдана)
+                Хариу (зөвхөн багш, админд харагдана)
               </span>
               <textarea
                 value={form.answerKey}
@@ -317,6 +321,34 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
                 className={`${INPUT_CLASS} font-mono text-[.82rem] resize-y`}
               />
             </label>
+
+            <div className="grid grid-cols-1 nav:grid-cols-2 gap-4 mt-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[.8rem] font-extrabold text-ink-3">
+                  Жишиг бодолт (зөвхөн багш, админд харагдана)
+                </span>
+                <textarea
+                  value={form.solutionLatex}
+                  onChange={(e) => setField("solutionLatex", e.target.value)}
+                  rows={9}
+                  placeholder={"Алхам бүрийг шинэ мөрөнд бичнэ.\nХариу: ..."}
+                  className={`${INPUT_CLASS} font-mono text-[.82rem] resize-y`}
+                />
+              </label>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[.8rem] font-extrabold text-ink-3">Урьдчилан харах</span>
+                <div className="min-h-[214px] rounded-xs border-[1.5px] border-line-2 bg-surface px-4 py-3 overflow-x-auto">
+                  {form.solutionLatex.trim() ? (
+                    <MathText source={form.solutionLatex} />
+                  ) : (
+                    <p className="text-ink-3 font-semibold text-[.85rem]">
+                      Бодолт бичихэд энд шууд харагдана.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
 
             {error && <p className="text-red-soft font-semibold text-[.85rem] mt-3">{error}</p>}
 
@@ -407,6 +439,13 @@ export default function ProblemsPanel({ initialProblems }: { initialProblems: Pr
                     )}
                     {p.topic && (
                       <span className="text-[.8rem] font-bold text-ink-3">{p.topic}</span>
+                    )}
+                    {/* A badge, not the text: the list already renders KaTeX for
+                        every problem and a worked solution would multiply it. */}
+                    {p.solutionLatex && (
+                      <span className="text-[.72rem] font-extrabold text-green bg-green-soft px-2.5 py-1 rounded-full">
+                        Жишиг бодолттой
+                      </span>
                     )}
                     {!p.active && (
                       <span className="text-[.72rem] font-extrabold text-ink-3 bg-surface-2 px-2.5 py-1 rounded-full">

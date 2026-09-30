@@ -24,6 +24,13 @@ const JPEG = Buffer.from(
 
 type Step = { problem: { id: string } | null; imageUrls: string[]; skipped: boolean };
 
+/**
+ * Seeded on every problem below. Admin-only: a child must never receive either
+ * of them, while solving or on the marked report afterwards.
+ */
+const ANSWER_MARKER = "answer-key-only-for-admins";
+const SOLUTION_MARKER = "reference-solution-only-for-teachers";
+
 /** An invited child, paid, with a two-problem paper in front of them. */
 async function readyToSolve(): Promise<{
   client: TestClient;
@@ -39,7 +46,14 @@ async function readyToSolve(): Promise<{
   for (const body of ["1+1", "2+2"]) {
     const { data } = await testDb()
       .from("problems")
-      .insert({ category: "C", topic: "Алхмын тест", body_latex: body, active: true })
+      .insert({
+        category: "C",
+        topic: "Алхмын тест",
+        body_latex: body,
+        answer_key: ANSWER_MARKER,
+        solution_latex: SOLUTION_MARKER,
+        active: true,
+      })
       .select("id")
       .single();
     const problemId = (data as { id: string }).id;
@@ -215,6 +229,54 @@ describe("the paper, step by step", () => {
     expect(page.text).toContain("Бодлого бүрийн үнэлгээ");
     expect(page.text).toContain("Бодож чадсангүй");
   });
+
+  it("never hands the child the answer or the reference solution", async () => {
+    const admin = await adminClient("full");
+    const { client, assessmentId, problemIds } = await readyToSolve();
+
+    const solving = await client.get(`/api/assessment/${assessmentId}/solutions`);
+    expect(solving.status, solving.text).toBe(200);
+    expect(solving.text).not.toContain(ANSWER_MARKER);
+    expect(solving.text).not.toContain(SOLUTION_MARKER);
+    expect(solving.text).not.toContain("answerKey");
+    expect(solving.text).not.toContain("solutionLatex");
+
+    await uploadPhoto(client, assessmentId, problemIds[0]);
+    await client.post(`/api/assessment/${assessmentId}/skip`, { problemId: problemIds[1] });
+    await client.post(`/api/assessment/${assessmentId}/submit`);
+
+    // The teacher, on the other hand, marks against it.
+    const detail = await admin.get<{ items: { problem: { solutionLatex?: string } | null }[] }>(
+      `/api/admin/grading/${assessmentId}`
+    );
+    expect(detail.status, detail.text).toBe(200);
+    expect(detail.body.items.map((i) => i.problem?.solutionLatex)).toContain(SOLUTION_MARKER);
+
+    const { data: solution } = await testDb()
+      .from("solutions")
+      .select("id")
+      .eq("assessment_id", assessmentId)
+      .eq("problem_id", problemIds[0])
+      .single();
+    await admin.put(`/api/admin/grading/${assessmentId}/score`, {
+      solutionId: (solution as { id: string }).id,
+      graderScore: "10",
+      graderComment: "",
+    });
+    const completed = await admin.put(`/api/admin/grading/${assessmentId}/complete`, {
+      teacherComment: "Дүгнэлт",
+    });
+    expect(completed.status, completed.text).toBe(200);
+
+    // The marked paper shows each problem again — still without either.
+    const page = await client.get(`/profile/assessment?a=${assessmentId}`);
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("Бодлого бүрийн үнэлгээ");
+    expect(page.text).not.toContain(ANSWER_MARKER);
+    expect(page.text).not.toContain(SOLUTION_MARKER);
+    // Walks the whole paper, solving through marking to the report — about
+    // fifteen round trips, which outlasts the default 30s on the test project.
+  }, 90_000);
 
   it("will not close marking while a handed-in problem has no score", async () => {
     const admin = await adminClient("full");

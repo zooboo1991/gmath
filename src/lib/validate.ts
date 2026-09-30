@@ -34,6 +34,7 @@ export const MAX_LEN = {
   problemTopic: 120,
   problemBody: 4000,
   problemAnswerKey: 2000,
+  problemSolution: 10000,
   levelName: 80,
   levelText: 2000,
   settingValue: 200,
