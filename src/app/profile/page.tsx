@@ -4,7 +4,13 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import ProfileClient from "@/components/profile/ProfileClient";
-import { listCertificatesByPhone, listRegistrationsByUser, toPublicUser } from "@/lib/db";
+import {
+  listCertificatesByPhone,
+  listPaymentsForRegistrations,
+  listRegistrationsByUser,
+  toPublicUser,
+} from "@/lib/db";
+import { registrationBalance, sumPaymentsFor } from "@/lib/registration";
 import { listProgramWaitlistByUser } from "@/lib/programWaitlist";
 import { getSessionUser } from "@/lib/session";
 import { TESTS } from "@/lib/tests";
@@ -63,6 +69,22 @@ export default async function ProfilePage() {
     listProgramWaitlistByUser(user.id).catch(() => []),
   ]);
 
+  // What is still owed per active course, for the card's "Дансны мэдээлэл"
+  // button. Only where the admin has set the agreed total: with no terms on
+  // record the balance is just the list price (a school-paid group, a
+  // negotiated deal), and putting that on the card would ask families for
+  // money nobody has asked them for. If payments can't be read, show no
+  // balances rather than every course as unpaid.
+  const termed = registrations.filter((r) => r.status === "active" && r.totalDue !== undefined);
+  const payments = await listPaymentsForRegistrations(termed.map((r) => r.id)).catch(() => null);
+  const balances: Record<string, number> = {};
+  if (payments) {
+    for (const r of termed) {
+      const { balance } = registrationBalance(r, sumPaymentsFor(r.id, payments));
+      if (balance > 0) balances[r.id] = balance;
+    }
+  }
+
   const tests = testResults
     .map((result) => {
       const test = TESTS.find((t) => t.slug === result.testSlug);
@@ -86,6 +108,7 @@ export default async function ProfilePage() {
         <ProfileClient
           user={toPublicUser(user)}
           registrations={registrations}
+          balances={balances}
           certificates={certificates}
           tests={tests}
           onboarding={onboarding}

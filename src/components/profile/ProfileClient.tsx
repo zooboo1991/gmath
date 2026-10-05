@@ -7,6 +7,8 @@ import SchoolAutocomplete from "@/components/SchoolAutocomplete";
 import PushSettings from "@/components/profile/PushSettings";
 import OnboardingChecklist from "@/components/profile/OnboardingChecklist";
 import ParentMeetingCard from "@/components/profile/ParentMeetingCard";
+import BankInfoModal from "@/components/profile/BankInfoModal";
+import { bankTransferNote } from "@/lib/bankAccount";
 import { useNow, LessonAction } from "@/components/profile/LessonSchedule";
 import type { Certificate, PublicUser, RegistrationWithGroup } from "@/lib/db";
 import {
@@ -16,6 +18,7 @@ import {
   IconPencil,
   IconDocument,
   IconClose,
+  IconBank,
 } from "@/components/icons";
 import { compareByStartDate, formatCourseDate } from "@/lib/courseDate";
 import { ONBOARDING_STEPS, type OnboardingState } from "@/lib/onboarding";
@@ -56,6 +59,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function ProfileClient({
   user: initialUser,
   registrations,
+  balances = {},
   certificates,
   tests = [],
   onboarding = {},
@@ -64,6 +68,8 @@ export default function ProfileClient({
 }: {
   user: PublicUser;
   registrations: RegistrationWithGroup[];
+  /** Outstanding balance per active registration id — only those still owing. */
+  balances?: Record<string, number>;
   certificates: Certificate[];
   /** Эхлэлийн чеклистийн төлөв, сургалтын id-гаар. */
   onboarding?: Record<string, OnboardingState>;
@@ -82,6 +88,7 @@ export default function ProfileClient({
   const [queue, setQueue] = useState(waitlist);
   const [leavingId, setLeavingId] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
+  const [bankFor, setBankFor] = useState<RegistrationWithGroup | null>(null);
   const [audience, setAudience] = useState<AudienceFilter>("all");
   const [category, setCategory] = useState<CategoryFilter>("all");
   // The course a notification click asked for (?course=<programId>): its card
@@ -470,7 +477,12 @@ export default function ProfileClient({
             <div className="flex flex-col gap-4">
               {shown.map((r) =>
                 r.status === "active" && isYearly(r) ? (
-                  <YearlyProgramCard key={r.id} registration={r} />
+                  <YearlyProgramCard
+                    key={r.id}
+                    registration={r}
+                    owing={(balances[r.id] ?? 0) > 0}
+                    onShowBank={() => setBankFor(r)}
+                  />
                 ) : (
                   <div
                     key={r.id}
@@ -509,12 +521,13 @@ export default function ProfileClient({
                     </div>
 
                     {r.status === "active" ? (
-                      <div className="relative z-[1] mt-3 flex items-center gap-2 flex-wrap pointer-events-none [&_a]:pointer-events-auto">
+                      <div className="relative z-[1] mt-3 flex items-center gap-2 flex-wrap pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+                        {(balances[r.id] ?? 0) > 0 && <BankButton onClick={() => setBankFor(r)} />}
                         <Link
                           href={`/profile/course/${encodeURIComponent(r.programId)}`}
                           className="inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft rounded-full px-4 py-2.5"
                         >
-                          Дэлгэрэнгүй харах →
+                          Дэлгэрэнгүй →
                         </Link>
                       </div>
                     ) : (
@@ -531,6 +544,21 @@ export default function ProfileClient({
           )}
         </div>
       </section>
+
+      {bankFor && (
+        <BankInfoModal
+          programId={bankFor.programId}
+          programLabel={bankFor.programLabel}
+          balance={balances[bankFor.id] ?? 0}
+          transferNote={bankTransferNote({
+            phone: user.phone,
+            tag: tagOf(bankFor),
+            lastName: user.lastName,
+            firstName: user.firstName,
+          })}
+          onClose={() => setBankFor(null)}
+        />
+      )}
 
       {showEdit && (
         <EditProfileModal
@@ -552,13 +580,21 @@ export default function ProfileClient({
  * assessments, contract) lives on the course's own page, which this links to.
  * Always pinned first in the active list (see ProfileClient).
  */
-function YearlyProgramCard({ registration }: { registration: RegistrationWithGroup }) {
+function YearlyProgramCard({
+  registration,
+  owing,
+  onShowBank,
+}: {
+  registration: RegistrationWithGroup;
+  owing: boolean;
+  onShowBank: () => void;
+}) {
   const now = useNow();
   const lessons = registration.lessons ?? [];
   const states = now ? getLessonStates(lessons, now) : null;
   const next = states?.find((s) => s.state === "upcoming" || s.state === "live");
   // A lesson that is on right now has to be reachable from the closed card.
-  // Folded away behind "Дэлгэрэнгүй харах", it left students asking for the
+  // Folded away behind "Дэлгэрэнгүй", it left students asking for the
   // link in chat while the class was already running.
   const liveIndex = states?.findIndex((st) => st.state === "live") ?? -1;
   const liveLesson = liveIndex >= 0 ? states?.[liveIndex] : undefined;
@@ -597,19 +633,35 @@ function YearlyProgramCard({ registration }: { registration: RegistrationWithGro
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
+        {/* Not shrink-0: with the bank button (and a live lesson) the row is
+            wider than a phone card, and only a shrinkable row can wrap. */}
+        <div className="flex items-center gap-2 flex-wrap min-w-0 max-w-full">
           {live && (
             <LessonAction info={live} courseId={registration.programId} lessonIndex={liveIndex} />
           )}
+          {owing && <BankButton onClick={onShowBank} />}
           <Link
             href={`/profile/course/${encodeURIComponent(registration.programId)}`}
             className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft rounded-full px-4 py-2.5"
           >
-            Дэлгэрэнгүй харах →
+            Дэлгэрэнгүй →
           </Link>
         </div>
       </div>
     </div>
+  );
+}
+
+/** Sits next to "Дэлгэрэнгүй" on a card the student still owes on. */
+function BankButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="shrink-0 inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-gold-strong bg-gold-soft rounded-full px-4 py-2.5"
+    >
+      <IconBank className="w-4 h-4" /> Дансны мэдээлэл
+    </button>
   );
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IconClose, IconBank, IconQrCode, IconCheckCircle, IconCopy, IconCheck } from "@/components/icons";
-import { BANK_ACCOUNT, BANK_NAME, BANK_RECIPIENT } from "@/lib/bankAccount";
+import { IconClose, IconBank, IconQrCode, IconCheckCircle } from "@/components/icons";
+import BankDetails from "@/components/profile/BankDetails";
 import { formatMnt } from "@/lib/price";
 
 /** Хамгийн бага төлөлт — серверийн шалгалттай ижил. */
@@ -37,7 +37,6 @@ export default function BalancePayModal({
   const [intent, setIntent] = useState<Intent | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
 
   const digits = Number(amount.replace(/[^\d]/g, "")) || 0;
 
@@ -109,12 +108,6 @@ export default function BalancePayModal({
       clearInterval(timer);
     };
   }, [step, intent, registrationId, onPaid]);
-
-  const copy = (key: string, value: string) => {
-    navigator.clipboard?.writeText(value);
-    setCopied(key);
-    setTimeout(() => setCopied(null), 1500);
-  };
 
   return (
     <div className="fixed inset-0 z-[100] bg-navy-deep/55 grid place-items-center px-4 py-8 overflow-y-auto">
@@ -204,34 +197,7 @@ export default function BalancePayModal({
               Гүйлгээний утгыг яг хэвээр нь бичнэ үү. Ажлын өдрүүдэд 24 цагийн дотор
               баталгаажиж, танд мэдэгдэнэ.
             </p>
-            <div className="bg-bg-soft rounded-md px-4 py-3 mt-3.5">
-              {[
-                ["bank", "Банк", BANK_NAME],
-                ["account", "Дансны дугаар", BANK_ACCOUNT],
-                ["recipient", "Хүлээн авагч", BANK_RECIPIENT],
-                ["amount", "Шилжүүлэх дүн", formatMnt(intent.amount)],
-                ["note", "Гүйлгээний утга", transferNote],
-              ].map(([key, label, value]) => (
-                <div key={key} className="flex flex-col gap-0.5 py-2 border-b border-line last:border-0">
-                  <span className="text-ink-3 font-semibold text-[.78rem]">{label}</span>
-                  <span className="flex items-start gap-2">
-                    <b className="min-w-0 break-words font-bold text-[.92rem]">{value}</b>
-                    <button
-                      type="button"
-                      onClick={() => copy(key, value)}
-                      aria-label={`${label} хуулах`}
-                      className="shrink-0 text-ink-3 hover:text-blue-strong"
-                    >
-                      {copied === key ? (
-                        <IconCheck className="w-4 h-4 text-green" strokeWidth={2.8} />
-                      ) : (
-                        <IconCopy className="w-4 h-4" />
-                      )}
-                    </button>
-                  </span>
-                </div>
-              ))}
-            </div>
+            <BankDetails amountLabel="Шилжүүлэх дүн" amount={formatMnt(intent.amount)} transferNote={transferNote} />
             <button
               type="button"
               onClick={onClose}
