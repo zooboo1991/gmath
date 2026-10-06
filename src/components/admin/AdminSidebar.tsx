@@ -7,6 +7,7 @@ import { useSyncExternalStore } from "react";
 import { canView, type AdminRole, type AdminSection } from "@/lib/adminSections";
 import type { IconProps } from "@/components/icons";
 import {
+  IconBank,
   IconBell,
   IconBook,
   IconGraduationCap,
@@ -37,6 +38,7 @@ import {
 const MENU: { href: string; label: string; icon: (p: IconProps) => React.ReactNode; section: AdminSection }[] = [
   { href: "/admin", label: "Хяналтын самбар", icon: IconGrid, section: "dashboard" },
   { href: "/admin/registrations", label: "Бүртгэл", icon: IconCheckCircle, section: "registrations" },
+  { href: "/admin/statements", label: "Дансны хуулга", icon: IconBank, section: "statements" },
   { href: "/admin/courses", label: "Сургалт", icon: IconBook, section: "courses" },
   { href: "/admin/articles", label: "Нийтлэл", icon: IconDocument, section: "articles" },
   { href: "/admin/users", label: "Хэрэглэгч", icon: IconPerson, section: "users" },

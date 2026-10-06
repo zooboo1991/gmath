@@ -65,6 +65,13 @@ const WRITE_ROUTES: Route[] = [
   { method: "POST", path: `/api/admin/registrations/${id()}/payments`, body: {} },
   { method: "POST", path: `/api/admin/registrations/${id()}/qpay-check`, body: {} },
   { method: "POST", path: `/api/admin/registrations/${id()}/settle-manual`, body: {} },
+  // Bank statements are the owner's own account — full admins only, reads included.
+  { method: "GET", path: "/api/admin/statements" },
+  { method: "POST", path: "/api/admin/statements", body: {} },
+  { method: "POST", path: `/api/admin/statements/${id()}/suggest`, body: {} },
+  { method: "GET", path: `/api/admin/statements/${id()}/file` },
+  { method: "PUT", path: `/api/admin/bank-transactions/${id()}`, body: {} },
+  { method: "POST", path: "/api/admin/bank-transactions/approve", body: {} },
   { method: "DELETE", path: `/api/admin/registrations/${id()}/payments/${id()}` },
   { method: "PUT", path: "/api/admin/settings", body: {} },
   { method: "POST", path: "/api/admin/upload", body: {} },

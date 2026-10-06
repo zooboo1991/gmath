@@ -1557,3 +1557,67 @@ alter table parent_meetings
 -- teacher only: like answer_key it is never sent to a student — student paths
 -- go through toPublicProblem, which leaves it out.
 alter table problems add column if not exists solution_latex text;
+
+-- ---------------------------------------------------------------------------
+-- Дансны хуулга (bank statement import)
+-- ---------------------------------------------------------------------------
+-- The admin uploads the Khan Bank .xlsx statement of the tuition account; every
+-- incoming (credit) row is kept here, matched to a student registration, and —
+-- once the admin presses «Батлах» — recorded as a registration_payments row.
+-- Only credits are stored: the account is the owner's own, so outgoing rows
+-- (salaries, purchases, personal transfers) stay out of the database. The
+-- original file goes to the private `bank-statements` bucket.
+create table if not exists bank_statements (
+  id uuid primary key default gen_random_uuid(),
+  file_name text not null,
+  file_path text,
+  holder text,
+  account text,
+  period_from date,
+  period_to date,
+  -- Incoming rows in the file, and how many of them were not already stored
+  -- from an earlier, overlapping statement.
+  credit_rows integer not null default 0,
+  new_rows integer not null default 0,
+  -- Completeness check: the footer total vs. the sum of the itemised rows, and
+  -- how many consecutive rows fail to chain (closing ≠ next opening balance).
+  row_credit_total numeric(16,2) not null default 0,
+  footer_credit_total numeric(16,2),
+  balance_gaps integer not null default 0,
+  uploaded_by text,
+  created_at timestamptz not null default now()
+);
+grant all on table public.bank_statements to service_role;
+
+create table if not exists bank_transactions (
+  id uuid primary key default gen_random_uuid(),
+  -- The statement that first brought this row in; overlapping uploads skip it.
+  statement_id uuid not null references bank_statements(id) on delete cascade,
+  -- "<local timestamp>|<closing balance>" — unique per account in practice;
+  -- the statement has no transaction id of its own.
+  dedupe_key text not null unique,
+  occurred_at timestamptz not null,
+  amount numeric(16,2) not null check (amount > 0),
+  description text not null default '',
+  counter_account text not null default '',
+  balance_after numeric(16,2),
+  -- review: needs the admin · ready: linked, recorded on «Батлах» ·
+  -- approved: recorded · skipped: no payment to record (QPay already booked,
+  -- not tuition, placement fee, the owner's own transfer).
+  status text not null default 'review'
+    check (status in ('review', 'ready', 'approved', 'skipped')),
+  registration_id uuid references registrations(id) on delete set null,
+  match_source text check (match_source in ('phone', 'name', 'qpay', 'intent', 'ai', 'admin', 'rule')),
+  confidence text check (confidence in ('high', 'medium', 'low')),
+  reason text,
+  -- Other plausible registrations, best first: [{registrationId, score, reason}].
+  candidates jsonb not null default '[]'::jsonb,
+  payment_id uuid references registration_payments(id) on delete set null,
+  approved_at timestamptz,
+  approved_by text,
+  created_at timestamptz not null default now()
+);
+create index if not exists bank_transactions_occurred_idx on bank_transactions (occurred_at desc);
+create index if not exists bank_transactions_statement_idx on bank_transactions (statement_id);
+create index if not exists bank_transactions_registration_idx on bank_transactions (registration_id);
+grant all on table public.bank_transactions to service_role;

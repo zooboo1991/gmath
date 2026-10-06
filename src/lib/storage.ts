@@ -13,6 +13,36 @@ export const LESSON_NOTES_BUCKET = "lesson-notes";
 /** Гэрээний Word загварууд. Хувийн — нийтийн URL байхгүй. */
 export const CONTRACTS_BUCKET = "contracts";
 
+/** Private: uploaded bank statements (.xlsx) — the owner's account history. */
+export const BANK_STATEMENTS_BUCKET = "bank-statements";
+
+const STATEMENT_PATH_RE = /^statements\/[0-9a-f-]{36}\.xlsx$/i;
+
+/** True for a path this module generated for a statement file. */
+export function isStatementPath(value: unknown): value is string {
+  return typeof value === "string" && STATEMENT_PATH_RE.test(value);
+}
+
+/**
+ * Stores an uploaded statement under a server-generated name. Only real .xlsx
+ * files (zip containers, "PK\x03\x04") are accepted — the caller's file name
+ * and type are never trusted. Returns the stored path.
+ */
+export async function uploadStatementFile(buffer: Buffer): Promise<string> {
+  if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b || buffer[2] !== 0x03 || buffer[3] !== 0x04) {
+    throw new Error("unsupported_statement_type");
+  }
+  const path = `statements/${crypto.randomUUID()}.xlsx`;
+  const { error } = await getSupabase()
+    .storage.from(BANK_STATEMENTS_BUCKET)
+    .upload(path, buffer, {
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      upsert: false,
+    });
+  if (error) throw error;
+  return path;
+}
+
 type ImageSignature = {
   mime: string;
   ext: string;
