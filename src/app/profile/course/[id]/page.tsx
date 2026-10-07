@@ -14,6 +14,7 @@ import { listPaymentsForRegistrations } from "@/lib/db";
 import { listIntentsForRegistration } from "@/lib/paymentIntents";
 import { registrationBalance, sumPaymentsFor } from "@/lib/registration";
 import { listExams, listFreeInvitedExams } from "@/lib/assessment/exams";
+import { listOlympiadsForFamily } from "@/lib/miniOlympiad/db";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +61,7 @@ export default async function ProfileCoursePage({
 
   const lessons = registration.lessons ?? [];
 
-  const [meetings, rollCall, views, freeExams, assessments, exams] = await Promise.all([
+  const [meetings, rollCall, views, freeExams, assessments, exams, olympiads] = await Promise.all([
     listLessonMeetingsForCourse(id).catch(() => []),
     listRollCallForUser(id, user.id).catch(() => ({})),
     // Бичлэгийн үзэлтийн хүснэгт шинэ — schema.sql-ээ ажиллуулаагүй
@@ -71,6 +72,8 @@ export default async function ProfileCoursePage({
       .then((all) => all.filter((a) => a.status !== "cancelled"))
       .catch(() => []),
     listExams().catch(() => []),
+    // Only this child's own published results (place among all, nothing of anyone else's).
+    listOlympiadsForFamily(user.id, id).catch(() => []),
   ]);
 
   // Төлбөрийн хэсэг. Санаархлын хүснэгт шинэ тул schema.sql-ээ ажиллуулаагүй
@@ -113,6 +116,7 @@ export default async function ProfileCoursePage({
           summary={summary}
           initialTab={TABS.find((t) => t === tab) ?? "schedule"}
           nowIso={new Date().toISOString()}
+          olympiads={olympiads}
           freeExam={
             invited
               ? {

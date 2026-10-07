@@ -20,6 +20,7 @@ export const VIEWER_SECTIONS = [
   "courses",
   "users",
   "analytics",
+  "olympiads",
 ] as const;
 
 export type AdminSection =
@@ -65,7 +66,7 @@ export type AdminSection =
  * either: taking attendance was what took them there, and it now has a screen
  * of its own built for the job.
  */
-export const TEACHER_SECTIONS = ["attendance", "grading", "placement", "bookings", "meetings"] as const;
+export const TEACHER_SECTIONS = ["attendance", "grading", "placement", "bookings", "meetings", "olympiads"] as const;
 
 export function canView(role: AdminRole, section: AdminSection): boolean {
   if (role === "full") return true;

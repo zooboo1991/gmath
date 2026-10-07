@@ -47,7 +47,7 @@ const SETUP_HINT = [
   "  1. Supabase дээр ТУСДАА (хаяж болох) төсөл үүсгэ",
   "  2. supabase/schema.sql-ыг тэр төслийн SQL Editor дээр нэг удаа ажиллуул",
   "  3. articles / problems / solutions / graded-sheets / lesson-notes / contracts /",
-  "     bank-statements гэсэн 7 bucket үүсгэ (эхний хоёр нь нийтийн, бусад нь хувийн)",
+  "     bank-statements / mini-olympiad гэсэн 8 bucket үүсгэ (эхний хоёр нь нийтийн, бусад нь хувийн)",
   "  4. web/.env.test.example-ийг web/.env.test болгон хуулж, тэр төслийн",
   "     URL болон service_role түлхүүрийг бөглө",
   "",

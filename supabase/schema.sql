@@ -1621,3 +1621,45 @@ create index if not exists bank_transactions_occurred_idx on bank_transactions (
 create index if not exists bank_transactions_statement_idx on bank_transactions (statement_id);
 create index if not exists bank_transactions_registration_idx on bank_transactions (registration_id);
 grant all on table public.bank_transactions to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Мини олимпиад (monthly mini olympiad results)
+-- ---------------------------------------------------------------------------
+-- A paper olympiad held for one programme (e.g. the 1-year D category). The
+-- teacher grades on paper; the admin records each child's per-problem scores,
+-- comments and the scan of their work, and «Нийтлэх» shows each family only
+-- their own child's result and place. Totals and places are computed from the
+-- rows, never stored.
+create table if not exists mini_olympiads (
+  id uuid primary key default gen_random_uuid(),
+  program_id text not null,
+  title text not null,
+  held_on date not null,
+  problem_count integer not null check (problem_count between 1 and 30),
+  max_per_problem integer not null default 7 check (max_per_problem between 1 and 100),
+  -- Hidden from families until published.
+  published_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists mini_olympiads_program_idx on mini_olympiads (program_id, held_on desc);
+grant all on table public.mini_olympiads to service_role;
+
+create table if not exists mini_olympiad_results (
+  id uuid primary key default gen_random_uuid(),
+  olympiad_id uuid not null references mini_olympiads(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  -- One entry per problem: points (null = not attempted), the comment the
+  -- family reads, and a note only teachers see.
+  scores jsonb not null default '[]'::jsonb,
+  comments jsonb not null default '[]'::jsonb,
+  notes jsonb not null default '[]'::jsonb,
+  -- The child's own work: [{path, name, size}] in the private "mini-olympiad" bucket.
+  files jsonb not null default '[]'::jsonb,
+  -- When the family was told the results are out — once per child, also for
+  -- children added after publishing.
+  notified_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (olympiad_id, user_id)
+);
+grant all on table public.mini_olympiad_results to service_role;

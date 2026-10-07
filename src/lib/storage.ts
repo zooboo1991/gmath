@@ -13,6 +13,39 @@ export const LESSON_NOTES_BUCKET = "lesson-notes";
 /** Гэрээний Word загварууд. Хувийн — нийтийн URL байхгүй. */
 export const CONTRACTS_BUCKET = "contracts";
 
+/** Private: a child's scanned mini-olympiad work — shown only to that child's family. */
+export const MINI_OLYMPIAD_BUCKET = "mini-olympiad";
+
+const OLYMPIAD_FILE_TYPES = { pdf: "application/pdf", jpg: "image/jpeg", png: "image/png" } as const;
+export type OlympiadFileExt = keyof typeof OLYMPIAD_FILE_TYPES;
+
+export function isOlympiadFileExt(value: unknown): value is OlympiadFileExt {
+  return typeof value === "string" && value in OLYMPIAD_FILE_TYPES;
+}
+
+/**
+ * One-time URL for the browser to put a scan straight into Storage (scans run
+ * past Vercel's 4.5MB body limit). The server picks the path, under the
+ * olympiad's own folder.
+ */
+export async function createOlympiadUploadUrl(
+  olympiadId: string,
+  ext: OlympiadFileExt
+): Promise<{ path: string; signedUrl: string; token: string; contentType: string }> {
+  const path = `olympiads/${olympiadId}/${crypto.randomUUID()}.${ext}`;
+  const { data, error } = await getSupabase().storage.from(MINI_OLYMPIAD_BUCKET).createSignedUploadUrl(path);
+  if (error) throw error;
+  return { path, signedUrl: data.signedUrl, token: data.token, contentType: OLYMPIAD_FILE_TYPES[ext] };
+}
+
+/** A path createOlympiadUploadUrl handed out for this olympiad — anything else is not ours. */
+export function isOlympiadFilePath(olympiadId: string, value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    new RegExp(`^olympiads/${olympiadId}/[0-9a-f-]{36}\\.(pdf|jpg|png)$`, "i").test(value)
+  );
+}
+
 /** Private: uploaded bank statements (.xlsx) — the owner's account history. */
 export const BANK_STATEMENTS_BUCKET = "bank-statements";
 

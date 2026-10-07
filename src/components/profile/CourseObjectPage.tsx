@@ -17,6 +17,7 @@ import {
   IconTrophy,
 } from "@/components/icons";
 import type { RegistrationWithGroup } from "@/lib/db";
+import type { FamilyOlympiadView } from "@/lib/miniOlympiad/db";
 import type { AssessmentStatus } from "@/lib/assessment/types";
 import type { AttendanceOutcome, AttendanceSummary } from "@/lib/courseAttendance";
 import { PRESENT_THRESHOLD_PERCENT } from "@/lib/courseAttendance";
@@ -73,6 +74,7 @@ export default function CourseObjectPage({
   freeExam,
   assessments,
   payment,
+  olympiads = [],
   nowIso,
 }: {
   registration: RegistrationWithGroup;
@@ -82,6 +84,8 @@ export default function CourseObjectPage({
   assessments: PastAssessment[];
   /** Төлбөрийн байдал — дүнг сервер боддог. */
   payment: CoursePayment;
+  /** This child's published mini-olympiad results, newest first. Never anyone else's. */
+  olympiads?: FamilyOlympiadView[];
   /** Серверийн цаг — эхний рендерийг сервер, браузер хоёрт нэг ижил байлгана. */
   nowIso: string;
 }) {
@@ -136,7 +140,7 @@ export default function CourseObjectPage({
             {tab === "assessment" && (
               <AssessmentTab freeExam={freeExam} assessments={assessments} />
             )}
-            {tab === "olympiad" && <OlympiadTab />}
+            {tab === "olympiad" && <OlympiadTab olympiads={olympiads} />}
             {tab === "contract" && <ContractTab />}
           </div>
         </div>
@@ -413,13 +417,70 @@ function AssessmentTab({
   );
 }
 
-function OlympiadTab() {
+function OlympiadTab({ olympiads }: { olympiads: FamilyOlympiadView[] }) {
+  if (olympiads.length === 0) {
+    return (
+      <Soon
+        icon={<IconTrophy className="w-7 h-7" />}
+        title="Мини олимпиадын дүн одоогоор алга"
+        text="Сар бүрийн эцэст зохион байгуулагдах мини олимпиадын оноо, байр, багшийн тайлбар дүн гармагц энд харагдана."
+      />
+    );
+  }
   return (
-    <Soon
-      icon={<IconTrophy className="w-7 h-7" />}
-      title="Мини олимпиад тун удахгүй"
-      text="Сар бүрийн эцэст зохион байгуулагдах мини олимпиадын бодлого, оноо, байр эндээс харагдана."
-    />
+    <div className="flex flex-col gap-4">
+      {olympiads.map((o) => {
+        const maxTotal = o.problemCount * o.maxPerProblem;
+        return (
+          <div key={o.olympiadId} className="bg-surface border border-line rounded-md shadow-xs px-5 py-5">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <b className="font-extrabold text-[1.1rem] block">{o.title}</b>
+                <span className="text-ink-3 font-semibold text-[.85rem]">{formatCourseDate(o.heldOn)}</span>
+              </div>
+              <div className="text-right">
+                <b className="font-extrabold text-[1.6rem] leading-none text-blue-strong block">{`${o.place}-р байр`}</b>
+                <span className="text-ink-3 font-semibold text-[.82rem]">{`${o.participants} хүүхдээс`}</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5 mt-4">
+              <Kpi label="Нийт оноо" value={`${o.total} / ${maxTotal}`} tone="green" />
+              <Kpi label="Байр" value={`${o.place} / ${o.participants}`} />
+            </div>
+            <div className="mt-4 flex flex-col divide-y divide-line border border-line rounded-sm">
+              {o.scores.map((s, i) => (
+                <div key={i} className="flex items-start gap-3 px-3.5 py-2.5">
+                  <span className="shrink-0 w-14 text-[.82rem] font-extrabold text-ink-3">{i + 1}-р</span>
+                  <b
+                    className={`shrink-0 w-14 font-extrabold tabular-nums text-[.92rem] ${
+                      s === o.maxPerProblem ? "text-green" : s ? "text-ink" : "text-ink-3"
+                    }`}
+                  >
+                    {s === null ? "–" : s} / {o.maxPerProblem}
+                  </b>
+                  <span className="text-[.86rem] font-medium text-ink-2 leading-[1.55]">{o.comments[i] || ""}</span>
+                </div>
+              ))}
+            </div>
+            {o.files.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {o.files.map((f) => (
+                  <a
+                    key={f.index}
+                    href={`/api/profile/olympiads/${o.resultId}/files/${f.index}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft rounded-full px-4 py-2"
+                  >
+                    <IconDocument className="w-4 h-4" /> {o.files.length > 1 ? `Бодолт ${f.index + 1}` : "Бодолтоо харах"}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

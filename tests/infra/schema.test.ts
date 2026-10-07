@@ -20,6 +20,8 @@ const TABLES = [
   "articles",
   "bank_statements",
   "bank_transactions",
+  "mini_olympiad_results",
+  "mini_olympiads",
   "assessment_problems",
   "assessments",
   "certificates",
@@ -65,7 +67,7 @@ const TABLES = [
 /** Columns added with `alter table` after their table first shipped. */
 const COLUMNS: [string, string][] = [["problems", "solution_latex"]];
 
-const BUCKETS = ["articles", "problems", "solutions", "graded-sheets", "lesson-notes", "contracts", "bank-statements"];
+const BUCKETS = ["articles", "problems", "solutions", "graded-sheets", "lesson-notes", "contracts", "bank-statements", "mini-olympiad"];
 
 describe("test database schema", () => {
   it("has every table supabase/schema.sql creates", async () => {

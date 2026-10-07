@@ -39,7 +39,7 @@
   Drive/YouTube холбоос. Танилцуулга бичлэг YouTube
 - **Файлууд: Supabase Storage.** Нийтийн bucket: `articles`, `problems`.
   Хувийн: `solutions`, `graded-sheets`, `lesson-notes`, `contracts`,
-  `bank-statements` (дансны хуулга) — public URL байхгүй,
+  `bank-statements` (дансны хуулга), `mini-olympiad` (хүүхдийн бодолтын скан) — public URL байхгүй,
   харах эрхийг route шалгаад хугацаатай гарын үсэгтэй холбоос үүсгэнэ.
   Хичээлийн тэмдэглэл (PDF) нь браузер дээр багасгагдаж
   (`src/lib/pdfShrink.ts`, pdfjs + pdf-lib), Vercel-ийн 4.5MB хязгаарыг
