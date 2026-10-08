@@ -1663,3 +1663,16 @@ create table if not exists mini_olympiad_results (
   unique (olympiad_id, user_id)
 );
 grant all on table public.mini_olympiad_results to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Хүүхдийн суух гарагууд (Сонгон анги)
+-- ---------------------------------------------------------------------------
+-- Some children attend only some of a class's days (Мягмар, Пүрэв of a
+-- Мягмар/Пүрэв/Баасан class). The register for a lesson lists only the
+-- children who attend its weekday, and a child's attendance counts only their
+-- days. A change applies from a date on, so earlier registers stay as taken:
+-- [{"from": null | "YYYY-MM-DD", "days": [2, 4] | null}, ...] sorted by
+-- "from" (null = since the start); the entry in force on a lesson's date is the
+-- last one whose "from" is on or before it. days are getDay() numbers
+-- (0 = Ням … 6 = Бямба); null days, or no entries at all, mean every day.
+alter table registrations add column if not exists attend_days jsonb;

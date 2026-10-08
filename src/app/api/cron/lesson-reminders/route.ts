@@ -9,6 +9,7 @@ import {
   type Lesson,
 } from "@/lib/db";
 import { mongoliaLocalToUtc, parseScheduleString } from "@/lib/lessonSchedule";
+import { attendsLesson } from "@/lib/attendDays";
 
 const WINDOW_START_MIN = 24;
 const WINDOW_END_MIN = 31;
@@ -49,7 +50,14 @@ export async function GET(request: Request) {
   let recipientTotal = 0;
   for (const c of candidates) {
     const registrations = await listRegistrationsByProgram(c.programId);
-    const userIds = [...new Set(registrations.filter((r) => r.status === "active" && r.userId).map((r) => r.userId!))];
+    // Only the children who attend this lesson's weekday.
+    const userIds = [
+      ...new Set(
+        registrations
+          .filter((r) => r.status === "active" && r.userId && attendsLesson(r.attendDays, c.lesson.schedule))
+          .map((r) => r.userId!)
+      ),
+    ];
     if (userIds.length > 0) {
       await createNotification({
         title: "Хичээл 30 минутын дараа эхэлнэ",

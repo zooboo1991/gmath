@@ -9,6 +9,7 @@ import {
   type Lesson,
 } from "./db";
 import { parseScheduleString } from "./lessonSchedule";
+import { attendsOn, type AttendDaysEntry } from "./attendDays";
 
 /** A classroom lesson the teacher can take the register for. */
 export type RollCallLesson = {
@@ -18,7 +19,7 @@ export type RollCallLesson = {
   topic: string;
   date: string;
   timeLabel: string;
-  /** How many students are on the course right now. */
+  /** How many students are expected at this lesson: on the course, and attending its weekday. */
   rosterCount: number;
   /** Marks already saved, if the register was taken. */
   present: number | null;
@@ -51,8 +52,10 @@ async function allOwners(): Promise<Owner[]> {
   ];
 }
 
-/** The active roster of a course, in the order a register is read. */
-export async function getRoster(courseId: string): Promise<{ userId: string; name: string; phone: string }[]> {
+type RosterEntry = { userId: string; name: string; phone: string; attendDays?: AttendDaysEntry[] };
+
+/** The active roster of a course, in the order a register is read, with each child's weekdays. */
+async function courseRoster(courseId: string): Promise<RosterEntry[]> {
   const registrations = await listRegistrationsByProgram(courseId);
   return registrations
     // The school's own test account sits in no classroom — a teacher reading
@@ -62,8 +65,28 @@ export async function getRoster(courseId: string): Promise<{ userId: string; nam
       userId: r.user!.id,
       name: `${r.user!.lastName} ${r.user!.firstName}`.trim() || r.user!.phone,
       phone: r.user!.phone,
+      attendDays: r.attendDays,
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "mn"));
+}
+
+/**
+ * The children expected at a lesson on `date`: on the course, and attending
+ * that weekday as their days stood then. A child who comes only on Мягмар and
+ * Пүрэв is not on a Баасан register. An undated lesson expects everyone.
+ */
+function expectedOn(roster: RosterEntry[], date: string): { userId: string; name: string; phone: string }[] {
+  return roster.filter((r) => attendsOn(r.attendDays, date)).map(({ userId, name, phone }) => ({ userId, name, phone }));
+}
+
+/** Children on the course who do not attend `date`'s weekday — their marks there are not shown or counted. */
+function offDayIds(roster: RosterEntry[], date: string): Set<string> {
+  return new Set(roster.filter((r) => !attendsOn(r.attendDays, date)).map((r) => r.userId));
+}
+
+/** The children expected at a lesson on `date` (every active child when no date is given). */
+export async function getRoster(courseId: string, date = ""): Promise<{ userId: string; name: string; phone: string }[]> {
+  return expectedOn(await courseRoster(courseId), date);
 }
 
 /**
@@ -118,27 +141,31 @@ export async function listRollCallLessons(opts: {
   // its own. Truncated, an old lesson shows fewer present and absent, or drops
   // to none at all, which the screen renders as "this register was never
   // taken".
-  const marks = await fetchAllRows<{ course_id: string; lesson_index: number; present: boolean }>(() =>
+  const marks = await fetchAllRows<{ course_id: string; lesson_index: number; user_id: string; present: boolean }>(() =>
     getSupabase()
       .from("lesson_roll_call")
-      .select("course_id, lesson_index, present")
+      .select("course_id, lesson_index, user_id, present")
       .in("course_id", courseIds)
       .in("lesson_index", lessonIndexes)
       .order("id")
   );
 
-  const rosterSizes = new Map<string, number>();
+  const rosters = new Map<string, RosterEntry[]>();
   for (const courseId of courseIds) {
-    rosterSizes.set(courseId, (await getRoster(courseId)).length);
+    rosters.set(courseId, await courseRoster(courseId));
   }
 
   return lessons.map((lesson) => {
+    // A child who does not attend that weekday is not counted; a child who has
+    // since left the course still is, as the register was taken.
+    const roster = rosters.get(lesson.courseId) ?? [];
+    const offDay = offDayIds(roster, lesson.date);
     const mine = marks.filter(
-      (m) => m.course_id === lesson.courseId && m.lesson_index === lesson.lessonIndex
+      (m) => m.course_id === lesson.courseId && m.lesson_index === lesson.lessonIndex && !offDay.has(m.user_id)
     );
     return {
       ...lesson,
-      rosterCount: rosterSizes.get(lesson.courseId) ?? 0,
+      rosterCount: roster.length - offDay.size,
       present: mine.length > 0 ? mine.filter((m) => m.present).length : null,
       absent: mine.length > 0 ? mine.filter((m) => !m.present).length : null,
     };
@@ -149,21 +176,26 @@ export async function listRollCallLessons(opts: {
 export async function getRollCall(
   courseId: string,
   lessonIndex: number
-): Promise<{ lesson: RollCallLesson | null; students: RollCallStudent[] }> {
+): Promise<{ lesson: RollCallLesson | null; students: RollCallStudent[]; offDay: number }> {
   const owner = (await findYearlyProgramById(courseId)) ?? (await findCourseById(courseId));
   const lesson = owner?.lessons?.[lessonIndex];
-  const roster = await getRoster(courseId);
+  const parsed = parseScheduleString(lesson?.schedule ?? "");
+  const everyone = await courseRoster(courseId);
+  const roster = expectedOn(everyone, parsed.date);
+  const offDay = offDayIds(everyone, parsed.date);
 
   const { data } = await getSupabase()
     .from("lesson_roll_call")
     .select("user_id, present")
     .eq("course_id", courseId)
     .eq("lesson_index", lessonIndex);
+  // Not the children who do not attend that weekday: a mark left from before their days changed is not counted.
   const marks = new Map(
-    ((data ?? []) as { user_id: string; present: boolean }[]).map((m) => [m.user_id, m.present])
+    ((data ?? []) as { user_id: string; present: boolean }[])
+      .filter((m) => !offDay.has(m.user_id))
+      .map((m) => [m.user_id, m.present])
   );
 
-  const parsed = parseScheduleString(lesson?.schedule ?? "");
   return {
     lesson: lesson
       ? {
@@ -187,6 +219,7 @@ export async function getRollCall(
       // the screen starts with every box ticked.
       present: marks.has(student.userId) ? marks.get(student.userId) : undefined,
     })),
+    offDay: offDay.size,
   };
 }
 

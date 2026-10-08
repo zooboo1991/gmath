@@ -19,6 +19,7 @@ const ACTION_LABELS: Record<string, string> = {
   "registration.settle_manual": "Дансаар төлсөн гэж баталгаажуулсан",
   "registration.cancel_pending": "Хүлээгдэж буй бүртгэл цуцалсан",
   "registration.set_total_due": "Төлөх дүн тохируулсан",
+  "registration.set_weekdays": "Суух гараг тохируулсан",
   "registration.add_payment": "Төлбөр бүртгэсэн",
   "registration.delete_payment": "Төлбөр хассан",
   "registration.statement_payment": "Дансны хуулгаас төлбөр бүртгэсэн",

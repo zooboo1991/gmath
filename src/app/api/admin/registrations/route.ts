@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { addManualRegistration, findRegistrationByUserAndProgram, findUserByPhone, listAllRegistrations } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { resolveProgram } from "@/lib/resolveProgram";
+import { changeAttendDays, cleanDays, type AttendDaysEntry } from "@/lib/attendDays";
 import { isFullAdmin } from "@/lib/session";
 
 const PHONE_RE = /^[0-9]{8}$/;
@@ -34,6 +35,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
   }
 
+  // Optional: the class days this child attends (left out = every day).
+  let attendDays: AttendDaysEntry[] | undefined;
+  if (data.weekdays !== undefined && data.weekdays !== null) {
+    const days = cleanDays(data.weekdays);
+    if (!days || days.length === 0 || program.weekdays.length < 2 || days.some((d) => !program.weekdays.includes(d))) {
+      return NextResponse.json({ ok: false, error: "Суух гарагаа ангийн хичээллэдэг өдрүүдээс сонгоно уу" }, { status: 400 });
+    }
+    attendDays = changeAttendDays([], days, null, program.weekdays);
+  }
+
   // Re-resolved server-side rather than trusting a client-supplied userId —
   // the admin's phone lookup was just a preview, not proof.
   const user = await findUserByPhone(phone);
@@ -51,11 +62,19 @@ export async function POST(request: Request) {
       price: program.price,
       phone,
       userId: user?.id,
+      attendDays,
     });
     await logAdminAction(request, {
       actionType: "registration.manual_add",
       targetId: registration.id,
-      details: { programId, phone, programLabel: program.label, price: program.price, linkedExistingAccount: Boolean(user) },
+      details: {
+        programId,
+        phone,
+        programLabel: program.label,
+        price: program.price,
+        linkedExistingAccount: Boolean(user),
+        ...(attendDays?.length ? { weekdays: attendDays[0].days } : {}),
+      },
     });
     return NextResponse.json({ ok: true, registration });
   } catch (err) {

@@ -21,6 +21,8 @@ export default function AttendancePanel() {
 
   const [lesson, setLesson] = useState<RollCallLesson | null>(null);
   const [students, setStudents] = useState<RollCallStudent[]>([]);
+  /** Children on the course who do not attend this lesson's weekday. */
+  const [offDay, setOffDay] = useState(0);
   const [present, setPresent] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -59,6 +61,7 @@ export default function AttendancePanel() {
       const roster = (json.students ?? []) as RollCallStudent[];
       setLesson(json.lesson ?? target);
       setStudents(roster);
+      setOffDay(typeof json.offDay === "number" ? json.offDay : 0);
       // Everyone is here until the teacher says otherwise; a register already
       // taken comes back exactly as it was left.
       setPresent(new Set(roster.filter((s) => s.present !== false).map((s) => s.userId)));
@@ -181,7 +184,9 @@ export default function AttendancePanel() {
         <div className="bg-surface border border-line rounded-md shadow-xs mb-4">
           {students.length === 0 ? (
             <p className="text-ink-3 font-semibold text-[.9rem] px-5 py-6 text-center">
-              Энэ сургалтад идэвхтэй бүртгэлтэй сурагч алга байна.
+              {offDay > 0
+                ? "Энэ гарагт суух сурагч алга байна — бүгд өөр гарагт суудаг."
+                : "Энэ сургалтад идэвхтэй бүртгэлтэй сурагч алга байна."}
             </p>
           ) : (
             students.map((student) => {
@@ -218,6 +223,12 @@ export default function AttendancePanel() {
             })
           )}
         </div>
+
+        {students.length > 0 && offDay > 0 && (
+          <p className="text-ink-3 font-semibold text-[.82rem] mb-3">
+            {`${offDay} сурагч энэ гарагт суудаггүй тул жагсаалтад алга.`}
+          </p>
+        )}
 
         {error && <p className="text-red-soft font-semibold text-[.88rem] mb-3">{error}</p>}
 

@@ -7,6 +7,7 @@ import type { PublicUser, Registration, RegistrationPayment } from "@/lib/db";
 import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
 import { formatMnt } from "@/lib/price";
 import { payMethodLabel, registrationBalance } from "@/lib/registration";
+import { WEEKDAY_SHORT, daysOn, describeDays, dotDate } from "@/lib/attendDays";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 
@@ -14,6 +15,46 @@ const PHONE_RE = /^[0-9]{8}$/;
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** Today in Mongolia (UTC+8) — the day a change of weekdays takes effect by default. */
+function mongoliaToday(): string {
+  return new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+}
+
+/** Toggle chips for the class's weekdays. */
+function DayChips({
+  weekdays,
+  selected,
+  onChange,
+  disabled,
+}: {
+  weekdays: number[];
+  selected: number[];
+  onChange: (days: number[]) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {weekdays.map((d) => {
+        const on = selected.includes(d);
+        return (
+          <button
+            key={d}
+            type="button"
+            disabled={disabled}
+            aria-pressed={on}
+            onClick={() => onChange(on ? selected.filter((x) => x !== d) : [...selected, d])}
+            className={`min-w-[44px] text-[.8rem] font-extrabold rounded-full px-3 py-1.5 border-[1.5px] disabled:opacity-50 ${
+              on ? "text-white bg-blue border-blue" : "text-ink-3 bg-surface border-line-2"
+            }`}
+          >
+            {WEEKDAY_SHORT[d]}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 
@@ -36,6 +77,7 @@ export default function RegistrationRoster({
   payments,
   onPaymentsChange,
   canEdit = true,
+  weekdays = [],
 }: {
   programId: string;
   registrations: RegistrationWithUser[];
@@ -50,8 +92,22 @@ export default function RegistrationRoster({
    * history would hide data the account is allowed to see.
    */
   canEdit?: boolean;
+  /**
+   * The weekdays the class meets (Monday first). With two or more, each child
+   * can be set to attend only some of them — the register and their
+   * attendance then leave the other days out.
+   */
+  weekdays?: number[];
 }) {
+  const pickDays = weekdays.length >= 2;
+  // Shown whenever someone has days set, even if the class's timetable has since
+  // shrunk — so a restriction can always be seen and cleared.
+  const showDays = pickDays || registrations.some((r) => (r.attendDays ?? []).length > 0);
   const [phone, setPhone] = useState("");
+  const [addDays, setAddDays] = useState<number[]>(weekdays);
+  const [daysEdit, setDaysEdit] = useState<{ id: string; days: number[]; from: string } | null>(null);
+  const [daysError, setDaysError] = useState<string | null>(null);
+  const [savingDays, setSavingDays] = useState(false);
   const [lookup, setLookup] = useState<{ status: "loading" | "done" | "error"; user?: PublicUser | null } | null>(
     null
   );
@@ -91,7 +147,12 @@ export default function RegistrationRoster({
       const res = await fetch("/api/admin/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ programId, phone }),
+        // Every day is the default, so only a narrower choice is sent.
+        body: JSON.stringify({
+          programId,
+          phone,
+          ...(pickDays && addDays.length < weekdays.length ? { weekdays: addDays } : {}),
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -101,6 +162,7 @@ export default function RegistrationRoster({
       onChange([{ ...json.registration, user: lookup?.user ?? undefined }, ...registrations]);
       setPhone("");
       setLookup(null);
+      setAddDays(weekdays);
     } catch {
       setAddError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
@@ -118,6 +180,42 @@ export default function RegistrationRoster({
       }
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const openDays = (r: RegistrationWithUser) => {
+    setDaysError(null);
+    // Only days the class still meets on: a day it dropped has no chip and could never be unticked.
+    const current = (daysOn(r.attendDays, mongoliaToday()) ?? weekdays).filter((d) => weekdays.includes(d));
+    setDaysEdit({ id: r.id, days: current.length > 0 ? current : weekdays, from: mongoliaToday() });
+  };
+
+  const saveDays = async (everyDay = false) => {
+    if (!daysEdit || (!everyDay && daysEdit.days.length === 0)) return;
+    const days = daysEdit.days.filter((d) => weekdays.includes(d));
+    const all = everyDay || weekdays.every((d) => days.includes(d));
+    setSavingDays(true);
+    setDaysError(null);
+    try {
+      const res = await fetch(`/api/admin/registrations/${daysEdit.id}/weekdays`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weekdays: all ? null : days,
+          from: daysEdit.from || null,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDaysError(json.error ?? "Хадгалахад алдаа гарлаа");
+        return;
+      }
+      onChange(registrations.map((r) => (r.id === daysEdit.id ? { ...r, attendDays: json.registration.attendDays } : r)));
+      setDaysEdit(null);
+    } catch {
+      setDaysError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setSavingDays(false);
     }
   };
 
@@ -196,6 +294,7 @@ export default function RegistrationRoster({
   );
   const shown =
     province === "all" ? registrations : registrations.filter((r) => (r.user?.province || "") === province);
+  const columns = 6 + (showDays ? 1 : 0) + (trackPayments ? 1 : 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -240,12 +339,21 @@ export default function RegistrationRoster({
             )}
             <button
               type="button"
-              disabled={adding}
+              disabled={adding || (pickDays && addDays.length === 0)}
               onClick={add}
               className="text-[.82rem] font-extrabold text-white bg-blue rounded-full px-4 py-2 disabled:opacity-50"
             >
               {adding ? "…" : "Нэмэх"}
             </button>
+            {pickDays && (
+              <div className="w-full flex items-center gap-2.5 flex-wrap">
+                <span className="text-[.78rem] font-extrabold text-ink-3">Суух гараг</span>
+                <DayChips weekdays={weekdays} selected={addDays} onChange={setAddDays} disabled={adding} />
+                {addDays.length === 0 && (
+                  <span className="text-[.78rem] font-bold text-gold-strong">Дор хаяж нэг өдөр сонгоно уу</span>
+                )}
+              </div>
+            )}
           </div>
         )}
         {addError && <p className="text-[.82rem] font-semibold text-red-soft mt-2.5">{addError}</p>}
@@ -298,6 +406,7 @@ export default function RegistrationRoster({
                 <th className="px-2 py-2">Сургууль</th>
                 <th className="px-2 py-2">Огноо</th>
                 <th className="px-2 py-2">Төлөв</th>
+                {showDays && <th className="px-2 py-2">Гараг</th>}
                 {trackPayments && <th className="px-2 py-2">Төлбөр</th>}
                 <th className="px-2 py-2" />
               </tr>
@@ -365,6 +474,37 @@ export default function RegistrationRoster({
                           </span>
                         )}
                       </td>
+                      {showDays && (
+                        <td className="px-2 py-3">
+                          {(() => {
+                            const today = mongoliaToday();
+                            const now = daysOn(r.attendDays, today);
+                            const later = (r.attendDays ?? []).find((e) => e.from !== null && e.from > today);
+                            const label = (
+                              <span className="font-bold text-[.84rem] text-ink-2">
+                                {now ? describeDays(now, true) : "Бүх өдөр"}
+                                {later && (
+                                  <span className="block text-[.74rem] text-ink-3">
+                                    {`${dotDate(later.from!)} өдрөөс: ${later.days ? describeDays(later.days, true) : "бүх өдөр"}`}
+                                  </span>
+                                )}
+                              </span>
+                            );
+                            return canEdit && r.status !== "cancelled" ? (
+                              <button
+                                type="button"
+                                onClick={() => (daysEdit?.id === r.id ? setDaysEdit(null) : openDays(r))}
+                                className="text-left hover:text-blue-strong"
+                                title="Суух гараг өөрчлөх"
+                              >
+                                {label}
+                              </button>
+                            ) : (
+                              label
+                            );
+                          })()}
+                        </td>
+                      )}
                       {trackPayments && (
                         <td className="px-2 py-3">
                           <button
@@ -407,9 +547,72 @@ export default function RegistrationRoster({
                         )}
                       </td>
                     </tr>
+                    {showDays && daysEdit?.id === r.id && (
+                      <tr className="border-t border-line">
+                        <td colSpan={columns} className="px-2 py-4 bg-bg-soft">
+                          <div className="flex flex-col gap-2.5 max-w-[560px]">
+                            <span className="text-[.78rem] font-extrabold text-ink-3">Суух гараг</span>
+                            <DayChips
+                              weekdays={weekdays}
+                              selected={daysEdit.days}
+                              onChange={(days) => setDaysEdit((d) => d && { ...d, days })}
+                              disabled={savingDays}
+                            />
+                            <label className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[.78rem] font-extrabold text-ink-3">Хэзээнээс</span>
+                              <input
+                                type="date"
+                                value={daysEdit.from}
+                                onChange={(e) => setDaysEdit((d) => d && { ...d, from: e.target.value })}
+                                className="px-3 py-1.5 rounded-xs border-[1.5px] border-line-2 bg-surface font-semibold text-[.85rem]"
+                              />
+                              <span className="text-[.76rem] font-semibold text-ink-3">
+                                {daysEdit.from
+                                  ? "Үүнээс өмнөх ирц хуучин гарагаараа үлдэнэ."
+                                  : "Хоосон бол хичээлийн эхнээс — өмнөх бүх ирцэд хамаарна."}
+                              </span>
+                            </label>
+                            {(r.attendDays ?? []).length > 0 && (
+                              <span className="text-[.76rem] font-semibold text-ink-3">
+                                {"Түүх: " +
+                                  (r.attendDays ?? [])
+                                    .map((e) => `${e.from ? `${dotDate(e.from)} өдрөөс` : "Эхнээс"} ${e.days ? describeDays(e.days, true) : "бүх өдөр"}`)
+                                    .join(" → ")}
+                              </span>
+                            )}
+                            {daysError && <span className="text-[.8rem] font-semibold text-red-soft">{daysError}</span>}
+                            <div className="flex gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                disabled={savingDays || daysEdit.days.length === 0 || !pickDays}
+                                onClick={() => saveDays()}
+                                className="text-[.82rem] font-extrabold text-white bg-blue rounded-full px-4 py-2 disabled:opacity-50"
+                              >
+                                {savingDays ? "…" : "Хадгалах"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={savingDays}
+                                onClick={() => saveDays(true)}
+                                className="text-[.82rem] font-extrabold text-blue-strong bg-blue-soft rounded-full px-4 py-2 disabled:opacity-50"
+                              >
+                                Бүх өдөр болгох
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDaysEdit(null)}
+                                className="text-[.82rem] font-extrabold text-ink-2 bg-surface-2 rounded-full px-4 py-2"
+                              >
+                                Болих
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                     {trackPayments && expanded && (
                       <tr className="border-t border-line">
-                        <td colSpan={6} className="px-2 py-4 bg-bg-soft">
+                        <td colSpan={columns} className="px-2 py-4 bg-bg-soft">
                           {canEdit && (
                           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2.5 items-end max-w-[420px]">
                             <label className="flex flex-col gap-1.5">

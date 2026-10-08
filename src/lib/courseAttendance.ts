@@ -1,5 +1,6 @@
 import { getWeekdayNameMn } from "./courseDate";
 import { mongoliaLocalToUtc, parseScheduleString } from "./lessonSchedule";
+import { attendsLesson, type AttendDaysEntry } from "./attendDays";
 
 /**
  * Хичээл бүрийн ирц — нэг сурагчийн нүдээр.
@@ -104,53 +105,60 @@ export function summariseAttendance(input: {
   rollCallByLessonIndex: Record<number, boolean>;
   /** Бичлэгийг нь үзсэн хичээлүүдийн дугаар. */
   watchedLessonIndexes: Set<number>;
+  /** Хүүхдийн суух гарагууд. Суудаггүй гарагийн хичээл жагсаалт, тоонд орохгүй. */
+  attendDays?: AttendDaysEntry[];
   now?: Date;
 }): AttendanceSummary {
   const now = input.now ?? new Date();
 
-  const lessons = input.lessons.map((lesson, lessonIndex): LessonAttendance => {
-    const mode: AttendanceMode = lesson.mode === "inperson" ? "inperson" : "online";
-    const { date, startTime, endTime } = parseScheduleString(lesson.schedule ?? "");
-    const weekday = getWeekdayNameMn(date);
-    const win = lessonWindow(lesson.schedule);
-    const watchedRecording = input.watchedLessonIndexes.has(lessonIndex);
-    const base = {
-      lessonIndex,
-      topic: lesson.topic,
-      mode,
-      dateLabel: date ? `${date.replaceAll("-", ".")}${weekday ? ` ${weekday}` : ""}` : "",
-      timeLabel: startTime && endTime ? `${startTime}–${endTime}` : startTime,
-      watchedRecording,
-      hasRecording: Boolean(lesson.recordingLink),
-    };
+  // Numbered over the whole course first, then the child's off-days dropped:
+  // marks, Zoom spans and recordings are all keyed by the course-wide index.
+  const lessons = input.lessons
+    .map((lesson, lessonIndex) => ({ lesson, lessonIndex }))
+    .filter(({ lesson }) => attendsLesson(input.attendDays, lesson.schedule))
+    .map(({ lesson, lessonIndex }): LessonAttendance => {
+      const mode: AttendanceMode = lesson.mode === "inperson" ? "inperson" : "online";
+      const { date, startTime, endTime } = parseScheduleString(lesson.schedule ?? "");
+      const weekday = getWeekdayNameMn(date);
+      const win = lessonWindow(lesson.schedule);
+      const watchedRecording = input.watchedLessonIndexes.has(lessonIndex);
+      const base = {
+        lessonIndex,
+        topic: lesson.topic,
+        mode,
+        dateLabel: date ? `${date.replaceAll("-", ".")}${weekday ? ` ${weekday}` : ""}` : "",
+        timeLabel: startTime && endTime ? `${startTime}–${endTime}` : startTime,
+        watchedRecording,
+        hasRecording: Boolean(lesson.recordingLink),
+      };
 
-    if (win && win.end.getTime() > now.getTime()) {
-      return { ...base, outcome: "upcoming" };
-    }
+      if (win && win.end.getTime() > now.getTime()) {
+        return { ...base, outcome: "upcoming" };
+      }
 
-    if (mode === "inperson") {
-      const marked = input.rollCallByLessonIndex[lessonIndex];
-      return { ...base, outcome: marked === undefined ? "unmarked" : marked ? "present" : "absent" };
-    }
+      if (mode === "inperson") {
+        const marked = input.rollCallByLessonIndex[lessonIndex];
+        return { ...base, outcome: marked === undefined ? "unmarked" : marked ? "present" : "absent" };
+      }
 
-    // Zoom-оор хянагдаагүй онлайн хичээлээс ирц мэдэх аргагүй.
-    if (!input.trackedLessonIndexes.has(lessonIndex) || !win) {
-      return { ...base, outcome: "unmarked" };
-    }
+      // Zoom-оор хянагдаагүй онлайн хичээлээс ирц мэдэх аргагүй.
+      if (!input.trackedLessonIndexes.has(lessonIndex) || !win) {
+        return { ...base, outcome: "unmarked" };
+      }
 
-    const durationMs = win.end.getTime() - win.start.getTime();
-    const attendedMs = overlapMs(input.spansByLessonIndex[lessonIndex] ?? [], win.start, win.end);
-    const percent = Math.min(100, Math.round((attendedMs / durationMs) * 100));
-    const minutes = Math.round(attendedMs / 60_000);
+      const durationMs = win.end.getTime() - win.start.getTime();
+      const attendedMs = overlapMs(input.spansByLessonIndex[lessonIndex] ?? [], win.start, win.end);
+      const percent = Math.min(100, Math.round((attendedMs / durationMs) * 100));
+      const minutes = Math.round(attendedMs / 60_000);
 
-    if (attendedMs === 0) return { ...base, outcome: "absent", minutes: 0, percent: 0 };
-    return {
-      ...base,
-      outcome: percent >= PRESENT_THRESHOLD_PERCENT ? "present" : "partial",
-      minutes,
-      percent,
-    };
-  });
+      if (attendedMs === 0) return { ...base, outcome: "absent", minutes: 0, percent: 0 };
+      return {
+        ...base,
+        outcome: percent >= PRESENT_THRESHOLD_PERCENT ? "present" : "partial",
+        minutes,
+        percent,
+      };
+    });
 
   const count = (outcome: AttendanceOutcome) => lessons.filter((l) => l.outcome === outcome).length;
   const present = count("present");

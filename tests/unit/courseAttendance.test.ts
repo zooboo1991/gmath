@@ -152,3 +152,21 @@ describe("бичлэг ба болоогүй хичээл", () => {
     expect(unmarked).toBe(1);
   });
 });
+
+describe("хүүхдийн суух гараг", () => {
+  it("суудаггүй гарагийн хичээл жагсаалт, тоонд орохгүй, дугаар нь хэвээр", () => {
+    const { lessons, absent, rate } = summarise({
+      // Мягмар, Баасан, Пүрэв — the child comes on Мягмар and Пүрэв only.
+      lessons: [lesson("Мягмар", "2026-08-25"), lesson("Баасан", "2026-08-28"), lesson("Пүрэв", "2026-08-27")].map((l) => ({
+        ...l,
+        mode: "inperson" as const,
+      })),
+      rollCallByLessonIndex: { 0: true, 1: false, 2: true },
+      attendDays: [{ from: null, days: [2, 4] }],
+    });
+    expect(lessons.map((l) => l.lessonIndex)).toEqual([0, 2]);
+    expect(absent).toBe(0);
+    expect(rate).toBe(100);
+  });
+});
+

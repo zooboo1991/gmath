@@ -22,6 +22,7 @@ import type { AssessmentStatus } from "@/lib/assessment/types";
 import type { AttendanceOutcome, AttendanceSummary } from "@/lib/courseAttendance";
 import { PRESENT_THRESHOLD_PERCENT } from "@/lib/courseAttendance";
 import { formatCourseDate } from "@/lib/courseDate";
+import { daysOn, describeDays, dotDate, type AttendDaysEntry } from "@/lib/attendDays";
 import { formatMnt } from "@/lib/price";
 import BalancePayModal from "@/components/profile/BalancePayModal";
 
@@ -101,7 +102,12 @@ export default function CourseObjectPage({
 
   return (
     <>
-      <CourseHeader registration={registration} summary={summary} />
+      <CourseHeader
+        registration={registration}
+        summary={summary}
+        // Today in Mongolia (UTC+8), from the server's clock so both renders agree.
+        today={new Date(Date.parse(nowIso) + 8 * 3600_000).toISOString().slice(0, 10)}
+      />
 
       <section className="pt-6 pb-[clamp(48px,7vw,96px)]">
         <div className="wrap max-w-[900px] mx-auto">
@@ -153,10 +159,15 @@ export default function CourseObjectPage({
 function CourseHeader({
   registration,
   summary,
+  today,
 }: {
   registration: RegistrationWithGroup;
   summary: AttendanceSummary;
+  today: string;
 }) {
+  const days = daysOn(registration.attendDays, today);
+  // A change already set for a later date: the timetable below follows it, so say so.
+  const next: AttendDaysEntry | undefined = (registration.attendDays ?? []).find((e) => e.from !== null && e.from > today);
   const judged = summary.present + summary.partial + summary.absent;
 
   return (
@@ -184,6 +195,14 @@ function CourseHeader({
                 {registration.price}
                 {registration.startDate && ` · Эхэлсэн: ${formatCourseDate(registration.startDate)}`}
               </p>
+              {days && (
+                <p className="text-white font-bold text-[.88rem] mt-1">{`${describeDays(days)} гарагт суудаг`}</p>
+              )}
+              {next && (
+                <p className="text-white/85 font-semibold text-[.85rem] mt-0.5">
+                  {`${dotDate(next.from!)} өдрөөс ${next.days ? `${describeDays(next.days)} гарагт` : "бүх өдөр"} суудаг`}
+                </p>
+              )}
             </div>
             <span className="inline-flex items-center gap-1.5 text-[.82rem] font-extrabold text-white bg-white/15 px-3 py-1.5 rounded-full shrink-0">
               <IconCheckCircle className="w-3.5 h-3.5" /> Идэвхтэй

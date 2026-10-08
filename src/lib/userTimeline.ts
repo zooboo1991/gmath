@@ -22,6 +22,7 @@ const KIND_BY_ADMIN_ACTION: Record<string, TimelineEvent["kind"]> = {
   "registration.add_payment": "payment",
   "registration.delete_payment": "payment",
   "registration.set_total_due": "payment",
+  "registration.set_weekdays": "course",
 };
 
 const ADMIN_ACTION_LABELS: Record<string, string> = {
@@ -35,6 +36,7 @@ const ADMIN_ACTION_LABELS: Record<string, string> = {
   "registration.add_payment": "Админ төлбөр бүртгэсэн",
   "registration.delete_payment": "Админ төлбөр хассан",
   "registration.set_total_due": "Админ төлөх дүнг тохируулсан",
+  "registration.set_weekdays": "Админ суух гарагийг тохируулсан",
 };
 
 /** "Сонгон бэлтгэл (C ангилал)" for a programme id, or the id when it is gone. */

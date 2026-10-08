@@ -6,6 +6,7 @@ import LessonNoteButton from "@/components/profile/LessonNoteButton";
 import { IconClock, IconVideoCamera, IconLocation, IconPlayBox } from "@/components/icons";
 import type { RegistrationWithGroup } from "@/lib/db";
 import { formatTimeUntil, getLessonStates, type LessonWithState } from "@/lib/lessonSchedule";
+import { attendsLesson } from "@/lib/attendDays";
 import { formatMb } from "@/lib/imageResize";
 
 const TICK_MS = 30_000;
@@ -228,7 +229,11 @@ export default function LessonSchedule({
   }
 
   const states = getLessonStates(lessons, now);
-  const numbered = states.map((info, lessonIndex) => ({ info, lessonIndex }));
+  // Numbered over the whole course (the join/recording routes take that index);
+  // the timetable then leaves out the days this child does not attend.
+  const numbered = states
+    .map((info, lessonIndex) => ({ info, lessonIndex }))
+    .filter(({ info }) => show === "past" || attendsLesson(registration.attendDays, info.lesson.schedule));
 
   if (show === "past") {
     const done = numbered.filter(({ info }) => info.state === "past").reverse();

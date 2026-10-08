@@ -66,6 +66,16 @@ export async function PUT(request: Request) {
     return NextResponse.json({ ok: false, error: "Буруу хүсэлт" }, { status: 400 });
   }
 
+  // Only children expected at this lesson: a register opened before a child's days changed must not mark them.
+  const { students } = await getRollCall(courseId, lessonIndex);
+  const expected = new Set(students.map((s) => s.userId));
+  if (marks.some((m: { userId: string }) => !expected.has(m.userId))) {
+    return NextResponse.json(
+      { ok: false, error: "Жагсаалт өөрчлөгдсөн байна — хуудсаа сэргээгээд дахин бүртгэнэ үү." },
+      { status: 409 }
+    );
+  }
+
   const actor = await getAdminActor();
   const counts = await saveRollCall({ courseId, lessonIndex, marks, markedBy: actor?.name });
   await logAdminAction(request, {

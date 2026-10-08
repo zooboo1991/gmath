@@ -1,4 +1,5 @@
 import { findCourseById, findYearlyProgramById } from "./db";
+import { classWeekdays } from "./attendDays";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -6,6 +7,8 @@ export type ResolvedProgram = {
   label: string;
   price: string;
   tag: string;
+  /** The weekdays a course meets (from its dated lessons); empty for a yearly programme. */
+  weekdays: number[];
 };
 
 /**
@@ -17,12 +20,17 @@ export type ResolvedProgram = {
 export async function resolveProgram(programId: string): Promise<ResolvedProgram | undefined> {
   const yearlyProgram = await findYearlyProgramById(programId);
   if (yearlyProgram) {
-    return { label: yearlyProgram.label, price: yearlyProgram.price, tag: yearlyProgram.tag };
+    return { label: yearlyProgram.label, price: yearlyProgram.price, tag: yearlyProgram.tag, weekdays: [] };
   }
   if (UUID_RE.test(programId)) {
     const course = await findCourseById(programId);
     if (!course) return undefined;
-    return { label: `${course.title} (${course.tag})`, price: course.price, tag: course.tag };
+    return {
+      label: `${course.title} (${course.tag})`,
+      price: course.price,
+      tag: course.tag,
+      weekdays: classWeekdays(course.lessons),
+    };
   }
   return undefined;
 }

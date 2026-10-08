@@ -97,13 +97,16 @@ describe("what a teacher's account may not do", () => {
       { method: "POST", path: `/api/admin/registrations/${registration.id}/settle-manual`, body: { amount: 1, paidAt: "2026-09-01" } },
       { method: "POST", path: "/api/admin/registrations", body: {} },
       { method: "DELETE", path: `/api/admin/registrations/${registration.id}`, body: undefined },
+      { method: "PUT", path: `/api/admin/registrations/${registration.id}/weekdays`, body: { weekdays: null, from: null } },
     ] as const;
 
     for (const route of refused) {
       const res =
         route.method === "POST"
           ? await teacher.post(route.path, route.body)
-          : await teacher.del(route.path);
+          : route.method === "PUT"
+            ? await teacher.put(route.path, route.body)
+            : await teacher.del(route.path);
       expect(res.status, `${route.method} ${route.path}`).toBe(401);
     }
 

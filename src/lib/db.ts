@@ -12,6 +12,7 @@ import { sendSms } from "./sms/skytel";
 import { compareMn } from "./sortMn";
 import { extractCourseCategories, getCourseAudience } from "./courseTag";
 import { courseHref } from "./courseHref";
+import { readAttendDays, type AttendDaysEntry } from "./attendDays";
 
 /**
  * Persistence layer backed by Supabase Postgres (see supabase/schema.sql
@@ -232,6 +233,11 @@ export type Registration = {
    * заахгүй байж болно.
    */
   placementCredit?: number;
+  /**
+   * The weekdays the child attends, dated so a change never rewrites past
+   * registers (see lib/attendDays). Empty or undefined: every class day.
+   */
+  attendDays?: AttendDaysEntry[];
 };
 
 /**
@@ -347,6 +353,8 @@ type RegistrationRow = {
   total_due: number | null;
   installment_due_date: string | null;
   placement_credit: number | null;
+  /** Absent until the column is added on that database — read as "every day". */
+  attend_days?: unknown;
 };
 
 type CertificateRow = {
@@ -465,6 +473,7 @@ function registrationFromRow(row: RegistrationRow): Registration {
     totalDue: row.total_due ?? undefined,
     installmentDueDate: row.installment_due_date ?? undefined,
     placementCredit: row.placement_credit ?? 0,
+    attendDays: readAttendDays(row.attend_days),
   };
 }
 
@@ -1577,6 +1586,8 @@ export async function addManualRegistration(input: {
   price: string;
   phone: string;
   userId?: string;
+  /** Only some of the class's days; left out (every day) the insert does not name the column. */
+  attendDays?: AttendDaysEntry[];
 }): Promise<Registration> {
   const { data, error } = await getSupabase()
     .from("registrations")
@@ -1588,6 +1599,7 @@ export async function addManualRegistration(input: {
       price: input.price,
       pay_method: "manual",
       status: "active",
+      ...(input.attendDays?.length ? { attend_days: input.attendDays } : {}),
     })
     .select("*")
     .single();
@@ -1919,6 +1931,18 @@ export async function deleteRegistration(id: string): Promise<boolean> {
   const { error, count } = await getSupabase().from("registrations").delete({ count: "exact" }).eq("id", id);
   if (error) throw error;
   return (count ?? 0) > 0;
+}
+
+/** Writes only attend_days — never a full patch of this money row (see updateRegistration). */
+export async function setRegistrationAttendDays(id: string, entries: AttendDaysEntry[]): Promise<Registration | undefined> {
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .update({ attend_days: entries.length ? entries : null })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data ? registrationFromRow(data as RegistrationRow) : undefined;
 }
 
 export async function setRegistrationTotalDue(id: string, totalDue: number): Promise<Registration | undefined> {
