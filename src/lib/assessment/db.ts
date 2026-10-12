@@ -454,14 +454,38 @@ export async function findAssessment(id: string): Promise<Assessment | undefined
   return data ? assessmentFromRow(data as AssessmentRow) : undefined;
 }
 
+/**
+ * A child's placement and quiz sittings, newest first. A course's homework and
+ * test papers (track 'course') are left out: every caller here is a placement
+ * path — resume, results, "already sat this exam" — and a homework paper in
+ * that list would be resumed or reported as a placement test. They are read
+ * through listCourseSittings instead.
+ */
 export async function listAssessmentsByUser(userId: string): Promise<Assessment[]> {
   const { data, error } = await getSupabase()
     .from("assessments")
     .select("*")
     .eq("user_id", userId)
+    .neq("track", "course")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data as AssessmentRow[]).map(assessmentFromRow);
+}
+
+/** One child's sittings of the given course papers (not cancelled), keyed by exam. */
+export async function listCourseSittings(userId: string, examIds: string[]): Promise<Map<string, Assessment>> {
+  const out = new Map<string, Assessment>();
+  if (examIds.length === 0) return out;
+  const { data, error } = await getSupabase()
+    .from("assessments")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("track", "course")
+    .neq("status", "cancelled")
+    .in("exam_id", examIds);
+  if (error) throw error;
+  for (const a of (data as AssessmentRow[]).map(assessmentFromRow)) if (a.examId) out.set(a.examId, a);
+  return out;
 }
 
 /** The one the student is still working through, if any. */
@@ -1036,7 +1060,7 @@ export async function countQuizQuestionsByGrade(track: QuizTrack): Promise<Recor
 export async function getOrAssembleQuiz(
   assessment: Assessment
 ): Promise<{ questions: QuizQuestion[]; answers: QuizAnswer[] }> {
-  if (assessment.track === "olympiad" || assessment.track === "placement" || !assessment.quizGrade) {
+  if (assessment.track === "olympiad" || assessment.track === "placement" || assessment.track === "course" || !assessment.quizGrade) {
     throw new Error("not a quiz assessment");
   }
 

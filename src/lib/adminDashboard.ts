@@ -38,9 +38,14 @@ export type OperationsSnapshot = {
   todayLessons: TodayLesson[];
 };
 
-async function count(table: string, filters: Record<string, string> = {}): Promise<number> {
+async function count(
+  table: string,
+  filters: Record<string, string> = {},
+  except: Record<string, string> = {}
+): Promise<number> {
   let query = getSupabase().from(table).select("*", { count: "exact", head: true });
   for (const [column, value] of Object.entries(filters)) query = query.eq(column, value);
+  for (const [column, value] of Object.entries(except)) query = query.neq(column, value);
   const { count: n, error } = await query;
   if (error) throw error;
   return n ?? 0;
@@ -162,9 +167,10 @@ export async function getOperationsSnapshot(now = new Date()): Promise<Operation
   ] = await Promise.all([
     count("assessments", { status: "problems_submitted" }).catch(() => 0),
     count("assessments", { status: "grading" }).catch(() => 0),
-    count("assessments", { status: "questionnaire_done" }).catch(() => 0),
-    count("assessments", { status: "completed" }).catch(() => 0),
-    count("exams", { status: "open" }).catch(() => 0),
+    // A course paper left unsent stays mid-way forever; it is not a child solving now.
+    count("assessments", { status: "questionnaire_done" }, { track: "course" }).catch(() => 0),
+    count("assessments", { status: "completed" }, { track: "course" }).catch(() => 0),
+    count("exams", { status: "open", kind: "placement" }).catch(() => 0),
     count("chat_issues", { status: "new" }).catch(() => 0),
     count("admin_users", { active: "true" }).catch(() => 0),
     findTodayLessons(now).catch(() => [] as TodayLesson[]),

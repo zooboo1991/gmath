@@ -37,8 +37,8 @@ export default async function ExamPreviewPage({ params }: { params: Promise<{ id
 
       <h1 className="text-[1.4rem] font-extrabold tracking-[-.02em]">{exam.title}</h1>
       <p className="text-ink-3 font-semibold text-[.88rem] mt-1 mb-6">
-        {exam.category} ангилал ({exam.category === "C" ? "5-6" : "7-8"} анги) · {exam.problems.length} бодлого ·{" "}
-        {exam.fee}
+        {exam.category ? `${exam.category} ангилал (${exam.category === "C" ? "5-6" : "7-8"} анги) · ` : ""}
+        {exam.problems.length} бодлого · {exam.fee}
       </p>
 
       {exam.problems.length === 0 ? (

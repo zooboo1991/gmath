@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPickingState, listSolutions, setProblemSkipped } from "@/lib/assessment/db";
 import { requireOwnAssessment, requireStatus } from "@/lib/assessment/guard";
+import { courseWindowError } from "@/lib/courseTasks";
 
 /**
  * "Бодож чадсангүй" — the child could not solve this one and moves on.
@@ -20,6 +21,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!step.ok) {
     return NextResponse.json({ ok: false, error: "Бодолт илгээгдсэн байна" }, { status: 409 });
   }
+
+  // A course paper takes work only inside its window.
+  const closed = await courseWindowError(guard.assessment);
+  if (closed) return NextResponse.json({ ok: false, error: closed }, { status: 409 });
 
   const data = await request.json().catch(() => ({}));
   const problemId = typeof data.problemId === "string" ? data.problemId : "";

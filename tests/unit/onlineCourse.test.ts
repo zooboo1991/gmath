@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { courseTotals, courseWeeks, lessonKind, lessonSubject, lessonTitle, weeklyRhythm } from "@/lib/onlineCourse";
+import { planCourseTasks, taskState } from "@/lib/courseTasks";
 
 const lessons = [
   { topic: "Гурвалжин 3 (Zoom)", schedule: "2026.10.30 Баасан гараг · 19:00–21:00" },
@@ -52,5 +53,52 @@ describe("weeks and totals", () => {
   it("reads the weekly rhythm and counts tasks and tests per week", () => {
     expect(rhythm[1]).toEqual({ day: "Мягмар", time: "09:00–21:00", text: "Даалгавар 1: 3–5 бодлого" });
     expect(courseTotals(lessons, rhythm)).toEqual({ weeks: 2, videos: 3, zooms: 2, tasks: 4, tests: 2 });
+  });
+});
+
+describe("course papers: plan and state", () => {
+  it("plans a homework per homework line and a test per test line, every week, named after the week's videos", () => {
+    const plan = planCourseTasks({ lessons, weeklySchedule: rhythm.map((r) => `${r.day} ${r.time} · ${r.text}`).join("\n") });
+    expect(plan.map((p) => [p.kind, p.title])).toEqual([
+      ["homework", "Даалгавар 1: Үнэлгээний бодлогууд 1"],
+      ["homework", "Даалгавар 2: Үнэлгээний бодлогууд 2"],
+      ["test", "Сорил 1: Үнэлгээний бодлогууд"],
+      ["homework", "Даалгавар 3: Гурвалжин 1"],
+      // Week 2 has one video lesson: the second homework takes the week's subject.
+      ["homework", "Даалгавар 4: Гурвалжин"],
+      ["test", "Сорил 2: Гурвалжин"],
+    ]);
+    expect(plan[0].opensAt).toBe("2026-10-20T01:00:00.000Z"); // Мягмар 09:00 in Ulaanbaatar
+    expect(plan[0].closesAt).toBe("2026-10-20T13:00:00.000Z");
+  });
+
+  it("numbers homework in week order, skips look-alike lines, and closes a late window the next day", () => {
+    const plan = planCourseTasks({
+      lessons: lessons.slice(1, 4),
+      weeklySchedule: [
+        "Пүрэв 09:00–21:00 · Даалгавар 2: 3–5 бодлого",
+        "Мягмар 09:00–21:00 · Даалгавар 1: 3–5 бодлого",
+        "Ням 20:00–02:00 · Сорил: вэб системд",
+        "Бямба 10:00–11:00 · Сорилын хариу: Zoom-оор",
+      ].join("\n"),
+    });
+    expect(plan.map((p) => [p.title, p.opensAt, p.closesAt])).toEqual([
+      ["Даалгавар 1: Үнэлгээний бодлогууд 1", "2026-10-20T01:00:00.000Z", "2026-10-20T13:00:00.000Z"],
+      ["Даалгавар 2: Үнэлгээний бодлогууд 2", "2026-10-22T01:00:00.000Z", "2026-10-22T13:00:00.000Z"],
+      // Ням 20:00 to Даваа 02:00, Ulaanbaatar time.
+      ["Сорил 1: Үнэлгээний бодлогууд", "2026-10-25T12:00:00.000Z", "2026-10-25T18:00:00.000Z"],
+    ]);
+  });
+
+  it("only a paper handed in counts; a paper not handed in by its close is missed", () => {
+    const task = { opensAt: "2026-10-20T01:00:00Z", closesAt: "2026-10-20T13:00:00Z", status: "open" as const, problemCount: 3 };
+    const at = (iso: string) => new Date(iso);
+    expect(taskState(task, undefined, at("2026-10-20T00:00:00Z"))).toBe("upcoming");
+    expect(taskState(task, undefined, at("2026-10-20T05:00:00Z"))).toBe("open");
+    expect(taskState({ ...task, problemCount: 0 }, undefined, at("2026-10-20T05:00:00Z"))).toBe("preparing");
+    expect(taskState(task, { status: "questionnaire_done" }, at("2026-10-20T05:00:00Z"))).toBe("in_progress");
+    expect(taskState(task, { status: "questionnaire_done" }, at("2026-10-20T14:00:00Z"))).toBe("missed");
+    expect(taskState(task, { status: "problems_submitted" }, at("2026-10-20T14:00:00Z"))).toBe("submitted");
+    expect(taskState(task, { status: "completed" }, at("2026-10-21T00:00:00Z"))).toBe("graded");
   });
 });

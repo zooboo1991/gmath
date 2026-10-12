@@ -1676,3 +1676,30 @@ grant all on table public.mini_olympiad_results to service_role;
 -- last one whose "from" is on or before it. days are getDay() numbers
 -- (0 = Ням … 6 = Бямба); null days, or no entries at all, mean every day.
 alter table registrations add column if not exists attend_days jsonb;
+
+-- ---------------------------------------------------------------------------
+-- Сургалтын даалгавар, сорил
+-- ---------------------------------------------------------------------------
+-- An online course (template "online-olympiad") hands out a paper of problems
+-- on set days: homework on Мягмар/Пүрэв, a test on Ням, each open for a window
+-- (09:00–21:00). They are exams — the same problem roll, photo upload and
+-- grading queue as the placement test — that belong to one course and open and
+-- close on their own. Problems come from the whole bank, so they carry no
+-- category. A sitting of one is track 'course', which keeps it out of every
+-- placement path (resume, results, parent-meeting eligibility), and a child
+-- sits each paper once.
+alter table exams add column if not exists kind text not null default 'placement';
+alter table exams drop constraint if exists exams_kind_check;
+alter table exams add constraint exams_kind_check check (kind in ('placement', 'homework', 'test'));
+alter table exams add column if not exists program_id text;
+alter table exams add column if not exists opens_at timestamptz;
+alter table exams add column if not exists closes_at timestamptz;
+alter table exams add column if not exists position smallint not null default 0;
+alter table exams alter column category drop not null;
+create index if not exists exams_program_idx on exams (program_id, opens_at) where program_id is not null;
+
+alter table assessments drop constraint if exists assessments_track_check;
+alter table assessments add constraint assessments_track_check
+  check (track in ('regular', 'advanced', 'olympiad', 'placement', 'course'));
+create unique index if not exists assessments_course_paper_idx
+  on assessments (user_id, exam_id) where track = 'course' and status <> 'cancelled';

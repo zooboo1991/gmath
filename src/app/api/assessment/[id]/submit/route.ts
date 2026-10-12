@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPickingState, listSolutions, updateAssessment } from "@/lib/assessment/db";
 import { requireOwnAssessment, requireStatus } from "@/lib/assessment/guard";
+import { courseWindowError } from "@/lib/courseTasks";
 
 /** Hands the work over to the graders. One-way. */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -13,6 +14,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!step.ok) {
     return NextResponse.json({ ok: false, error: "Аль хэдийн илгээгдсэн байна" }, { status: 409 });
   }
+
+  // A course paper takes work only inside its window.
+  const closed = await courseWindowError(guard.assessment);
+  if (closed) return NextResponse.json({ ok: false, error: closed }, { status: 409 });
 
   const state = await getPickingState(guard.assessment);
   if (state.chosen.length === 0) {

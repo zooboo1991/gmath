@@ -29,13 +29,14 @@ import { downscaleImage, formatMb, MAX_UPLOAD_BYTES } from "@/lib/imageResize";
 import { AnchorTab, Card, KpiTile } from "./AdminObjectPageParts";
 import LessonScheduleEditor from "./LessonScheduleEditor";
 import RegistrationRoster from "./RegistrationRoster";
+import CourseTasksAdmin from "./CourseTasksAdmin";
 import { classWeekdays } from "@/lib/attendDays";
 import IssueCertificatesCard from "./IssueCertificatesCard";
 import ProgramArticlesEditor, { type ArticleOption } from "@/components/admin/ProgramArticlesEditor";
 import PendingRegistrationActions from "@/components/admin/PendingRegistrationActions";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
-type SectionTab = "info" | "roster" | "confirm" | "report";
+type SectionTab = "info" | "roster" | "tasks" | "confirm" | "report";
 
 const PERIOD_OPTIONS = [
   { value: "/ сар", label: "Сар" },
@@ -421,6 +422,10 @@ export default function CourseObjectPage({
                 active={tab === "roster"}
                 onClick={() => setTab("roster")}
               />
+              {/* Homework and tests belong to the week-by-week online courses. */}
+              {course?.template === "online-olympiad" && (
+                <AnchorTab label="Даалгавар, сорил" active={tab === "tasks"} onClick={() => setTab("tasks")} />
+              )}
               {canEdit && (
                 <>
                   <AnchorTab
@@ -751,6 +756,12 @@ export default function CourseObjectPage({
               </div>
             </Card>
           </div>
+        )}
+
+        {tab === "tasks" && isEditing && course && (
+          <Card title="Даалгавар, сорил">
+            <CourseTasksAdmin courseId={course.id} canEdit={canEdit} />
+          </Card>
         )}
 
         {tab === "report" && isEditing && (

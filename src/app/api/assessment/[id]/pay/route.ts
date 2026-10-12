@@ -12,6 +12,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!guard.ok) {
     return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
   }
+  // A course's homework or test has no questionnaire and no fee: it is opened
+  // by its course's start button, inside its window, and nowhere else.
+  if (guard.assessment.track === "course") {
+    return NextResponse.json({ ok: false, error: "Үнэлгээ олдсонгүй" }, { status: 404 });
+  }
 
   // Paying twice for the same assessment must be impossible, however the
   // client got here (double click, retried request, back button).

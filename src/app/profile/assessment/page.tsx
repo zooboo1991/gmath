@@ -5,7 +5,9 @@ import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import AssessmentClosed from "@/components/assessment/AssessmentClosed";
 import AssessmentResult from "@/components/assessment/AssessmentResult";
-import { isAssessmentOpen, listAssessmentsByUser } from "@/lib/assessment/db";
+import { findAssessment, isAssessmentOpen, listAssessmentsByUser } from "@/lib/assessment/db";
+import { findExam } from "@/lib/assessment/exams";
+import { taskWindow } from "@/lib/courseTasks";
 import { buildAssessmentReport, type AssessmentReport } from "@/lib/assessment/report";
 import type { Assessment } from "@/lib/assessment/types";
 import { getSessionUser } from "@/lib/session";
@@ -66,11 +68,23 @@ export default async function ProfileAssessmentPage({
   // C and the D exam has two of these, and they must not be shown each other's
   // marks. Without it: the finished one, falling back to whatever is running.
   const { a: wanted } = await searchParams;
+  // A course's homework or test is not in the placement list above; it is
+  // reached only by its own id (the course list, the "дүн гарлаа" bell).
+  const coursePaper = wanted && !assessments.some((x) => x.id === wanted)
+    ? await findAssessment(wanted)
+        .then((x) => (x && x.userId === user.id && x.track === "course" && x.status !== "cancelled" ? x : undefined))
+        .catch(() => undefined)
+    : undefined;
   const assessment =
+    coursePaper ??
     (wanted ? assessments.find((x) => x.id === wanted) : undefined) ??
     assessments.find((x) => x.status === "completed") ??
     assessments[0] ??
     null;
+  const paperExam = coursePaper?.examId ? await findExam(coursePaper.examId).catch(() => undefined) : undefined;
+  const backHref = paperExam?.programId ? `/profile/course/${encodeURIComponent(paperExam.programId)}?tab=tasks` : "/profile";
+  // A course paper is not behind the placement switch: its own window decides.
+  const paperWindow = paperExam ? taskWindow(paperExam) : undefined;
 
   // The marked paper — problem by problem, with the teacher's notes. Read for
   // work that has left the child's hands; before that there is nothing to show.
@@ -92,15 +106,24 @@ export default async function ProfileAssessmentPage({
     <>
       <Navbar />
       <main>
-        <PageHero eyebrow="Түвшин тогтоох" title="Багшийн дүгнэлт" />
+        <PageHero
+          eyebrow={paperExam ? (paperExam.kind === "test" ? "Сорил" : "Даалгавар") : "Түвшин тогтоох"}
+          title={paperExam ? paperExam.title : "Багшийн дүгнэлт"}
+        />
         <section className="section-pad">
           <div className="wrap max-w-[700px] mx-auto">
-            <AssessmentResult assessment={assessment} report={report} placement={placement} open={open} />
+            <AssessmentResult
+              assessment={assessment}
+              report={report}
+              placement={placement}
+              open={paperWindow ? paperWindow === "open" : open}
+              missed={paperWindow === "after"}
+            />
             <Link
-              href="/profile"
+              href={backHref}
               className="inline-flex items-center gap-2 font-extrabold text-[.92rem] text-blue-strong mt-7"
             >
-              ← Профайл руу буцах
+              {paperExam ? "← Даалгаврууд руу буцах" : "← Профайл руу буцах"}
             </Link>
           </div>
         </section>

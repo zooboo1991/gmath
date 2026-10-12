@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import FreeExamBox, { type FreeExam } from "@/components/profile/FreeExamBox";
 import LessonSchedule, { LessonModeTag } from "@/components/profile/LessonSchedule";
+import CourseTasksTab from "@/components/profile/CourseTasksTab";
+import type { StudentTask } from "@/lib/courseTasks";
 import {
   IconArrowLeft,
   IconCalendar,
@@ -28,6 +30,7 @@ import BalancePayModal from "@/components/profile/BalancePayModal";
 
 export type CourseTab =
   | "schedule"
+  | "tasks"
   | "recordings"
   | "attendance"
   | "payment"
@@ -55,6 +58,7 @@ type PastAssessment = {
 
 const TABS: { key: CourseTab; label: string }[] = [
   { key: "schedule", label: "Хичээлийн хуваарь" },
+  { key: "tasks", label: "Даалгавар, сорил" },
   { key: "recordings", label: "Хичээл нөхөж үзэх" },
   { key: "attendance", label: "Ирц" },
   { key: "payment", label: "Төлбөр" },
@@ -76,6 +80,7 @@ export default function CourseObjectPage({
   assessments,
   payment,
   olympiads = [],
+  tasks = [],
   nowIso,
 }: {
   registration: RegistrationWithGroup;
@@ -87,6 +92,8 @@ export default function CourseObjectPage({
   payment: CoursePayment;
   /** This child's published mini-olympiad results, newest first. Never anyone else's. */
   olympiads?: FamilyOlympiadView[];
+  /** The course's homework and tests with this child's state on each (empty for courses without). */
+  tasks?: StudentTask[];
   /** Серверийн цаг — эхний рендерийг сервер, браузер хоёрт нэг ижил байлгана. */
   nowIso: string;
 }) {
@@ -116,7 +123,8 @@ export default function CourseObjectPage({
             aria-label="Сургалтын мэдээлэл"
             className="flex gap-1.5 overflow-x-auto border-b border-line -mx-1 px-1 pb-px"
           >
-            {TABS.map((t) => (
+            {/* «Даалгавар, сорил» only on a course that hands out papers. */}
+            {TABS.filter((t) => t.key !== "tasks" || tasks.length > 0).map((t) => (
               <button
                 key={t.key}
                 type="button"
@@ -136,6 +144,7 @@ export default function CourseObjectPage({
 
           <div className="pt-5">
             {tab === "schedule" && <ScheduleTab registration={registration} nowIso={nowIso} />}
+            {tab === "tasks" && <CourseTasksTab tasks={tasks} />}
             {tab === "recordings" && (
               <LessonSchedule registration={registration} show="past" nowIso={nowIso} />
             )}

@@ -10,6 +10,7 @@ import { listRollCallForUser } from "@/lib/rollCall";
 import { listRecordingViews } from "@/lib/recordingViews";
 import { summariseAttendance, type AttendanceSpan } from "@/lib/courseAttendance";
 import { listAssessmentsByUser } from "@/lib/assessment/db";
+import { listStudentTasks } from "@/lib/courseTasks";
 import { listPaymentsForRegistrations } from "@/lib/db";
 import { listIntentsForRegistration } from "@/lib/paymentIntents";
 import { registrationBalance, sumPaymentsFor } from "@/lib/registration";
@@ -24,6 +25,7 @@ export const metadata: Metadata = {
 
 const TABS: CourseTab[] = [
   "schedule",
+  "tasks",
   "recordings",
   "attendance",
   "payment",
@@ -75,6 +77,8 @@ export default async function ProfileCoursePage({
     // Only this child's own published results (place among all, nothing of anyone else's).
     listOlympiadsForFamily(user.id, id).catch(() => []),
   ]);
+  // The course's homework and tests, with this child's state on each.
+  const tasks = await listStudentTasks(id, user.id).catch(() => []);
 
   // Төлбөрийн хэсэг. Санаархлын хүснэгт шинэ тул schema.sql-ээ ажиллуулаагүй
   // орчинд бүтэн хуудас унах ёсгүй.
@@ -118,6 +122,7 @@ export default async function ProfileCoursePage({
           initialTab={TABS.find((t) => t === tab) ?? "schedule"}
           nowIso={new Date().toISOString()}
           olympiads={olympiads}
+          tasks={tasks}
           freeExam={
             invited
               ? {

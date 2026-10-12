@@ -41,6 +41,7 @@ export default function AssessmentResult({
   report,
   placement = null,
   open = true,
+  missed = false,
 }: {
   assessment: Assessment | null;
   /** The marked paper. Null until there is work to show. */
@@ -53,6 +54,8 @@ export default function AssessmentResult({
    * a test that would refuse them at the next click.
    */
   open?: boolean;
+  /** A course's homework or test whose window closed before «Илгээх». */
+  missed?: boolean;
 }) {
   if (!assessment) {
     if (!open) {
@@ -89,7 +92,11 @@ export default function AssessmentResult({
   }
 
   if (assessment.status !== "completed") {
-    const copy = IN_PROGRESS_COPY[assessment.status] ?? IN_PROGRESS_COPY.problems_submitted;
+    const handedInNow = assessment.status === "problems_submitted" || assessment.status === "grading";
+    const copy =
+      missed && !handedInNow
+        ? { title: "Хугацаа дууссан", text: "«Илгээх» дараагүй тул энэ ажил тооцогдоогүй." }
+        : (IN_PROGRESS_COPY[assessment.status] ?? IN_PROGRESS_COPY.problems_submitted);
     // Unfinished work goes back to the paper itself, not to the starting page —
     // the child left off at a problem, and that is where they belong.
     const href =
@@ -207,9 +214,11 @@ export default function AssessmentResult({
       {/* The headline: what the teacher gave, in points. */}
       <div className="panel-blue rounded-lg text-white px-[26px] py-[28px] shadow-blue">
         <span className="inline-flex items-center gap-2 text-[.78rem] font-extrabold tracking-[.12em] uppercase text-gold">
-          <IconCheckCircle className="w-4 h-4" /> Шалгалт дууссан
+          <IconCheckCircle className="w-4 h-4" /> {assessment.track === "course" ? "Засагдсан" : "Шалгалт дууссан"}
         </span>
-        <h2 className="text-[1.5rem] font-extrabold mt-2.5">Багшийн дүгнэлт гарлаа</h2>
+        <h2 className="text-[1.5rem] font-extrabold mt-2.5">
+          {assessment.track === "course" ? "Дүн гарлаа" : "Багшийн дүгнэлт гарлаа"}
+        </h2>
         {report && report.scoredCount > 0 && (
           <div className="flex items-baseline gap-3 mt-3 flex-wrap">
             <b className="text-[2.6rem] font-extrabold leading-none">

@@ -16,7 +16,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!guard.ok) {
     return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
   }
-  if (guard.assessment.track === "olympiad") {
+  if (guard.assessment.track === "olympiad" || guard.assessment.track === "course") {
     return NextResponse.json({ ok: false, error: "Энэ үнэлгээ тест хэлбэрийнх биш" }, { status: 409 });
   }
   const step = requireStatus(guard.assessment, ["paid"]);

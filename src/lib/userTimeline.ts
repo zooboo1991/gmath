@@ -76,6 +76,8 @@ export async function getUserTimeline(user: User): Promise<TimelineEvent[]> {
         .from("assessments")
         .select("created_at, updated_at, status, category")
         .eq("user_id", user.id)
+        // A course's homework would read here as a placement test — those are not level tests.
+        .neq("track", "course")
         .then(({ data }) => (data ?? []) as { created_at: string; updated_at: string; status: string; category: string | null }[]),
       supabase
         .from("chat_conversations")

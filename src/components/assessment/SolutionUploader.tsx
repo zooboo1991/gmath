@@ -27,7 +27,14 @@ function isDone(step: Step): boolean {
  * чадсангүй" is written to the server as it happens, closing the tab and
  * coming back lands on the step they left.
  */
-export default function SolutionUploader({ assessmentId }: { assessmentId: string }) {
+export default function SolutionUploader({
+  assessmentId,
+  doneHref = "/profile/assessment",
+}: {
+  assessmentId: string;
+  /** Where the child goes after handing in — the course's list for a homework, the results page for a placement test. */
+  doneHref?: string;
+}) {
   const router = useRouter();
   const [steps, setSteps] = useState<Step[] | null>(null);
   // Handed in already? Then this page is a record, not a form.
@@ -83,7 +90,7 @@ export default function SolutionUploader({ assessmentId }: { assessmentId: strin
           Багш таны ажлыг шалгаж байна. Дүгнэлт гарсны дараа профайл дээр тань харагдана.
         </p>
         <Link
-          href="/profile/assessment"
+          href={doneHref}
           className="inline-flex items-center justify-center font-extrabold rounded-full bg-blue text-white shadow-blue px-[26px] py-3.5 mt-5 transition-transform hover:-translate-y-0.5"
         >
           Явцыг харах →
@@ -162,7 +169,7 @@ export default function SolutionUploader({ assessmentId }: { assessmentId: strin
         setError(apiError(res, json, "Илгээхэд алдаа гарлаа"));
         return;
       }
-      router.push("/profile/assessment");
+      router.push(doneHref);
       router.refresh();
     } catch {
       setError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");

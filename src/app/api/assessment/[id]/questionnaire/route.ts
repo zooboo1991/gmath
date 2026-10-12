@@ -10,6 +10,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!guard.ok) {
     return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
   }
+  // A course's homework or test has no questionnaire and no fee: it is opened
+  // by its course's start button, inside its window, and nowhere else.
+  if (guard.assessment.track === "course") {
+    return NextResponse.json({ ok: false, error: "Үнэлгээ олдсонгүй" }, { status: 404 });
+  }
   // Re-submitting is allowed while still on this step (the student may go
   // back and correct an answer), but the fee has to be paid first.
   const step = requireStatus(guard.assessment, ["paid", "questionnaire_done"]);

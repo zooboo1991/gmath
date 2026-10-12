@@ -14,6 +14,7 @@ import {
 import { requireOwnAssessment, requireStatus } from "@/lib/assessment/guard";
 import { toPublicProblem, type PublicProblem } from "@/lib/assessment/types";
 import { createSignedUrl, SOLUTIONS_BUCKET, uploadPrivateImage } from "@/lib/storage";
+import { courseWindowError } from "@/lib/courseTasks";
 
 /**
  * The problems this student committed to solving, each with whatever they
@@ -73,6 +74,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!step.ok) {
     return NextResponse.json({ ok: false, error: "Бодолт илгээгдсэн тул өөрчлөх боломжгүй" }, { status: 409 });
   }
+
+  // A course paper takes work only inside its window.
+  const closed = await courseWindowError(guard.assessment);
+  if (closed) return NextResponse.json({ ok: false, error: closed }, { status: 409 });
 
   const formData = await request.formData();
   const problemId = String(formData.get("problemId") ?? "");

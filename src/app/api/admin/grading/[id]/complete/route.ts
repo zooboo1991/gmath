@@ -3,6 +3,8 @@ import { findAssessment, findLevel, listSolutions, updateAssessment } from "@/li
 import { splitConclusion } from "@/lib/assessment/scoring";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 import { REFUSED, requireCapability } from "@/lib/adminAccess";
+import { createNotification } from "@/lib/db";
+import { findExam } from "@/lib/assessment/exams";
 
 /** The teacher's final call: the written verdict that closes the marking. */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -13,6 +15,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const assessment = await findAssessment(id);
   if (!assessment) {
     return NextResponse.json({ ok: false, error: "Үнэлгээ олдсонгүй" }, { status: 404 });
+  }
+
+  // Only a paper handed in by «Илгээх» counts — one left unsent at the close is
+  // not marked, and its family is not told it was.
+  if (assessment.track === "course" && !["problems_submitted", "grading", "completed"].includes(assessment.status)) {
+    return NextResponse.json({ ok: false, error: "Илгээгээгүй даалгаврыг засах боломжгүй" }, { status: 409 });
   }
 
   const data = await request.json();
@@ -30,8 +38,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const teacherComment = typeof data.teacherComment === "string" ? data.teacherComment.trim() : "";
   // Only the section headings ("Бүтэц оруулах" and nothing typed under them)
-  // is as empty as a blank box.
-  if (!teacherComment || splitConclusion(teacherComment).every((block) => !block.body)) {
+  // is as empty as a blank box. A course's homework or test is done with the
+  // per-problem scores and comments; the written verdict is the placement
+  // test's.
+  const blank = !teacherComment || splitConclusion(teacherComment).every((block) => !block.body);
+  if (blank && assessment.track !== "course") {
     return NextResponse.json({ ok: false, error: "Багшийн дүгнэлтийг бөглөнө үү" }, { status: 400 });
   }
   if (isTooLong(teacherComment, MAX_LEN.teacherComment)) {
@@ -56,8 +67,26 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const updated = await updateAssessment(id, {
     ...(level === undefined ? {} : { final_level: level }),
-    teacher_comment: teacherComment,
+    teacher_comment: blank ? null : teacherComment,
     status: "completed",
   });
+
+  // The family hears when a homework or test is marked — once, on the first completion.
+  if (assessment.track === "course" && assessment.status !== "completed") {
+    const exam = assessment.examId ? await findExam(assessment.examId) : undefined;
+    try {
+      await createNotification({
+        title: exam?.kind === "test" ? "Сорилын дүн гарлаа" : "Даалгаврын дүн гарлаа",
+        body: `${exam?.title ?? "Даалгавар"} — багш засаж дууслаа. Оноо, тайлбараа профайлаасаа үзнэ үү.`,
+        targetType: "users",
+        userIds: [assessment.userId],
+        channel: "site",
+        link: `/profile/assessment?a=${encodeURIComponent(id)}`,
+      });
+    } catch (err) {
+      // The marks are saved either way; a missed bell is not worth failing the teacher's click.
+      console.error("[grading.complete] notifying the family failed", id, err);
+    }
+  }
   return NextResponse.json({ ok: true, assessment: updated });
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import ExamEditor from "@/components/admin/ExamEditor";
 import { listProblems } from "@/lib/assessment/db";
 import { listCourses, listYearlyPrograms } from "@/lib/db";
@@ -14,6 +14,8 @@ export default async function AdminExamPage({ params }: { params: Promise<{ id: 
   await requireAdminSection("assessment");
   const { id } = await params;
   const exam = await findExamDetail(id);
+  // A course's homework/test has its own editor.
+  if (exam && exam.kind !== "placement") redirect(`/admin/course-tasks/${id}`);
   if (!exam) notFound();
 
   // Only live problems can be added; an archived one already on the exam

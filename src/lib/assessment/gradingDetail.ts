@@ -8,6 +8,7 @@ import {
 import { SIGNED_URL_TTL_SECONDS } from "./config";
 import { createSignedUrl, GRADED_SHEETS_BUCKET, SOLUTIONS_BUCKET } from "../storage";
 import { findUserById, toPublicUser } from "../db";
+import { findExam } from "./exams";
 
 /**
  * Everything a grader needs for one submission, assembled in one place so the
@@ -21,12 +22,13 @@ export async function buildGradingDetail(id: string) {
   const assessment = await findAssessment(id);
   if (!assessment) return null;
 
-  const [user, questionnaire, state, allProblems, solutions] = await Promise.all([
+  const [user, questionnaire, state, allProblems, solutions, exam] = await Promise.all([
     findUserById(assessment.userId),
     findQuestionnaire(id),
     getPickingState(assessment),
     listProblems({ includeInactive: true }),
     listSolutions(id),
+    assessment.examId ? findExam(assessment.examId) : Promise.resolve(undefined),
   ]);
 
   const items = await Promise.all(
@@ -75,6 +77,8 @@ export async function buildGradingDetail(id: string) {
 
   return {
     assessment,
+    /** Which paper this is — named on a course's homework/test, where it says what is being marked. */
+    exam: exam ? { title: exam.title, kind: exam.kind } : null,
     user: user ? toPublicUser(user) : undefined,
     questionnaire: questionnaire ?? null,
     items,

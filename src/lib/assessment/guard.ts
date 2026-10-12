@@ -42,16 +42,17 @@ export async function requireOwnAssessment(id: string): Promise<GuardResult> {
   if (!user) {
     return { ok: false, error: "Нэвтэрнэ үү", status: 401 };
   }
-  // Checked here rather than in each of the nine routes that call this: one
-  // gate is one thing to get right, and a route added later inherits it.
-  if (!(await canUseAssessment(user))) return ASSESSMENT_CLOSED;
-
   const assessment = await findAssessment(id);
   // Someone else's assessment is reported as missing rather than forbidden,
   // so the response can't be used to probe which ids exist.
   if (!assessment || assessment.userId !== user.id) {
     return { ok: false, error: "Үнэлгээ олдсонгүй", status: 404 };
   }
+  // Checked here rather than in each of the nine routes that call this: one
+  // gate is one thing to get right, and a route added later inherits it. A
+  // course's homework is not behind the placement switch — its own window
+  // (lib/courseTasks) decides when it takes work.
+  if (assessment.track !== "course" && !(await canUseAssessment(user))) return ASSESSMENT_CLOSED;
 
   return { ok: true, user, assessment };
 }

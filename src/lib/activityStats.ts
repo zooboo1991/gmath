@@ -24,7 +24,8 @@ async function countInRange(
   column: string,
   fromIso: string,
   toIso: string,
-  filters: Record<string, string> = {}
+  filters: Record<string, string> = {},
+  except: Record<string, string> = {}
 ): Promise<number> {
   let query = getSupabase()
     .from(table)
@@ -32,6 +33,7 @@ async function countInRange(
     .gte(column, fromIso)
     .lte(column, toIso);
   for (const [key, value] of Object.entries(filters)) query = query.eq(key, value);
+  for (const [key, value] of Object.entries(except)) query = query.neq(key, value);
   const { count, error } = await query;
   if (error) throw error;
   return count ?? 0;
@@ -70,11 +72,12 @@ export async function getActivityStats(fromDate: string, toDate: string): Promis
     attended,
     notifications,
   ] = await Promise.all([
-    countInRange("assessments", "created_at", fromIso, toIso).catch(zero),
+    // Level tests only — a course's homework and tests are not «шалгалт».
+    countInRange("assessments", "created_at", fromIso, toIso, {}, { track: "course" }).catch(zero),
     // Handed in and marked are both status changes, so they are counted by
     // when the row last moved rather than when it was created.
-    countInRange("assessments", "updated_at", fromIso, toIso, { status: "problems_submitted" }).catch(zero),
-    countInRange("assessments", "updated_at", fromIso, toIso, { status: "completed" }).catch(zero),
+    countInRange("assessments", "updated_at", fromIso, toIso, { status: "problems_submitted" }, { track: "course" }).catch(zero),
+    countInRange("assessments", "updated_at", fromIso, toIso, { status: "completed" }, { track: "course" }).catch(zero),
     countInRange("waitlist_requests", "created_at", fromIso, toIso).catch(zero),
     countInRange("chat_conversations", "started_at", fromIso, toIso).catch(zero),
     countInRange("chat_issues", "created_at", fromIso, toIso).catch(zero),

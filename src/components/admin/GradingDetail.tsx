@@ -44,6 +44,7 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
   const [items, setItems] = useState(detail.items);
   const [sheets, setSheets] = useState(detail.gradedSheets);
   const [teacherComment, setTeacherComment] = useState(detail.assessment.teacherComment ?? "");
+  const isCoursePaper = detail.assessment.track === "course";
   const conclusionRef = useRef<HTMLTextAreaElement>(null);
   // Every card's score and note live here rather than inside the card, so
   // "Дуусгах" can write out anything the teacher typed but did not press
@@ -219,7 +220,8 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
     // Checked before the confirm: finishing cannot be undone, so it must not
     // be the step that says the conclusion was empty.
     const conclusion = teacherComment.trim();
-    if (!conclusion || splitConclusion(conclusion).every((block) => !block.body)) {
+    // A course's homework or test is done with the per-problem marks; the verdict is optional there.
+    if (!isCoursePaper && (!conclusion || splitConclusion(conclusion).every((block) => !block.body))) {
       setError("Багшийн дүгнэлтийг бөглөнө үү — гарчиг бүрийн доор бичнэ үү.");
       document.getElementById("grading-conclusion")?.focus();
       return;
@@ -314,6 +316,15 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
           </p>
         )}
 
+        {isCoursePaper && detail.exam && (
+          <div className={CARD}>
+            <span className="text-[.76rem] font-extrabold tracking-[.08em] uppercase text-blue-strong">
+              {detail.exam.kind === "test" ? "Сорил" : "Даалгавар"}
+            </span>
+            <h2 className="text-[1.1rem] font-extrabold mt-1">{detail.exam.title}</h2>
+          </div>
+        )}
+
         <div className={CARD}>
           <h2 className="text-[1.02rem] font-extrabold mb-3">Сурагчийн мэдээлэл</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[.9rem]">
@@ -372,7 +383,9 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
         ))}
 
         <div className={CARD}>
-          <h2 className="text-[1.02rem] font-extrabold mb-1">Багшийн эцсийн дүгнэлт</h2>
+          <h2 className="text-[1.02rem] font-extrabold mb-1">
+            {isCoursePaper ? "Багшийн дүгнэлт (заавал биш)" : "Багшийн эцсийн дүгнэлт"}
+          </h2>
           <p className="text-ink-3 font-semibold text-[.85rem] mb-4">
             Энэ хэсэг сурагчийн профайл дээр шууд харагдана.
           </p>

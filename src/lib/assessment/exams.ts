@@ -15,12 +15,23 @@ import type { Problem, ProblemCategory } from "./types";
 
 export type ExamStatus = "draft" | "open" | "closed";
 
+/** placement: the paid/invited level test. homework / test: a course's dated paper (lib/courseTasks). */
+export type ExamKind = "placement" | "homework" | "test";
+
 export type Exam = {
   id: string;
   title: string;
+  /** Always set on a placement exam; a course paper draws from the whole bank and has none. */
   category: ProblemCategory;
   fee: string;
   status: ExamStatus;
+  kind: ExamKind;
+  /** The course a homework/test paper belongs to. */
+  programId?: string;
+  /** When a homework/test paper can be opened and until when it is handed in. */
+  opensAt?: string;
+  closesAt?: string;
+  position: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -31,33 +42,44 @@ export type ExamDetail = Exam & {
   freeCourses: { programId: string; label: string }[];
 };
 
-type ExamRow = {
+export type ExamRow = {
   id: string;
   title: string;
   category: ProblemCategory;
   fee: string;
   status: ExamStatus;
+  kind?: ExamKind | null;
+  program_id?: string | null;
+  opens_at?: string | null;
+  closes_at?: string | null;
+  position?: number | null;
   created_at: string;
   updated_at: string;
 };
 
-function examFromRow(row: ExamRow): Exam {
+export function examFromRow(row: ExamRow): Exam {
   return {
     id: row.id,
     title: row.title,
     category: row.category,
     fee: row.fee,
     status: row.status,
+    kind: row.kind ?? "placement",
+    programId: row.program_id ?? undefined,
+    opensAt: row.opens_at ?? undefined,
+    closesAt: row.closes_at ?? undefined,
+    position: row.position ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
+/** The placement exams, for the admin's «Шалгалт» list. A course's papers are managed on its own page. */
 export async function listExams(): Promise<(Exam & { problemCount: number; freeCourseCount: number })[]> {
   const supabase = getSupabase();
   const [{ data: rows, error }, { data: problemRows }, { data: freeRows, error: freeError }] =
     await Promise.all([
-      supabase.from("exams").select("*").order("created_at", { ascending: false }),
+      supabase.from("exams").select("*").eq("kind", "placement").order("created_at", { ascending: false }),
       supabase.from("exam_problems").select("exam_id"),
       // exam_free_courses, not the exam_free_users table this used to read:
       // that one was dropped when invitations became course-based, and its
@@ -211,6 +233,7 @@ export async function findOpenExam(category: ProblemCategory): Promise<Exam | un
   const { data, error } = await getSupabase()
     .from("exams")
     .select("*")
+    .eq("kind", "placement")
     .eq("category", category)
     .eq("status", "open")
     .order("created_at", { ascending: false })
@@ -292,6 +315,7 @@ export async function listFreeInvitedExams(userId: string): Promise<InvitedExam[
   const { data: examRows, error: examError } = await supabase
     .from("exams")
     .select("*")
+    .eq("kind", "placement")
     .eq("status", "open")
     .in("id", [...new Set(invited.map((r) => r.exam_id))])
     .order("created_at", { ascending: false });

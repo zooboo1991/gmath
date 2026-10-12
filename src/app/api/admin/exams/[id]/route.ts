@@ -27,7 +27,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;
-  const existing = await findExam(id);
+  // A course's homework/test is edited on its own page (api/admin/course-tasks).
+  const found = await findExam(id);
+  const existing = found?.kind === "placement" ? found : undefined;
   if (!existing) return NextResponse.json({ ok: false, error: "Шалгалт олдсонгүй" }, { status: 404 });
 
   const data = await request.json().catch(() => ({}));
@@ -100,7 +102,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ ok: false, error: "Зөвшөөрөлгүй" }, { status: 401 });
   }
   const { id } = await params;
-  const exam = await findExam(id);
+  const found = await findExam(id);
+  const exam = found?.kind === "placement" ? found : undefined;
   if (!exam) return NextResponse.json({ ok: false, error: "Шалгалт олдсонгүй" }, { status: 404 });
 
   try {

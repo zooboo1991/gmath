@@ -22,6 +22,7 @@ export default function GradingQueue({
   completed,
   cancelled,
   totals,
+  paperTitles = {},
 }: {
   queue: AssessmentWithUser[];
   completed: AssessmentWithUser[];
@@ -29,6 +30,8 @@ export default function GradingQueue({
   cancelled: AssessmentWithUser[];
   /** Total per finished paper, keyed by assessment id. */
   totals: Record<string, PaperTotal>;
+  /** The paper's name for a course's homework/test, keyed by assessment id — so the teacher knows what is being marked. */
+  paperTitles?: Record<string, string>;
 }) {
   const router = useRouter();
   // The tab lives in the address bar (?tab=completed), so a reload, a shared
@@ -134,6 +137,9 @@ export default function GradingQueue({
                       <span className="text-[.85rem] text-ink-3 font-semibold">
                         {a.user?.grade ?? "—"} · {a.user?.phone ?? "—"} · {formatDate(a.createdAt)}
                       </span>
+                      {paperTitles[a.id] && (
+                        <span className="block text-[.82rem] font-extrabold text-blue-strong mt-0.5">{paperTitles[a.id]}</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
                       {a.status === "cancelled" ? (

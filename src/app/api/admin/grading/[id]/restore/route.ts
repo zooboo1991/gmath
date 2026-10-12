@@ -20,7 +20,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
   }
 
-  const restored = await restoreAssessment(id);
+  let restored;
+  try {
+    restored = await restoreAssessment(id);
+  } catch (err) {
+    // A course paper is one sitting per child: they started it afresh after the cancel.
+    if ((err as { code?: string }).code !== "23505") throw err;
+    return NextResponse.json(
+      { ok: false, error: "Сурагч энэ даалгаврыг дахин эхлүүлсэн тул хуучныг сэргээх боломжгүй." },
+      { status: 409 }
+    );
+  }
   await logAdminAction(request, { actionType: "assessment.restore", targetId: id });
   return NextResponse.json({ ok: true, assessment: restored });
 }
