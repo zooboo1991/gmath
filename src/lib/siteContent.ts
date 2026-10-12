@@ -145,3 +145,21 @@ export const songonProgram = {
     },
   ],
 };
+
+/**
+ * Online olympiad courses (template "online-olympiad"), in words — the parts a
+ * course row has no field for. The timetable, lessons, price and dates come
+ * from the course itself; see lib/onlineCourse.
+ */
+export const onlineOlympiadCourse = {
+  format: "Онлайн — видео хичээл, Zoom хичээл, gmath.mn вэб систем",
+  videoNote:
+    "Видео хичээлийг нээгдсэн цагаас нь эхлэн тухайн долоо хоногийн сорил дуустал (Ням гарагийн 21:00 хүртэл) үзэх боломжтой.",
+  taskNote: "Даалгавар бүр 3–5 бодлоготой. Бодлогоо бодоод бодолтын зургаа системд оруулна.",
+  certificate: "Сертификатыг ирц, даалгавар, сорилын гүйцэтгэлээс хамаарч олгоно.",
+  /** Information meetings before a course starts, by course slug. */
+  infoSessions: {
+    "e-online": "2026.10.16 (Баасан) 19:00–19:30 · Zoom",
+  } as Record<string, string>,
+};
+

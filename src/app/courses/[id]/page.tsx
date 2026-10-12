@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CourseDetail, { type RelatedCourse } from "@/components/program/CourseDetail";
 import SonginDetail from "@/components/program/SonginDetail";
+import OnlineOlympiadDetail from "@/components/program/OnlineOlympiadDetail";
 import JsonLd, { SITE_URL } from "@/components/JsonLd";
 import {
   countRegistrationsForProgram,
@@ -104,6 +105,8 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             articles={articles}
             scheduleBundles={scheduleBundles}
           />
+        ) : course.template === "online-olympiad" ? (
+          <OnlineOlympiadDetail course={course} related={related} articles={articles} />
         ) : (
           <CourseDetail course={course} related={related} articles={articles} />
         )}
