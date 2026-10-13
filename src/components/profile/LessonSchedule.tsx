@@ -28,21 +28,27 @@ export function useNow(): Date | null {
   return tick === null ? null : new Date();
 }
 
+type LessonMode = "online" | "inperson" | "recorded";
+
 /**
- * Онлайн / Танхим. Lessons saved before the field existed are online — the
- * schedule editor assumes the same, so the two agree.
+ * Онлайн / Танхим / Бичлэг. Lessons saved before the field existed are online —
+ * the schedule editor assumes the same, so the two agree.
  */
-export function LessonModeTag({ mode }: { mode?: "online" | "inperson" }) {
+export function LessonModeTag({ mode }: { mode?: LessonMode }) {
   const inPerson = mode === "inperson";
   return (
     <span
       className={`inline-flex items-center gap-1 text-[.68rem] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
-        inPerson ? "text-gold-strong bg-gold-soft" : "text-blue-strong bg-blue-soft"
+        inPerson ? "text-gold-strong bg-gold-soft" : mode === "recorded" ? "text-purple bg-purple-soft" : "text-blue-strong bg-blue-soft"
       }`}
     >
       {inPerson ? (
         <>
           <IconLocation className="w-[11px] h-[11px]" /> Танхим
+        </>
+      ) : mode === "recorded" ? (
+        <>
+          <IconPlayBox className="w-[11px] h-[11px]" /> Бичлэг
         </>
       ) : (
         <>
@@ -61,7 +67,7 @@ function LessonRow({
   courseId,
 }: {
   info: LessonWithState | undefined;
-  lesson: { topic: string; mode?: "online" | "inperson" };
+  lesson: { topic: string; mode?: LessonMode };
   lessonIndex: number;
   courseId: string;
 }) {
@@ -116,6 +122,7 @@ function NextLessonCard({
   courseId: string;
 }) {
   const live = info.state === "live";
+  const video = info.lesson.mode === "recorded";
   const until = info.startsInMs !== undefined ? formatTimeUntil(info.startsInMs) : "";
 
   // Zoom холбоос ч, тэмдэглэл ч ороогүй хичээл дээр LessonAction юу ч
@@ -142,7 +149,7 @@ function NextLessonCard({
           >
             {live ? (
               <>
-                <span className="w-2 h-2 rounded-full bg-green" /> Хичээл яг одоо болж байна
+                <span className="w-2 h-2 rounded-full bg-green" /> {video ? "Видео хичээл нээгдлээ" : "Хичээл яг одоо болж байна"}
               </>
             ) : (
               <>
@@ -168,7 +175,7 @@ function NextLessonCard({
               ойлгомжтой — гэрийн хүн бэлдэх цагаа шууд мэднэ. */}
           {!live && until && (
             <span className="block font-extrabold text-[.95rem] text-blue-strong mt-2">
-              {`Хичээл эхлэхэд ${until} үлдлээ`}
+              {video ? `Видео хичээл нээгдэхэд ${until} үлдлээ` : `Хичээл эхлэхэд ${until} үлдлээ`}
             </span>
           )}
         </div>
@@ -366,6 +373,12 @@ export function LessonAction({
       action
     );
 
+  // A video lesson is shown only from its opening time; the server refuses
+  // the recording before then too.
+  if (info.lesson.mode === "recorded" && info.state === "upcoming") {
+    return withNote(<span className="shrink-0 font-bold text-[.78rem] text-ink-3">Нээгдээгүй</span>);
+  }
+
   if (info.lesson.recordingLink) {
     // The link itself is no longer rendered: RecordingPlayer asks the server
     // for a signed, expiring URL and plays it here on the page.
@@ -374,7 +387,7 @@ export function LessonAction({
     );
   }
 
-  if (info.state === "past") {
+  if (info.state === "past" || info.lesson.mode === "recorded") {
     return withNote(<span className="shrink-0 font-bold text-[.78rem] text-ink-3">Бичлэг удахгүй</span>);
   }
 

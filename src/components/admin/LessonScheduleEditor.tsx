@@ -254,7 +254,17 @@ export default function LessonScheduleEditor({
             const next = { ...parsed, ...patch };
             updateRow(i, { schedule: buildScheduleString(next.date, next.startTime, next.endTime) });
           };
-          const isOnline = lesson.mode !== "inperson";
+          const mode = lesson.mode ?? "online";
+          const isOnline = mode === "online";
+          const isRecorded = mode === "recorded";
+          // A video lesson opens at a time and has no end, and no Zoom room.
+          const switchMode = (next: NonNullable<Lesson["mode"]>) =>
+            updateRow(i, {
+              mode: next,
+              ...(next === "recorded"
+                ? { zoomLink: undefined, schedule: buildScheduleString(parsed.date, parsed.startTime, "") }
+                : {}),
+            });
           return (
             <div key={i} className="flex gap-2 items-start bg-bg-soft rounded-xs p-2.5">
               <span className="w-7 h-7 rounded-md bg-surface border border-line-2 grid place-items-center font-extrabold text-[.8rem] shrink-0 mt-0.5">
@@ -268,24 +278,24 @@ export default function LessonScheduleEditor({
                   className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.9rem] focus:outline-none focus:border-blue focus:bg-surface"
                 />
                 <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => updateRow(i, { mode: "online" })}
-                    className={`text-[.78rem] font-extrabold px-2.5 py-1.5 rounded-full transition-colors ${
-                      isOnline ? "text-blue-strong bg-blue-soft" : "text-ink-3 bg-bg-soft"
-                    }`}
-                  >
-                    Онлайн
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateRow(i, { mode: "inperson" })}
-                    className={`text-[.78rem] font-extrabold px-2.5 py-1.5 rounded-full transition-colors ${
-                      !isOnline ? "text-blue-strong bg-blue-soft" : "text-ink-3 bg-bg-soft"
-                    }`}
-                  >
-                    Танхим
-                  </button>
+                  {(
+                    [
+                      ["online", "Онлайн"],
+                      ["inperson", "Танхим"],
+                      ["recorded", "Бичлэг"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => switchMode(value)}
+                      className={`text-[.78rem] font-extrabold px-2.5 py-1.5 rounded-full transition-colors ${
+                        mode === value ? "text-blue-strong bg-blue-soft" : "text-ink-3 bg-bg-soft"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
                 <div className="flex gap-1.5 items-center flex-wrap">
                   <input
@@ -295,19 +305,24 @@ export default function LessonScheduleEditor({
                     className="px-2.5 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
                   />
                   {weekday && <span className="text-[.78rem] font-bold text-blue-strong shrink-0">{weekday} гараг</span>}
+                  {isRecorded && <span className="text-[.78rem] font-bold text-ink-3 shrink-0">нээгдэх цаг</span>}
                   <input
                     type="time"
                     value={parsed.startTime}
                     onChange={(e) => updateSchedule({ startTime: e.target.value })}
                     className="px-2.5 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
                   />
-                  <span className="text-ink-3 font-bold">–</span>
-                  <input
-                    type="time"
-                    value={parsed.endTime}
-                    onChange={(e) => updateSchedule({ endTime: e.target.value })}
-                    className="px-2.5 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
-                  />
+                  {!isRecorded && (
+                    <>
+                      <span className="text-ink-3 font-bold">–</span>
+                      <input
+                        type="time"
+                        value={parsed.endTime}
+                        onChange={(e) => updateSchedule({ endTime: e.target.value })}
+                        className="px-2.5 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
+                      />
+                    </>
+                  )}
                 </div>
                 <div className={`grid grid-cols-1 gap-1.5 ${isOnline ? "sm:grid-cols-2" : ""}`}>
                   {isOnline && (
@@ -321,7 +336,7 @@ export default function LessonScheduleEditor({
                   <input
                     value={lesson.recordingLink ?? ""}
                     onChange={(e) => updateRow(i, { recordingLink: e.target.value })}
-                    placeholder="Бичлэг: Bunny видеоны ID эсвэл холбоос"
+                    placeholder={isRecorded ? "Bunny видеоны ID эсвэл холбоос" : "Бичлэг: Bunny видеоны ID эсвэл холбоос"}
                     className="w-full px-3 py-2 rounded-xs border-[1.5px] border-line-2 bg-surface-2 text-ink font-semibold text-[.82rem] focus:outline-none focus:border-blue focus:bg-surface"
                   />
                   {/* Tells the teacher which of the two behaviours this row will
@@ -330,13 +345,21 @@ export default function LessonScheduleEditor({
                   {lesson.recordingLink?.trim() ? (
                     parseBunnyVideoId(lesson.recordingLink) ? (
                       <span className="text-[.75rem] font-extrabold text-green">
-                        ✓ Bunny — сайт дээрээ тоглоно
+                        {isRecorded ? "✓ Bunny — нээгдэх цагтаа сайт дээр тоглоно" : "✓ Bunny — сайт дээрээ тоглоно"}
+                      </span>
+                    ) : isRecorded ? (
+                      <span className="text-[.75rem] font-extrabold text-red-soft">
+                        Бичлэгээр орох хичээлд зөвхөн Bunny-гийн видео оруулна
                       </span>
                     ) : (
                       <span className="text-[.75rem] font-semibold text-ink-3">
                         Гадаад холбоос — шинэ цонхонд нээгдэнэ
                       </span>
                     )
+                  ) : isRecorded ? (
+                    <span className="text-[.75rem] font-semibold text-ink-3">
+                      Видео нээгдэх цагаасаа сурагчдад харагдана
+                    </span>
                   ) : null}
 
                   {/* The lesson's notes: the problems worked through in class,

@@ -76,9 +76,12 @@ export async function POST(
   if (!owner || !lesson) {
     return NextResponse.json({ ok: false, error: "Хичээл олдсонгүй" }, { status: 404 });
   }
-  if (lesson.mode === "inperson") {
+  if (lesson.mode === "inperson" || lesson.mode === "recorded") {
     return NextResponse.json(
-      { ok: false, error: "Танхимын хичээлд Zoom meeting үүсгэх боломжгүй" },
+      {
+        ok: false,
+        error: `${lesson.mode === "inperson" ? "Танхимын" : "Бичлэгээр орох"} хичээлд Zoom meeting үүсгэх боломжгүй`,
+      },
       { status: 400 }
     );
   }

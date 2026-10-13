@@ -3,6 +3,7 @@ import { findCourseById, findRegistrationByUserAndProgram, findYearlyProgramById
 import { getSessionUser } from "@/lib/session";
 import { bunnyConfigured, parseBunnyVideoId, signBunnyEmbedUrl } from "@/lib/bunny";
 import { recordRecordingView } from "@/lib/recordingViews";
+import { recordingOpen } from "@/lib/lessonSchedule";
 
 /**
  * Hands back a short-lived, signed playback URL for one lesson's recording.
@@ -31,9 +32,15 @@ export async function POST(request: Request) {
 
   // programId is either a real course (UUID) or a yearly program ("program-c").
   const owner = (await findYearlyProgramById(courseId)) ?? (await findCourseById(courseId));
-  const recordingLink = owner?.lessons?.[lessonIndex]?.recordingLink;
+  const lesson = owner?.lessons?.[lessonIndex];
+  const recordingLink = lesson?.recordingLink;
   if (!recordingLink) {
     return NextResponse.json({ ok: false, error: "Энэ хичээлийн бичлэг алга байна" }, { status: 404 });
+  }
+  // A video lesson is put in ahead of time and opens on its schedule — the
+  // signed URL must not exist before then, whatever the page shows.
+  if (!recordingOpen(lesson, new Date())) {
+    return NextResponse.json({ ok: false, error: "Энэ хичээл хараахан нээгдээгүй байна" }, { status: 409 });
   }
 
   // Тэмдэглэгээ энд хийгдэнэ: сурагч бүртгэлтэй нь шалгагдсан, бичлэг нь

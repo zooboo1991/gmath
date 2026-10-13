@@ -161,10 +161,12 @@ export default function CourseDetail({
                     <span className="inline-flex items-center gap-1.5 text-[.85rem] font-bold text-ink-3">
                       {lesson.mode === "inperson" ? (
                         <IconLocation className="w-[15px] h-[15px] text-blue-strong shrink-0" />
+                      ) : lesson.mode === "recorded" ? (
+                        <IconPlayBox className="w-[15px] h-[15px] text-blue-strong shrink-0" />
                       ) : (
                         <IconMonitor className="w-[15px] h-[15px] text-blue-strong shrink-0" />
                       )}
-                      {lesson.mode === "inperson" ? "Танхим" : "Онлайн"}
+                      {lesson.mode === "inperson" ? "Танхим" : lesson.mode === "recorded" ? "Бичлэг" : "Онлайн"}
                     </span>
                   </div>
                 </div>

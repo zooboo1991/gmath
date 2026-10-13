@@ -108,7 +108,11 @@ export function publicUserFromJoin(row: unknown): PublicUser | undefined {
   return toPublicUser(userFromRow(row as UserRow));
 }
 
-export type LessonMode = "online" | "inperson";
+/**
+ * "recorded" is a video lesson: a Bunny recording that opens at its scheduled
+ * time — no room, no Zoom, no roll call.
+ */
+export type LessonMode = "online" | "inperson" | "recorded";
 
 export type Lesson = {
   topic: string;
@@ -2951,7 +2955,11 @@ export async function notifyNewRecordings(
   previousLessons: Lesson[],
   currentLessons: Lesson[]
 ): Promise<void> {
-  const newlyRecorded = currentLessons.filter((lesson, i) => lesson.recordingLink && !previousLessons[i]?.recordingLink);
+  // A video lesson's recording is put in ahead of its opening time, which is
+  // when the family is meant to hear of it — not the moment the link is saved.
+  const newlyRecorded = currentLessons.filter(
+    (lesson, i) => lesson.mode !== "recorded" && lesson.recordingLink && !previousLessons[i]?.recordingLink
+  );
   if (newlyRecorded.length === 0) return;
 
   const registrations = await listRegistrationsByProgram(programId);

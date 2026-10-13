@@ -17,7 +17,9 @@ export type OnlineLessonKind = "video" | "zoom" | "other";
 
 const KIND_SUFFIX = /\s*\((видео|zoom)\)\s*$/i;
 
-export function lessonKind(topic: string): OnlineLessonKind {
+/** A lesson saved as «Бичлэг» is a video whatever its topic says; otherwise the topic's ending decides. */
+export function lessonKind(topic: string, mode?: string): OnlineLessonKind {
+  if (mode === "recorded") return "video";
   const m = topic.match(KIND_SUFFIX);
   if (!m) return "other";
   return m[1].toLowerCase() === "zoom" ? "zoom" : "video";
@@ -57,7 +59,7 @@ const addDays = (iso: string, days: number) => {
 };
 
 /** The dated lessons grouped into Monday–Sunday weeks, numbered from the first. */
-export function courseWeeks(lessons: { topic: string; schedule?: string }[]): CourseWeek[] {
+export function courseWeeks(lessons: { topic: string; schedule?: string; mode?: string }[]): CourseWeek[] {
   const byWeek = new Map<string, CourseWeek>();
   const dated = lessons
     .map((l) => ({ l, parsed: parseScheduleString(l.schedule ?? "") }))
@@ -74,7 +76,7 @@ export function courseWeeks(lessons: { topic: string; schedule?: string }[]): Co
     const subject = lessonSubject(l.topic);
     if (!week.subjects.includes(subject)) week.subjects.push(subject);
     week.lessons.push({
-      kind: lessonKind(l.topic),
+      kind: lessonKind(l.topic, l.mode),
       title: lessonTitle(l.topic),
       date: parsed.date,
       weekday: WEEKDAY_NAMES[day],
@@ -102,13 +104,13 @@ export function weeklyRhythm(value: string | undefined | null): RhythmDay[] {
 }
 
 /** What the course adds up to: lessons from the lesson list, tasks and tests from the weekly rhythm. */
-export function courseTotals(lessons: { topic: string; schedule?: string }[], rhythm: RhythmDay[]) {
+export function courseTotals(lessons: { topic: string; schedule?: string; mode?: string }[], rhythm: RhythmDay[]) {
   const weeks = courseWeeks(lessons).length;
   const perWeek = (word: RegExp) => rhythm.filter((r) => word.test(r.text)).length;
   return {
     weeks,
-    videos: lessons.filter((l) => lessonKind(l.topic) === "video").length,
-    zooms: lessons.filter((l) => lessonKind(l.topic) === "zoom").length,
+    videos: lessons.filter((l) => lessonKind(l.topic, l.mode) === "video").length,
+    zooms: lessons.filter((l) => lessonKind(l.topic, l.mode) === "zoom").length,
     tasks: perWeek(/^даалгавар/i) * weeks,
     tests: perWeek(/^сорил/i) * weeks,
   };

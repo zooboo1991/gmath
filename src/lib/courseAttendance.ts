@@ -30,7 +30,8 @@ export type AttendanceOutcome = "present" | "partial" | "absent" | "unmarked" | 
 export type AttendanceLesson = {
   topic: string;
   schedule?: string;
-  mode?: AttendanceMode;
+  /** "recorded" (a video lesson) never reaches the roll — see summariseAttendance. */
+  mode?: AttendanceMode | "recorded";
   recordingLink?: string;
 };
 
@@ -115,6 +116,8 @@ export function summariseAttendance(input: {
   // marks, Zoom spans and recordings are all keyed by the course-wide index.
   const lessons = input.lessons
     .map((lesson, lessonIndex) => ({ lesson, lessonIndex }))
+    // A video lesson is watched, not attended: it has no place in the roll.
+    .filter(({ lesson }) => lesson.mode !== "recorded")
     .filter(({ lesson }) => attendsLesson(input.attendDays, lesson.schedule))
     .map(({ lesson, lessonIndex }): LessonAttendance => {
       const mode: AttendanceMode = lesson.mode === "inperson" ? "inperson" : "online";

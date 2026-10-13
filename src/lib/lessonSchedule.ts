@@ -48,7 +48,7 @@ export function mongoliaLocalToUtc(isoDate: string, time: string): Date | null {
 type ScheduledLesson = {
   topic: string;
   schedule?: string;
-  mode?: "online" | "inperson";
+  mode?: "online" | "inperson" | "recorded";
   zoomLink?: string;
   recordingLink?: string;
   noteFile?: string;
@@ -78,6 +78,11 @@ export type LessonWithState = {
 
 /** A lesson counts as "live" from fifteen minutes before it starts. */
 const JOIN_EARLY_MS = 15 * 60 * 1000;
+/**
+ * A video lesson is "live" — the one on top, «нээгдлээ» — for the day it
+ * opens, then joins the past lessons. It is never open before its time.
+ */
+const RECORDED_FRESH_MS = 12 * 60 * 60 * 1000;
 /** How long a lesson is assumed to run when no end time was entered. */
 const ASSUMED_LENGTH_MS = 2 * 60 * 60 * 1000;
 
@@ -121,11 +126,17 @@ export function getLessonStates(lessons: ScheduledLesson[] | undefined, now: Dat
       return { lesson, state: "unscheduled" as const, dateLabel: "", timeLabel: "" };
     }
     const state: LessonState =
-      ms > timed.end.getTime()
-        ? "past"
-        : ms >= timed.start.getTime() - JOIN_EARLY_MS
-          ? "live"
-          : "upcoming";
+      lesson.mode === "recorded"
+        ? ms < timed.start.getTime()
+          ? "upcoming"
+          : ms < timed.start.getTime() + RECORDED_FRESH_MS
+            ? "live"
+            : "past"
+        : ms > timed.end.getTime()
+          ? "past"
+          : ms >= timed.start.getTime() - JOIN_EARLY_MS
+            ? "live"
+            : "upcoming";
     return {
       lesson,
       state,
@@ -142,6 +153,17 @@ export function getLessonStates(lessons: ScheduledLesson[] | undefined, now: Dat
  * минут» гэдэг нарийвчлал хэрэггүй, «удахгүй» эсэхийг л мэдэх хэрэгтэй.
  * Хугацаа өнгөрсөн бол хоосон.
  */
+/**
+ * Whether a video lesson may be watched yet: from its opening time, or at
+ * once when it has no date. Every other kind of lesson is not gated here.
+ */
+export function recordingOpen(lesson: { mode?: string; schedule?: string }, now: Date): boolean {
+  if (lesson.mode !== "recorded") return true;
+  const { date, startTime } = parseScheduleString(lesson.schedule ?? "");
+  const opens = mongoliaLocalToUtc(date, startTime || "00:00");
+  return !opens || now.getTime() >= opens.getTime();
+}
+
 export function formatTimeUntil(ms: number): string {
   if (ms <= 0) return "";
   const totalMinutes = Math.floor(ms / 60_000);

@@ -91,7 +91,7 @@ function collectCandidates(
   out: Candidate[]
 ): void {
   lessons.forEach((lesson, lessonIndex) => {
-    if (lesson.mode === "inperson" || !lesson.zoomLink || !lesson.schedule) return;
+    if (lesson.mode === "inperson" || lesson.mode === "recorded" || !lesson.zoomLink || !lesson.schedule) return;
     if (sentKeys.has(`${programId}#${lessonIndex}`)) return;
 
     const { date, startTime } = parseScheduleString(lesson.schedule);

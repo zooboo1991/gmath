@@ -1,6 +1,7 @@
-import type { Lesson } from "./db";
+import type { Lesson, LessonMode } from "./db";
 import { parseBunnyVideoId } from "./bunnyVideo";
 import { isLessonNotePath } from "./storage";
+import { buildScheduleString, parseScheduleString } from "./lessonSchedule";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "./validate";
 
 /**
@@ -19,16 +20,25 @@ type LessonInput = {
   noteSize?: number;
 };
 
+const modeOf = (mode: unknown): LessonMode =>
+  mode === "inperson" ? "inperson" : mode === "recorded" ? "recorded" : "online";
+
+/** A video lesson opens at a time and has no end: "… · 09:00", not "… · 09:00–11:00". */
+function openingOnly(schedule: string): string {
+  const parsed = parseScheduleString(schedule);
+  return parsed.date ? buildScheduleString(parsed.date, parsed.startTime, "") : schedule;
+}
+
 export function normalizeLessons(input: unknown): Lesson[] | undefined {
   if (!Array.isArray(input)) return undefined;
   return (input as LessonInput[])
     .map((l) => ({
       topic: l.topic?.trim() ?? "",
-      schedule: l.schedule?.trim() || undefined,
-      mode: l.mode === "inperson" ? ("inperson" as const) : ("online" as const),
-      // In-person lessons have no Zoom room — a mode switch shouldn't leave
+      schedule: (modeOf(l.mode) === "recorded" ? openingOnly(l.schedule?.trim() ?? "") : l.schedule?.trim()) || undefined,
+      mode: modeOf(l.mode),
+      // Only an online lesson has a Zoom room — a mode switch shouldn't leave
       // a stale link a student could still be shown.
-      zoomLink: l.mode === "inperson" ? undefined : l.zoomLink?.trim() || undefined,
+      zoomLink: modeOf(l.mode) === "online" ? l.zoomLink?.trim() || undefined : undefined,
       recordingLink: l.recordingLink?.trim() || undefined,
       // Only ever a path this app minted (see createNoteUploadUrl). A hand-made
       // request could otherwise name any object in the bucket — or a key that
@@ -59,6 +69,10 @@ export function validateLessons(input: unknown): string | null {
       // labels "Video ID" — refusing it here contradicted the editor, which
       // already tells the teacher such a value will play in-page.
       if (label === "Бичлэгийн холбоос" && parseBunnyVideoId(value)) continue;
+      // A video lesson plays on the site, from Bunny, and nowhere else.
+      if (label === "Бичлэгийн холбоос" && lesson.mode === "recorded") {
+        return "Бичлэгээр орох хичээлд зөвхөн Bunny-гийн видеоны ID эсвэл холбоос оруулна";
+      }
       if (!isValidHttpUrl(value)) {
         return `Хичээлийн ${label} буруу байна (http:// эсвэл https:// -ээр эхэлнэ)`;
       }

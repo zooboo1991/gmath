@@ -12,13 +12,20 @@
 
 import { afterAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
-import { anonClient, signedInClient } from "../../support/client";
-import { cleanupTracked } from "../../support/db";
-import { createTestCourse, createTestRegistration, createTestUser } from "../../support/factories";
+import { adminClient, anonClient, signedInClient } from "../../support/client";
+import { cleanupTracked, testDb } from "../../support/db";
+import {
+  createTestCourse,
+  createTestRegistration,
+  createTestUser,
+  notificationsFor,
+  trackNotificationsForCreatedUsers,
+} from "../../support/factories";
 
 const BUNNY_VIDEO_ID = "0f6b4f9a-1c2d-4e5f-8a9b-0c1d2e3f4a5b";
 
 afterAll(async () => {
+  await trackNotificationsForCreatedUsers();
   await cleanupTracked();
 });
 
@@ -276,5 +283,63 @@ describe("POST /api/lessons/join", () => {
 
     const res = await client.post("/api/lessons/join", { courseId: course.id, lessonIndex: 7 });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("a video lesson («Бичлэг»)", () => {
+  /** "2026.10.19 Даваа гараг · 09:00" for a moment `days` from now, in Ulaanbaatar time. */
+  const openingIn = (days: number) => {
+    const ub = new Date(Date.now() + days * 86_400_000 + 8 * 3_600_000);
+    const iso = ub.toISOString().slice(0, 10);
+    const weekday = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"][ub.getUTCDay()];
+    return `${iso.replaceAll("-", ".")} ${weekday} гараг · ${ub.toISOString().slice(11, 16)}`;
+  };
+
+  async function studentOn(lessons: unknown[]) {
+    const course = await createTestCourse({ lessons });
+    const student = await createTestUser();
+    await createTestRegistration({ userId: student.id, programId: course.id, status: "active" });
+    return { course, student, client: await signedInClient(student.phone, student.password) };
+  }
+
+  it("does not hand out its recording before it opens, and does after", async () => {
+    const { course, client } = await studentOn([
+      { topic: "Маргаашийн видео", schedule: openingIn(1), mode: "recorded", recordingLink: BUNNY_VIDEO_ID },
+      { topic: "Өчигдрийн видео", schedule: openingIn(-1), mode: "recorded", recordingLink: BUNNY_VIDEO_ID },
+    ]);
+    const early = await client.post("/api/lessons/recording", { courseId: course.id, lessonIndex: 0 });
+    expect(early.status).toBe(409);
+    const open = await client.post<{ external: boolean; url: string }>("/api/lessons/recording", { courseId: course.id, lessonIndex: 1 });
+    expect(open.status, open.text).toBe(200);
+    expect(open.body.external).toBe(false);
+  });
+
+  it("is saved with a Bunny video only, and its students are not told until it opens", async () => {
+    const when = openingIn(2);
+    const { course, student } = await studentOn([{ topic: "Видео", schedule: when, mode: "recorded" }]);
+    const admin = await adminClient("full");
+
+    const drive = await admin.put(`/api/admin/courses/${course.id}/lessons`, {
+      lessons: [{ topic: "Видео", schedule: when, mode: "recorded", recordingLink: "https://drive.google.com/file/d/abc/view" }],
+    });
+    expect(drive.status).toBe(400);
+    expect(drive.body).toMatchObject({ error: expect.stringMatching(/Bunny/) });
+
+    const saved = await admin.put(`/api/admin/courses/${course.id}/lessons`, {
+      lessons: [
+        { topic: "Видео", schedule: `${when}–23:59`, mode: "recorded", zoomLink: "https://zoom.us/j/1", recordingLink: BUNNY_VIDEO_ID },
+      ],
+    });
+    expect(saved.status, saved.text).toBe(200);
+    const { data } = await testDb().from("courses").select("lessons").eq("id", course.id).single();
+    const [lesson] = (data as { lessons: { mode: string; schedule: string; zoomLink?: string }[] }).lessons;
+    expect(lesson.mode).toBe("recorded");
+    // Opening time only: the end time typed with it is dropped.
+    expect(lesson.schedule).toBe(when);
+    expect(lesson.zoomLink).toBeUndefined();
+
+    // The «бичлэг орлоо» notification is fired without being awaited; give it time to (not) arrive.
+    await new Promise((r) => setTimeout(r, 2000));
+    expect((await notificationsFor(student.id)).filter((n) => n.title === "Хичээлийн бичлэг орлоо")).toEqual([]);
   });
 });
