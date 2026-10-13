@@ -142,6 +142,41 @@ describe("creating a course", () => {
     expect(page.text).toContain(title);
   });
 
+  it("leads /courses with a published online olympiad course, above the classroom groups", async () => {
+    const seed = async (title: string, status: string) => {
+      const { data, error } = await testDb()
+        .from("courses")
+        .insert({
+          kind: "upcoming",
+          tag: "E ангилал",
+          title,
+          topics: "Туршилт",
+          price: "680,000₮",
+          period: "/ 7 долоо хоног",
+          status,
+          template: "online-olympiad",
+          lessons: [{ topic: "Гурвалжин 1 (видео)", schedule: "2026.10.19 Даваа гараг · 09:00", mode: "online" }],
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`online seed failed: ${error.message}`);
+      track("courses", (data as { id: string }).id);
+      return (data as { id: string }).id;
+    };
+    const title = `Онлайн тест ${randomUUID().slice(0, 8)}`;
+    const id = await seed(title, "published");
+    const draft = `Онлайн ноорог ${randomUUID().slice(0, 8)}`;
+    await seed(draft, "draft");
+
+    const page = await anonClient().get("/courses");
+    expect(page.status).toBe(200);
+    expect(page.text).toContain(title);
+    expect(page.text).toContain(`href="/courses/${id}"`);
+    expect(page.text).not.toContain(draft);
+    // First on the page: before the classroom groups' band.
+    expect(page.text.indexOf(title)).toBeLessThan(page.text.indexOf("Сонгон бэлтгэлийн ангиуд"));
+  });
+
   describe("required fields", () => {
     const cases: [string, Record<string, unknown>][] = [
       ["no kind", { kind: undefined }],

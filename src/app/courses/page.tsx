@@ -4,6 +4,7 @@ import Footer from "@/components/Footer";
 import PageHero from "@/components/PageHero";
 import CourseCard from "@/components/CourseCard";
 import SongonClassCard from "@/components/SongonClassCard";
+import OnlineCourseFeature from "@/components/OnlineCourseFeature";
 import { countRegistrationsForProgram, listCourses, listYearlyPrograms } from "@/lib/db";
 import WaitlistCard from "@/components/WaitlistCard";
 import { getSessionUser } from "@/lib/session";
@@ -43,6 +44,10 @@ export default async function CoursesPage() {
     .filter((c) => c.template === "songon")
     .sort((a, b) => a.title.localeCompare(b.title, "mn"));
   const songonBundles = buildScheduleBundles(songon);
+  // Online olympiad courses lead the page, newest start first.
+  const online = allUpcoming
+    .filter((c) => c.template === "online-olympiad")
+    .sort((a, b) => (b.startDate ?? "").localeCompare(a.startDate ?? ""));
 
   const songonSeats = await Promise.all(
     songon.map((c) => (c.capacity !== undefined ? countRegistrationsForProgram(c.id) : Promise.resolve(0)))
@@ -53,6 +58,16 @@ export default async function CoursesPage() {
       <Navbar />
       <main>
         <PageHero eyebrow="Сургалтууд" title="Бүх сургалтын хөтөлбөрүүд" />
+
+        {online.length > 0 && (
+          <section className="pt-[clamp(40px,6vw,60px)]">
+            <div className="wrap flex flex-col gap-5">
+              {online.map((c) => (
+                <OnlineCourseFeature key={c.id} course={c} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {songon.length > 0 && (
           <section className="pt-[clamp(40px,6vw,60px)]">
