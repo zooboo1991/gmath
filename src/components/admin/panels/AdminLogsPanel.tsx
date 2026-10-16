@@ -36,6 +36,7 @@ const ACTION_LABELS: Record<string, string> = {
   "olympiad.import": "Мини олимпиадын дүн Excel-ээс оруулсан",
   "olympiad.result": "Мини олимпиадын дүн засварласан",
   "olympiad.result_delete": "Мини олимпиадын дүн хассан",
+  "olympiad.solution": "Мини олимпиадын бодолт хавсаргасан/хассан",
   "lesson.zoom_meeting_create": "Zoom meeting үүсгэсэн",
   "lesson.zoom_meeting_update": "Zoom meeting-ийн цаг шинэчилсэн",
   "lesson.note_delete": "Хичээлийн тэмдэглэл хассан",

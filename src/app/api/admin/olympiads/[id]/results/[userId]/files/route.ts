@@ -47,6 +47,10 @@ export async function PUT(request: Request, { params }: Ctx) {
   if ((await listResults(olympiad)).some((r) => r.userId !== userId && r.files.some((f) => f.path === path))) {
     return NextResponse.json({ ok: false, error: "Энэ файл өөр сурагчид хавсаргагдсан байна" }, { status: 400 });
   }
+  // Nor the olympiad's own solution: removing it from one would delete the other's file.
+  if (olympiad.solutionFiles.some((f) => f.path === path)) {
+    return NextResponse.json({ ok: false, error: "Энэ файл олимпиадын бодолтод хавсаргагдсан байна" }, { status: 400 });
+  }
   const name = (typeof data.name === "string" ? data.name.trim() : "").slice(0, 120) || "бодолт";
   const size = Number.isFinite(Number(data.size)) ? Number(data.size) : 0;
   const done = await changeResultFiles(olympiad, userId, (files) => {

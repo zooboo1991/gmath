@@ -1703,3 +1703,11 @@ alter table assessments add constraint assessments_track_check
   check (track in ('regular', 'advanced', 'olympiad', 'placement', 'course'));
 create unique index if not exists assessments_course_paper_idx
   on assessments (user_id, exam_id) where track = 'course' and status <> 'cancelled';
+
+-- ---------------------------------------------------------------------------
+-- Мини олимпиадын албан ёсны бодолт
+-- ---------------------------------------------------------------------------
+-- The olympiad's own worked solutions — the teacher's model answers, as PDF or
+-- images in the private "mini-olympiad" bucket, [{path, name, size}]. Shown to
+-- every child who has a result in it once the results are published.
+alter table mini_olympiads add column if not exists solution_files jsonb not null default '[]'::jsonb;

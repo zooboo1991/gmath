@@ -433,6 +433,55 @@ describe("import, publish and what a family sees", () => {
     expect((data as { files: { name: string }[] }).files.map((f) => f.name)).toEqual(["hoyor.pdf"]);
   });
 
+  it("shows the olympiad's own solution to every child who took part, once published", async () => {
+    const admin = await adminClient("full");
+    const a = await child(`Бодолтоор${suffix()}`);
+    const b = await child(`Хоёрдугаар${suffix()}`);
+    const outsider = await child(`Ороогүй${suffix()}`);
+    const o = await newOlympiad(admin);
+    await admin.put(`/api/admin/olympiads/${o.id}/results/${a.user.id}`, { scores: [7, 1, 0] });
+    await admin.put(`/api/admin/olympiads/${o.id}/results/${b.user.id}`, { scores: [0, 0, 0] });
+
+    const base = `/api/admin/olympiads/${o.id}/solution`;
+    expect((await (await adminClient("viewer")).post(base, { ext: "pdf", size: 9 })).status).toBe(401);
+    const url = await admin.post<{ path: string; signedUrl: string; contentType: string }>(base, { ext: "pdf", size: 9 });
+    expect(url.status, url.text).toBe(200);
+    trackStorageObject("mini-olympiad", url.body.path);
+    const put = await fetch(url.body.signedUrl, { method: "PUT", headers: { "Content-Type": url.body.contentType }, body: "%PDF-1.4\n" });
+    expect(put.ok).toBe(true);
+    expect((await admin.put(base, { path: "olympiads/other/x.pdf", name: "x" })).status).toBe(400);
+    const saved = await admin.put<{ olympiad: { solutionFiles: { name: string }[] } }>(base, { path: url.body.path, name: "d bodolt.pdf", size: 9 });
+    expect(saved.status, saved.text).toBe(200);
+    expect(saved.body.olympiad.solutionFiles.map((f) => f.name)).toEqual(["d bodolt.pdf"]);
+    // The shared solution is never one child's scan, and the other way round.
+    expect((await admin.put(`/api/admin/olympiads/${o.id}/results/${a.user.id}/files`, { path: url.body.path, name: "x", size: 9 })).status).toBe(400);
+
+    const resultOf = async (userId: string) => {
+      const { data } = await testDb().from("mini_olympiad_results").select("id").eq("olympiad_id", o.id).eq("user_id", userId).single();
+      return (data as { id: string }).id;
+    };
+    const aPath = `/api/profile/olympiads/${await resultOf(a.user.id)}/solution/0`;
+    const bPath = `/api/profile/olympiads/${await resultOf(b.user.id)}/solution/0`;
+    expect((await a.client.get(aPath)).status).toBe(404); // not published yet
+
+    await admin.post(`/api/admin/olympiads/${o.id}/publish`, { publish: true });
+    expect([302, 307]).toContain((await a.client.get(aPath)).status);
+    expect([302, 307]).toContain((await b.client.get(bPath)).status);
+    const page = await a.client.get(`/profile/course/${PROGRAM}?tab=olympiad`);
+    expect(page.text).toContain(aPath);
+    expect(page.text).toContain("Албан ёсны бодолт");
+    // Only through one's own result: someone else's link, a child who did not take part, a stranger.
+    expect((await b.client.get(aPath)).status).toBe(404);
+    expect((await outsider.client.get(aPath)).status).toBe(404);
+    expect((await anonClient().get(aPath)).status).toBe(404);
+    expect((await outsider.client.get(`/profile/course/${PROGRAM}?tab=olympiad`)).text).not.toContain("/solution/");
+
+    const removed = await admin.del<{ olympiad: { solutionFiles: unknown[] } }>(`${base}?path=${encodeURIComponent(url.body.path)}`);
+    expect(removed.status).toBe(200);
+    expect(removed.body.olympiad.solutionFiles).toEqual([]);
+    expect((await a.client.get(aPath)).status).toBe(404);
+  });
+
   it("deletes an olympiad with its results", async () => {
     const admin = await adminClient("full");
     const kid = await child(`Устгах${suffix()}`);

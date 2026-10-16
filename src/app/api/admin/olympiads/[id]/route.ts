@@ -57,7 +57,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!(await requireCapability("grading")).ok) return NextResponse.json(REFUSED, { status: 401 });
   const olympiad = await findOlympiad((await params).id);
   if (!olympiad) return NextResponse.json(NOT_FOUND, { status: 404 });
-  const paths = (await listResults(olympiad)).flatMap((r) => r.files.map((f) => f.path));
+  const paths = [...(await listResults(olympiad)).flatMap((r) => r.files.map((f) => f.path)), ...olympiad.solutionFiles.map((f) => f.path)];
   await deleteOlympiad(olympiad.id);
   await removeOlympiadFiles(paths);
   await logAdminAction(request, {

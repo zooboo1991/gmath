@@ -490,8 +490,19 @@ function OlympiadTab({ olympiads }: { olympiads: FamilyOlympiadView[] }) {
                 </div>
               ))}
             </div>
-            {o.files.length > 0 && (
+            {(o.files.length > 0 || o.solutions.length > 0) && (
               <div className="mt-4 flex flex-wrap gap-2">
+                {o.solutions.map((f) => (
+                  <a
+                    key={`solution-${f.index}`}
+                    href={`/api/profile/olympiads/${o.resultId}/solution/${f.index}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 font-extrabold text-[.85rem] text-green bg-green-soft rounded-full px-4 py-2"
+                  >
+                    <IconDocument className="w-4 h-4" /> {o.solutions.length > 1 ? `Албан ёсны бодолт ${f.index + 1}` : "Албан ёсны бодолт"}
+                  </a>
+                ))}
                 {o.files.map((f) => (
                   <a
                     key={f.index}

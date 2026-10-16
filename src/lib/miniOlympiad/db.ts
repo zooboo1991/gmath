@@ -13,6 +13,8 @@ export type MiniOlympiad = {
   maxPerProblem: number;
   publishedAt?: string;
   createdAt: string;
+  /** The olympiad's own worked solutions, for every child who took part. */
+  solutionFiles: OlympiadFile[];
 };
 
 export type OlympiadFile = { path: string; name: string; size: number };
@@ -51,6 +53,7 @@ type OlympiadRow = {
   max_per_problem: number;
   published_at: string | null;
   created_at: string;
+  solution_files: OlympiadFile[] | null;
 };
 
 type ResultRow = {
@@ -76,6 +79,7 @@ function olympiadFromRow(row: OlympiadRow): MiniOlympiad {
     maxPerProblem: row.max_per_problem,
     publishedAt: row.published_at ?? undefined,
     createdAt: row.created_at,
+    solutionFiles: Array.isArray(row.solution_files) ? row.solution_files : [],
   };
 }
 
@@ -150,6 +154,17 @@ export async function updateOlympiad(
   patch: Partial<{ title: string; held_on: string; max_per_problem: number }>
 ): Promise<MiniOlympiad | undefined> {
   const { data, error } = await getSupabase().from("mini_olympiads").update(patch).eq("id", id).select("*").maybeSingle();
+  if (error) throw error;
+  return data ? olympiadFromRow(data as OlympiadRow) : undefined;
+}
+
+/**
+ * Replaces the olympiad's solution files. Read-change-write without a guard:
+ * only full admins and teachers touch this list, a file or two per olympiad,
+ * and a lost race costs one re-upload, not a child's work.
+ */
+export async function setSolutionFiles(id: string, files: OlympiadFile[]): Promise<MiniOlympiad | undefined> {
+  const { data, error } = await getSupabase().from("mini_olympiads").update({ solution_files: files }).eq("id", id).select("*").maybeSingle();
   if (error) throw error;
   return data ? olympiadFromRow(data as OlympiadRow) : undefined;
 }
@@ -399,6 +414,8 @@ export type FamilyOlympiadView = {
   comments: string[];
   /** Only positions: the uploaded file's name may be another child's ("D Anungoo.pdf" picked by hand). */
   files: { index: number }[];
+  /** The olympiad's own solutions, the same for everyone who took part. */
+  solutions: { index: number }[];
   total: number;
   place: number;
   participants: number;
@@ -436,6 +453,7 @@ export async function listOlympiadsForFamily(userId: string, programId: string):
       scores: mine.scores,
       comments: mine.comments,
       files: mine.files.map((_, index) => ({ index })),
+      solutions: o.solutionFiles.map((_, index) => ({ index })),
       total: totalOf(mine.scores),
       place: standing.place,
       participants: standing.participants,

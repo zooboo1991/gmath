@@ -68,6 +68,7 @@ export default function OlympiadDetailPanel({
   const [addUserId, setAddUserId] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
   const scanRef = useRef<HTMLInputElement>(null);
+  const solutionRef = useRef<HTMLInputElement>(null);
 
   const nameOf = useMemo(() => new Map(roster.map((r) => [r.userId, r.left ? `${r.name} (гарсан)` : r.name])), [roster]);
   const inOlympiad = useMemo(() => new Set(results.map((r) => r.userId)), [results]);
@@ -333,6 +334,49 @@ export default function OlympiadDetailPanel({
     setBusy(false);
   }
 
+  // The olympiad's own solutions: one shared set, uploaded the way scans are.
+  async function uploadSolutions(files: FileList | null) {
+    if (!files?.length) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    let added = 0;
+    for (const file of [...files]) {
+      const ext = extOf(file);
+      if (!ext || file.size > MAX_SCAN_BYTES) {
+        setError(`${file.name}: зөвхөн PDF/JPG/PNG, 20MB хүртэл`);
+        continue;
+      }
+      try {
+        const base = `/api/admin/olympiads/${olympiad.id}/solution`;
+        const res = await fetch(base, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ext, size: file.size }) });
+        const json = await readJson<{ path: string; signedUrl: string; contentType: string }>(res);
+        if (!res.ok || !json.signedUrl || !json.path) throw new Error(apiError(res, json, "Хуулах URL авч чадсангүй"));
+        const put = await fetch(json.signedUrl, { method: "PUT", headers: { "Content-Type": json.contentType ?? "" }, body: file });
+        if (!put.ok) throw new Error("Файл хуулахад алдаа гарлаа");
+        const saved = await call(
+          base,
+          { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: json.path, name: file.name, size: file.size }) },
+          "Файл бүртгэхэд алдаа гарлаа"
+        );
+        if (!saved) break;
+        added++;
+      } catch (err) {
+        setError(`${file.name}: ${err instanceof Error ? err.message : "алдаа гарлаа"}`);
+      }
+    }
+    if (added) setNotice(`Бодолтын ${added} файл хавсаргалаа.`);
+    if (solutionRef.current) solutionRef.current.value = "";
+    setBusy(false);
+  }
+
+  async function removeSolution(path: string, name: string) {
+    if (!confirm(`«${name}» бодолтыг хасах уу?`)) return;
+    setBusy(true);
+    await call(`/api/admin/olympiads/${olympiad.id}/solution?path=${encodeURIComponent(path)}`, { method: "DELETE" }, "Хасахад алдаа гарлаа");
+    setBusy(false);
+  }
+
   const draftRow = draft ? results.find((r) => r.userId === draft.userId) : undefined;
 
   return (
@@ -455,6 +499,38 @@ export default function OlympiadDetailPanel({
           </div>
         </div>
       )}
+
+      {/* The olympiad's own solutions */}
+      <div className="bg-surface border border-line rounded-md shadow-xs px-5 py-4">
+        <b className="font-extrabold text-[1rem] block">Албан ёсны бодолт</b>
+        <p className="text-ink-3 font-semibold text-[.82rem] mt-1 leading-[1.55]">
+          Олимпиадын бодлогуудын бодолт (PDF эсвэл зураг). Нийтэлсний дараа дүнтэй бүх хүүхдийн гэр бүлд харагдана.
+        </p>
+        {olympiad.solutionFiles.length > 0 ? (
+          <div className="mt-3 flex flex-col gap-1.5">
+            {olympiad.solutionFiles.map((f, i) => (
+              <div key={f.path} className="flex items-center gap-3 text-[.85rem]">
+                <a href={`/api/admin/olympiads/${olympiad.id}/solution/${i}`} target="_blank" rel="noreferrer" className="font-bold text-blue-strong break-all">
+                  {f.name}
+                </a>
+                {canEdit && (
+                  <button type="button" disabled={busy} onClick={() => removeSolution(f.path, f.name)} className="font-bold text-red-soft disabled:opacity-50">
+                    Хасах
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[.85rem] font-semibold text-ink-3 mt-3">Бодолт хавсаргаагүй байна.</p>
+        )}
+        {canEdit && (
+          <label className={`inline-flex mt-3 font-extrabold text-[.85rem] text-blue-strong bg-blue-soft rounded-full px-4 py-2 cursor-pointer ${busy ? "opacity-50 pointer-events-none" : ""}`}>
+            Бодолт хавсаргах
+            <input ref={solutionRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => uploadSolutions(e.target.files)} />
+          </label>
+        )}
+      </div>
 
       {/* Import preview */}
       {preview && (
