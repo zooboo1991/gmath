@@ -466,7 +466,7 @@ function OlympiadTab({ olympiads }: { olympiads: FamilyOlympiadView[] }) {
                 <b className="font-extrabold text-[1.1rem] block">{o.title}</b>
                 <span className="text-ink-3 font-semibold text-[.85rem]">{formatCourseDate(o.heldOn)}</span>
               </div>
-              <div className="text-right">
+              <div className="sm:text-right">
                 <b className="font-extrabold text-[1.6rem] leading-none text-blue-strong block">{`${o.place}-р байр`}</b>
                 <span className="text-ink-3 font-semibold text-[.82rem]">{`${o.participants} хүүхдээс`}</span>
               </div>
@@ -477,7 +477,9 @@ function OlympiadTab({ olympiads }: { olympiads: FamilyOlympiadView[] }) {
             </div>
             <div className="mt-4 flex flex-col divide-y divide-line border border-line rounded-sm">
               {o.scores.map((s, i) => (
-                <div key={i} className="flex items-start gap-3 px-3.5 py-2.5">
+                // On a phone the comment takes its own line under the score — beside it, a column
+                // a few words wide made one comment ten lines tall.
+                <div key={i} className="flex flex-wrap sm:flex-nowrap items-start gap-x-3 gap-y-1 px-3.5 py-2.5">
                   <span className="shrink-0 w-14 text-[.82rem] font-extrabold text-ink-3">{i + 1}-р</span>
                   <b
                     className={`shrink-0 w-14 font-extrabold tabular-nums text-[.92rem] ${
@@ -486,7 +488,11 @@ function OlympiadTab({ olympiads }: { olympiads: FamilyOlympiadView[] }) {
                   >
                     {s === null ? "–" : s} / {o.maxPerProblem}
                   </b>
-                  <span className="text-[.86rem] font-medium text-ink-2 leading-[1.55]">{o.comments[i] || ""}</span>
+                  {o.comments[i] && (
+                    <span className="basis-full sm:basis-auto sm:flex-1 min-w-0 text-[.86rem] font-medium text-ink-2 leading-[1.55]">
+                      {o.comments[i]}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
