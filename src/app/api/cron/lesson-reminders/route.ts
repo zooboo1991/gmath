@@ -10,6 +10,7 @@ import {
 } from "@/lib/db";
 import { mongoliaLocalToUtc, parseScheduleString } from "@/lib/lessonSchedule";
 import { attendsLesson } from "@/lib/attendDays";
+import { isInfoSession } from "@/lib/onlineCourse";
 
 const WINDOW_START_MIN = 24;
 const WINDOW_END_MIN = 31;
@@ -92,6 +93,8 @@ function collectCandidates(
 ): void {
   lessons.forEach((lesson, lessonIndex) => {
     if (lesson.mode === "inperson" || lesson.mode === "recorded" || !lesson.zoomLink || !lesson.schedule) return;
+    // "Хичээл 30 минутын дараа эхэлнэ" would be wrong for the parents' info meeting.
+    if (isInfoSession(lesson.topic)) return;
     if (sentKeys.has(`${programId}#${lessonIndex}`)) return;
 
     const { date, startTime } = parseScheduleString(lesson.schedule);

@@ -157,9 +157,5 @@ export const onlineOlympiadCourse = {
     "Видео хичээлийг нээгдсэн цагаас нь эхлэн тухайн долоо хоногийн сорил дуустал (Ням гарагийн 21:00 хүртэл) үзэх боломжтой.",
   taskNote: "Даалгавар бүр 3–5 бодлоготой. Бодлогоо бодоод бодолтын зургаа системд оруулна.",
   certificate: "Сертификатыг ирц, даалгавар, сорилын гүйцэтгэлээс хамаарч олгоно.",
-  /** Information meetings before a course starts, by course slug. */
-  infoSessions: {
-    "e-online": "2026.10.16 (Баасан) 19:00–19:30 · Zoom",
-  } as Record<string, string>,
 };
 

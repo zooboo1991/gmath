@@ -89,6 +89,17 @@ describe("онлайн хичээлийн ирц", () => {
     expect(absent).toBe(0);
     expect(unmarked).toBe(1);
   });
+
+  it("эцэг эхийн мэдээллийн уулзалтыг ирцэд тооцохгүй, дугаарлалт хэвээр", () => {
+    const { lessons, absent, rate } = summarise({
+      lessons: [lesson("Мэдээлэл өгөх уулзалт", "2026-08-17"), lesson("Тоон онол", "2026-08-24")],
+      trackedLessonIndexes: new Set([0, 1]),
+      spansByLessonIndex: { 1: [{ joinedAt: "2026-08-24T10:00:00Z", leftAt: "2026-08-24T12:00:00Z" }] },
+    });
+    expect(lessons.map((l) => [l.lessonIndex, l.outcome])).toEqual([[1, "present"]]);
+    expect(absent).toBe(0);
+    expect(rate).toBe(100);
+  });
 });
 
 describe("танхимын хичээлийн ирц", () => {

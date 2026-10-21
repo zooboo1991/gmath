@@ -17,6 +17,35 @@ export type OnlineLessonKind = "video" | "zoom" | "other";
 
 const KIND_SUFFIX = /\s*\((видео|zoom)\)\s*$/i;
 
+/**
+ * «Мэдээлэл өгөх уулзалт» — the parents' meeting before a course starts. It sits
+ * in the schedule only so the admin's Zoom button can make its meeting; it is
+ * no lesson: not a week, a total, a roll entry or a reminder.
+ */
+export function isInfoSession(topic: string): boolean {
+  return /^мэдээлэл өгөх уулзалт/i.test(topic.trim());
+}
+
+/**
+ * The info meeting as the course page shows it — "2026.10.24 (Бямба) 16:00 · Zoom" —
+ * with its Zoom link once the admin has made the meeting. Gone after its day.
+ */
+export function infoSessionOf(
+  lessons: { topic: string; schedule?: string; zoomLink?: string }[],
+  now: Date = new Date()
+): { when: string; zoomUrl?: string } | undefined {
+  const lesson = lessons.find((l) => isInfoSession(l.topic));
+  if (!lesson) return undefined;
+  const { date, startTime } = parseScheduleString(lesson.schedule ?? "");
+  const today = new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  if (date && date < today) return undefined;
+  const day = date ? weekdayOf(date) : null;
+  const when = date
+    ? `${date.replaceAll("-", ".")}${day === null ? "" : ` (${WEEKDAY_NAMES[day]})`}${startTime ? ` ${startTime}` : ""} · Zoom`
+    : "Zoom";
+  return { when, zoomUrl: lesson.zoomLink || undefined };
+}
+
 /** A lesson saved as «Бичлэг» is a video whatever its topic says; otherwise the topic's ending decides. */
 export function lessonKind(topic: string, mode?: string): OnlineLessonKind {
   if (mode === "recorded") return "video";
@@ -62,6 +91,7 @@ const addDays = (iso: string, days: number) => {
 export function courseWeeks(lessons: { topic: string; schedule?: string; mode?: string }[]): CourseWeek[] {
   const byWeek = new Map<string, CourseWeek>();
   const dated = lessons
+    .filter((l) => !isInfoSession(l.topic))
     .map((l) => ({ l, parsed: parseScheduleString(l.schedule ?? "") }))
     .filter(({ parsed }) => parsed.date)
     .sort((a, b) => (a.parsed.date + a.parsed.startTime).localeCompare(b.parsed.date + b.parsed.startTime));
@@ -107,10 +137,11 @@ export function weeklyRhythm(value: string | undefined | null): RhythmDay[] {
 export function courseTotals(lessons: { topic: string; schedule?: string; mode?: string }[], rhythm: RhythmDay[]) {
   const weeks = courseWeeks(lessons).length;
   const perWeek = (word: RegExp) => rhythm.filter((r) => word.test(r.text)).length;
+  const taught = lessons.filter((l) => !isInfoSession(l.topic));
   return {
     weeks,
-    videos: lessons.filter((l) => lessonKind(l.topic, l.mode) === "video").length,
-    zooms: lessons.filter((l) => lessonKind(l.topic, l.mode) === "zoom").length,
+    videos: taught.filter((l) => lessonKind(l.topic, l.mode) === "video").length,
+    zooms: taught.filter((l) => lessonKind(l.topic, l.mode) === "zoom").length,
     tasks: perWeek(/^даалгавар/i) * weeks,
     tests: perWeek(/^сорил/i) * weeks,
   };

@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { courseTotals, courseWeeks, lessonKind, lessonSubject, lessonTitle, weeklyRhythm } from "@/lib/onlineCourse";
+import { courseTotals, courseWeeks, infoSessionOf, isInfoSession, lessonKind, lessonSubject, lessonTitle, weeklyRhythm } from "@/lib/onlineCourse";
 import { planCourseTasks, taskState } from "@/lib/courseTasks";
 
 const lessons = [
@@ -53,6 +53,28 @@ describe("weeks and totals", () => {
   it("reads the weekly rhythm and counts tasks and tests per week", () => {
     expect(rhythm[1]).toEqual({ day: "Мягмар", time: "09:00–21:00", text: "Даалгавар 1: 3–5 бодлого" });
     expect(courseTotals(lessons, rhythm)).toEqual({ weeks: 2, videos: 3, zooms: 2, tasks: 4, tests: 2 });
+  });
+
+  it("leaves the parents' info meeting out of the weeks and the totals", () => {
+    const withMeeting = [
+      { topic: "Мэдээлэл өгөх уулзалт (Zoom)", schedule: "2026.10.17 Бямба гараг · 16:00–17:00" },
+      ...lessons,
+    ];
+    expect(isInfoSession(" мэдээлэл өгөх уулзалт")).toBe(true);
+    expect(isInfoSession("Гурвалжин 3 (Zoom)")).toBe(false);
+    expect(courseWeeks(withMeeting).map((w) => w.start)).toEqual(["2026-10-19", "2026-10-26"]);
+    expect(courseTotals(withMeeting, rhythm)).toEqual(courseTotals(lessons, rhythm));
+  });
+
+  it("shows the info meeting with its Zoom link until its day is over", () => {
+    const meeting = { topic: "Мэдээлэл өгөх уулзалт", schedule: "2026.10.24 Бямба гараг · 16:00–17:00" };
+    const before = new Date("2026-10-21T04:00:00Z");
+    expect(infoSessionOf([meeting, ...lessons], before)).toEqual({ when: "2026.10.24 (Бямба) 16:00 · Zoom", zoomUrl: undefined });
+    expect(infoSessionOf([{ ...meeting, zoomLink: "https://zoom.us/j/1" }], before)?.zoomUrl).toBe("https://zoom.us/j/1");
+    // 2026-10-24 23:00 in Ulaanbaatar is still the day; the next morning it is gone.
+    expect(infoSessionOf([meeting], new Date("2026-10-24T15:00:00Z"))).toBeDefined();
+    expect(infoSessionOf([meeting], new Date("2026-10-25T01:00:00Z"))).toBeUndefined();
+    expect(infoSessionOf(lessons, before)).toBeUndefined();
   });
 });
 

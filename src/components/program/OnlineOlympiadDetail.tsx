@@ -18,7 +18,7 @@ import {
 } from "@/components/icons";
 import { formatCourseDate } from "@/lib/courseDate";
 import { onlineOlympiadCourse } from "@/lib/siteContent";
-import { courseTotals, courseWeeks, shortRange, weeklyRhythm, type OnlineLessonKind } from "@/lib/onlineCourse";
+import { courseTotals, courseWeeks, infoSessionOf, shortRange, weeklyRhythm, type OnlineLessonKind } from "@/lib/onlineCourse";
 
 /**
  * An online olympiad course run week by week: two video lessons, two sets of
@@ -75,7 +75,7 @@ export default function OnlineOlympiadDetail({
   const rhythm = weeklyRhythm(course.weeklySchedule);
   const weeks = courseWeeks(course.lessons);
   const totals = courseTotals(course.lessons, rhythm);
-  const infoSession = course.slug ? onlineOlympiadCourse.infoSessions[course.slug] : undefined;
+  const infoSession = infoSessionOf(course.lessons);
   const lastDay = weeks.at(-1)?.end;
 
   const stats = [
@@ -145,7 +145,17 @@ export default function OnlineOlympiadDetail({
             {infoSession && (
               <span className="inline-flex items-center gap-2 text-[.9rem] font-bold text-white bg-white/10 rounded-full px-4 py-2.5">
                 <IconVideoCamera className="w-4 h-4 text-gold" />
-                {`Мэдээлэл өгөх уулзалт: ${infoSession}`}
+                {`Мэдээлэл өгөх уулзалт: ${infoSession.when}`}
+                {infoSession.zoomUrl && (
+                  <a
+                    href={infoSession.zoomUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gold underline underline-offset-2 hover:text-gold-strong"
+                  >
+                    Нэгдэх
+                  </a>
+                )}
               </span>
             )}
           </div>

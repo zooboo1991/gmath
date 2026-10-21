@@ -1,6 +1,7 @@
 import { getWeekdayNameMn } from "./courseDate";
 import { mongoliaLocalToUtc, parseScheduleString } from "./lessonSchedule";
 import { attendsLesson, type AttendDaysEntry } from "./attendDays";
+import { isInfoSession } from "./onlineCourse";
 
 /**
  * Хичээл бүрийн ирц — нэг сурагчийн нүдээр.
@@ -118,6 +119,8 @@ export function summariseAttendance(input: {
     .map((lesson, lessonIndex) => ({ lesson, lessonIndex }))
     // A video lesson is watched, not attended: it has no place in the roll.
     .filter(({ lesson }) => lesson.mode !== "recorded")
+    // The parents' info meeting is not a lesson the child can miss.
+    .filter(({ lesson }) => !isInfoSession(lesson.topic))
     .filter(({ lesson }) => attendsLesson(input.attendDays, lesson.schedule))
     .map(({ lesson, lessonIndex }): LessonAttendance => {
       const mode: AttendanceMode = lesson.mode === "inperson" ? "inperson" : "online";
