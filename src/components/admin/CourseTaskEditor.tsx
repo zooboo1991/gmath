@@ -8,6 +8,7 @@ import { INPUT_CLASS } from "@/components/admin/panels/shared";
 import { apiError, readJson } from "@/lib/fetchJson";
 import type { Problem } from "@/lib/assessment/types";
 import type { ExamDetail } from "@/lib/assessment/exams";
+import type { SubmissionState, TaskSubmission } from "@/lib/courseTasks";
 
 /**
  * One homework/test paper of a course: its name, the window it is open in
@@ -30,12 +31,21 @@ export default function CourseTaskEditor({
   courseHref,
   courseTitle,
   canEdit,
+  submissions,
+  windowOver,
+  canGrade,
 }: {
   task: Omit<ExamDetail, "problems"> & { problems: ShownProblem[] };
   bank: ShownProblem[];
   courseHref: string;
   courseTitle: string;
   canEdit: boolean;
+  /** Each of the course's children against this paper; null when it could not be loaded. */
+  submissions: TaskSubmission[] | null;
+  /** The paper's window has shut: a sitting not handed in by now never will be. */
+  windowOver: boolean;
+  /** May open a sitting in the grading queue. */
+  canGrade: boolean;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(task.title);
@@ -203,6 +213,8 @@ export default function CourseTaskEditor({
         </label>
       </div>
 
+      <Submissions submissions={submissions} over={windowOver} canGrade={canGrade} />
+
       <div className="grid grid-cols-1 nav:grid-cols-2 gap-6 mt-8">
         <div>
           <h2 className="text-[1.05rem] font-extrabold mb-3">{`Сонгосон бодлого (${chosen.length})`}</h2>
@@ -289,6 +301,74 @@ export default function CourseTaskEditor({
             {`${kindLabel} устгах`}
           </button>
           <p className="text-ink-3 font-semibold text-[.82rem] mt-1">Сурагч эхлүүлээгүй бол л устгана.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const STATE: Record<SubmissionState, { text: string; tone: string }> = {
+  graded: { text: "Шалгасан", tone: "text-green bg-green-soft" },
+  grading: { text: "Шалгаж байна", tone: "text-blue-strong bg-blue-soft" },
+  submitted: { text: "Илгээсэн", tone: "text-blue-strong bg-blue-soft" },
+  started: { text: "Эхлүүлсэн", tone: "text-gold-strong bg-gold-soft" },
+  not_started: { text: "Эхлүүлээгүй", tone: "text-ink-3 bg-bg-soft" },
+};
+
+/**
+ * Who has handed this paper in. A child who started but never pressed
+ * «Илгээх» is told apart from one who never opened it — once the window has
+ * shut, that is work the teacher may want to chase.
+ */
+function Submissions({
+  submissions,
+  over,
+  canGrade,
+}: {
+  submissions: TaskSubmission[] | null;
+  over: boolean;
+  canGrade: boolean;
+}) {
+  if (submissions === null) {
+    return <p className="text-red-soft font-bold text-[.9rem] mt-8">Илгээлтийн мэдээллийг ачаалж чадсангүй.</p>;
+  }
+  const real = submissions.filter((s) => !s.isTest);
+  const handedIn = real.filter((s) => s.state === "submitted" || s.state === "grading" || s.state === "graded").length;
+  return (
+    <div className="mt-8">
+      <h2 className="text-[1.05rem] font-extrabold mb-1">{`Илгээлт (${handedIn} / ${real.length})`}</h2>
+      <p className="text-ink-3 font-semibold text-[.85rem] mb-3">
+        Бодолтоо «Илгээх» дарж илгээсэн хүүхэд л шалгах дараалалд орно.
+      </p>
+      {submissions.length === 0 ? (
+        <p className="text-ink-3 font-semibold text-[.9rem]">Сургалтад идэвхтэй бүртгэлтэй хүүхэд алга.</p>
+      ) : (
+        <div className="bg-surface border border-line rounded-md divide-y divide-line">
+          {submissions.map((s) => {
+            const st = s.state === "started" && over ? { text: "Илгээгээгүй", tone: "text-red-soft bg-red-soft/10" } : STATE[s.state];
+            const linked = canGrade && s.assessmentId && s.state !== "started" && s.state !== "not_started";
+            return (
+              <div key={s.userId} className="px-4 py-2.5 flex items-center gap-3 flex-wrap">
+                <span className="font-extrabold text-[.9rem] min-w-0 flex-1">
+                  {s.name}
+                  {s.isTest && <span className="ml-1.5 text-[.75rem] font-bold text-ink-3">(тест)</span>}
+                  {s.grade && <span className="ml-1.5 text-[.8rem] font-semibold text-ink-3">{s.grade}</span>}
+                </span>
+                {s.assessmentId && (
+                  <span className="text-[.8rem] font-semibold text-ink-3">{`${s.photographed} бодлогын зураг`}</span>
+                )}
+                {s.total !== undefined && s.max !== undefined && (
+                  <span className="text-[.85rem] font-extrabold tabular-nums">{`${s.total} / ${s.max}`}</span>
+                )}
+                <span className={`text-[.76rem] font-extrabold px-2.5 py-1 rounded-full ${st.tone}`}>{st.text}</span>
+                {linked && (
+                  <Link href={`/admin/grading/${s.assessmentId}`} className="text-[.82rem] font-extrabold text-blue-strong">
+                    Шалгах →
+                  </Link>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

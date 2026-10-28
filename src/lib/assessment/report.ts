@@ -1,6 +1,6 @@
 import { getPickingState, listProblems, listSolutions } from "./db";
 import { SIGNED_URL_TTL_SECONDS } from "./config";
-import { maxPaperScore } from "./scoring";
+import { maxPaperScore, pointsPerProblem } from "./scoring";
 import { toPublicProblem, type Assessment, type PublicProblem } from "./types";
 import { createSignedUrl, GRADED_SHEETS_BUCKET, SOLUTIONS_BUCKET } from "../storage";
 
@@ -77,7 +77,8 @@ export async function buildAssessmentReport(assessment: Assessment): Promise<Ass
     scoredCount: scored.length,
     maxScore: maxPaperScore(
       state.shown.map((entry) => entry.action),
-      Boolean(assessment.examId)
+      Boolean(assessment.examId),
+      pointsPerProblem(assessment.track)
     ),
   };
 }

@@ -4,6 +4,7 @@ import CourseTaskEditor from "@/components/admin/CourseTaskEditor";
 import { listProblems } from "@/lib/assessment/db";
 import { findExamDetail } from "@/lib/assessment/exams";
 import { findCourseById } from "@/lib/db";
+import { listTaskSubmissions, taskWindow, type TaskSubmission } from "@/lib/courseTasks";
 import { requireAdminSection } from "@/lib/adminAccess";
 import { can } from "@/lib/adminSections";
 import type { Problem } from "@/lib/assessment/types";
@@ -21,9 +22,10 @@ export default async function AdminCourseTaskPage({ params }: { params: Promise<
   // The whole live bank (a course paper is not tied to one category) — and only
   // what the page shows of a problem: the answer key and worked solution are
   // the bank's, which a read-only admin is not shown.
-  const [bank, course] = await Promise.all([
+  const [bank, course, submissions] = await Promise.all([
     canEdit ? listProblems().catch(() => [] as Problem[]) : Promise.resolve([] as Problem[]),
     findCourseById(task.programId),
+    listTaskSubmissions({ id: task.id, programId: task.programId }).catch(() => null as TaskSubmission[] | null),
   ]);
   const shown = (p: Problem) => ({ id: p.id, topic: p.topic, bodyLatex: p.bodyLatex, category: p.category });
   return (
@@ -33,6 +35,9 @@ export default async function AdminCourseTaskPage({ params }: { params: Promise<
       courseHref={`/admin/courses/${task.programId}`}
       courseTitle={course?.title ?? "Сургалт"}
       canEdit={canEdit}
+      submissions={submissions}
+      windowOver={taskWindow(task) === "after"}
+      canGrade={can(role, "grading")}
     />
   );
 }

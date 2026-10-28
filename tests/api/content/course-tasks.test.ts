@@ -235,6 +235,9 @@ describe("a student sitting a paper", () => {
 
     // Marked with scores alone — no written verdict needed for homework — and the family is told.
     const { data: solution } = await testDb().from("solutions").select("id").eq("assessment_id", id).single();
+    // A course paper is marked like an olympiad: out of 7 a problem, not a placement test's 10.
+    const over = await admin.put(`/api/admin/grading/${id}/score`, { solutionId: (solution as { id: string }).id, graderScore: 7.5 });
+    expect(over.status, over.text).toBe(400);
     const scored = await admin.put(`/api/admin/grading/${id}/score`, { solutionId: (solution as { id: string }).id, graderScore: 7, graderComment: "Зөв" });
     expect(scored.status, scored.text).toBe(200);
     const done = await admin.put(`/api/admin/grading/${id}/complete`, { teacherComment: "" });
@@ -244,6 +247,37 @@ describe("a student sitting a paper", () => {
     const report = await client.get(`/profile/assessment?a=${id}`);
     expect(report.status).toBe(200);
     expect(report.text).toContain(homework.title);
+    // Two problems on the paper, the one given up on included.
+    expect(report.text).toContain("7 / 14");
+  });
+
+  it("shows the admin, on the paper's page, who has handed it in", async () => {
+    const admin = await adminClient("full");
+    const course = await onlineCourse();
+    const [homework] = await generate(admin, course.id);
+    const problems = await readyPaper(admin, homework);
+    const handedIn = await student(course.id);
+    const halfway = await student(course.id);
+    const absent = await student(course.id);
+
+    const a = (await start(handedIn.client, homework.id)).body.assessmentId;
+    expect((await upload(handedIn.client, a, problems[0])).status).toBe(200);
+    expect((await handedIn.client.post(`/api/assessment/${a}/skip`, { problemId: problems[1] })).status).toBe(200);
+    expect((await handedIn.client.post(`/api/assessment/${a}/submit`, {})).status).toBe(200);
+    // Photographed one problem and never pressed «Илгээх».
+    const b = (await start(halfway.client, homework.id)).body.assessmentId;
+    expect((await upload(halfway.client, b, problems[0])).status).toBe(200);
+
+    const page = await admin.get(`/admin/course-tasks/${homework.id}`);
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("Илгээлт (1 / 3)");
+    for (const s of [handedIn, halfway, absent]) expect(page.text).toContain(s.user.firstName);
+    expect(page.text).toContain("Илгээсэн");
+    expect(page.text).toContain("Эхлүүлсэн");
+    expect(page.text).toContain("Эхлүүлээгүй");
+    // Only handed-in work opens in the grading queue.
+    expect(page.text).toContain(`/admin/grading/${a}`);
+    expect(page.text).not.toContain(`/admin/grading/${b}`);
   });
 
   it("is only for the course's own active students", async () => {

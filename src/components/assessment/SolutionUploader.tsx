@@ -338,7 +338,8 @@ export default function SolutionUploader({
           </button>
         ) : (
           <p className="text-center text-ink-3 font-semibold text-[.88rem]">
-            {total - doneCount} бодлого үлдлээ. Бүгдийг бодож дуусмагц илгээх товч гарна.
+            {total - doneCount} бодлого үлдлээ. Бодлого бүрт зургаа оруулах эсвэл бодож чадаагүй бол «Бодож чадсангүй»
+            дармагц илгээх товч гарна.
           </p>
         )}
         <p className="text-center text-ink-3 font-medium text-[.82rem] mt-3">

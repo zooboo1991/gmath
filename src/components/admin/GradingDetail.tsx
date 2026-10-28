@@ -11,6 +11,7 @@ import {
   formatPaperScore,
   maxPaperScore,
   parsePoints,
+  pointsPerProblem,
   splitConclusion,
 } from "@/lib/assessment/scoring";
 import { MAX_LEN } from "@/lib/validate";
@@ -116,12 +117,14 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
   // The running total as the teacher types, over the whole paper: problems the
   // child gave up on are on it too and simply earn nothing. Each score is taken
   // the way the route will store it, so this matches the child's report.
+  const points = pointsPerProblem(detail.assessment.track);
   const maxScore = maxPaperScore(
     [...items.map(() => "solving"), ...detail.skipped.map((s) => s.action)],
-    Boolean(detail.assessment.examId)
+    Boolean(detail.assessment.examId),
+    points
   );
   const totalScore = items.reduce(
-    (sum, item) => sum + ((item.solution && parsePoints(marks[item.solution.id]?.score ?? "")) || 0),
+    (sum, item) => sum + ((item.solution && parsePoints(marks[item.solution.id]?.score ?? "", points)) || 0),
     0
   );
 
@@ -368,6 +371,7 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
             key={item.problem?.id ?? i}
             index={i}
             item={item}
+            points={points}
             done={done}
             mark={(item.solution && marks[item.solution.id]) ?? EMPTY_MARK}
             dirty={Boolean(item.solution && unsaved.includes(item.solution.id))}
@@ -545,6 +549,7 @@ export default function GradingDetail({ detail }: { detail: Detail }) {
 function SolutionCard({
   index,
   item,
+  points,
   done,
   mark,
   dirty,
@@ -556,6 +561,8 @@ function SolutionCard({
 }: {
   index: number;
   item: Detail["items"][number];
+  /** What one problem is marked out of: 10 on a placement test, 7 on a course paper. */
+  points: number;
   done: boolean;
   mark: Mark;
   /** Typed here but not yet on the server. */
@@ -663,12 +670,12 @@ function SolutionCard({
             <span
               className={`text-[.8rem] font-extrabold ${missingScore ? "text-red-soft" : "text-ink-3"}`}
             >
-              {missingScore ? "Оноо оруулна уу" : "Оноо (0-10)"}
+              {missingScore ? "Оноо оруулна уу" : `Оноо (0-${points})`}
             </span>
             <input
               type="number"
               min={0}
-              max={10}
+              max={points}
               step={0.5}
               value={score}
               onChange={(e) => onChange({ ...mark, score: e.target.value })}

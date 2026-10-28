@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { findAssessment, gradeSolution, listSolutions, updateAssessment } from "@/lib/assessment/db";
+import { pointsPerProblem } from "@/lib/assessment/scoring";
 import { isTooLong, MAX_LEN } from "@/lib/validate";
 import { REFUSED, requireCapability } from "@/lib/adminAccess";
 
@@ -29,8 +30,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   let graderScore: number | undefined;
   if (raw !== null && raw !== undefined && raw !== "") {
     graderScore = Number(raw);
-    if (!Number.isFinite(graderScore) || graderScore < 0 || graderScore > 10) {
-      return NextResponse.json({ ok: false, error: "Оноо 0-10 хооронд байна" }, { status: 400 });
+    // 10 a problem on a placement test, 7 on a course's homework and tests.
+    const max = pointsPerProblem(assessment.track);
+    if (!Number.isFinite(graderScore) || graderScore < 0 || graderScore > max) {
+      return NextResponse.json({ ok: false, error: `Оноо 0-${max} хооронд байна` }, { status: 400 });
     }
     graderScore = Math.round(graderScore * 10) / 10;
   }

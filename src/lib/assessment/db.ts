@@ -11,7 +11,7 @@ import {
   QUIZ_QUESTIONS_PER_TEST,
 } from "./config";
 import { estimateLevel } from "./levelEstimator";
-import { maxPaperScore } from "./scoring";
+import { maxPaperScore, pointsPerProblem } from "./scoring";
 import { isProblemCategory } from "./types";
 import type {
   Assessment,
@@ -488,6 +488,22 @@ export async function listCourseSittings(userId: string, examIds: string[]): Pro
   return out;
 }
 
+/** Every child's sitting of one course paper (not cancelled), with who they are. */
+export async function listExamSittings(examId: string): Promise<AssessmentWithUser[]> {
+  const { data, error } = await getSupabase()
+    .from("assessments")
+    .select("*, users(*)")
+    .eq("exam_id", examId)
+    .eq("track", "course")
+    .neq("status", "cancelled");
+  if (error) throw error;
+
+  return (data as (AssessmentRow & { users: unknown })[]).map((row) => {
+    const { users, ...rest } = row;
+    return { ...assessmentFromRow(rest), user: publicUserFromJoin(users) };
+  });
+}
+
 /** The one the student is still working through, if any. */
 /**
  * The assessment this child is part-way through.
@@ -688,9 +704,10 @@ export type PaperTotal = { total: number; max: number };
  * Assessments with no paper (nothing handed out) are left out.
  */
 export async function listPaperTotals(
-  assessments: Pick<Assessment, "id" | "examId">[]
+  assessments: Pick<Assessment, "id" | "examId" | "track">[]
 ): Promise<Record<string, PaperTotal>> {
   const fromExam = new Map(assessments.map((a) => [a.id, Boolean(a.examId)]));
+  const points = new Map(assessments.map((a) => [a.id, pointsPerProblem(a.track)]));
   const totals: Record<string, PaperTotal> = {};
   for (const ids of chunk(assessments.map((a) => a.id))) {
     const [papers, solutions] = await Promise.all([
@@ -714,7 +731,7 @@ export async function listPaperTotals(
       actions.set(row.assessment_id, [...(actions.get(row.assessment_id) ?? []), row.action]);
     }
     for (const [id, list] of actions) {
-      const max = maxPaperScore(list, fromExam.get(id) ?? false);
+      const max = maxPaperScore(list, fromExam.get(id) ?? false, points.get(id) ?? 0);
       if (max > 0) totals[id] = { total: 0, max };
     }
     for (const row of solutions) {

@@ -4,8 +4,16 @@
  * report all read this, so the three can never disagree on the total.
  */
 
-/** Every olympiad problem is marked out of this many points. */
+/** A placement problem is marked out of this many points. */
 export const POINTS_PER_PROBLEM = 10;
+
+/** A course's homework and tests are marked like an olympiad: out of 7 a problem. */
+export const COURSE_POINTS_PER_PROBLEM = 7;
+
+/** What one problem of this sitting is marked out of. */
+export function pointsPerProblem(track: string): number {
+  return track === "course" ? COURSE_POINTS_PER_PROBLEM : POINTS_PER_PROBLEM;
+}
 
 /**
  * The most a paper can earn: every problem the child was given. On a composed
@@ -14,20 +22,21 @@ export const POINTS_PER_PROBLEM = 10;
  * card the child passed over ("too_easy", "dont_know" meaning "show me
  * another"); only the ones they chose to solve were ever on their paper.
  */
-export function maxPaperScore(actions: readonly string[], fromExam: boolean): number {
+export function maxPaperScore(actions: readonly string[], fromExam: boolean, points: number): number {
   const onPaper = actions.filter((action) => action === "solving" || (fromExam && action === "dont_know"));
-  return onPaper.length * POINTS_PER_PROBLEM;
+  return onPaper.length * points;
 }
 
 /**
- * A score as the score route will store it — 0 to 10, one decimal — or
- * undefined for anything it would refuse. The live total on the grading page
- * adds these, so it matches what the child sees once the paper is finished.
+ * A score as the score route will store it — 0 to the problem's points, one
+ * decimal — or undefined for anything it would refuse. The live total on the
+ * grading page adds these, so it matches what the child sees once the paper
+ * is finished.
  */
-export function parsePoints(raw: string): number | undefined {
+export function parsePoints(raw: string, max: number): number | undefined {
   if (!raw.trim()) return undefined;
   const points = Number(raw);
-  if (!Number.isFinite(points) || points < 0 || points > POINTS_PER_PROBLEM) return undefined;
+  if (!Number.isFinite(points) || points < 0 || points > max) return undefined;
   return Math.round(points * 10) / 10;
 }
 

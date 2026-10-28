@@ -1,6 +1,7 @@
 import { getSupabase } from "./supabase";
 import { examFromRow, findExam, listExamProblems, openExamPaper, type Exam, type ExamRow } from "./assessment/exams";
-import { listCourseSittings, listPaperTotals, updateAssessment } from "./assessment/db";
+import { listCourseSittings, listExamSittings, listPaperTotals, updateAssessment } from "./assessment/db";
+import { publicUserFromJoin, type PublicUser } from "./db";
 import type { Assessment } from "./assessment/types";
 import { mongoliaLocalToUtc } from "./lessonSchedule";
 import { courseWeeks, weeklyRhythm } from "./onlineCourse";
@@ -113,6 +114,85 @@ export async function listStudentTasks(programId: string, userId: string, now = 
       ...(score ? { total: score.total, max: score.max } : {}),
     };
   });
+}
+
+export type SubmissionState = "not_started" | "started" | "submitted" | "grading" | "graded";
+
+export type TaskSubmission = {
+  userId: string;
+  name: string;
+  grade?: string;
+  isTest: boolean;
+  state: SubmissionState;
+  assessmentId?: string;
+  /** Problems with at least one photo on them — handed in or not. */
+  photographed: number;
+  total?: number;
+  max?: number;
+};
+
+const SUBMISSION_ORDER: SubmissionState[] = ["graded", "grading", "submitted", "started", "not_started"];
+
+/**
+ * One paper against the course's children, for its admin page: who never
+ * opened it, who started without pressing «Илгээх», who handed in, and the
+ * score once the paper is finished. A child who sat it and has left the course
+ * since is still listed — the sitting is theirs.
+ */
+export async function listTaskSubmissions(task: { id: string; programId: string }): Promise<TaskSubmission[]> {
+  const [regs, sittings] = await Promise.all([
+    getSupabase().from("registrations").select("users(*)").eq("program_id", task.programId).eq("status", "active"),
+    listExamSittings(task.id),
+  ]);
+  if (regs.error) throw regs.error;
+
+  const people = new Map<string, PublicUser>();
+  for (const r of regs.data as { users: unknown }[]) {
+    const u = publicUserFromJoin(Array.isArray(r.users) ? r.users[0] : r.users);
+    if (u) people.set(u.id, u);
+  }
+  const byUser = new Map<string, Assessment>();
+  for (const { user, ...sitting } of sittings) {
+    if (!user) continue;
+    people.set(user.id, user);
+    byUser.set(user.id, sitting);
+  }
+
+  const ids = [...byUser.values()].map((a) => a.id);
+  const photographed = new Map<string, number>();
+  if (ids.length > 0) {
+    const { data, error } = await getSupabase().from("solutions").select("assessment_id, image_paths").in("assessment_id", ids);
+    if (error) throw error;
+    for (const s of data as { assessment_id: string; image_paths: string[] | null }[]) {
+      if ((s.image_paths ?? []).length > 0) photographed.set(s.assessment_id, (photographed.get(s.assessment_id) ?? 0) + 1);
+    }
+  }
+  const graded = [...byUser.values()].filter((a) => a.status === "completed");
+  const totals = graded.length ? await listPaperTotals(graded) : {};
+
+  const stateOf = (a: Assessment | undefined): SubmissionState => {
+    if (!a) return "not_started";
+    if (a.status === "completed") return "graded";
+    if (a.status === "grading") return "grading";
+    if (a.status === "problems_submitted") return "submitted";
+    return "started";
+  };
+  return [...people.values()]
+    .map((u) => {
+      const a = byUser.get(u.id);
+      const score = a ? totals[a.id] : undefined;
+      return {
+        userId: u.id,
+        name: `${u.lastName ?? ""} ${u.firstName ?? ""}`.trim() || "(нэргүй)",
+        grade: u.grade,
+        isTest: Boolean(u.isTest),
+        state: stateOf(a),
+        assessmentId: a?.id,
+        photographed: a ? (photographed.get(a.id) ?? 0) : 0,
+        ...(score ? { total: score.total, max: score.max } : {}),
+      };
+    })
+    .sort((x, y) => SUBMISSION_ORDER.indexOf(x.state) - SUBMISSION_ORDER.indexOf(y.state) || x.name.localeCompare(y.name, "mn"));
 }
 
 async function hasActiveRegistration(userId: string, programId: string): Promise<boolean> {
