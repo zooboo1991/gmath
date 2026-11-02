@@ -85,8 +85,8 @@ export default function CourseTaskEditor({
     });
 
   const save = async (nextStatus = status) => {
-    if (!opensAt || !closesAt) {
-      setError("Нээгдэх, хаагдах цагаа бөглөнө үү");
+    if (!opensAt) {
+      setError("Нээгдэх цагаа бөглөнө үү");
       return;
     }
     setSaving(true);
@@ -99,7 +99,7 @@ export default function CourseTaskEditor({
         body: JSON.stringify({
           title,
           opensAt: fromLocalInput(opensAt),
-          closesAt: fromLocalInput(closesAt),
+          closesAt: closesAt ? fromLocalInput(closesAt) : null,
           status: nextStatus,
           problemIds: chosen,
         }),
@@ -207,10 +207,25 @@ export default function CourseTaskEditor({
           <span className="text-[.78rem] font-extrabold text-ink-3">Нээгдэх (УБ цаг)</span>
           <input type="datetime-local" className={INPUT_CLASS} value={opensAt} disabled={!canEdit} onChange={(e) => setOpensAt(e.target.value)} />
         </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[.78rem] font-extrabold text-ink-3">Хаагдах (УБ цаг)</span>
-          <input type="datetime-local" className={INPUT_CLASS} value={closesAt} disabled={!canEdit} onChange={(e) => setClosesAt(e.target.value)} />
-        </label>
+        {/* Not a <label>: a click on «Хугацаагүй болгох» must not open the date picker. */}
+        <div className="flex flex-col gap-1.5">
+          <span className="flex items-center justify-between gap-2 text-[.78rem] font-extrabold text-ink-3">
+            {closesAt ? "Хаагдах (УБ цаг)" : "Хаагдах — хугацаагүй"}
+            {closesAt && canEdit && (
+              <button type="button" className="text-blue-strong font-extrabold" onClick={() => setClosesAt("")}>
+                Хугацаагүй болгох
+              </button>
+            )}
+          </span>
+          <input
+            type="datetime-local"
+            aria-label="Хаагдах (УБ цаг)"
+            className={INPUT_CLASS}
+            value={closesAt}
+            disabled={!canEdit}
+            onChange={(e) => setClosesAt(e.target.value)}
+          />
+        </div>
       </div>
 
       <Submissions submissions={submissions} over={windowOver} canGrade={canGrade} />

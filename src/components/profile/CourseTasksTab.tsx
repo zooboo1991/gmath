@@ -15,13 +15,14 @@ import type { StudentTask, TaskState } from "@/lib/courseTasks";
 
 const WEEKDAYS = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
 
-/** "10.20 (Мягмар) 09:00–21:00" in Ulaanbaatar time. */
-function windowLabel(opensAt: string, closesAt: string): string {
+/** "10.20 (Мягмар) 09:00–21:00" in Ulaanbaatar time, or "10.20 (Мягмар) 09:00-аас" with no end. */
+function windowLabel(opensAt: string, closesAt?: string): string {
   const local = (iso: string) => new Date(new Date(iso).getTime() + 8 * 3600_000);
   const o = local(opensAt);
-  const c = local(closesAt);
   const hm = (d: Date) => d.toISOString().slice(11, 16);
   const md = (d: Date) => d.toISOString().slice(5, 10).replace("-", ".");
+  if (!closesAt) return `${md(o)} (${WEEKDAYS[o.getUTCDay()]}) ${hm(o)}-аас`;
+  const c = local(closesAt);
   const sameDay = o.toISOString().slice(0, 10) === c.toISOString().slice(0, 10);
   return `${md(o)} (${WEEKDAYS[o.getUTCDay()]}) ${hm(o)}–${sameDay ? "" : `${md(c)} `}${hm(c)}`;
 }
@@ -67,8 +68,8 @@ export default function CourseTasksTab({ tasks }: { tasks: StudentTask[] }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-ink-2 font-medium text-[.92rem] leading-[1.6]">
-        Даалгавар, сорил тус бүр өөрийн цагт нээгдэнэ. Бодлогоо бодоод бодолтын зургаа оруулж, хаагдахаас өмнө
-        «Илгээх» дарна — илгээгээгүй бол тооцогдохгүй.
+        Даалгавар, сорил тус бүр өөрийн цагт нээгдэнэ. Бодлогоо бодоод бодолтын зургаа оруулж, «Илгээх» дарна —
+        илгээгээгүй бол тооцогдохгүй. Илгээсний дараа өөрчлөх боломжгүй.
       </p>
       {error && <p className="text-red-soft font-bold text-[.9rem]">{error}</p>}
       {tasks.map((t) => {

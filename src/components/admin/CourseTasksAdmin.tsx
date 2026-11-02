@@ -13,10 +13,11 @@ import type { CourseTask } from "@/lib/courseTasks";
 
 const WEEKDAYS = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"];
 const local = (iso: string) => new Date(new Date(iso).getTime() + 8 * 3600_000);
-const label = (opensAt: string, closesAt: string) => {
+const label = (opensAt: string, closesAt?: string) => {
   const o = local(opensAt);
-  const c = local(closesAt);
   const md = (d: Date) => d.toISOString().slice(5, 10).replace("-", ".");
+  if (!closesAt) return `${md(o)} ${WEEKDAYS[o.getUTCDay()]} ${o.toISOString().slice(11, 16)}-аас`;
+  const c = local(closesAt);
   const sameDay = o.toISOString().slice(0, 10) === c.toISOString().slice(0, 10);
   return `${md(o)} ${WEEKDAYS[o.getUTCDay()]} ${o.toISOString().slice(11, 16)}–${sameDay ? "" : `${md(c)} `}${c.toISOString().slice(11, 16)}`;
 };

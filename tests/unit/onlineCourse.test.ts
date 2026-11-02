@@ -123,4 +123,12 @@ describe("course papers: plan and state", () => {
     expect(taskState(task, { status: "problems_submitted" }, at("2026-10-20T14:00:00Z"))).toBe("submitted");
     expect(taskState(task, { status: "completed" }, at("2026-10-21T00:00:00Z"))).toBe("graded");
   });
+
+  it("a paper with no closing time is never missed: it stays open until handed in", () => {
+    const task = { opensAt: "2026-10-20T01:00:00Z", status: "open" as const, problemCount: 3 };
+    const later = new Date("2026-12-01T00:00:00Z");
+    expect(taskState(task, undefined, later)).toBe("open");
+    expect(taskState(task, { status: "questionnaire_done" }, later)).toBe("in_progress");
+    expect(taskState(task, { status: "problems_submitted" }, later)).toBe("submitted");
+  });
 });

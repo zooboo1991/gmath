@@ -10,12 +10,14 @@ import { WEEKDAY_NAMES } from "./attendDays";
 /**
  * A course's homework and test papers (Даалгавар, Сорил).
  *
- * Each is an exam of kind homework/test that belongs to one course and is open
- * for a window — Мягмар 09:00–21:00 — so the problem roll, photo upload and
- * grading queue are the placement test's own. What is different is who may sit
- * one (the course's active students, free), when (inside the window; only a
- * paper handed in by «Илгээх» counts), and that a sitting is track 'course', so
- * no placement path ever mistakes it for a level test.
+ * Each is an exam of kind homework/test that belongs to one course and opens at
+ * its time — Мягмар 09:00 — so the problem roll, photo upload and grading queue
+ * are the placement test's own. What is different is who may sit one (the
+ * course's active students, free), when (from its opening; a paper with no
+ * closing time stays open until the child hands it in, so a child who joins
+ * late can still do the earlier ones; only a paper handed in by «Илгээх»
+ * counts), and that a sitting is track 'course', so no placement path ever
+ * mistakes it for a level test.
  */
 
 export type CourseTaskKind = "homework" | "test";
@@ -24,7 +26,8 @@ export type CourseTask = Exam & {
   kind: CourseTaskKind;
   programId: string;
   opensAt: string;
-  closesAt: string;
+  /** Unset: no end — open until the child hands it in. */
+  closesAt?: string;
   problemCount: number;
 };
 
@@ -46,7 +49,7 @@ export async function listCourseTasks(programId: string): Promise<CourseTask[]> 
   type Row = ExamRow & { exam_problems: { problem_id: string }[] | null };
   return (data as Row[])
     .map((row) => ({ ...examFromRow(row), problemCount: (row.exam_problems ?? []).length }))
-    .filter((t): t is CourseTask => Boolean(t.programId && t.opensAt && t.closesAt) && t.kind !== "placement");
+    .filter((t): t is CourseTask => Boolean(t.programId && t.opensAt) && t.kind !== "placement");
 }
 
 /** Where now falls against a paper's window. */
@@ -81,7 +84,7 @@ export type StudentTask = {
   kind: CourseTaskKind;
   title: string;
   opensAt: string;
-  closesAt: string;
+  closesAt?: string;
   problemCount: number;
   state: TaskState;
   assessmentId?: string;

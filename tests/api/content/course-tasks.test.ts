@@ -3,7 +3,8 @@
  * papers, sat like an exam (problems, photos, «Илгээх», teacher's marks).
  *
  * The questions: does the timetable produce the papers; can only the course's
- * own students sit them, only inside their window, and only once; does only a
+ * own students sit them, only inside their window (or, with no closing time,
+ * any time after it opens), and only once; does only a
  * paper handed in count; are they kept out of every placement path; and is
  * the family told when the marks are in.
  */
@@ -48,7 +49,7 @@ const RHYTHM = [
   "Ням 09:00–21:00 · Сорил: тухайн долоо хоногийн сэдвээр",
 ].join("\n");
 
-type Task = { id: string; kind: string; title: string; opensAt: string; closesAt: string; status: string; problemCount: number };
+type Task = { id: string; kind: string; title: string; opensAt: string; closesAt?: string; status: string; problemCount: number };
 
 /** A one-week online course with its timetable, as the admin would set it up. */
 async function onlineCourse() {
@@ -132,7 +133,7 @@ describe("making a course's papers from its timetable", () => {
       ["test", "Сорил 1: Гурвалжин", "draft", 0],
     ]);
     // Мягмар 2026-10-20 09:00–21:00 Ulaanbaatar time.
-    expect([tasks[0].opensAt, tasks[0].closesAt].map((t) => new Date(t).toISOString())).toEqual([
+    expect([tasks[0].opensAt, tasks[0].closesAt].map((t) => new Date(t ?? "").toISOString())).toEqual([
       "2026-10-20T01:00:00.000Z",
       "2026-10-20T13:00:00.000Z",
     ]);
@@ -315,6 +316,35 @@ describe("a student sitting a paper", () => {
     expect((queue.data as { status: string }).status).toBe("questionnaire_done");
     // Nor can it be marked, and the family is told nothing.
     expect((await admin.put(`/api/admin/grading/${started.body.assessmentId}/complete`, { teacherComment: "" })).status).toBe(409);
+  });
+
+  it("keeps a paper with no closing time open, for a child who joins late too, until they hand it in", async () => {
+    const admin = await adminClient("full");
+    const course = await onlineCourse();
+    const [homework] = await generate(admin, course.id);
+    const problems = await readyPaper(admin, homework);
+    // Opened two days ago, and the admin clears its closing time.
+    const cleared = await admin.put(`/api/admin/course-tasks/${homework.id}`, {
+      opensAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+      closesAt: null,
+    });
+    expect(cleared.status, cleared.text).toBe(200);
+    const { data: row } = await testDb().from("exams").select("closes_at").eq("id", homework.id).single();
+    expect((row as { closes_at: string | null }).closes_at).toBeNull();
+
+    const { client } = await student(course.id);
+    const listed = await client.get(`/profile/course/${course.id}?tab=tasks`);
+    expect(listed.text).toContain(homework.title);
+    expect(listed.text).not.toContain("Илгээгээгүй");
+
+    const started = await start(client, homework.id);
+    expect(started.status, started.text).toBe(200);
+    const id = started.body.assessmentId;
+    expect((await upload(client, id, problems[0])).status).toBe(200);
+    expect((await client.post(`/api/assessment/${id}/skip`, { problemId: problems[1] })).status).toBe(200);
+    expect((await client.post(`/api/assessment/${id}/submit`, {})).status).toBe(200);
+    // Handed in, it is shut to that child.
+    expect((await upload(client, id, problems[1])).status).toBe(409);
   });
 
   it("keeps a paper the teacher never opened off the child's list once its day has passed", async () => {

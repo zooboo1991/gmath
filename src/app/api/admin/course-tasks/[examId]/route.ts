@@ -29,10 +29,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ exam
     return NextResponse.json({ ok: false, error: "Нэрээ оруулна уу (160 тэмдэгтээс ихгүй)" }, { status: 400 });
   }
   const opensAt = data.opensAt === undefined ? task.opensAt : typeof data.opensAt === "string" ? data.opensAt : "";
-  const closesAt = data.closesAt === undefined ? task.closesAt : typeof data.closesAt === "string" ? data.closesAt : "";
   const opens = new Date(opensAt ?? "");
-  const closes = new Date(closesAt ?? "");
-  if (Number.isNaN(opens.getTime()) || Number.isNaN(closes.getTime()) || opens >= closes) {
+  if (Number.isNaN(opens.getTime())) {
+    return NextResponse.json({ ok: false, error: "Нээгдэх цагаа оруулна уу" }, { status: 400 });
+  }
+  // No closing time (null or empty) is a paper with no end: open until each child hands it in.
+  const closesAt = data.closesAt === undefined ? (task.closesAt ?? null) : data.closesAt;
+  if (closesAt !== null && typeof closesAt !== "string") {
+    return NextResponse.json({ ok: false, error: "Хаагдах цаг буруу байна" }, { status: 400 });
+  }
+  const closes = closesAt ? new Date(closesAt) : null;
+  if (closes && (Number.isNaN(closes.getTime()) || opens >= closes)) {
     return NextResponse.json({ ok: false, error: "Нээгдэх цаг хаагдах цагаас өмнө байх ёстой" }, { status: 400 });
   }
   const status = data.status === undefined ? task.status : data.status;
@@ -78,14 +85,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ exam
   await updateExam(examId, { title, status });
   const { error: timeError } = await getSupabase()
     .from("exams")
-    .update({ opens_at: opens.toISOString(), closes_at: closes.toISOString() })
+    .update({ opens_at: opens.toISOString(), closes_at: closes?.toISOString() ?? null })
     .eq("id", examId);
   if (timeError) throw timeError;
 
   await logAdminAction(request, {
     actionType: "course.task_update",
     targetId: examId,
-    details: { title, status, problems: problemCount, opensAt: opens.toISOString(), closesAt: closes.toISOString() },
+    details: { title, status, problems: problemCount, opensAt: opens.toISOString(), closesAt: closes?.toISOString() ?? null },
   });
   return NextResponse.json({ ok: true, task: await loadTask(examId) });
 }
