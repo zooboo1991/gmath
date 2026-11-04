@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import CourseTaskEditor from "@/components/admin/CourseTaskEditor";
 import { listProblems } from "@/lib/assessment/db";
 import { findExamDetail } from "@/lib/assessment/exams";
-import { findCourseById } from "@/lib/db";
+import { findCourseById, findYearlyProgramById } from "@/lib/db";
 import { listTaskSubmissions, taskWindow, type TaskSubmission } from "@/lib/courseTasks";
 import { requireAdminSection } from "@/lib/adminAccess";
 import { can } from "@/lib/adminSections";
@@ -22,9 +22,10 @@ export default async function AdminCourseTaskPage({ params }: { params: Promise<
   // The whole live bank (a course paper is not tied to one category) — and only
   // what the page shows of a problem: the answer key and worked solution are
   // the bank's, which a read-only admin is not shown.
-  const [bank, course, submissions] = await Promise.all([
+  const [bank, course, yearly, submissions] = await Promise.all([
     canEdit ? listProblems().catch(() => [] as Problem[]) : Promise.resolve([] as Problem[]),
     findCourseById(task.programId),
+    findYearlyProgramById(task.programId),
     listTaskSubmissions({ id: task.id, programId: task.programId }).catch(() => null as TaskSubmission[] | null),
   ]);
   const shown = (p: Problem) => ({ id: p.id, topic: p.topic, bodyLatex: p.bodyLatex, category: p.category });
@@ -32,8 +33,8 @@ export default async function AdminCourseTaskPage({ params }: { params: Promise<
     <CourseTaskEditor
       task={{ ...task, problems: task.problems.map(shown) }}
       bank={bank.map(shown)}
-      courseHref={`/admin/courses/${task.programId}`}
-      courseTitle={course?.title ?? "Сургалт"}
+      courseHref={yearly ? `/admin/yearly/${task.programId}` : `/admin/courses/${task.programId}`}
+      courseTitle={course?.title ?? yearly?.label ?? "Сургалт"}
       canEdit={canEdit}
       submissions={submissions}
       windowOver={taskWindow(task) === "after"}

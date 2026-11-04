@@ -28,7 +28,16 @@ const STATUS: Record<string, { text: string; tone: string }> = {
   closed: { text: "Хаалттай", tone: "text-ink-3 bg-bg-soft" },
 };
 
-export default function CourseTasksAdmin({ courseId, canEdit }: { courseId: string; canEdit: boolean }) {
+export default function CourseTasksAdmin({
+  courseId,
+  canEdit,
+  fromTimetable = true,
+}: {
+  courseId: string;
+  canEdit: boolean;
+  /** An online course makes its papers from its weekly timetable; a yearly programme has none. */
+  fromTimetable?: boolean;
+}) {
   const [tasks, setTasks] = useState<CourseTask[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -72,10 +81,11 @@ export default function CourseTasksAdmin({ courseId, canEdit }: { courseId: stri
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-ink-2 font-semibold text-[.9rem] leading-[1.6] max-w-[56ch]">
-          «7 хоногийн хуваарь»-ийн «Даалгавар», «Сорил» мөр бүрээр долоо хоног тутам нэг даалгавар үүснэ. Даалгавар бүрт
-          бодлогоо сонгоод «Нээх» дарна — нээгдээгүй даалгаврыг сурагч эхлүүлэх боломжгүй.
+          {fromTimetable
+            ? "«7 хоногийн хуваарь»-ийн «Даалгавар», «Сорил» мөр бүрээр долоо хоног тутам нэг даалгавар үүснэ. Даалгавар бүрт бодлогоо сонгоод «Нээх» дарна — нээгдээгүй даалгаврыг сурагч эхлүүлэх боломжгүй."
+            : "Даалгавар бүр дээр дарж бодлого, хугацаа, хэн илгээснийг нь харна. Илгээсэн бодолт засах дараалалд орно."}
         </p>
-        {canEdit && (
+        {canEdit && fromTimetable && (
           <button
             type="button"
             disabled={busy}

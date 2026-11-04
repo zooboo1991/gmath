@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
-import { findCourseById } from "@/lib/db";
+import { findCourseById, findYearlyProgramById } from "@/lib/db";
 import { logAdminAction } from "@/lib/adminLog";
 import { isAdmin, isFullAdmin } from "@/lib/session";
 import { generateCourseTasks, listCourseTasks } from "@/lib/courseTasks";
 
 const REFUSED = { ok: false, error: "Зөвшөөрөлгүй" };
 
-/** The course's homework and test papers, in the order they open. Any admin may look. */
+/**
+ * The papers of a course or of a yearly programme ("program-c"), in the order
+ * they open. Any admin may look.
+ */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) return NextResponse.json(REFUSED, { status: 401 });
-  const course = await findCourseById((await params).id);
-  if (!course) return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
-  return NextResponse.json({ ok: true, tasks: await listCourseTasks(course.id) });
+  const { id } = await params;
+  const programId = (await findCourseById(id))?.id ?? (await findYearlyProgramById(id))?.id;
+  if (!programId) return NextResponse.json({ ok: false, error: "Сургалт олдсонгүй" }, { status: 404 });
+  return NextResponse.json({ ok: true, tasks: await listCourseTasks(programId) });
 }
 
 /**

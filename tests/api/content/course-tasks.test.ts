@@ -406,3 +406,43 @@ describe("a student sitting a paper", () => {
     expect(results.text).not.toContain("Шалгалт үргэлжилж байна");
   });
 });
+
+describe("a yearly programme's papers", () => {
+  it("are listed on the programme's admin page and sat by its own students", async () => {
+    const admin = await adminClient("full");
+    const { data, error } = await testDb()
+      .from("exams")
+      .insert({
+        title: `Даалгавар ${randomUUID().slice(0, 6)}`,
+        category: null,
+        fee: "0₮",
+        status: "draft",
+        kind: "homework",
+        program_id: "program-c",
+        opens_at: new Date(Date.now() - 3600_000).toISOString(),
+        closes_at: null,
+        position: 0,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    const id = (data as { id: string }).id;
+    track("exams", id);
+    const problems = await readyPaper(admin, { id } as Task);
+
+    const listed = await admin.get<{ tasks: Task[] }>("/api/admin/courses/program-c/tasks");
+    expect(listed.status, listed.text).toBe(200);
+    expect(listed.body.tasks.map((t) => t.id)).toContain(id);
+    // A yearly programme has no weekly timetable to make papers from.
+    expect((await admin.post("/api/admin/courses/program-c/tasks", {})).status).toBe(404);
+
+    const { client } = await student("program-c");
+    const started = await start(client, id);
+    expect(started.status, started.text).toBe(200);
+    expect((await upload(client, started.body.assessmentId, problems[0])).status).toBe(200);
+
+    const page = await admin.get(`/admin/course-tasks/${id}`);
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("/admin/yearly/program-c");
+  });
+});

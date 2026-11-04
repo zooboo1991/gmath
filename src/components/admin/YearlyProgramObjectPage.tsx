@@ -18,10 +18,11 @@ import ProgramArticlesEditor, { type ArticleOption } from "@/components/admin/Pr
 import PendingRegistrationActions from "@/components/admin/PendingRegistrationActions";
 
 import ProgramWaitlistPanel from "./ProgramWaitlistPanel";
+import CourseTasksAdmin from "./CourseTasksAdmin";
 import type { ProgramWaitlistEntryWithUser } from "@/lib/programWaitlist";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
-type SectionTab = "info" | "roster" | "confirm" | "waitlist" | "report";
+type SectionTab = "info" | "roster" | "tasks" | "confirm" | "waitlist" | "report";
 
 export default function YearlyProgramObjectPage({
   program,
@@ -202,6 +203,7 @@ export default function YearlyProgramObjectPage({
             active={tab === "roster"}
             onClick={() => setTab("roster")}
           />
+          <AnchorTab label="Даалгавар, сорил" active={tab === "tasks"} onClick={() => setTab("tasks")} />
           {/* Money stays with the owner: confirming payments and the revenue
               report are hidden from an account that may not act on either. */}
           {canEdit && (
@@ -481,6 +483,12 @@ export default function YearlyProgramObjectPage({
               </div>
             </Card>
           </div>
+        )}
+
+        {tab === "tasks" && (
+          <Card title="Даалгавар, сорил">
+            <CourseTasksAdmin courseId={program.id} canEdit={canEdit} fromTimetable={false} />
+          </Card>
         )}
 
         {tab === "waitlist" && (
