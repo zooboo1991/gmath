@@ -114,9 +114,31 @@ function withTimes(lessons: ScheduledLesson[]): TimedLesson[] {
 }
 
 /**
+ * Rows in the order their lessons happen. Lessons are only ever appended (the
+ * Zoom meetings, reminders and registers are keyed by position), so a split
+ * classroom's second class or a make-up sits after later lessons — but a child
+ * reads a timetable by date. Rows with no start keep their order, at the end.
+ */
+export function chronological<T>(rows: T[], startOf: (row: T) => number | undefined): T[] {
+  return rows
+    .map((row, i) => ({ row, i, at: startOf(row) ?? Number.POSITIVE_INFINITY }))
+    .sort((a, b) => (a.at === b.at ? a.i - b.i : a.at < b.at ? -1 : 1))
+    .map(({ row }) => row);
+}
+
+/**
+ * The number a lesson goes by: the one in its topic («Хичээл №31» → "31"), so
+ * each class's copy of a split lesson shows the same number; otherwise its
+ * place in the course.
+ */
+export function lessonNumber(topic: string, lessonIndex: number): string {
+  return /№\s*(\d+)/.exec(topic)?.[1] ?? String(lessonIndex + 1);
+}
+
+/**
  * Annotates every lesson with where it sits relative to `now`, keeping the
- * teacher's original ordering — that is the curriculum order students expect,
- * not chronological order.
+ * course's own ordering (lesson index, which the join and recording routes
+ * take). The family's timetable then sorts by date — see `chronological`.
  */
 export function getLessonStates(lessons: ScheduledLesson[] | undefined, now: Date): LessonWithState[] {
   if (!lessons?.length) return [];

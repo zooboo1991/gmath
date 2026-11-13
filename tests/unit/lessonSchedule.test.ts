@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTimeUntil, getLessonStates } from "@/lib/lessonSchedule";
+import { chronological, formatTimeUntil, getLessonStates, lessonNumber } from "@/lib/lessonSchedule";
 
 const lesson = (date: string, time = "18:00–20:00") => ({
   topic: "Тоон онол",
@@ -79,5 +79,30 @@ describe("үлдсэн хугацааны бичиглэл", () => {
   it("өнгөрсөн хугацааг хоосон буцаана", () => {
     expect(formatTimeUntil(0)).toBe("");
     expect(formatTimeUntil(-5 * m)).toBe("");
+  });
+});
+
+describe("хуваарийг огноогоор нь", () => {
+  it("puts an appended lesson back in its place by date, keeping undated ones last", () => {
+    const rows = [
+      { name: "№32", at: 3 },
+      { name: "undated", at: undefined },
+      { name: "№33", at: 4 },
+      { name: "№31 (2-р анги)", at: 1 },
+    ];
+    expect(chronological(rows, (r) => r.at).map((r) => r.name)).toEqual(["№31 (2-р анги)", "№32", "№33", "undated"]);
+  });
+
+  it("keeps the course's order for lessons that start together", () => {
+    const rows = [
+      { name: "1-р анги", at: 5 },
+      { name: "2-р анги", at: 5 },
+    ];
+    expect(chronological(rows, (r) => r.at).map((r) => r.name)).toEqual(["1-р анги", "2-р анги"]);
+  });
+
+  it("numbers a lesson by its topic, else by its place", () => {
+    expect(lessonNumber("Хичээл №31", 34)).toBe("31");
+    expect(lessonNumber("Тоон онол", 4)).toBe("5");
   });
 });

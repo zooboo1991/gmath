@@ -26,6 +26,7 @@ import { PRESENT_THRESHOLD_PERCENT } from "@/lib/courseAttendance";
 import { formatCourseDate } from "@/lib/courseDate";
 import { daysOn, describeDays, dotDate, type AttendDaysEntry } from "@/lib/attendDays";
 import { classGroupLabel } from "@/lib/classGroups";
+import { chronological, lessonNumber } from "@/lib/lessonSchedule";
 import { formatMnt } from "@/lib/price";
 import BalancePayModal from "@/components/profile/BalancePayModal";
 
@@ -309,8 +310,11 @@ const OUTCOME: Record<AttendanceOutcome, { label: string; className: string }> =
 
 function AttendanceTab({ summary }: { summary: AttendanceSummary }) {
   // Болоогүй хичээлийг ирцийн жагсаалтад тавих нь утгагүй — доор нь
-  // хэдэн хичээл үлдсэнийг л хэлнэ.
-  const done = summary.lessons.filter((l) => l.outcome !== "upcoming");
+  // хэдэн хичээл үлдсэнийг л хэлнэ. Огноогоор, сүүлийн хичээл нь дээрээ.
+  const done = chronological(
+    summary.lessons.filter((l) => l.outcome !== "upcoming"),
+    (l) => (l.startsAt ? Date.parse(l.startsAt) : undefined)
+  ).reverse();
 
   if (summary.lessons.length === 0) {
     return <Empty icon={<IconCalendar className="w-6 h-6" />} text="Хуваарь хараахан ороогүй байна." />;
@@ -338,7 +342,7 @@ function AttendanceTab({ summary }: { summary: AttendanceSummary }) {
             return (
               <div key={l.lessonIndex} className="flex gap-3 px-4 py-3.5">
                 <span className="w-6 h-6 rounded-md grid place-items-center font-extrabold text-[.72rem] shrink-0 mt-0.5 bg-bg-soft text-ink-2 border border-line-2">
-                  {l.lessonIndex + 1}
+                  {lessonNumber(l.topic, l.lessonIndex)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <span className="flex items-center gap-2 flex-wrap">

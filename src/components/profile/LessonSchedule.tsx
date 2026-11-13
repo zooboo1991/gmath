@@ -5,7 +5,13 @@ import RecordingPlayer from "@/components/profile/RecordingPlayer";
 import LessonNoteButton from "@/components/profile/LessonNoteButton";
 import { IconClock, IconVideoCamera, IconLocation, IconPlayBox } from "@/components/icons";
 import type { RegistrationWithGroup } from "@/lib/db";
-import { formatTimeUntil, getLessonStates, type LessonWithState } from "@/lib/lessonSchedule";
+import {
+  chronological,
+  formatTimeUntil,
+  getLessonStates,
+  lessonNumber,
+  type LessonWithState,
+} from "@/lib/lessonSchedule";
 import { attendsLesson } from "@/lib/attendDays";
 import { inClassGroup } from "@/lib/classGroups";
 import { formatMb } from "@/lib/imageResize";
@@ -83,7 +89,7 @@ function LessonRow({
             : "bg-surface text-ink-2 border border-line-2"
         }`}
       >
-        {lessonIndex + 1}
+        {lessonNumber(lesson.topic, lessonIndex)}
       </span>
       <div className="min-w-0 flex-1">
         <span className="flex items-center gap-2 flex-wrap">
@@ -161,7 +167,7 @@ function NextLessonCard({
 
           <div className="flex items-center gap-2 flex-wrap mt-1.5">
             <b className="font-extrabold text-[1.05rem]">
-              {lessonIndex + 1}. {info.lesson.topic}
+              {lessonNumber(info.lesson.topic, lessonIndex)}. {info.lesson.topic}
             </b>
             <LessonModeTag mode={info.lesson.mode} />
           </div>
@@ -240,11 +246,14 @@ export default function LessonSchedule({
   // Numbered over the whole course (the join/recording routes take that index);
   // the timetable then leaves out the days this child does not attend, and the
   // other class's copy of a split classroom lesson — in the past list too, where
-  // it would only repeat the same lesson at another time.
-  const numbered = states
-    .map((info, lessonIndex) => ({ info, lessonIndex }))
-    .filter(({ info }) => inClassGroup(registration.classGroup, info.lesson.group))
-    .filter(({ info }) => show === "past" || attendsLesson(registration.attendDays, info.lesson.schedule));
+  // it would only repeat the same lesson at another time — and runs by date.
+  const numbered = chronological(
+    states
+      .map((info, lessonIndex) => ({ info, lessonIndex }))
+      .filter(({ info }) => inClassGroup(registration.classGroup, info.lesson.group))
+      .filter(({ info }) => show === "past" || attendsLesson(registration.attendDays, info.lesson.schedule)),
+    ({ info }) => info.startsInMs
+  );
 
   if (show === "past") {
     const done = numbered.filter(({ info }) => info.state === "past").reverse();

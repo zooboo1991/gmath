@@ -47,6 +47,8 @@ export type LessonAttendance = {
   dateLabel: string;
   /** "18:00–20:00" — цаг оруулаагүй бол хоосон. */
   timeLabel: string;
+  /** Хичээл эхлэх агшин (ISO) — жагсаалтыг огноогоор эрэмбэлэхэд. Цаг оруулаагүй бол байхгүй. */
+  startsAt?: string;
   outcome: AttendanceOutcome;
   /** Онлайн хичээлд суусан минут (бүхэл тоо). */
   minutes?: number;
@@ -140,6 +142,7 @@ export function summariseAttendance(input: {
         mode,
         dateLabel: date ? `${date.replaceAll("-", ".")}${weekday ? ` ${weekday}` : ""}` : "",
         timeLabel: startTime && endTime ? `${startTime}–${endTime}` : startTime,
+        ...(win ? { startsAt: win.start.toISOString() } : {}),
         watchedRecording,
         hasRecording: Boolean(lesson.recordingLink),
       };
