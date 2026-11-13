@@ -1,6 +1,7 @@
 import { getWeekdayNameMn } from "./courseDate";
 import { mongoliaLocalToUtc, parseScheduleString } from "./lessonSchedule";
 import { attendsLesson, type AttendDaysEntry } from "./attendDays";
+import { inClassGroup } from "./classGroups";
 import { isInfoSession } from "./onlineCourse";
 
 /**
@@ -34,6 +35,8 @@ export type AttendanceLesson = {
   /** "recorded" (a video lesson) never reaches the roll — see summariseAttendance. */
   mode?: AttendanceMode | "recorded";
   recordingLink?: string;
+  /** The class an in-person lesson is for (see lib/classGroups). Unset: everyone's. */
+  group?: number;
 };
 
 export type LessonAttendance = {
@@ -109,6 +112,8 @@ export function summariseAttendance(input: {
   watchedLessonIndexes: Set<number>;
   /** Хүүхдийн суух гарагууд. Суудаггүй гарагийн хичээл жагсаалт, тоонд орохгүй. */
   attendDays?: AttendDaysEntry[];
+  /** Хүүхдийн анги. Өөр ангийн танхимын хичээл жагсаалт, тоонд орохгүй. */
+  classGroup?: number;
   now?: Date;
 }): AttendanceSummary {
   const now = input.now ?? new Date();
@@ -122,6 +127,7 @@ export function summariseAttendance(input: {
     // The parents' info meeting is not a lesson the child can miss.
     .filter(({ lesson }) => !isInfoSession(lesson.topic))
     .filter(({ lesson }) => attendsLesson(input.attendDays, lesson.schedule))
+    .filter(({ lesson }) => inClassGroup(input.classGroup, lesson.group))
     .map(({ lesson, lessonIndex }): LessonAttendance => {
       const mode: AttendanceMode = lesson.mode === "inperson" ? "inperson" : "online";
       const { date, startTime, endTime } = parseScheduleString(lesson.schedule ?? "");

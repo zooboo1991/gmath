@@ -53,6 +53,8 @@ type ScheduledLesson = {
   recordingLink?: string;
   noteFile?: string;
   noteSize?: number;
+  /** The class an in-person lesson is for (lib/classGroups); unset: everyone's. */
+  group?: number;
 };
 
 /**

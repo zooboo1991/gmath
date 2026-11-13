@@ -7,6 +7,7 @@ import { IconClock, IconVideoCamera, IconLocation, IconPlayBox } from "@/compone
 import type { RegistrationWithGroup } from "@/lib/db";
 import { formatTimeUntil, getLessonStates, type LessonWithState } from "@/lib/lessonSchedule";
 import { attendsLesson } from "@/lib/attendDays";
+import { inClassGroup } from "@/lib/classGroups";
 import { formatMb } from "@/lib/imageResize";
 
 const TICK_MS = 30_000;
@@ -237,9 +238,12 @@ export default function LessonSchedule({
 
   const states = getLessonStates(lessons, now);
   // Numbered over the whole course (the join/recording routes take that index);
-  // the timetable then leaves out the days this child does not attend.
+  // the timetable then leaves out the days this child does not attend, and the
+  // other class's copy of a split classroom lesson — in the past list too, where
+  // it would only repeat the same lesson at another time.
   const numbered = states
     .map((info, lessonIndex) => ({ info, lessonIndex }))
+    .filter(({ info }) => inClassGroup(registration.classGroup, info.lesson.group))
     .filter(({ info }) => show === "past" || attendsLesson(registration.attendDays, info.lesson.schedule));
 
   if (show === "past") {

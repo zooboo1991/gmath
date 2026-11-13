@@ -107,6 +107,7 @@ export default async function ProfileCoursePage({
     rollCallByLessonIndex: rollCall,
     watchedLessonIndexes: new Set(views.map((v) => v.lessonIndex)),
     attendDays: registration.attendDays,
+    classGroup: registration.classGroup,
   });
 
   const invited = freeExams.find((e) => e.viaProgramId === id);

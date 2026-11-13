@@ -1711,3 +1711,17 @@ create unique index if not exists assessments_course_paper_idx
 -- images in the private "mini-olympiad" bucket, [{path, name, size}]. Shown to
 -- every child who has a result in it once the results are published.
 alter table mini_olympiads add column if not exists solution_files jsonb not null default '[]'::jsonb;
+
+-- ---------------------------------------------------------------------------
+-- Танхимын анги (нэг хөтөлбөрийн танхимыг хоёр ангид хуваах)
+-- ---------------------------------------------------------------------------
+-- A programme too big for one classroom splits its in-person lessons into
+-- classes ("1-р анги", "2-р анги"). Each such lesson names its class in its
+-- JSON (yearly_programs.lessons[].group); each child is placed in one here.
+-- The register, the child's timetable and attendance, and the lesson reminder
+-- of a class's lesson then leave the other class out. null = not placed: the
+-- child is expected at every class's lessons, as before the split. Online
+-- lessons carry no class and stay shared.
+alter table registrations add column if not exists class_group smallint;
+alter table registrations drop constraint if exists registrations_class_group_check;
+alter table registrations add constraint registrations_class_group_check check (class_group in (1, 2));

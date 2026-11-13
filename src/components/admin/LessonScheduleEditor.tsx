@@ -9,6 +9,7 @@ import { parseBunnyVideoId } from "@/lib/bunnyVideo";
 import { formatMb } from "@/lib/imageResize";
 import { isPdf, looksLikePdf, MAX_NOTE_BYTES, shrinkPdf } from "@/lib/pdfShrink";
 import { apiError, readJson } from "@/lib/fetchJson";
+import { CLASS_GROUPS, classGroupLabel } from "@/lib/classGroups";
 
 type AttendanceRow = { lastName: string; firstName: string; phone: string; joinedAt: string; leftAt?: string };
 
@@ -23,6 +24,7 @@ export default function LessonScheduleEditor({
   onChange,
   id,
   courseZoomLink,
+  withClassGroups = false,
 }: {
   lessons: Lesson[];
   onChange: (lessons: Lesson[]) => void;
@@ -30,6 +32,8 @@ export default function LessonScheduleEditor({
   id?: string;
   /** The course/program-level Zoom link, hinted as a placeholder on a lesson's own (blank) Zoom field. */
   courseZoomLink?: string;
+  /** An in-person lesson can be one class's (lib/classGroups) — the yearly programmes, whose classroom may be split. */
+  withClassGroups?: boolean;
 }) {
   const addRow = () => onChange([...lessons, { topic: "", schedule: "", mode: "online" }]);
   const updateRow = (index: number, patch: Partial<Lesson>) =>
@@ -261,6 +265,8 @@ export default function LessonScheduleEditor({
           const switchMode = (next: NonNullable<Lesson["mode"]>) =>
             updateRow(i, {
               mode: next,
+              // Only a classroom lesson belongs to one class.
+              ...(next !== "inperson" ? { group: undefined } : {}),
               ...(next === "recorded"
                 ? { zoomLink: undefined, schedule: buildScheduleString(parsed.date, parsed.startTime, "") }
                 : {}),
@@ -297,6 +303,24 @@ export default function LessonScheduleEditor({
                     </button>
                   ))}
                 </div>
+                {withClassGroups && mode === "inperson" && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="text-[.74rem] font-extrabold text-ink-3 mr-0.5">Анги:</span>
+                    {([undefined, ...CLASS_GROUPS] as (number | undefined)[]).map((g) => (
+                      <button
+                        key={g ?? "all"}
+                        type="button"
+                        aria-pressed={lesson.group === g}
+                        onClick={() => updateRow(i, { group: g })}
+                        className={`text-[.76rem] font-extrabold px-2.5 py-1 rounded-full transition-colors ${
+                          lesson.group === g ? "text-blue-strong bg-blue-soft" : "text-ink-3 bg-bg-soft"
+                        }`}
+                      >
+                        {g ? classGroupLabel(g) : "Бүх анги"}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="flex gap-1.5 items-center flex-wrap">
                   <input
                     type="date"

@@ -3,6 +3,7 @@ import { parseBunnyVideoId } from "./bunnyVideo";
 import { isLessonNotePath } from "./storage";
 import { buildScheduleString, parseScheduleString } from "./lessonSchedule";
 import { isTooLong, isValidHttpUrl, MAX_LEN } from "./validate";
+import { cleanClassGroup } from "./classGroups";
 
 /**
  * Shared between the course POST and PUT routes. Both used to inline their own
@@ -18,6 +19,7 @@ type LessonInput = {
   recordingLink?: string;
   noteFile?: string;
   noteSize?: number;
+  group?: unknown;
 };
 
 const modeOf = (mode: unknown): LessonMode =>
@@ -48,6 +50,8 @@ export function normalizeLessons(input: unknown): Lesson[] | undefined {
         isLessonNotePath(l.noteFile) && typeof l.noteSize === "number" && l.noteSize > 0
           ? Math.round(l.noteSize)
           : undefined,
+      // Only a classroom is split into classes; online and video lessons stay everyone's.
+      group: modeOf(l.mode) === "inperson" ? cleanClassGroup(l.group) : undefined,
     }))
     .filter((l) => l.topic);
 }

@@ -10,6 +10,7 @@ import {
 } from "@/lib/db";
 import { mongoliaLocalToUtc, parseScheduleString } from "@/lib/lessonSchedule";
 import { attendsLesson } from "@/lib/attendDays";
+import { inClassGroup } from "@/lib/classGroups";
 import { isInfoSession } from "@/lib/onlineCourse";
 
 const WINDOW_START_MIN = 24;
@@ -51,11 +52,17 @@ export async function GET(request: Request) {
   let recipientTotal = 0;
   for (const c of candidates) {
     const registrations = await listRegistrationsByProgram(c.programId);
-    // Only the children who attend this lesson's weekday.
+    // Only the children who attend this lesson's weekday, and are in its class.
     const userIds = [
       ...new Set(
         registrations
-          .filter((r) => r.status === "active" && r.userId && attendsLesson(r.attendDays, c.lesson.schedule))
+          .filter(
+            (r) =>
+              r.status === "active" &&
+              r.userId &&
+              attendsLesson(r.attendDays, c.lesson.schedule) &&
+              inClassGroup(r.classGroup, c.lesson.group)
+          )
           .map((r) => r.userId!)
       ),
     ];

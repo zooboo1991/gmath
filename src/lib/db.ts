@@ -13,6 +13,7 @@ import { compareMn } from "./sortMn";
 import { extractCourseCategories, getCourseAudience } from "./courseTag";
 import { courseHref } from "./courseHref";
 import { readAttendDays, type AttendDaysEntry } from "./attendDays";
+import { cleanClassGroup, inClassGroup } from "./classGroups";
 
 /**
  * Persistence layer backed by Supabase Postgres (see supabase/schema.sql
@@ -132,6 +133,11 @@ export type Lesson = {
   noteFile?: string;
   /** Size of that PDF in bytes, so the student sees what they are about to open. */
   noteSize?: number;
+  /**
+   * An in-person lesson of a programme split into classes: the class it is for
+   * (1, 2 — see lib/classGroups). Unset: every child of the programme.
+   */
+  group?: number;
 };
 
 export type Course = {
@@ -242,6 +248,11 @@ export type Registration = {
    * registers (see lib/attendDays). Empty or undefined: every class day.
    */
   attendDays?: AttendDaysEntry[];
+  /**
+   * The class the child is in, when the programme's in-person lessons are
+   * split (see lib/classGroups). Undefined: not placed — every class's lessons.
+   */
+  classGroup?: number;
 };
 
 /**
@@ -359,6 +370,8 @@ type RegistrationRow = {
   placement_credit: number | null;
   /** Absent until the column is added on that database — read as "every day". */
   attend_days?: unknown;
+  /** Absent until the column is added on that database — read as "not placed". */
+  class_group?: number | null;
 };
 
 type CertificateRow = {
@@ -478,6 +491,7 @@ function registrationFromRow(row: RegistrationRow): Registration {
     installmentDueDate: row.installment_due_date ?? undefined,
     placementCredit: row.placement_credit ?? 0,
     attendDays: readAttendDays(row.attend_days),
+    classGroup: cleanClassGroup(row.class_group),
   };
 }
 
@@ -1949,6 +1963,18 @@ export async function setRegistrationAttendDays(id: string, entries: AttendDaysE
   return data ? registrationFromRow(data as RegistrationRow) : undefined;
 }
 
+/** Writes only class_group — never a full patch of this money row (see updateRegistration). null: not placed. */
+export async function setRegistrationClassGroup(id: string, group: number | null): Promise<Registration | undefined> {
+  const { data, error } = await getSupabase()
+    .from("registrations")
+    .update({ class_group: group })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data ? registrationFromRow(data as RegistrationRow) : undefined;
+}
+
 export async function setRegistrationTotalDue(id: string, totalDue: number): Promise<Registration | undefined> {
   const { data, error } = await getSupabase()
     .from("registrations")
@@ -2963,7 +2989,14 @@ export async function notifyNewRecordings(
   if (newlyRecorded.length === 0) return;
 
   const registrations = await listRegistrationsByProgram(programId);
-  const userIds = [...new Set(registrations.filter((r) => r.status === "active" && r.userId).map((r) => r.userId!))];
+  // Not the other class of a split classroom: their timetable never shows that lesson.
+  const userIds = [
+    ...new Set(
+      registrations
+        .filter((r) => r.status === "active" && r.userId && newlyRecorded.some((l) => inClassGroup(r.classGroup, l.group)))
+        .map((r) => r.userId!)
+    ),
+  ];
   if (userIds.length === 0) return;
 
   // One notification for the whole save, not one per lesson: an admin who

@@ -8,6 +8,7 @@ import { IconCheckCircle, IconClock, IconClose } from "@/components/icons";
 import { formatMnt } from "@/lib/price";
 import { payMethodLabel, registrationBalance } from "@/lib/registration";
 import { WEEKDAY_SHORT, daysOn, describeDays, dotDate } from "@/lib/attendDays";
+import { CLASS_GROUPS, classGroupLabel } from "@/lib/classGroups";
 
 type RegistrationWithUser = Registration & { user?: PublicUser };
 
@@ -78,6 +79,7 @@ export default function RegistrationRoster({
   onPaymentsChange,
   canEdit = true,
   weekdays = [],
+  classGroups = false,
 }: {
   programId: string;
   registrations: RegistrationWithUser[];
@@ -98,6 +100,12 @@ export default function RegistrationRoster({
    * attendance then leave the other days out.
    */
   weekdays?: number[];
+  /**
+   * The classroom is split into classes (lib/classGroups): each child gets a
+   * class, and the register, timetable and reminders of a class's lessons
+   * then leave the other class out.
+   */
+  classGroups?: boolean;
 }) {
   const pickDays = weekdays.length >= 2;
   // Shown whenever someone has days set, even if the class's timetable has since
@@ -108,6 +116,8 @@ export default function RegistrationRoster({
   const [daysEdit, setDaysEdit] = useState<{ id: string; days: number[]; from: string } | null>(null);
   const [daysError, setDaysError] = useState<string | null>(null);
   const [savingDays, setSavingDays] = useState(false);
+  const [groupBusyId, setGroupBusyId] = useState<string | null>(null);
+  const [groupError, setGroupError] = useState<string | null>(null);
   const [lookup, setLookup] = useState<{ status: "loading" | "done" | "error"; user?: PublicUser | null } | null>(
     null
   );
@@ -219,6 +229,29 @@ export default function RegistrationRoster({
     }
   };
 
+  /** Puts a child in a class, or (null) back in none — their chip pressed again. */
+  const saveGroup = async (r: RegistrationWithUser, group: number | null) => {
+    setGroupBusyId(r.id);
+    setGroupError(null);
+    try {
+      const res = await fetch(`/api/admin/registrations/${r.id}/class-group`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ classGroup: group }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setGroupError(json.error ?? "Анги хадгалахад алдаа гарлаа");
+        return;
+      }
+      onChange(registrations.map((x) => (x.id === r.id ? { ...x, classGroup: json.registration.classGroup } : x)));
+    } catch {
+      setGroupError("Сүлжээний алдаа гарлаа. Дахин оролдоно уу.");
+    } finally {
+      setGroupBusyId(null);
+    }
+  };
+
   const toggleExpand = (r: RegistrationWithUser) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -294,7 +327,7 @@ export default function RegistrationRoster({
   );
   const shown =
     province === "all" ? registrations : registrations.filter((r) => (r.user?.province || "") === province);
-  const columns = 6 + (showDays ? 1 : 0) + (trackPayments ? 1 : 0);
+  const columns = 6 + (showDays ? 1 : 0) + (classGroups ? 1 : 0) + (trackPayments ? 1 : 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -392,6 +425,24 @@ export default function RegistrationRoster({
         </div>
       )}
 
+      {classGroups && (
+        <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mb-3 text-[.84rem] font-bold text-ink-2">
+          <span className="text-[.78rem] font-extrabold text-ink-3 uppercase tracking-[.04em]">Танхимын анги</span>
+          {CLASS_GROUPS.map((g) => (
+            <span key={g}>
+              {`${classGroupLabel(g)}: ${registrations.filter((r) => r.status === "active" && r.classGroup === g).length}`}
+            </span>
+          ))}
+          {(() => {
+            const unplaced = registrations.filter((r) => r.status === "active" && !r.classGroup).length;
+            return unplaced > 0 ? (
+              <span className="text-gold-strong">{`Ангигүй: ${unplaced} (бүх ангийн хичээлд гарна)`}</span>
+            ) : null;
+          })()}
+          {groupError && <span className="w-full text-[.82rem] font-semibold text-red-soft">{groupError}</span>}
+        </div>
+      )}
+
       {registrations.length === 0 ? (
         <p className="text-ink-3 font-semibold text-[.9rem]">Одоогоор бүртгэл алга байна.</p>
       ) : shown.length === 0 ? (
@@ -407,6 +458,7 @@ export default function RegistrationRoster({
                 <th className="px-2 py-2">Огноо</th>
                 <th className="px-2 py-2">Төлөв</th>
                 {showDays && <th className="px-2 py-2">Гараг</th>}
+                {classGroups && <th className="px-2 py-2">Анги</th>}
                 {trackPayments && <th className="px-2 py-2">Төлбөр</th>}
                 <th className="px-2 py-2" />
               </tr>
@@ -503,6 +555,36 @@ export default function RegistrationRoster({
                               label
                             );
                           })()}
+                        </td>
+                      )}
+                      {classGroups && (
+                        <td className="px-2 py-3">
+                          {canEdit && r.status !== "cancelled" ? (
+                            <div className="flex gap-1">
+                              {CLASS_GROUPS.map((g) => {
+                                const on = r.classGroup === g;
+                                return (
+                                  <button
+                                    key={g}
+                                    type="button"
+                                    disabled={groupBusyId === r.id}
+                                    aria-pressed={on}
+                                    onClick={() => saveGroup(r, on ? null : g)}
+                                    title={on ? `${classGroupLabel(g)}-аас гаргах` : `${classGroupLabel(g)}д оруулах`}
+                                    className={`min-w-[36px] text-[.8rem] font-extrabold rounded-full px-2.5 py-1 border-[1.5px] disabled:opacity-50 ${
+                                      on ? "text-white bg-blue border-blue" : "text-ink-3 bg-surface border-line-2"
+                                    }`}
+                                  >
+                                    {g}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className="font-bold text-[.84rem] text-ink-2">
+                              {r.classGroup ? classGroupLabel(r.classGroup) : "—"}
+                            </span>
+                          )}
                         </td>
                       )}
                       {trackPayments && (

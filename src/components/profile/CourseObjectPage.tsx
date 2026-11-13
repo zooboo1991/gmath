@@ -25,6 +25,7 @@ import type { AttendanceOutcome, AttendanceSummary } from "@/lib/courseAttendanc
 import { PRESENT_THRESHOLD_PERCENT } from "@/lib/courseAttendance";
 import { formatCourseDate } from "@/lib/courseDate";
 import { daysOn, describeDays, dotDate, type AttendDaysEntry } from "@/lib/attendDays";
+import { classGroupLabel } from "@/lib/classGroups";
 import { formatMnt } from "@/lib/price";
 import BalancePayModal from "@/components/profile/BalancePayModal";
 
@@ -206,6 +207,11 @@ function CourseHeader({
               </p>
               {days && (
                 <p className="text-white font-bold text-[.88rem] mt-1">{`${describeDays(days)} гарагт суудаг`}</p>
+              )}
+              {registration.classGroup && (
+                <p className="text-white font-bold text-[.88rem] mt-1">
+                  {`Танхимын хичээлд ${classGroupLabel(registration.classGroup)}д суудаг`}
+                </p>
               )}
               {next && (
                 <p className="text-white/85 font-semibold text-[.85rem] mt-0.5">

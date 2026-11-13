@@ -380,6 +380,7 @@ export default function YearlyProgramObjectPage({
               onChange={(lessons) => setForm((f) => ({ ...f, lessons }))}
               id={program.id}
               courseZoomLink={form.zoomLink}
+              withClassGroups
             />
             {!canEdit && canEditLessons && (
               <button
@@ -408,6 +409,9 @@ export default function YearlyProgramObjectPage({
               payments={payments}
               onPaymentsChange={setPayments}
               canEdit={canEdit}
+              // The class column appears once the classroom is split — a lesson
+              // or a child already has a class — and stays out of the way until then.
+              classGroups={form.lessons.some((l) => l.group) || registrations.some((r) => r.classGroup)}
             />
           </Card>
         )}
