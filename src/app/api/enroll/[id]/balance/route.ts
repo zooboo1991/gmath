@@ -9,6 +9,7 @@ import {
   attachInvoiceToIntent,
   cancelPaymentIntent,
   createPaymentIntent,
+  findOpenBankIntent,
   findOpenQpayIntent,
   senderInvoiceNoForIntent,
   settleInstallmentIntent,
@@ -88,6 +89,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   if (method === "bank") {
+    // The same press again — often only to see the account details — gets the
+    // open announcement back instead of a second card and a second staff alert.
+    // A different amount is a different announcement and still makes a new one.
+    const open = await findOpenBankIntent(id, amount);
+    if (open) return NextResponse.json({ ok: true, method: "bank", intent: open });
     const intent = await createPaymentIntent({ registrationId: id, amount, method: "bank" });
     await notifyBalanceBankPending(registration, amount);
     return NextResponse.json({ ok: true, method: "bank", intent });

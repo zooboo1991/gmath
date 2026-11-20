@@ -13,6 +13,7 @@ import {
   createTestCourse,
   createTestRegistration,
   createTestUser,
+  notificationsFor,
   trackNotificationsForCreatedUsers,
 } from "../../support/factories";
 import { findMockInvoice, payMockInvoice } from "../../support/mockControl";
@@ -257,5 +258,49 @@ describe("дансаар үлдэгдэл төлөх", () => {
     const res = await pay(client, registrationId, { amount: 600_000, method: "bank" });
     expect(res.body.intent).toBeTruthy();
     expect(await findMockInvoice(senderInvoiceNoForIntent(res.body.intent!.id))).toBeNull();
+  });
+
+  it("ижил дүнгээр дахин дарахад тэр л санаархлыг буцааж, дахин мэдэгдэхгүй", async () => {
+    const { registrationId, client, student } = await studentWithBalance();
+
+    // «Дансаар төлөх» дарж л дансны мэдээллээ дахин хардаг — дарах бүр шинэ
+    // карт, ажилтанд шинэ мэдэгдэл болдог байсан (нэг гэр бүлээс 5 минутад 3).
+    const first = await pay(client, registrationId, { amount: 600_000, method: "bank" });
+    const second = await pay(client, registrationId, { amount: 600_000, method: "bank" });
+
+    expect(second.status, second.text).toBe(200);
+    expect(second.body.method).toBe("bank");
+    expect(second.body.intent!.id).toBe(first.body.intent!.id);
+    const open = (await intentsOf(registrationId)).filter((i) => i.method === "bank" && i.status === "pending");
+    expect(open.length).toBe(1);
+    const notices = (await notificationsFor(student.id)).filter(
+      (n) => n.title === "Үлдэгдлийн төлбөрийг хүлээн авлаа"
+    );
+    expect(notices.length).toBe(1);
+  });
+
+  it("өөр дүнгээр дарахад шинэ санаархал үүсгэнэ", async () => {
+    const { registrationId, client } = await studentWithBalance();
+    const first = await pay(client, registrationId, { amount: 600_000, method: "bank" });
+    const second = await pay(client, registrationId, { amount: 300_000, method: "bank" });
+
+    expect(second.body.intent!.id).not.toBe(first.body.intent!.id);
+    const pending = (await intentsOf(registrationId)).filter((i) => i.status === "pending");
+    expect(pending.map((i) => i.amount).sort((a, b) => a - b)).toEqual([300_000, 600_000]);
+  });
+
+  it("хаагдсан санаархлыг дахин ашиглахгүй", async () => {
+    const { registrationId, client } = await studentWithBalance();
+    const first = await pay(client, registrationId, { amount: 600_000, method: "bank" });
+    // The admin cancelled it — the money never came.
+    await testDb()
+      .from("registration_payment_intents")
+      .update({ status: "cancelled" })
+      .eq("id", first.body.intent!.id);
+
+    const again = await pay(client, registrationId, { amount: 600_000, method: "bank" });
+
+    expect(again.status, again.text).toBe(200);
+    expect(again.body.intent!.id).not.toBe(first.body.intent!.id);
   });
 });

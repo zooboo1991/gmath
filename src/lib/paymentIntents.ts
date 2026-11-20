@@ -117,6 +117,31 @@ export async function findOpenQpayIntent(
   return data ? fromRow(data as Row) : undefined;
 }
 
+/**
+ * The family's open bank announcement for this exact amount, if any. Pressing
+ * «Дансаар төлөх» is also how a family brings the account details back up, so
+ * the same press repeated must not stack another announcement — and another
+ * staff alert — each time.
+ */
+export async function findOpenBankIntent(
+  registrationId: string,
+  amount: number
+): Promise<RegistrationPaymentIntent | undefined> {
+  const { data, error } = await getSupabase()
+    .from("registration_payment_intents")
+    .select("*")
+    .eq("registration_id", registrationId)
+    .eq("method", "bank")
+    .eq("status", "pending")
+    .eq("amount", amount)
+    .order("created_at", { ascending: false })
+    .order("id")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? fromRow(data as Row) : undefined;
+}
+
 /** Админд харуулах, сурагчид "шалгагдаж байна" гэж хэлэхэд хэрэгтэй мөрүүд. */
 export async function listIntentsForRegistration(
   registrationId: string
