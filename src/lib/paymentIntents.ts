@@ -1,5 +1,13 @@
-import { addRegistrationPayment, createNotification, findRegistrationById } from "./db";
+import {
+  addRegistrationPayment,
+  createNotification,
+  findRegistrationById,
+  listPaymentsForRegistrations,
+  type RegistrationPayment,
+} from "./db";
+import { fetchAllRows } from "./fetchAll";
 import { getPaymentProvider } from "./payment";
+import { registrationBalance, sumPaymentsFor } from "./registration";
 import { getSupabase } from "./supabase";
 
 /**
@@ -123,6 +131,22 @@ export async function listIntentsForRegistration(
   return (data as Row[]).map(fromRow);
 }
 
+/**
+ * Every balance payment a family started, newest first — the admin
+ * registrations list shows them beside the registrations. Without the QR
+ * image: the list never draws it, and each one is kilobytes of base64.
+ */
+export async function listAllPaymentIntents(): Promise<RegistrationPaymentIntent[]> {
+  const rows = await fetchAllRows<Omit<Row, "qpay_qr_image" | "qpay_short_url">>(() =>
+    getSupabase()
+      .from("registration_payment_intents")
+      .select("id, registration_id, amount, method, status, qpay_invoice_id, qpay_payment_id, created_at, paid_at")
+      .order("created_at", { ascending: false })
+      .order("id")
+  );
+  return rows.map((row) => fromRow({ ...row, qpay_qr_image: null, qpay_short_url: null }));
+}
+
 export async function attachInvoiceToIntent(
   id: string,
   invoice: { invoiceId: string; qrImage: string; shortUrl: string }
@@ -228,4 +252,132 @@ async function notifyInstallmentPaid(registrationId: string, amount: number): Pr
   } catch (err) {
     console.error("[intent] notification failed", registrationId, err);
   }
+}
+
+// ---------------------------------------------------------------------------
+// The admin side: balance payments listed in «Бүртгэл» beside registrations,
+// confirmed, checked or cancelled the way a pending registration is.
+// ---------------------------------------------------------------------------
+
+export type IntentActionResult =
+  | { ok: true; intent: RegistrationPaymentIntent; payment?: RegistrationPayment; paid?: boolean }
+  | { ok: false; status: number; error: string; paid?: boolean };
+
+const ALREADY_PAID_BY_QPAY = "QPay дээр аль хэдийн төлөгдсөн байна — төлбөр нь бүртгэгдлээ.";
+
+/**
+ * Before an admin books or drops a QPay balance payment by hand: asks QPay
+ * first (a family that did pay gets booked, not cancelled), then voids the
+ * invoice so the QR still in their history cannot take the money a second
+ * time. Null when there is nothing left to stop the admin's action.
+ */
+async function retireQpayInvoice(intent: RegistrationPaymentIntent): Promise<IntentActionResult | null> {
+  if (intent.method !== "qpay" || !intent.qpayInvoiceId) return null;
+  if ((await settleInstallmentIntent(intent.id)).paid) {
+    return { ok: false, status: 409, paid: true, error: ALREADY_PAID_BY_QPAY };
+  }
+  try {
+    await getPaymentProvider().cancelPayment(intent.qpayInvoiceId);
+    return null;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("INVOICE_PAID")) {
+      const { paid } = await settleInstallmentIntent(intent.id);
+      return {
+        ok: false,
+        status: 409,
+        paid,
+        error: paid ? ALREADY_PAID_BY_QPAY : "QPay энэ нэхэмжлэхийг төлөгдсөн гэж байна — «QPay шалгах» дарж дахин оролдоно уу.",
+      };
+    }
+    console.error("[intent] voiding the invoice failed", intent.id, err);
+    return {
+      ok: false,
+      status: 502,
+      error: "QPay нэхэмжлэхийг цуцалж чадсангүй. Дахин төлөгдөх эрсдэлтэй тул юу ч өөрчлөөгүй — дахин оролдоно уу.",
+    };
+  }
+}
+
+/**
+ * «Баталгаажуулах» on a balance payment that arrived outside QPay: a bank
+ * transfer the family announced, or a QR they ignored and paid by transfer.
+ * The admin reads the amount and date off the statement — the family's own
+ * word never books money. The row is claimed (pending → paid) before the
+ * payment is written, so a double click or two admins cannot book it twice.
+ */
+export async function confirmIntentManually(
+  intentId: string,
+  input: { amount: number; paidAt: string }
+): Promise<IntentActionResult> {
+  const intent = await findPaymentIntent(intentId);
+  if (!intent) return { ok: false, status: 404, error: "Төлөлт олдсонгүй" };
+  if (intent.status === "paid") return { ok: false, status: 409, paid: true, error: "Энэ төлөлт аль хэдийн бүртгэгдсэн байна" };
+  if (intent.status !== "pending") return { ok: false, status: 409, error: "Энэ төлөлт цуцлагдсан байна" };
+
+  const registration = await findRegistrationById(intent.registrationId);
+  if (!registration || registration.status !== "active") {
+    return { ok: false, status: 409, error: "Бүртгэл идэвхтэй биш байна" };
+  }
+  const payments = await listPaymentsForRegistrations([registration.id]);
+  const { balance } = registrationBalance(registration, sumPaymentsFor(registration.id, payments));
+  if (input.amount > balance + 1) {
+    return { ok: false, status: 400, error: `Үлдэгдлээс их дүн байна (үлдэгдэл ${balance.toLocaleString("en-US")}₮)` };
+  }
+
+  const blocked = await retireQpayInvoice(intent);
+  if (blocked) return blocked;
+
+  const { data, error } = await getSupabase()
+    .from("registration_payment_intents")
+    // Booked as the transfer that really happened, on the day the admin read off the statement.
+    .update({ status: "paid", method: "bank", paid_at: `${input.paidAt}T12:00:00+08:00` })
+    .eq("id", intentId)
+    .eq("status", "pending")
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return { ok: false, status: 409, error: "Төлөлтийн төлөв өөрчлөгдсөн байна — хуудсаа шинэчилнэ үү" };
+
+  const payment = await addRegistrationPayment({ registrationId: registration.id, amount: input.amount, paidAt: input.paidAt });
+  await notifyInstallmentPaid(registration.id, input.amount);
+  return { ok: true, intent: fromRow(data as Row), payment };
+}
+
+/** «QPay шалгах»: QPay is the authority; a paid invoice is booked exactly as the callback would. */
+export async function checkIntentWithQpay(intentId: string): Promise<IntentActionResult> {
+  const intent = await findPaymentIntent(intentId);
+  if (!intent) return { ok: false, status: 404, error: "Төлөлт олдсонгүй" };
+  if (intent.method !== "qpay" || !intent.qpayInvoiceId) {
+    return { ok: false, status: 400, error: "Энэ төлөлт QPay-ийн нэхэмжлэхгүй байна" };
+  }
+  const { paid } = await settleInstallmentIntent(intentId);
+  return { ok: true, intent: (await findPaymentIntent(intentId)) ?? intent, paid };
+}
+
+/**
+ * «Цуцлах»: the family never paid this one. A paid row is final. A QPay one is
+ * checked with QPay and its invoice voided first, so a payment that did come
+ * through is booked instead of cancelled.
+ */
+export async function cancelIntentByAdmin(intentId: string): Promise<IntentActionResult> {
+  const intent = await findPaymentIntent(intentId);
+  if (!intent) return { ok: false, status: 404, error: "Төлөлт олдсонгүй" };
+  if (intent.status === "cancelled") return { ok: true, intent };
+  if (intent.status === "paid") return { ok: false, status: 409, paid: true, error: "Энэ төлөлт аль хэдийн бүртгэгдсэн байна" };
+
+  const blocked = await retireQpayInvoice(intent);
+  if (blocked) return blocked;
+
+  await cancelPaymentIntent(intentId);
+  const after = await findPaymentIntent(intentId);
+  if (after?.status !== "cancelled") {
+    return { ok: false, status: 409, paid: after?.status === "paid", error: "Төлөлтийн төлөв өөрчлөгдсөн байна — хуудсаа шинэчилнэ үү" };
+  }
+  return { ok: true, intent: after };
+}
+
+/** The registration's payments after an action on one of its balance payments — the list redraws «paid / due» from them. */
+export async function paymentsAfterIntent(intentId: string): Promise<RegistrationPayment[] | undefined> {
+  const intent = await findPaymentIntent(intentId);
+  return intent ? listPaymentsForRegistrations([intent.registrationId]) : undefined;
 }
